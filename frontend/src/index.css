@@ -1,0 +1,132 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg: #0d0e12;
+    --surface: #13141a;
+    --surface2: #1a1b23;
+    --border: rgba(255, 255, 255, 0.13);
+    --text-primary: #f0f1f5;
+    --text-secondary: #b4bfcc;
+    --text-tertiary: #8896a8;
+    --accent: #3b82f6;
+    --gain: #4ade80;
+    --loss: #f87171;
+    --warning: #fbbf24;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    color-scheme: dark;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-bg text-text-primary font-sans antialiased;
+    font-size: 14px;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
+  }
+
+  /* Remove default number input spinners */
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-bg-surface border border-border/50 rounded-card p-4 shadow-card;
+  }
+
+  .card-elevated {
+    @apply bg-bg-surface2 border border-border/50 rounded-card p-4;
+  }
+
+  .btn-primary {
+    @apply bg-accent hover:bg-accent-dark text-white font-medium px-4 py-2 rounded-lg transition-colors duration-150 text-sm;
+  }
+
+  .btn-secondary {
+    @apply bg-bg-surface2 hover:bg-bg-elevated border border-border text-text-primary font-medium px-4 py-2 rounded-lg transition-colors duration-150 text-sm;
+  }
+
+  .btn-ghost {
+    @apply hover:bg-bg-surface2 text-text-secondary hover:text-text-primary px-3 py-2 rounded-lg transition-colors duration-150 text-sm;
+  }
+
+  .input {
+    @apply bg-bg-surface2 border border-border text-text-primary placeholder-text-tertiary rounded-lg px-3 py-2 text-sm w-full focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/30 transition-colors duration-150;
+  }
+
+  .label {
+    @apply text-text-secondary text-xs font-medium uppercase tracking-wide mb-1 block;
+  }
+
+  .mono {
+    @apply font-mono;
+  }
+
+  .amount-positive {
+    @apply text-gain font-mono;
+  }
+
+  .amount-negative {
+    @apply text-loss font-mono;
+  }
+
+  .amount-neutral {
+    @apply text-text-secondary font-mono;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .skeleton {
+    @apply bg-bg-surface2 rounded animate-pulse;
+  }
+
+  /* Nivo chart overrides */
+  .nivo-chart-container {
+    @apply text-text-secondary;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}

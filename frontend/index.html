@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="de" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Budget-Pal — Persönliche Finanzplanung mit Schweizer Rentenrechner, Monte Carlo Simulationen und KI-Kategorisierung." />
+    <meta name="theme-color" content="#0d0e12" />
+
+    <!-- Content Security Policy -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="
+        default-src 'self';
+        script-src 'self' 'unsafe-inline';
+        style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+        font-src 'self' https://fonts.gstatic.com;
+        img-src 'self' data: blob:;
+        connect-src 'self' https://budgetpal.doebele12.de;
+      "
+    />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Budget-Pal" />
+    <meta property="og:description" content="Persönliche Finanzplanung — Schweizer Kontext, Rentenrechner, Monte Carlo." />
+    <meta property="og:type" content="website" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=DM+Serif+Display:ital@0;1&display=swap"
+      rel="stylesheet"
+    />
+
+    <title>Budget-Pal</title>
+
+    <!-- Prevent flash of unstyled content on dark theme -->
+    <style>
+      html, body {
+        background-color: #0d0e12;
+        color: #f0f1f5;
+        margin: 0;
+        padding: 0;
+      }
+      #root {
+        min-height: 100vh;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

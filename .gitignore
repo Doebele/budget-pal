@@ -1,0 +1,175 @@
+# ============================================================
+# Budget-Pal .gitignore
+# Python + Node + Docker + macOS
+# ============================================================
+
+# ── Environment & Secrets ─────────────────────────────────────
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.p12
+secrets/
+
+# ── Python ────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+.python-version
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+pytest.ini
+.pytest.ini
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# Mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# Pyright
+pyrightconfig.json
+
+# Alembic
+# Keep alembic/versions tracked, but not __pycache__ inside it
+backend/alembic/__pycache__/
+backend/alembic/versions/__pycache__/
+
+# ML model cache
+backend/app/services/models/
+*.pt
+*.bin
+*.safetensors
+sentence_transformers_cache/
+
+# ── Node / Frontend ───────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.pnpm-store/
+
+# Vite build output
+frontend/dist/
+frontend/dist-ssr/
+*.local
+
+# TypeScript
+*.tsbuildinfo
+
+# ── Docker ────────────────────────────────────────────────────
+# Don't ignore docker-compose.override.yml if present — it's intentional
+# docker-compose.override.yml
+
+# ── Data & Uploads ────────────────────────────────────────────
+data/uploads/
+data/backups/
+data/ocr_cache/
+*.csv
+!backend/app/services/import_parsers/test_fixtures/*.csv
+*.pdf
+!docs/*.pdf
+
+# ── IDE & Editors ─────────────────────────────────────────────
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Logs ─────────────────────────────────────────────────────
+logs/
+*.log
+*.log.*
+npm-debug.log
+yarn-debug.log
+
+# ── OS ────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*~
+
+# ── Certificates / SSL ────────────────────────────────────────
+certbot/
+letsencrypt/
+*.crt
+*.csr
+
+# ── Misc ─────────────────────────────────────────────────────
+*.bak
+*.tmp
+*.temp
+.scratch/
+scratch.*
