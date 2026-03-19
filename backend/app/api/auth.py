@@ -6,7 +6,7 @@ POST /auth/login     — returns JWT
 GET  /auth/me        — current user profile
 PUT  /auth/me        — update profile
 """
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -57,6 +57,7 @@ class UserProfileResponse(BaseModel):
     is_active: bool
     created_at: datetime
     date_of_birth: Optional[datetime]
+    birthdate: Optional[str]  # ISO date string YYYY-MM-DD for frontend convenience
     retirement_age: int
     currency: str
     locale: str
@@ -65,6 +66,7 @@ class UserProfileResponse(BaseModel):
 class UserUpdateRequest(BaseModel):
     name: Optional[str] = None
     date_of_birth: Optional[datetime] = None
+    birthdate: Optional[str] = None  # ISO date string YYYY-MM-DD from frontend datepicker
     retirement_age: Optional[int] = None
     currency: Optional[str] = None
     locale: Optional[str] = None
@@ -146,6 +148,7 @@ async def get_me(current_user: User = Depends(get_current_user)):
         is_active=current_user.is_active,
         created_at=current_user.created_at,
         date_of_birth=current_user.date_of_birth,
+        birthdate=current_user.date_of_birth.strftime("%Y-%m-%d") if current_user.date_of_birth else None,
         retirement_age=current_user.retirement_age,
         currency=current_user.currency,
         locale=current_user.locale,
@@ -163,6 +166,14 @@ async def update_me(
         current_user.name = payload.name
     if payload.date_of_birth is not None:
         current_user.date_of_birth = payload.date_of_birth
+    if payload.birthdate is not None:
+        # Accept ISO date string "YYYY-MM-DD" from frontend datepicker
+        try:
+            current_user.date_of_birth = datetime.strptime(payload.birthdate, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="birthdate must be in YYYY-MM-DD format.")
+    elif payload.birthdate == "":
+        current_user.date_of_birth = None
     if payload.retirement_age is not None:
         current_user.retirement_age = payload.retirement_age
     if payload.currency is not None:
@@ -194,6 +205,7 @@ async def update_me(
         is_active=current_user.is_active,
         created_at=current_user.created_at,
         date_of_birth=current_user.date_of_birth,
+        birthdate=current_user.date_of_birth.strftime("%Y-%m-%d") if current_user.date_of_birth else None,
         retirement_age=current_user.retirement_age,
         currency=current_user.currency,
         locale=current_user.locale,
