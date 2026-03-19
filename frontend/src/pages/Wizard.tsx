@@ -32,6 +32,8 @@ import {
 import type { PeerGroupDefaults, PeerGroupProfile } from "@/services/peerGroupAnalyzer";
 import StepIndicator from "@/components/wizard/StepIndicator";
 import PeerGroupCard from "@/components/wizard/PeerGroupCard";
+import Step5AccordionExpenses from "@/components/wizard/Step5AccordionExpenses";
+import type { SelectedExpenseEntry, CustomExpenseEntry } from "@/components/wizard/Step5AccordionExpenses";
 
 // ── Wizard data shape ──────────────────────────────────────────
 
@@ -91,6 +93,8 @@ interface WizardData {
   parking: number;
   carAmortization: number;
   selectedSubscriptions: string[];
+  expenseEntries: SelectedExpenseEntry[];
+  customExpenseEntries: CustomExpenseEntry[];
   freizeit: number;
 
   // Step 6 — assets
@@ -173,6 +177,8 @@ const DEFAULT_WIZARD_DATA: WizardData = {
   parking: 0,
   carAmortization: 0,
   selectedSubscriptions: ["Netflix", "Spotify", "ADSL/Fiber (Swisscom)", "Mobile Abo (Sunrise)"],
+  expenseEntries: [],
+  customExpenseEntries: [],
   freizeit: 250,
 
   bankBalance: 0,
@@ -1640,7 +1646,7 @@ export default function Wizard() {
     2: <Step2 data={wizardData} update={update} />,
     3: <Step3 data={wizardData} update={update} />,
     4: <Step4 data={wizardData} update={update} />,
-    5: <Step5 data={wizardData} update={update} />,
+    5: <Step5AccordionExpenses data={wizardData} update={update} />,
     6: <Step6 data={wizardData} update={update} />,
     7: <Step7 data={wizardData} update={update} />,
     8: <Step8 data={wizardData} update={update} />,
