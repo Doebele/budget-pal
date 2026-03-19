@@ -66,7 +66,7 @@ export default function SankeyChart({ data, height = 300 }: SankeyChartProps) {
         data={data}
         margin={{ top: 8, right: 120, bottom: 8, left: 120 }}
         align="justify"
-        colors={(node) => nodeColorMap[node.id] || colors.accent}
+        colors={(node: { id: string }) => nodeColorMap[node.id] || colors.accent}
         nodeOpacity={0.9}
         nodeHoverOpacity={1}
         nodeThickness={18}
@@ -92,7 +92,7 @@ export default function SankeyChart({ data, height = 300 }: SankeyChartProps) {
             },
           },
         }}
-        tooltip={({ node }) => (
+        tooltip={({ node }: { node: { id: string; value: number; color: string } }) => (
           <div
             style={{
               background: colors.bgElevated,

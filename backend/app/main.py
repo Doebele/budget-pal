@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.core.database import init_db
-from app.api import auth, transactions, imports, projections, accounts, categories, budgets, pension, assets
+from app.api import auth, transactions, imports, projections, accounts, categories, budgets, pension, assets, wizard
 
 logging.basicConfig(
     level=logging.INFO,
@@ -69,6 +69,7 @@ app.include_router(categories.router, prefix="/api/categories", tags=["categorie
 app.include_router(budgets.router, prefix="/api/budgets", tags=["budgets"])
 app.include_router(pension.router, prefix="/api/pension", tags=["pension"])
 app.include_router(assets.router, prefix="/api/assets", tags=["assets"])
+app.include_router(wizard.router, prefix="/api/wizard", tags=["wizard"])
 
 
 # ── Health Check ──────────────────────────────────────────────

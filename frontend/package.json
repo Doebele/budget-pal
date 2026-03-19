@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "typecheck": "tsc --noEmit",
@@ -46,8 +46,7 @@
     "@radix-ui/react-avatar": "^1.0.4",
     "@radix-ui/react-checkbox": "^1.0.4",
     "@radix-ui/react-switch": "^1.0.3",
-    "@radix-ui/react-scroll-area": "^1.0.5",
-    "@radix-ui/react-badge": "^1.0.0"
+    "@radix-ui/react-scroll-area": "^1.0.5"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",

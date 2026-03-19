@@ -136,7 +136,7 @@ class Transaction(Base):
     __table_args__ = (
         UniqueConstraint("account_id", "import_hash", name="uq_transaction_hash"),
         Index("ix_transactions_account_date", "account_id", "date"),
-        Index("ix_transactions_category", "category"),
+        # Note: ix_transactions_category is created automatically by index=True on the column
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)

@@ -56,7 +56,11 @@ export default function Transactions() {
   };
 
   const categories = Array.from(
-    new Set((transactions || []).map((t: Transaction) => t.category).filter(Boolean))
+    new Set(
+      (transactions || [])
+        .map((t: Transaction) => t.category)
+        .filter((c): c is string => Boolean(c))
+    )
   ).sort();
 
   return (
@@ -114,9 +118,9 @@ export default function Transactions() {
             </thead>
             <tbody>
               {isLoading &&
-                Array.from({ length: 8 }).map((_, i) => (
+                Array.from<undefined>({ length: 8 }).map((_el, i) => (
                   <tr key={i} className="border-b border-border/30">
-                    {Array.from({ length: 5 }).map((_, j) => (
+                    {Array.from<undefined>({ length: 5 }).map((_c, j) => (
                       <td key={j} className="px-4 py-3">
                         <div className="skeleton h-4 w-24 rounded" />
                       </td>

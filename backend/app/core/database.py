@@ -74,7 +74,18 @@ async def init_db() -> None:
     """Create all tables if they do not exist. (Dev/initial setup.)
     In production, use Alembic migrations instead.
     """
+    import logging
+    from sqlalchemy.exc import ProgrammingError
+
+    logger = logging.getLogger(__name__)
     from app.models import models  # noqa: F401 — import to register models
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(lambda c: Base.metadata.create_all(c, checkfirst=True))
+        logger.info("Database schema ready.")
+    except ProgrammingError as exc:
+        if "already exists" in str(exc).lower():
+            logger.warning("DB objects already exist — schema is up to date. Use Alembic for migrations.")
+        else:
+            raise

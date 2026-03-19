@@ -15,6 +15,7 @@ const Accounts = lazy(() => import("@/pages/Accounts"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const Login = lazy(() => import("@/pages/Login"));
 const Register = lazy(() => import("@/pages/Register"));
+const Wizard = lazy(() => import("@/pages/Wizard"));
 
 // ── Protected Route ───────────────────────────────────────────
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -134,6 +135,18 @@ export default function App() {
               <AppShell>
                 <Settings />
               </AppShell>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Wizard — full-page, no sidebar */}
+        <Route
+          path="/wizard"
+          element={
+            <ProtectedRoute>
+              <Suspense fallback={<LoadingScreen />}>
+                <Wizard />
+              </Suspense>
             </ProtectedRoute>
           }
         />
