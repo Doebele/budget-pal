@@ -7,11 +7,17 @@
  */
 
 import { useState, useMemo } from "react";
+import type { LucideIcon } from "lucide-react";
 import {
-  ChevronDown, ChevronRight, Plus, X, ExternalLink,
-  Check, Users, Trash2,
+  ChevronDown, ChevronRight, Plus, X,
+  Check, Tv, Music, Cloud, Smartphone, Newspaper,
+  Activity, Train, Briefcase, Home, ShoppingCart,
 } from "lucide-react";
 import { clsx } from "clsx";
+import { toMonthlyCHF } from "@/services/faviconService";
+import type { Frequency, SupportedCurrency } from "@/services/faviconService";
+import ProviderIcon from "./ProviderIcon";
+import ProviderSidebar from "./ProviderSidebar";
 
 // ─────────────────────────────────────────────────────────────────
 // Types
@@ -28,7 +34,6 @@ export interface ProviderVariant {
 export interface ExpenseProvider {
   id: string;
   name: string;
-  emoji: string;
   tagline: string;
   website?: string;
   variants: ProviderVariant[];
@@ -38,7 +43,7 @@ export interface ExpenseProvider {
 export interface ExpenseCategory {
   id: string;
   label: string;
-  emoji: string;
+  Icon: React.ComponentType<{ className?: string }>;
   description: string;
   providers: ExpenseProvider[];
 }
@@ -49,6 +54,12 @@ export interface SelectedExpenseEntry {
   variantId: string;
   customPrice?: number;
   note?: string;
+  // Individual mode fields
+  viewMode?: "simple" | "individual";
+  individualAmount?: number;
+  frequency?: Frequency;
+  currency?: SupportedCurrency;
+  firstPaymentDate?: string;
 }
 
 export interface CustomExpenseEntry {
@@ -67,11 +78,11 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
   {
     id: "streaming",
     label: "Streaming & TV",
-    emoji: "📺",
+    Icon: Tv,
     description: "Video-Streaming und TV-Dienste",
     providers: [
       {
-        id: "netflix", name: "Netflix", emoji: "🎬",
+        id: "netflix", name: "Netflix",
         tagline: "Serien, Filme und Dokus", website: "https://netflix.com",
         peerPopularity: 68,
         variants: [
@@ -81,7 +92,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         ],
       },
       {
-        id: "disney-plus", name: "Disney+", emoji: "🏰",
+        id: "disney-plus", name: "Disney+",
         tagline: "Disney, Marvel, Star Wars, Pixar", website: "https://disneyplus.com",
         peerPopularity: 34,
         variants: [
@@ -91,7 +102,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         ],
       },
       {
-        id: "amazon-prime", name: "Amazon Prime Video", emoji: "📦",
+        id: "amazon-prime", name: "Amazon Prime Video",
         tagline: "Prime Video + schnelle Lieferung", website: "https://primevideo.com",
         peerPopularity: 29,
         variants: [
@@ -100,7 +111,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         ],
       },
       {
-        id: "apple-tv", name: "Apple TV+", emoji: "🍎",
+        id: "apple-tv", name: "Apple TV+",
         tagline: "Apple Originals", website: "https://tv.apple.com",
         peerPopularity: 18,
         variants: [
@@ -110,7 +121,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         ],
       },
       {
-        id: "yt-premium", name: "YouTube Premium", emoji: "▶️",
+        id: "yt-premium", name: "YouTube Premium",
         tagline: "YouTube ohne Werbung + YouTube Music", website: "https://youtube.com/premium",
         peerPopularity: 22,
         variants: [
@@ -119,7 +130,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         ],
       },
       {
-        id: "dazn", name: "DAZN", emoji: "⚽",
+        id: "dazn", name: "DAZN",
         tagline: "Sport-Streaming: Fussball, Champions League", website: "https://dazn.com",
         peerPopularity: 12,
         variants: [
@@ -132,11 +143,11 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
   {
     id: "musik",
     label: "Musik",
-    emoji: "🎵",
+    Icon: Music,
     description: "Musik-Streaming Dienste",
     providers: [
       {
-        id: "spotify", name: "Spotify", emoji: "🟢",
+        id: "spotify", name: "Spotify",
         tagline: "Meistgenutzter Musik-Streamingdienst", website: "https://spotify.com",
         peerPopularity: 71,
         variants: [
@@ -147,7 +158,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         ],
       },
       {
-        id: "apple-music", name: "Apple Music", emoji: "🎶",
+        id: "apple-music", name: "Apple Music",
         tagline: "Hi-Res Audio, für Apple-Nutzer", website: "https://music.apple.com",
         peerPopularity: 24,
         variants: [
@@ -157,7 +168,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         ],
       },
       {
-        id: "tidal", name: "TIDAL", emoji: "🌊",
+        id: "tidal", name: "TIDAL",
         tagline: "HiFi Lossless Audio", website: "https://tidal.com",
         peerPopularity: 5,
         variants: [
@@ -170,11 +181,11 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
   {
     id: "cloud-software",
     label: "Cloud & Software",
-    emoji: "☁️",
+    Icon: Cloud,
     description: "Cloud-Speicher und Software-Abos",
     providers: [
       {
-        id: "icloud", name: "iCloud+", emoji: "🍏",
+        id: "icloud", name: "iCloud+",
         tagline: "Apple Cloud-Speicher", website: "https://apple.com/icloud",
         peerPopularity: 55,
         variants: [
@@ -184,7 +195,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         ],
       },
       {
-        id: "google-one", name: "Google One", emoji: "🔵",
+        id: "google-one", name: "Google One",
         tagline: "Google Cloud-Speicher", website: "https://one.google.com",
         peerPopularity: 28,
         variants: [
@@ -194,7 +205,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         ],
       },
       {
-        id: "ms365", name: "Microsoft 365", emoji: "💻",
+        id: "ms365", name: "Microsoft 365",
         tagline: "Word, Excel, PowerPoint, 1 TB OneDrive", website: "https://microsoft.com/365",
         peerPopularity: 42,
         variants: [
@@ -203,7 +214,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         ],
       },
       {
-        id: "adobe-cc", name: "Adobe Creative Cloud", emoji: "🎨",
+        id: "adobe-cc", name: "Adobe Creative Cloud",
         tagline: "Photoshop, Illustrator, Premiere, InDesign", website: "https://adobe.com",
         peerPopularity: 11,
         variants: [
@@ -213,7 +224,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         ],
       },
       {
-        id: "1password", name: "1Password", emoji: "🔐",
+        id: "1password", name: "1Password",
         tagline: "Passwort-Manager", website: "https://1password.com",
         peerPopularity: 18,
         variants: [
@@ -222,7 +233,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         ],
       },
       {
-        id: "chatgpt", name: "ChatGPT Plus", emoji: "🤖",
+        id: "chatgpt", name: "ChatGPT Plus",
         tagline: "GPT-4o, DALL-E, Plugins", website: "https://chat.openai.com",
         peerPopularity: 24,
         variants: [
@@ -234,11 +245,11 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
   {
     id: "kommunikation",
     label: "Kommunikation",
-    emoji: "📱",
+    Icon: Smartphone,
     description: "Internet, Mobile und Festnetz",
     providers: [
       {
-        id: "swisscom-internet", name: "Swisscom Internet", emoji: "🔷",
+        id: "swisscom-internet", name: "Swisscom Internet",
         tagline: "Glasfaser/VDSL, Marktführer Schweiz", website: "https://swisscom.ch",
         peerPopularity: 38,
         variants: [
@@ -249,7 +260,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         ],
       },
       {
-        id: "sunrise-internet", name: "Sunrise Internet", emoji: "🌅",
+        id: "sunrise-internet", name: "Sunrise Internet",
         tagline: "Breitband & TV von Sunrise", website: "https://sunrise.ch",
         peerPopularity: 22,
         variants: [
@@ -259,7 +270,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         ],
       },
       {
-        id: "salt-home", name: "Salt Home", emoji: "🧂",
+        id: "salt-home", name: "Salt Home",
         tagline: "Günstiges Glasfaser-Internet", website: "https://salt.ch",
         peerPopularity: 12,
         variants: [
@@ -268,7 +279,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         ],
       },
       {
-        id: "swisscom-mobile", name: "Swisscom Mobile", emoji: "🔷",
+        id: "swisscom-mobile", name: "Swisscom Mobile",
         tagline: "Bestes Netz der Schweiz", website: "https://swisscom.ch",
         peerPopularity: 35,
         variants: [
@@ -278,7 +289,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         ],
       },
       {
-        id: "sunrise-mobile", name: "Sunrise Mobile", emoji: "🌅",
+        id: "sunrise-mobile", name: "Sunrise Mobile",
         tagline: "Günstig und schnell", website: "https://sunrise.ch",
         peerPopularity: 20,
         variants: [
@@ -288,7 +299,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         ],
       },
       {
-        id: "wingo", name: "Wingo", emoji: "🟣",
+        id: "wingo", name: "Wingo",
         tagline: "Swisscom-Netz zum Sparpreis", website: "https://wingo.ch",
         peerPopularity: 16,
         variants: [
@@ -298,7 +309,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         ],
       },
       {
-        id: "salt-mobile", name: "Salt Mobile", emoji: "🧂",
+        id: "salt-mobile", name: "Salt Mobile",
         tagline: "Günstige Alternative", website: "https://salt.ch",
         peerPopularity: 12,
         variants: [
@@ -311,11 +322,11 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
   {
     id: "news-medien",
     label: "News & Medien",
-    emoji: "📰",
+    Icon: Newspaper,
     description: "Zeitungen, Magazine und Nachrichtenangebote",
     providers: [
       {
-        id: "nzz", name: "NZZ Digital", emoji: "📜",
+        id: "nzz", name: "NZZ Digital",
         tagline: "Neue Zürcher Zeitung – Premium-Journalismus", website: "https://nzz.ch",
         peerPopularity: 24,
         variants: [
@@ -324,7 +335,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         ],
       },
       {
-        id: "tagi", name: "Tages-Anzeiger", emoji: "📑",
+        id: "tagi", name: "Tages-Anzeiger",
         tagline: "Tagi Digital Abo", website: "https://tagesanzeiger.ch",
         peerPopularity: 18,
         variants: [
@@ -333,7 +344,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         ],
       },
       {
-        id: "blick-plus", name: "Blick+", emoji: "⚡",
+        id: "blick-plus", name: "Blick+",
         tagline: "Blick Plus Digital", website: "https://blick.ch",
         peerPopularity: 11,
         variants: [
@@ -341,7 +352,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         ],
       },
       {
-        id: "guardian", name: "The Guardian", emoji: "🦅",
+        id: "guardian", name: "The Guardian",
         tagline: "Unabhängiger Qualitätsjournalismus (EN)", website: "https://theguardian.com",
         peerPopularity: 8,
         variants: [
@@ -354,11 +365,11 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
   {
     id: "fitness",
     label: "Fitness & Sport",
-    emoji: "🏋️",
+    Icon: Activity,
     description: "Fitnesscenter, Sport-Apps und Clubs",
     providers: [
       {
-        id: "fitnesscenter", name: "Fitnesscenter", emoji: "💪",
+        id: "fitnesscenter", name: "Fitnesscenter",
         tagline: "Monatliches Fitnesscenter-Abo",
         peerPopularity: 42,
         variants: [
@@ -368,7 +379,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         ],
       },
       {
-        id: "apple-fitness", name: "Apple Fitness+", emoji: "🍎",
+        id: "apple-fitness", name: "Apple Fitness+",
         tagline: "Online-Workouts von Apple", website: "https://apple.com/apple-fitness-plus",
         peerPopularity: 12,
         variants: [
@@ -377,7 +388,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         ],
       },
       {
-        id: "strava", name: "Strava Premium", emoji: "🚴",
+        id: "strava", name: "Strava Premium",
         tagline: "GPS-Tracking für Läufer & Radfahrer", website: "https://strava.com",
         peerPopularity: 19,
         variants: [
@@ -386,7 +397,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         ],
       },
       {
-        id: "schwimmbad", name: "Schwimmbad-Abo", emoji: "🏊",
+        id: "schwimmbad", name: "Schwimmbad-Abo",
         tagline: "Monatskarte Hallenbad",
         peerPopularity: 14,
         variants: [
@@ -399,11 +410,11 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
   {
     id: "mobilitaet",
     label: "Mobilität (ÖV-Abos)",
-    emoji: "🚂",
+    Icon: Train,
     description: "SBB und weitere ÖV-Abonnements",
     providers: [
       {
-        id: "sbb-halbtax", name: "SBB Halbtax", emoji: "🎫",
+        id: "sbb-halbtax", name: "SBB Halbtax",
         tagline: "Alle ÖV-Tickets zum halben Preis", website: "https://sbb.ch",
         peerPopularity: 62,
         variants: [
@@ -412,7 +423,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         ],
       },
       {
-        id: "sbb-ga", name: "SBB Generalabonnement", emoji: "🚄",
+        id: "sbb-ga", name: "SBB Generalabonnement",
         tagline: "Unlimitiert Reisen in der ganzen Schweiz", website: "https://sbb.ch",
         peerPopularity: 18,
         variants: [
@@ -421,7 +432,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         ],
       },
       {
-        id: "mobility", name: "Mobility Carsharing", emoji: "🚗",
+        id: "mobility", name: "Mobility Carsharing",
         tagline: "Carsharing mit 3'000+ Autos schweizweit", website: "https://mobility.ch",
         peerPopularity: 11,
         variants: [
@@ -435,11 +446,11 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
   {
     id: "business",
     label: "Business & Weiterbildung",
-    emoji: "💼",
+    Icon: Briefcase,
     description: "Business-Tools, Weiterbildung und KI-Dienste",
     providers: [
       {
-        id: "linkedin", name: "LinkedIn Premium", emoji: "🤝",
+        id: "linkedin", name: "LinkedIn Premium",
         tagline: "Karriere-Netzwerk mit erweiterten Funktionen", website: "https://linkedin.com",
         peerPopularity: 19,
         variants: [
@@ -449,7 +460,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         ],
       },
       {
-        id: "notion", name: "Notion", emoji: "📓",
+        id: "notion", name: "Notion",
         tagline: "All-in-one Workspace", website: "https://notion.so",
         peerPopularity: 14,
         variants: [
@@ -458,7 +469,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         ],
       },
       {
-        id: "claude-pro", name: "Claude Pro", emoji: "✨",
+        id: "claude-pro", name: "Claude Pro",
         tagline: "Anthropic Claude mit erweitertem Kontext", website: "https://claude.ai",
         peerPopularity: 12,
         variants: [
@@ -466,7 +477,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         ],
       },
       {
-        id: "slack", name: "Slack", emoji: "💬",
+        id: "slack", name: "Slack",
         tagline: "Team-Kommunikation", website: "https://slack.com",
         peerPopularity: 11,
         variants: [
@@ -479,11 +490,11 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
   {
     id: "haus-garten",
     label: "Haus & Garten",
-    emoji: "🏠",
+    Icon: Home,
     description: "Haushaltshilfe, Gartenpflege und Heimdienste",
     providers: [
       {
-        id: "reinigung", name: "Reinigungshilfe", emoji: "🧹",
+        id: "reinigung", name: "Reinigungshilfe",
         tagline: "Regelmässige Putz-/Reinigungshilfe",
         peerPopularity: 28,
         variants: [
@@ -493,7 +504,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         ],
       },
       {
-        id: "gartenpflege", name: "Gartenpflege", emoji: "🌿",
+        id: "gartenpflege", name: "Gartenpflege",
         tagline: "Monatliche Gartenpflege",
         peerPopularity: 15,
         variants: [
@@ -503,7 +514,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         ],
       },
       {
-        id: "security", name: "Sicherheitssystem", emoji: "🔒",
+        id: "security", name: "Sicherheitssystem",
         tagline: "Abo für Heimsicherheit (z.B. Securitas)",
         peerPopularity: 9,
         variants: [
@@ -516,11 +527,11 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
   {
     id: "shopping-loyalty",
     label: "Shopping & Loyalität",
-    emoji: "🛒",
+    Icon: ShoppingCart,
     description: "Kundenprogramme und Shopping-Abos",
     providers: [
       {
-        id: "cumulus-extra", name: "Migros Cumulus Extra", emoji: "🛍️",
+        id: "cumulus-extra", name: "Migros Cumulus Extra",
         tagline: "Erweiterte Cumulus-Vorteile + Rabattpässe", website: "https://migros.ch",
         peerPopularity: 22,
         variants: [
@@ -528,7 +539,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         ],
       },
       {
-        id: "galaxus-plus", name: "Galaxus Plus", emoji: "🔧",
+        id: "galaxus-plus", name: "Galaxus Plus",
         tagline: "Kostenloser Versand bei Digitec/Galaxus", website: "https://galaxus.ch",
         peerPopularity: 16,
         variants: [
@@ -546,6 +557,15 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
 function fchf(n: number): string {
   if (n === 0) return "Gratis";
   return `CHF ${n % 1 === 0 ? n : n.toFixed(2)}`;
+}
+
+function getEffectiveMonthly(entry: SelectedExpenseEntry, providers: ExpenseProvider[]): number {
+  if (entry.viewMode === "individual" && entry.individualAmount != null) {
+    return toMonthlyCHF(entry.individualAmount, entry.frequency ?? "monthly", entry.currency ?? "CHF");
+  }
+  if (entry.customPrice != null) return entry.customPrice;
+  const variant = providers.flatMap(p => p.variants).find(v => v.id === entry.variantId);
+  return variant?.price ?? 0;
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -586,9 +606,8 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
     let sum = 0;
     for (const e of data.expenseEntries) {
       const cat = EXPENSE_CATEGORIES.find(c => c.id === e.categoryId);
-      const prov = cat?.providers.find(p => p.id === e.providerId);
-      const variant = prov?.variants.find(v => v.id === e.variantId);
-      sum += e.customPrice ?? variant?.price ?? 0;
+      const providers = cat?.providers ?? [];
+      sum += getEffectiveMonthly(e, providers);
     }
     for (const c of data.customExpenseEntries) sum += c.price;
     return sum;
@@ -726,7 +745,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
                 onClick={() => toggleCategory(cat.id)}
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/[0.02] transition-colors text-left"
               >
-                <span className="text-xl flex-shrink-0">{cat.emoji}</span>
+                <cat.Icon className="w-5 h-5 text-text-secondary flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="text-text-primary text-sm font-medium">{cat.label}</div>
                   <div className="text-text-tertiary text-xs">{cat.description}</div>
@@ -775,8 +794,8 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
                           {isSelected && <Check className="w-3 h-3 text-white" />}
                         </div>
 
-                        {/* Emoji */}
-                        <span className="text-base flex-shrink-0">{prov.emoji}</span>
+                        {/* Provider icon (favicon) */}
+                        <ProviderIcon website={prov.website} name={prov.name} size={20} />
 
                         {/* Name + tagline */}
                         <div className="flex-1 min-w-0">
@@ -790,14 +809,14 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
                             "font-mono text-xs",
                             isSelected ? "text-accent font-semibold" : "text-text-tertiary"
                           )}>
-                            {entry?.customPrice !== undefined
-                              ? fchf(entry.customPrice)
+                            {entry
+                              ? fchf(getEffectiveMonthly(entry, cat.providers))
                               : fchf(activeVariant?.price ?? 0)}
                             {(activeVariant?.price ?? 0) > 0 && <span className="text-[10px] font-normal opacity-70">/Mo</span>}
                           </div>
                           {prov.peerPopularity && (
                             <div className="flex items-center gap-1 justify-end mt-0.5 text-[10px] text-text-tertiary">
-                              <Users className="w-2.5 h-2.5" />
+                              <Activity className="w-2.5 h-2.5" />
                               {prov.peerPopularity}%
                             </div>
                           )}
@@ -892,211 +911,17 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
       </div>
 
       {/* ── RIGHT: Sticky Sidebar ────────────────────────────── */}
-      <div className={clsx(
-        "hidden lg:block w-72 flex-shrink-0 transition-all duration-200",
-        focusedProvider ? "opacity-100" : "opacity-0 pointer-events-none"
-      )}>
+      <div className={clsx("hidden lg:block w-72 flex-shrink-0", !focusedProvider && "invisible")}>
         {focusedProvider && focusedCategory && (
-          <div className="sticky top-4 bg-bg-surface border border-border/50 rounded-xl overflow-hidden shadow-xl">
-
-            {/* Sidebar header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-bg-surface2">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <span className="text-xl flex-shrink-0">{focusedProvider.emoji}</span>
-                <div className="min-w-0">
-                  <div className="text-text-primary font-semibold text-sm truncate">{focusedProvider.name}</div>
-                  <div className="text-text-tertiary text-[11px] truncate">{focusedCategory.label}</div>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={closeSidebar}
-                className="text-text-tertiary hover:text-text-primary transition-colors flex-shrink-0 ml-2"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Sidebar body */}
-            <div className="p-4 space-y-4 max-h-[75vh] overflow-y-auto scrollbar-hide">
-
-              {/* Tagline */}
-              <p className="text-text-secondary text-xs leading-relaxed">{focusedProvider.tagline}</p>
-
-              {/* Peer popularity */}
-              {focusedProvider.peerPopularity && focusedProvider.peerPopularity > 0 && (
-                <div className="flex items-start gap-2 bg-accent/8 border border-accent/15 rounded-lg px-3 py-2.5">
-                  <Users className="w-3.5 h-3.5 text-accent flex-shrink-0 mt-0.5" />
-                  <span className="text-text-secondary text-xs leading-relaxed">
-                    <strong className="text-accent">{focusedProvider.peerPopularity}%</strong> deiner Peer-Gruppe nutzen diesen Dienst
-                  </span>
-                </div>
-              )}
-
-              {/* Variant picker */}
-              <div>
-                <label className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary block mb-2">
-                  Tarif / Plan
-                </label>
-                <div className="space-y-1.5">
-                  {focusedProvider.variants.map(variant => {
-                    const isActive = focusedEntry?.variantId === variant.id;
-                    return (
-                      <button
-                        key={variant.id}
-                        type="button"
-                        disabled={!focusedEntry}
-                        onClick={() => focusedEntry && updateEntry(focusedProvider.id, { variantId: variant.id, customPrice: undefined })}
-                        className={clsx(
-                          "w-full flex items-start justify-between rounded-lg px-3 py-2.5 text-left text-xs transition-all border",
-                          isActive
-                            ? "border-accent/60 bg-accent/12 text-text-primary"
-                            : "border-border/50 hover:border-border text-text-secondary hover:bg-white/[0.03]",
-                          !focusedEntry && "opacity-50 cursor-not-allowed"
-                        )}
-                      >
-                        <div className="flex items-start gap-2">
-                          <div className={clsx(
-                            "w-3.5 h-3.5 rounded-full border mt-0.5 flex-shrink-0 flex items-center justify-center transition-all",
-                            isActive ? "border-accent bg-accent" : "border-white/25"
-                          )}>
-                            {isActive && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="font-medium flex items-center gap-1 flex-wrap">
-                              {variant.label}
-                              {variant.popular && (
-                                <span className="text-[9px] bg-gain/15 text-gain px-1.5 py-px rounded-full font-semibold">BELIEBT</span>
-                              )}
-                            </div>
-                            {variant.description && (
-                              <div className="text-text-tertiary text-[10px] mt-0.5 leading-relaxed">{variant.description}</div>
-                            )}
-                          </div>
-                        </div>
-                        <span className={clsx(
-                          "font-mono flex-shrink-0 ml-2 mt-0.5",
-                          isActive ? "text-accent font-semibold" : "text-text-tertiary"
-                        )}>
-                          {fchf(variant.price)}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {!focusedEntry && (
-                  <p className="text-text-tertiary text-[10px] mt-2 text-center">
-                    Wähle diesen Anbieter zuerst aus (Checkbox links)
-                  </p>
-                )}
-              </div>
-
-              {/* Custom price override */}
-              {focusedEntry && (
-                <div>
-                  <label className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary block mb-1.5">
-                    Eigener Preis <span className="normal-case font-normal">(optional)</span>
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <div className="relative flex-1">
-                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary text-xs pointer-events-none">CHF</span>
-                      <input
-                        type="number"
-                        className="input pl-10 text-sm w-full"
-                        placeholder={String(focusedProvider.variants.find(v => v.id === focusedEntry.variantId)?.price ?? "")}
-                        value={focusedEntry.customPrice ?? ""}
-                        onChange={e => updateEntry(focusedProvider.id, {
-                          customPrice: e.target.value ? parseFloat(e.target.value) : undefined,
-                        })}
-                        min={0}
-                      />
-                    </div>
-                    <span className="text-text-tertiary text-xs">/Mo</span>
-                    {focusedEntry.customPrice !== undefined && (
-                      <button
-                        type="button"
-                        onClick={() => updateEntry(focusedProvider.id, { customPrice: undefined })}
-                        className="text-text-tertiary hover:text-loss transition-colors"
-                        title="Zurücksetzen"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                  <p className="text-text-tertiary text-[10px] mt-1 leading-relaxed">
-                    Überschreibe den Planpreis mit deinem tatsächlichen Betrag.
-                  </p>
-                </div>
-              )}
-
-              {/* Note */}
-              {focusedEntry && (
-                <div>
-                  <label className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary block mb-1.5">
-                    Notiz
-                  </label>
-                  <input
-                    type="text"
-                    className="input text-sm w-full"
-                    placeholder="z.B. Family-Plan, Jahresabo, mit Partner geteilt…"
-                    value={focusedEntry.note ?? ""}
-                    onChange={e => updateEntry(focusedProvider.id, { note: e.target.value || undefined })}
-                  />
-                </div>
-              )}
-
-              {/* Website */}
-              {focusedProvider.website && (
-                <a
-                  href={focusedProvider.website}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-accent hover:text-accent-light text-xs transition-colors"
-                >
-                  <ExternalLink className="w-3 h-3" />
-                  Webseite besuchen
-                </a>
-              )}
-
-              {/* Action buttons */}
-              <div className="pt-3 border-t border-border/50">
-                {focusedEntry ? (
-                  <button
-                    type="button"
-                    onClick={() => removeProvider(focusedProvider.id)}
-                    className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-loss/30 bg-loss/8 text-loss hover:bg-loss/15 px-3 py-2 text-xs font-medium transition-all"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                    Entfernen
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => handleProviderClick(focusedProvider, focusedCategory.id)}
-                    className="w-full btn-primary text-xs py-2"
-                  >
-                    <Check className="w-3 h-3 mr-1 inline" />
-                    Hinzufügen
-                  </button>
-                )}
-              </div>
-
-              {/* Currently selected total for this provider */}
-              {focusedEntry && (() => {
-                const variant = focusedProvider.variants.find(v => v.id === focusedEntry.variantId);
-                const effectivePrice = focusedEntry.customPrice ?? variant?.price ?? 0;
-                return effectivePrice > 0 ? (
-                  <div className="bg-bg-surface2 rounded-lg px-3 py-2 flex items-center justify-between">
-                    <span className="text-text-tertiary text-[11px]">Dieser Anbieter</span>
-                    <span className="font-mono text-sm font-semibold text-text-primary">
-                      {fchf(effectivePrice)}<span className="text-text-tertiary text-xs font-normal">/Mo</span>
-                    </span>
-                  </div>
-                ) : null;
-              })()}
-            </div>
-          </div>
+          <ProviderSidebar
+            provider={focusedProvider}
+            category={focusedCategory}
+            entry={focusedEntry}
+            onClose={closeSidebar}
+            onSelect={() => handleProviderClick(focusedProvider, focusedCategory.id)}
+            onDeselect={() => removeProvider(focusedProvider.id)}
+            onUpdate={(patch) => updateEntry(focusedProvider.id, patch)}
+          />
         )}
       </div>
     </div>
