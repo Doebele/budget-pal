@@ -2,22 +2,23 @@
  * Step5AccordionExpenses — Enhanced Everyday Expenses & Subscriptions
  *
  * Layout:
- *  LEFT  – Category accordions with provider checkboxes
- *  RIGHT – Sticky detail sidebar for the focused provider
+ *  LEFT  – Category accordions with provider checkboxes + search-first add flow
+ *  RIGHT – Sticky detail sidebar for focused provider OR custom provider sidebar
  */
 
 import { useState, useMemo } from "react";
-import type { LucideIcon } from "lucide-react";
 import {
   ChevronDown, ChevronRight, Plus, X,
   Check, Tv, Music, Cloud, Smartphone, Newspaper,
   Activity, Train, Briefcase, Home, ShoppingCart,
+  Search, PenLine,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { toMonthlyCHF } from "@/services/faviconService";
 import type { Frequency, SupportedCurrency } from "@/services/faviconService";
 import ProviderIcon from "./ProviderIcon";
 import ProviderSidebar from "./ProviderSidebar";
+import CustomProviderSidebar from "./CustomProviderSidebar";
 
 // ─────────────────────────────────────────────────────────────────
 // Types
@@ -66,8 +67,13 @@ export interface CustomExpenseEntry {
   id: string;
   categoryId: string;
   name: string;
-  price: number;
+  website?: string;
+  individualAmount?: number;
+  frequency?: Frequency;
+  currency?: SupportedCurrency;
+  firstPaymentDate?: string;
   note?: string;
+  price: number; // effective monthly CHF — computed on save
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -568,6 +574,24 @@ function getEffectiveMonthly(entry: SelectedExpenseEntry, providers: ExpenseProv
   return variant?.price ?? 0;
 }
 
+function getEffectiveMonthlyCustom(entry: CustomExpenseEntry): number {
+  return entry.price; // already computed as monthly CHF on save
+}
+
+function searchProviders(query: string): Array<{ provider: ExpenseProvider; category: ExpenseCategory }> {
+  if (!query.trim()) return [];
+  const q = query.toLowerCase();
+  const results: Array<{ provider: ExpenseProvider; category: ExpenseCategory }> = [];
+  for (const cat of EXPENSE_CATEGORIES) {
+    for (const prov of cat.providers) {
+      if (prov.name.toLowerCase().includes(q) || prov.tagline.toLowerCase().includes(q)) {
+        results.push({ provider: prov, category: cat });
+      }
+    }
+  }
+  return results.slice(0, 6);
+}
+
 // ─────────────────────────────────────────────────────────────────
 // Props
 // ─────────────────────────────────────────────────────────────────
@@ -581,6 +605,14 @@ interface Props {
 }
 
 // ─────────────────────────────────────────────────────────────────
+// Custom sidebar state type
+// ─────────────────────────────────────────────────────────────────
+
+type CustomSidebarState =
+  | { mode: "new"; categoryId: string; initialName?: string }
+  | { mode: "edit"; entryId: string };
+
+// ─────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────
 
@@ -590,9 +622,11 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
   );
   const [focusedProviderId, setFocusedProviderId] = useState<string | null>(null);
   const [focusedCategoryId, setFocusedCategoryId] = useState<string | null>(null);
-  const [addingCustomIn, setAddingCustomIn] = useState<string | null>(null);
-  const [customName, setCustomName] = useState("");
-  const [customPrice, setCustomPrice] = useState("");
+
+  // Search-first add flow state
+  const [searchCategoryId, setSearchCategoryId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [customSidebarState, setCustomSidebarState] = useState<CustomSidebarState | null>(null);
 
   // O(1) lookup map: providerId → entry
   const selectedMap = useMemo(() => {
@@ -609,7 +643,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
       const providers = cat?.providers ?? [];
       sum += getEffectiveMonthly(e, providers);
     }
-    for (const c of data.customExpenseEntries) sum += c.price;
+    for (const c of data.customExpenseEntries) sum += getEffectiveMonthlyCustom(c);
     return sum;
   }, [data.expenseEntries, data.customExpenseEntries]);
 
@@ -631,11 +665,49 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
   function openSidebar(provider: ExpenseProvider, categoryId: string) {
     setFocusedProviderId(provider.id);
     setFocusedCategoryId(categoryId);
+    setCustomSidebarState(null); // close custom sidebar when opening provider sidebar
   }
 
-  function closeSidebar() {
+  function closeSidebarProvider() {
     setFocusedProviderId(null);
     setFocusedCategoryId(null);
+  }
+
+  function openCustomNew(categoryId: string, initialName?: string) {
+    setCustomSidebarState({ mode: "new", categoryId, initialName });
+    closeSidebarProvider();
+    setSearchCategoryId(null);
+    setSearchQuery("");
+  }
+
+  function openCustomEdit(entryId: string) {
+    setCustomSidebarState({ mode: "edit", entryId });
+    closeSidebarProvider();
+  }
+
+  function closeCustomSidebar() {
+    setCustomSidebarState(null);
+  }
+
+  function handleCustomSave(entry: CustomExpenseEntry) {
+    const existing = data.customExpenseEntries.findIndex(e => e.id === entry.id);
+    if (existing >= 0) {
+      update({ customExpenseEntries: data.customExpenseEntries.map(e => e.id === entry.id ? entry : e) });
+    } else {
+      update({ customExpenseEntries: [...data.customExpenseEntries, entry] });
+    }
+    closeCustomSidebar();
+  }
+
+  function handleSearchSelect(provider: ExpenseProvider, category: ExpenseCategory) {
+    setOpenCategories(prev => { const next = new Set(prev); next.add(category.id); return next; });
+    if (!selectedMap[provider.id]) {
+      const defaultVariant = provider.variants.find(v => v.popular) ?? provider.variants[0];
+      update({ expenseEntries: [...data.expenseEntries, { providerId: provider.id, categoryId: category.id, variantId: defaultVariant.id }] });
+    }
+    openSidebar(provider, category.id);
+    setSearchCategoryId(null);
+    setSearchQuery("");
   }
 
   function handleProviderClick(provider: ExpenseProvider, categoryId: string) {
@@ -658,7 +730,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
     const isSelected = !!selectedMap[provider.id];
     if (isSelected) {
       update({ expenseEntries: data.expenseEntries.filter(x => x.providerId !== provider.id) });
-      if (focusedProviderId === provider.id) closeSidebar();
+      if (focusedProviderId === provider.id) closeSidebarProvider();
     } else {
       const defaultVariant = provider.variants.find(v => v.popular) ?? provider.variants[0];
       update({
@@ -673,7 +745,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
 
   function removeProvider(providerId: string) {
     update({ expenseEntries: data.expenseEntries.filter(e => e.providerId !== providerId) });
-    if (focusedProviderId === providerId) closeSidebar();
+    if (focusedProviderId === providerId) closeSidebarProvider();
   }
 
   function updateEntry(providerId: string, patch: Partial<SelectedExpenseEntry>) {
@@ -682,20 +754,6 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
         e.providerId === providerId ? { ...e, ...patch } : e
       ),
     });
-  }
-
-  function addCustomEntry(categoryId: string) {
-    const price = parseFloat(customPrice);
-    if (!customName.trim() || isNaN(price) || price < 0) return;
-    update({
-      customExpenseEntries: [
-        ...data.customExpenseEntries,
-        { id: `custom-${Date.now()}`, categoryId, name: customName.trim(), price },
-      ],
-    });
-    setCustomName("");
-    setCustomPrice("");
-    setAddingCustomIn(null);
   }
 
   function removeCustomEntry(id: string) {
@@ -830,77 +888,124 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
                   {/* Custom entries */}
                   {data.customExpenseEntries
                     .filter(e => e.categoryId === cat.id)
-                    .map(custom => (
-                      <div key={custom.id} className="flex items-center gap-3 px-4 py-3 border-b border-border/30 bg-warning/5">
-                        <div className="w-5 h-5 rounded border bg-warning/20 border-warning/40 flex items-center justify-center flex-shrink-0">
-                          <Check className="w-3 h-3 text-warning" />
-                        </div>
-                        <span className="text-base flex-shrink-0">✏️</span>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-text-primary text-sm font-medium">{custom.name}</div>
-                          <div className="text-text-tertiary text-[11px]">Eigener Anbieter</div>
-                        </div>
-                        <span className="font-mono text-xs text-warning">{fchf(custom.price)}/Mo</span>
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); removeCustomEntry(custom.id); }}
-                          className="text-text-tertiary hover:text-loss transition-colors p-0.5"
+                    .map(custom => {
+                      const isFocusedCustom =
+                        customSidebarState?.mode === "edit" && customSidebarState.entryId === custom.id;
+                      return (
+                        <div
+                          key={custom.id}
+                          onClick={() => openCustomEdit(custom.id)}
+                          className={clsx(
+                            "flex items-center gap-3 px-4 py-3 border-b border-border/30 cursor-pointer transition-all duration-150",
+                            isFocusedCustom ? "bg-accent/10" : "bg-warning/5 hover:bg-warning/10"
+                          )}
                         >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
+                          <div className="w-5 h-5 rounded border bg-warning/20 border-warning/40 flex items-center justify-center flex-shrink-0">
+                            <Check className="w-3 h-3 text-warning" />
+                          </div>
+                          <PenLine className="w-4 h-4 text-text-tertiary flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-text-primary text-sm font-medium">{custom.name}</div>
+                            <div className="text-text-tertiary text-[11px]">Eigener Anbieter</div>
+                          </div>
+                          <span className="font-mono text-xs text-warning">{fchf(getEffectiveMonthlyCustom(custom))}/Mo</span>
+                          {isFocusedCustom && <ChevronRight className="w-3.5 h-3.5 text-accent flex-shrink-0" />}
+                        </div>
+                      );
+                    })}
 
-                  {/* Add custom provider */}
-                  {addingCustomIn === cat.id ? (
-                    <div className="px-4 py-3 bg-bg-surface2 space-y-2">
-                      <div className="flex gap-2">
+                  {/* Add / Search provider */}
+                  {searchCategoryId === cat.id ? (
+                    <div className="px-4 py-3 bg-bg-surface2 space-y-2 border-t border-border/40">
+                      <div className="flex items-center gap-2">
+                        <Search className="w-3.5 h-3.5 text-text-tertiary flex-shrink-0" />
                         <input
                           type="text"
-                          className="input flex-1 text-sm"
-                          placeholder="Anbieter-Name"
-                          value={customName}
-                          onChange={e => setCustomName(e.target.value)}
-                          onKeyDown={e => e.key === "Enter" && addCustomEntry(cat.id)}
+                          className="input flex-1 text-sm py-1.5"
+                          placeholder="Anbieter suchen…"
+                          value={searchQuery}
+                          onChange={e => setSearchQuery(e.target.value)}
                           autoFocus
                         />
-                        <div className="relative w-28">
-                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary text-xs pointer-events-none">CHF</span>
-                          <input
-                            type="number"
-                            className="input pl-9 w-full text-sm"
-                            placeholder="0"
-                            value={customPrice}
-                            onChange={e => setCustomPrice(e.target.value)}
-                            onKeyDown={e => e.key === "Enter" && addCustomEntry(cat.id)}
-                          />
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
                         <button
                           type="button"
-                          className="btn-primary flex-1 text-xs py-1.5"
-                          onClick={() => addCustomEntry(cat.id)}
+                          onClick={() => { setSearchCategoryId(null); setSearchQuery(""); }}
+                          className="text-text-tertiary hover:text-text-primary transition-colors flex-shrink-0"
                         >
-                          Hinzufügen
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-secondary text-xs py-1.5"
-                          onClick={() => { setAddingCustomIn(null); setCustomName(""); setCustomPrice(""); }}
-                        >
-                          Abbrechen
+                          <X className="w-4 h-4" />
                         </button>
                       </div>
+
+                      {/* Search results */}
+                      {searchQuery.trim() && (() => {
+                        const results = searchProviders(searchQuery);
+                        return (
+                          <div className="space-y-1">
+                            {results.map(({ provider, category: resCat }) => (
+                              <button
+                                key={provider.id}
+                                type="button"
+                                onClick={() => handleSearchSelect(provider, resCat)}
+                                className={clsx(
+                                  "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-white/[0.04] transition-colors text-left",
+                                  selectedMap[provider.id] && "opacity-60"
+                                )}
+                              >
+                                <ProviderIcon website={provider.website} name={provider.name} size={16} />
+                                <div className="flex-1 min-w-0">
+                                  <span className="text-text-primary text-xs font-medium">{provider.name}</span>
+                                  <span className="text-text-tertiary text-[10px] ml-2">{resCat.label}</span>
+                                </div>
+                                <span className="text-text-tertiary font-mono text-[10px] flex-shrink-0">
+                                  CHF {provider.variants.find(v => v.popular)?.price ?? provider.variants[0]?.price}/Mo
+                                </span>
+                                {selectedMap[provider.id] && <Check className="w-3 h-3 text-accent flex-shrink-0" />}
+                              </button>
+                            ))}
+
+                            {/* Always show "create custom" at bottom */}
+                            <button
+                              type="button"
+                              onClick={() => openCustomNew(cat.id, searchQuery)}
+                              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-accent/8 text-accent text-left transition-colors border border-dashed border-accent/30 mt-1"
+                            >
+                              <Plus className="w-3.5 h-3.5 flex-shrink-0" />
+                              <span className="text-xs font-medium">
+                                {results.length === 0
+                                  ? `"${searchQuery}" als eigenen Anbieter anlegen`
+                                  : "Eigenen Anbieter anlegen"}
+                              </span>
+                            </button>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Empty state — no query */}
+                      {!searchQuery.trim() && (
+                        <button
+                          type="button"
+                          onClick={() => openCustomNew(cat.id)}
+                          className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-accent/8 text-accent text-left transition-colors border border-dashed border-accent/30"
+                        >
+                          <Plus className="w-3.5 h-3.5 flex-shrink-0" />
+                          <span className="text-xs font-medium">Eigenen Anbieter anlegen</span>
+                        </button>
+                      )}
                     </div>
                   ) : (
                     <button
                       type="button"
-                      onClick={(e) => { e.stopPropagation(); setAddingCustomIn(cat.id); }}
-                      className="w-full flex items-center gap-2 px-4 py-2.5 text-text-tertiary hover:text-text-secondary hover:bg-white/[0.02] text-xs transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSearchCategoryId(cat.id);
+                        setSearchQuery("");
+                        setCustomSidebarState(null);
+                        closeSidebarProvider();
+                      }}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-text-tertiary hover:text-text-secondary hover:bg-white/[0.02] text-xs transition-colors border-t border-border/40"
                     >
                       <Plus className="w-3.5 h-3.5" />
-                      Eigenen Anbieter hinzufügen
+                      Anbieter hinzufügen
                     </button>
                   )}
                 </div>
@@ -911,16 +1016,35 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
       </div>
 
       {/* ── RIGHT: Sticky Sidebar ────────────────────────────── */}
-      <div className={clsx("hidden lg:block w-72 flex-shrink-0", !focusedProvider && "invisible")}>
-        {focusedProvider && focusedCategory && (
+      <div className={clsx(
+        "hidden lg:block w-72 flex-shrink-0",
+        !focusedProvider && !customSidebarState && "invisible"
+      )}>
+        {focusedProvider && focusedCategory && !customSidebarState && (
           <ProviderSidebar
             provider={focusedProvider}
             category={focusedCategory}
             entry={focusedEntry}
-            onClose={closeSidebar}
+            onClose={closeSidebarProvider}
             onSelect={() => handleProviderClick(focusedProvider, focusedCategory.id)}
             onDeselect={() => removeProvider(focusedProvider.id)}
             onUpdate={(patch) => updateEntry(focusedProvider.id, patch)}
+          />
+        )}
+        {customSidebarState && (
+          <CustomProviderSidebar
+            key={customSidebarState.mode === "new" ? "new" : customSidebarState.entryId}
+            categories={EXPENSE_CATEGORIES}
+            initialCategoryId={customSidebarState.mode === "new" ? customSidebarState.categoryId : undefined}
+            initialName={customSidebarState.mode === "new" ? customSidebarState.initialName : undefined}
+            entry={
+              customSidebarState.mode === "edit"
+                ? (data.customExpenseEntries.find(e => e.id === customSidebarState.entryId) ?? null)
+                : null
+            }
+            onClose={closeCustomSidebar}
+            onSave={handleCustomSave}
+            onDelete={(id) => { removeCustomEntry(id); closeCustomSidebar(); }}
           />
         )}
       </div>
