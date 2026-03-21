@@ -20,6 +20,9 @@ import {
   Home, Heart, Car, Train, Banknote,
   TrendingUp, Building2, Bitcoin, BookOpen,
   ShieldCheck, Plane, ArrowRight, Check,
+  User, Users, Users2, UserMinus,
+  Briefcase, Globe, TrendingDown, PiggyBank,
+  Landmark, BarChart2, Coins, Wallet,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { api } from "@/lib/api";
@@ -319,7 +322,7 @@ function ToggleCard({
 }: {
   enabled: boolean;
   onToggle: () => void;
-  icon: string;
+  icon: React.ReactNode;
   label: string;
   sublabel?: string;
   children?: React.ReactNode;
@@ -334,7 +337,9 @@ function ToggleCard({
         className="w-full flex items-center gap-3 p-4 text-left"
         onClick={onToggle}
       >
-        <span className="text-xl shrink-0">{icon}</span>
+        <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
+          {icon}
+        </div>
         <div className="flex-1 min-w-0">
           <p className={clsx("text-sm font-medium", enabled ? "text-text-primary" : "text-text-secondary")}>
             {label}
@@ -415,11 +420,11 @@ function SummaryCard({ label, value, sub }: { label: string; value: string; sub?
 // ── Step 1: Demografie ─────────────────────────────────────────
 
 function Step1({ data, update }: { data: WizardData; update: (p: Partial<WizardData>) => void }) {
-  const HAUSHALT_OPTIONS: { value: WizardData["haushalt"]; label: string; icon: string }[] = [
-    { value: "single",       label: "Einzelperson",   icon: "🧑" },
-    { value: "couple",       label: "Paar",            icon: "👫" },
-    { value: "family",       label: "Familie",         icon: "👨‍👩‍👧" },
-    { value: "single-parent", label: "Alleinerziehend", icon: "👤" },
+  const HAUSHALT_OPTIONS: { value: WizardData["haushalt"]; label: string; Icon: React.ComponentType<{ className?: string }> }[] = [
+    { value: "single",        label: "Einzelperson",   Icon: User },
+    { value: "couple",        label: "Paar",            Icon: Users },
+    { value: "family",        label: "Familie",         Icon: Users2 },
+    { value: "single-parent", label: "Alleinerziehend", Icon: UserMinus },
   ];
   const BESCHAEFTIGUNG_OPTIONS: { value: WizardData["beschaeftigung"]; label: string }[] = [
     { value: "employed",      label: "Angestellt" },
@@ -494,7 +499,9 @@ function Step1({ data, update }: { data: WizardData; update: (p: Partial<WizardD
               )}
               onClick={() => update({ haushalt: opt.value })}
             >
-              <span className="text-2xl block mb-1.5">{opt.icon}</span>
+              <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center mb-2">
+                <opt.Icon className={clsx("w-4 h-4", data.haushalt === opt.value ? "text-accent" : "text-text-tertiary")} />
+              </div>
               <span className={clsx(
                 "text-sm font-medium",
                 data.haushalt === opt.value ? "text-accent" : "text-text-secondary"
@@ -534,32 +541,32 @@ function Step2({ data, update }: { data: WizardData; update: (p: Partial<WizardD
 
   const INCOME_SOURCES = [
     {
-      icon: "💼", label: "Lohn / Gehalt (brutto)", sublabel: "Monatlich",
+      icon: <Briefcase className="w-4 h-4 text-text-tertiary" />, label: "Lohn / Gehalt (brutto)", sublabel: "Monatlich",
       enabledKey: "lohnEnabled" as const, valueKey: "lohn" as const,
       show: true,
     },
     {
-      icon: "🏢", label: "Selbständiges Einkommen", sublabel: "Monatlicher Durchschnitt",
+      icon: <Building2 className="w-4 h-4 text-text-tertiary" />, label: "Selbständiges Einkommen", sublabel: "Monatlicher Durchschnitt",
       enabledKey: "selbstaendigEnabled" as const, valueKey: "selbstaendig" as const,
       show: true,
     },
     {
-      icon: "📈", label: "Dividenden & Kapitalerträge", sublabel: "Monatlicher Durchschnitt",
+      icon: <TrendingUp className="w-4 h-4 text-text-tertiary" />, label: "Dividenden & Kapitalerträge", sublabel: "Monatlicher Durchschnitt",
       enabledKey: "dividendenEnabled" as const, valueKey: "dividenden" as const,
       show: true,
     },
     {
-      icon: "🏠", label: "Mieteinnahmen", sublabel: "Monatlich netto",
+      icon: <Home className="w-4 h-4 text-text-tertiary" />, label: "Mieteinnahmen", sublabel: "Monatlich netto",
       enabledKey: "mieteinnahmenEnabled" as const, valueKey: "mieteinnahmen" as const,
       show: true,
     },
     {
-      icon: "🌍", label: "Auslandeinkommen", sublabel: "Monatlicher Durchschnitt (CHF-Equivalent)",
+      icon: <Globe className="w-4 h-4 text-text-tertiary" />, label: "Auslandeinkommen", sublabel: "Monatlicher Durchschnitt (CHF-Equivalent)",
       enabledKey: "auslandeinkommenEnabled" as const, valueKey: "auslandeinkommen" as const,
       show: true,
     },
     {
-      icon: "🏦", label: "AHV / Rente", sublabel: "Monatliche Rentenzahlung",
+      icon: <PiggyBank className="w-4 h-4 text-text-tertiary" />, label: "AHV / Rente", sublabel: "Monatliche Rentenzahlung",
       enabledKey: "ahvRenteEnabled" as const, valueKey: "ahvRente" as const,
       show: data.beschaeftigung === "retired",
     },
@@ -1001,7 +1008,7 @@ function Step6({ data, update }: { data: WizardData; update: (p: Partial<WizardD
 
   const ASSETS = [
     {
-      icon: "🏦",
+      icon: <Landmark className="w-4 h-4 text-text-tertiary" />,
       label: "Bankkonto / Sparkonto",
       sublabel: "Gesamtsaldo aller Konten",
       enabledKey: "bankEnabled" as const,
@@ -1012,7 +1019,7 @@ function Step6({ data, update }: { data: WizardData; update: (p: Partial<WizardD
       ),
     },
     {
-      icon: "📊",
+      icon: <BarChart2 className="w-4 h-4 text-text-tertiary" />,
       label: "Aktien & ETFs",
       sublabel: "Aktueller Depotwert",
       enabledKey: "stocksEnabled" as const,
@@ -1029,7 +1036,7 @@ function Step6({ data, update }: { data: WizardData; update: (p: Partial<WizardD
       ),
     },
     {
-      icon: "🏠",
+      icon: <Building2 className="w-4 h-4 text-text-tertiary" />,
       label: "Immobilien",
       sublabel: "Marktwert abzüglich Hypothek",
       enabledKey: "propertyAssetEnabled" as const,
@@ -1045,7 +1052,7 @@ function Step6({ data, update }: { data: WizardData; update: (p: Partial<WizardD
       ),
     },
     {
-      icon: "🪙",
+      icon: <Coins className="w-4 h-4 text-text-tertiary" />,
       label: "Kryptowährungen",
       sublabel: "Aktueller Marktwert (CHF)",
       enabledKey: "cryptoEnabled" as const,
@@ -1056,7 +1063,7 @@ function Step6({ data, update }: { data: WizardData; update: (p: Partial<WizardD
       ),
     },
     {
-      icon: "💰",
+      icon: <Wallet className="w-4 h-4 text-text-tertiary" />,
       label: "Sonstige Anlagen",
       sublabel: "Obligationen, Fonds, Private Equity, etc.",
       enabledKey: "otherAssetsEnabled" as const,
@@ -1356,11 +1363,11 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
 // ── Step 8: Finanzplan-Ziele ───────────────────────────────────
 
 function Step8({ data, update }: { data: WizardData; update: (p: Partial<WizardData>) => void }) {
-  const SCENARIOS = [
-    { key: "scenarioMortgage" as const, icon: "📉", label: "Hypothek amortisieren", sub: "Planmässige Schuldenreduktion bis zur Pensionierung" },
-    { key: "scenarioSavings" as const, icon: "💰", label: "Sparplan erhöhen", sub: "Optimierung der monatlichen Sparquote" },
-    { key: "scenarioEarlyRetirement" as const, icon: "✈️", label: "Frühpensionierung (vor 65)", sub: "Analyse der Finanzierbarkeit einer Frühpensionierung" },
-    { key: "scenarioCare" as const, icon: "🏥", label: "Pflegekosten einplanen (ab 80)", sub: "Szenario für Pflegebedarf im hohen Alter" },
+  const SCENARIOS: { key: "scenarioMortgage" | "scenarioSavings" | "scenarioEarlyRetirement" | "scenarioCare"; icon: React.ReactNode; label: string; sub: string }[] = [
+    { key: "scenarioMortgage",      icon: <TrendingDown className="w-4 h-4" />, label: "Hypothek amortisieren",        sub: "Planmässige Schuldenreduktion bis zur Pensionierung" },
+    { key: "scenarioSavings",       icon: <PiggyBank className="w-4 h-4" />,    label: "Sparplan erhöhen",             sub: "Optimierung der monatlichen Sparquote" },
+    { key: "scenarioEarlyRetirement", icon: <Plane className="w-4 h-4" />,      label: "Frühpensionierung (vor 65)",   sub: "Analyse der Finanzierbarkeit einer Frühpensionierung" },
+    { key: "scenarioCare",          icon: <Heart className="w-4 h-4" />,        label: "Pflegekosten einplanen (ab 80)", sub: "Szenario für Pflegebedarf im hohen Alter" },
   ];
 
   return (
@@ -1420,7 +1427,9 @@ function Step8({ data, update }: { data: WizardData; update: (p: Partial<WizardD
               onClick={() => update({ [sc.key]: !data[sc.key] })}
             >
               <div className="flex items-start gap-3">
-                <span className="text-xl shrink-0">{sc.icon}</span>
+                <div className={clsx("w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5", data[sc.key] ? "bg-accent/15 text-accent" : "bg-white/5 text-text-tertiary")}>
+                  {sc.icon}
+                </div>
                 <div className="flex-1">
                   <p className={clsx("text-sm font-medium", data[sc.key] ? "text-accent" : "text-text-primary")}>
                     {sc.label}
@@ -1530,16 +1539,16 @@ function ReviewScreen({
         <h4 className="text-text-primary font-medium text-sm mb-3">Aktivierte Szenarien</h4>
         <div className="flex flex-wrap gap-2">
           {data.scenarioMortgage && (
-            <span className="badge bg-accent/15 text-accent">📉 Hypothek amortisieren</span>
+            <span className="badge bg-accent/15 text-accent flex items-center gap-1"><TrendingDown className="w-3 h-3" /> Hypothek amortisieren</span>
           )}
           {data.scenarioSavings && (
-            <span className="badge bg-accent/15 text-accent">💰 Sparplan erhöhen</span>
+            <span className="badge bg-accent/15 text-accent flex items-center gap-1"><PiggyBank className="w-3 h-3" /> Sparplan erhöhen</span>
           )}
           {data.scenarioEarlyRetirement && (
-            <span className="badge bg-accent/15 text-accent">✈️ Frühpensionierung</span>
+            <span className="badge bg-accent/15 text-accent flex items-center gap-1"><Plane className="w-3 h-3" /> Frühpensionierung</span>
           )}
           {data.scenarioCare && (
-            <span className="badge bg-accent/15 text-accent">🏥 Pflegekosten</span>
+            <span className="badge bg-accent/15 text-accent flex items-center gap-1"><Heart className="w-3 h-3" /> Pflegekosten</span>
           )}
           {!data.scenarioMortgage && !data.scenarioSavings && !data.scenarioEarlyRetirement && !data.scenarioCare && (
             <span className="text-text-tertiary text-xs">Keine Szenarien ausgewählt</span>
