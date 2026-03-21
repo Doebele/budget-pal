@@ -67,7 +67,7 @@ export default function Sidebar() {
             to={path}
             onClick={() => setMobileOpen(false)}
             className={clsx(
-              "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150",
+              "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-all duration-150",
               isActive(path)
                 ? "bg-accent/15 text-accent"
                 : "text-text-secondary hover:text-text-primary hover:bg-bg-surface2"
@@ -87,7 +87,7 @@ export default function Sidebar() {
             to={path}
             onClick={() => setMobileOpen(false)}
             className={clsx(
-              "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150",
+              "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-all duration-150",
               isActive(path)
                 ? "bg-accent/15 text-accent"
                 : highlight

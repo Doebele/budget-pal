@@ -11,7 +11,7 @@ import {
   Check, Users, Calendar, RefreshCw,
 } from "lucide-react";
 import { clsx } from "clsx";
-import ProviderIcon from "./ProviderIcon";
+import ProviderBrandIcon from "./ProviderBrandIcon";
 import {
   toMonthlyCHF, FREQUENCY_LABELS, FREQUENCIES,
   SUPPORTED_CURRENCIES, CURRENCY_SYMBOLS,
@@ -67,11 +67,11 @@ export default function ProviderSidebar({
   const effectiveMonthly = entry ? getEffectiveMonthly(entry, provider.variants) : null;
 
   return (
-    <div className="sticky top-4 flex flex-col bg-bg-surface border border-border/50 rounded-xl overflow-hidden shadow-2xl max-h-[calc(100vh-2rem)]">
+    <div className="sticky top-4 flex flex-col bg-bg-surface border border-border/50 rounded-lg overflow-hidden shadow-2xl max-h-[calc(100vh-2rem)]">
 
       {/* ── Fixed Header ──────────────────────────────────── */}
       <header className="flex items-center gap-3 px-4 py-3 border-b border-border/50 bg-bg-surface2 flex-shrink-0">
-        <ProviderIcon website={provider.website} name={provider.name} size={24} />
+        <ProviderBrandIcon providerId={provider.id} size={24} />
         <div className="flex-1 min-w-0">
           <div className="text-text-primary font-semibold text-sm truncate">{provider.name}</div>
           <div className="text-text-tertiary text-[11px] truncate">{category.label}</div>
@@ -84,7 +84,7 @@ export default function ProviderSidebar({
             title={viewMode === "simple" ? "Individuelle Eingabe" : "Einfache Ansicht"}
             onClick={() => switchMode(viewMode === "simple" ? "individual" : "simple")}
             className={clsx(
-              "p-1.5 rounded-lg transition-all flex-shrink-0",
+              "p-1.5 rounded-md transition-all flex-shrink-0",
               viewMode === "individual"
                 ? "bg-accent/20 text-accent"
                 : "text-text-tertiary hover:text-text-primary hover:bg-white/[0.05]"
@@ -137,7 +137,7 @@ export default function ProviderSidebar({
                       disabled={!entry}
                       onClick={() => entry && onUpdate({ variantId: variant.id, customPrice: undefined })}
                       className={clsx(
-                        "w-full flex items-start justify-between rounded-lg px-3 py-2.5 text-left text-xs transition-all border",
+                        "w-full flex items-start justify-between rounded-md px-3 py-2.5 text-left text-xs transition-all border",
                         isActive
                           ? "border-accent/60 bg-accent/12 text-text-primary"
                           : "border-border/50 hover:border-border text-text-secondary hover:bg-white/[0.03]",
@@ -267,7 +267,7 @@ export default function ProviderSidebar({
                     type="button"
                     onClick={() => onUpdate({ frequency: freq })}
                     className={clsx(
-                      "rounded-lg border px-2 py-2 text-[11px] font-medium transition-all text-left",
+                      "rounded-md border px-2 py-2 text-[11px] font-medium transition-all text-left",
                       (entry.frequency ?? "monthly") === freq
                         ? "border-accent/50 bg-accent/10 text-accent"
                         : "border-border/50 text-text-secondary hover:border-border"
@@ -327,7 +327,7 @@ export default function ProviderSidebar({
             <button
               type="button"
               onClick={onDeselect}
-              className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-loss/30 bg-loss/8 text-loss hover:bg-loss/15 px-3 py-2 text-xs font-medium transition-all"
+              className="w-full flex items-center justify-center gap-1.5 rounded-md border border-loss/30 bg-loss/8 text-loss hover:bg-loss/15 px-3 py-2 text-xs font-medium transition-all"
             >
               <Trash2 className="w-3 h-3" />
               Entfernen

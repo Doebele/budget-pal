@@ -216,7 +216,7 @@ export default function PeerGroupCard({
       <div className="card border-accent/20 bg-accent/5">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-accent/20 flex items-center justify-center shrink-0">
+            <div className="w-11 h-11 rounded-lg bg-accent/20 flex items-center justify-center shrink-0">
               <Users className="w-5 h-5 text-accent" />
             </div>
             <div>
@@ -282,7 +282,7 @@ export default function PeerGroupCard({
               <div
                 key={cat.key}
                 className={clsx(
-                  "rounded-xl p-3 border transition-all duration-300",
+                  "rounded-md p-3 border transition-all duration-300",
                   "opacity-0 animate-[fadeSlideUp_0.4s_ease-out_forwards]",
                   "border-white/8 bg-white/3 hover:border-white/15 hover:bg-white/5 cursor-pointer"
                 )}

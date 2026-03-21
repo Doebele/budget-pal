@@ -329,7 +329,7 @@ function ToggleCard({
 }) {
   return (
     <div className={clsx(
-      "rounded-xl border transition-all duration-200 overflow-hidden",
+      "rounded-md border transition-all duration-200 overflow-hidden",
       enabled ? "border-accent/40 bg-accent/5" : "border-white/8 bg-white/2"
     )}>
       <button
@@ -337,7 +337,7 @@ function ToggleCard({
         className="w-full flex items-center gap-3 p-4 text-left"
         onClick={onToggle}
       >
-        <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
+        <div className="w-8 h-8 rounded-sm bg-white/5 flex items-center justify-center shrink-0">
           {icon}
         </div>
         <div className="flex-1 min-w-0">
@@ -436,7 +436,7 @@ function Step1({ data, update }: { data: WizardData; update: (p: Partial<WizardD
   return (
     <div className="space-y-8">
       <div className="text-center space-y-3">
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-accent/30 to-accent/10 border border-accent/30 flex items-center justify-center mx-auto">
+        <div className="w-16 h-16 rounded-lg bg-gradient-to-br from-accent/30 to-accent/10 border border-accent/30 flex items-center justify-center mx-auto">
           <BarChart3 className="w-8 h-8 text-accent" />
         </div>
         <div>
@@ -492,14 +492,14 @@ function Step1({ data, update }: { data: WizardData; update: (p: Partial<WizardD
               key={opt.value}
               type="button"
               className={clsx(
-                "rounded-xl border p-3.5 text-left transition-all duration-150",
+                "rounded-md border p-3.5 text-left transition-all duration-150",
                 data.haushalt === opt.value
                   ? "border-accent/50 bg-accent/10"
                   : "border-white/8 bg-white/2 hover:border-white/20 hover:bg-white/5"
               )}
               onClick={() => update({ haushalt: opt.value })}
             >
-              <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center mb-2">
+              <div className="w-8 h-8 rounded-sm bg-white/5 flex items-center justify-center mb-2">
                 <opt.Icon className={clsx("w-4 h-4", data.haushalt === opt.value ? "text-accent" : "text-text-tertiary")} />
               </div>
               <span className={clsx(
@@ -518,7 +518,7 @@ function Step1({ data, update }: { data: WizardData; update: (p: Partial<WizardD
               key={opt.value}
               type="button"
               className={clsx(
-                "rounded-lg border py-2.5 px-3 text-sm font-medium transition-all duration-150",
+                "rounded border py-2.5 px-3 text-sm font-medium transition-all duration-150",
                 data.beschaeftigung === opt.value
                   ? "border-accent/50 bg-accent/10 text-accent"
                   : "border-white/8 bg-white/2 text-text-secondary hover:border-white/20"
@@ -716,7 +716,7 @@ function Step4({ data, update }: { data: WizardData; update: (p: Partial<WizardD
               key={mode}
               type="button"
               className={clsx(
-                "flex-1 rounded-lg border py-2.5 text-sm font-medium transition-all",
+                "flex-1 rounded border py-2.5 text-sm font-medium transition-all",
                 data.housingMode === mode
                   ? "border-accent/50 bg-accent/10 text-accent"
                   : "border-white/8 text-text-secondary hover:border-white/20"
@@ -771,7 +771,7 @@ function Step4({ data, update }: { data: WizardData; update: (p: Partial<WizardD
                 key={f}
                 type="button"
                 className={clsx(
-                  "rounded-lg border py-2 text-sm font-medium transition-all",
+                  "rounded border py-2 text-sm font-medium transition-all",
                   data.franchise === f
                     ? "border-accent/50 bg-accent/10 text-accent"
                     : "border-white/8 text-text-secondary hover:border-white/15"
@@ -878,7 +878,7 @@ function Step5({ data, update }: { data: WizardData; update: (p: Partial<WizardD
               key={opt.value}
               type="button"
               className={clsx(
-                "rounded-lg border py-2.5 text-xs font-medium transition-all flex items-center justify-center gap-1.5",
+                "rounded border py-2.5 text-xs font-medium transition-all flex items-center justify-center gap-1.5",
                 data.transportMode === opt.value
                   ? "border-accent/50 bg-accent/10 text-accent"
                   : "border-white/8 text-text-secondary hover:border-white/15"
@@ -902,7 +902,7 @@ function Step5({ data, update }: { data: WizardData; update: (p: Partial<WizardD
                   key={abo.key}
                   type="button"
                   className={clsx(
-                    "rounded-lg border px-3 py-2 text-sm transition-all",
+                    "rounded border px-3 py-2 text-sm transition-all",
                     data[abo.key]
                       ? "border-accent/50 bg-accent/10 text-accent"
                       : "border-white/8 text-text-secondary hover:border-white/15"
@@ -946,7 +946,7 @@ function Step5({ data, update }: { data: WizardData; update: (p: Partial<WizardD
                       key={sub.name}
                       type="button"
                       className={clsx(
-                        "w-full flex items-center justify-between rounded-lg px-3 py-2 text-sm transition-all",
+                        "w-full flex items-center justify-between rounded px-3 py-2 text-sm transition-all",
                         isSelected
                           ? "bg-accent/10 text-text-primary"
                           : "hover:bg-white/5 text-text-secondary"
@@ -1152,7 +1152,7 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
       {/* ── Säule 1: AHV ─── */}
       <div className="card">
         <div className="flex items-center gap-2 mb-4">
-          <div className="w-7 h-7 rounded-lg bg-red-500/15 flex items-center justify-center shrink-0">
+          <div className="w-7 h-7 rounded-sm bg-red-500/15 flex items-center justify-center shrink-0">
             <ShieldCheck className="w-4 h-4 text-red-400" />
           </div>
           <h3 className="text-text-primary font-medium text-sm">Säule 1 — AHV / IV</h3>
@@ -1179,7 +1179,7 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
             />
           </Field>
 
-          <div className="bg-white/3 rounded-xl p-3 flex items-center justify-between">
+          <div className="bg-white/3 rounded-md p-3 flex items-center justify-between">
             <div>
               <p className="text-text-tertiary text-xs">Geschätzte AHV-Rente</p>
               <p className="text-text-primary font-mono font-semibold text-xl mt-0.5">{chf(ahvRente)}</p>
@@ -1196,7 +1196,7 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
       {/* ── Säule 2: BVG ─── */}
       <div className="card">
         <div className="flex items-center gap-2 mb-4">
-          <div className="w-7 h-7 rounded-lg bg-blue-500/15 flex items-center justify-center shrink-0">
+          <div className="w-7 h-7 rounded-sm bg-blue-500/15 flex items-center justify-center shrink-0">
             <Building2 className="w-4 h-4 text-blue-400" />
           </div>
           <h3 className="text-text-primary font-medium text-sm">Säule 2 — BVG / Pensionskasse</h3>
@@ -1221,7 +1221,7 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
             />
           </Field>
 
-          <div className="bg-white/3 rounded-xl p-3 grid grid-cols-2 gap-4">
+          <div className="bg-white/3 rounded-md p-3 grid grid-cols-2 gap-4">
             <div>
               <p className="text-text-tertiary text-xs">Kapital bei {data.bvgRentenalter}</p>
               <p className="text-accent font-mono font-semibold text-lg mt-0.5">{chf(bvgKapital)}</p>
@@ -1238,7 +1238,7 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
       {/* ── Säule 3a ─── */}
       <div className="card">
         <div className="flex items-center gap-2 mb-4">
-          <div className="w-7 h-7 rounded-lg bg-green-500/15 flex items-center justify-center shrink-0">
+          <div className="w-7 h-7 rounded-sm bg-green-500/15 flex items-center justify-center shrink-0">
             <Banknote className="w-4 h-4 text-green-400" />
           </div>
           <h3 className="text-text-primary font-medium text-sm">Säule 3a — Gebundene Vorsorge</h3>
@@ -1246,7 +1246,7 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
 
         <div className="space-y-3">
           {data.pillar3aAccounts.map((acc, idx) => (
-            <div key={idx} className="border border-white/8 rounded-xl p-4 space-y-3">
+            <div key={idx} className="border border-white/8 rounded-md p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <p className="text-text-primary text-sm font-medium">Konto {idx + 1}</p>
                 {idx > 0 && (
@@ -1303,7 +1303,7 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
             </button>
           )}
 
-          <div className="flex items-start gap-2 p-3 rounded-lg bg-gain/5 border border-gain/15">
+          <div className="flex items-start gap-2 p-3 rounded-md bg-gain/5 border border-gain/15">
             <ShieldCheck className="w-4 h-4 text-gain shrink-0 mt-0.5" />
             <p className="text-text-secondary text-xs leading-relaxed">
               <strong className="text-gain">Steueroptimierung:</strong> Gestaffelte Bezüge auf mehrere 3a-Konten
@@ -1507,7 +1507,7 @@ function ReviewScreen({
   return (
     <div className="space-y-7">
       <div className="text-center space-y-2">
-        <div className="w-14 h-14 rounded-2xl bg-gain/15 border border-gain/30 flex items-center justify-center mx-auto">
+        <div className="w-14 h-14 rounded-lg bg-gain/15 border border-gain/30 flex items-center justify-center mx-auto">
           <Check className="w-7 h-7 text-gain" />
         </div>
         <h2 className="text-text-primary font-semibold text-xl">
@@ -1587,15 +1587,49 @@ function ReviewScreen({
 // ── Main Wizard ────────────────────────────────────────────────
 
 const TOTAL_STEPS = 8;
+const STORAGE_KEY = "budgetpal_wizard_draft";
+
+function loadDraft(): WizardData {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) return { ...DEFAULT_WIZARD_DATA, ...JSON.parse(saved) };
+  } catch {}
+  return DEFAULT_WIZARD_DATA;
+}
 
 export default function Wizard() {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
-  const [wizardData, setWizardData] = useState<WizardData>(DEFAULT_WIZARD_DATA);
+  const [wizardData, setWizardData] = useState<WizardData>(loadDraft);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [animating, setAnimating] = useState(false);
   const [direction, setDirection] = useState<"forward" | "back">("forward");
   const [isReview, setIsReview] = useState(false);
+
+  // Auto-save to localStorage on every change
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(wizardData));
+    } catch {}
+  }, [wizardData]);
+
+  // Prefill from user profile on mount (name + birthdate)
+  useEffect(() => {
+    api.get("/auth/me").then((res) => {
+      const user = res.data;
+      setWizardData((prev) => {
+        const patch: Partial<WizardData> = {};
+        if (!prev.vorname && user.name) {
+          patch.vorname = user.name.split(" ")[0];
+        }
+        if (prev.geburtsjahr === 1985 && user.birthdate) {
+          const year = new Date(user.birthdate).getFullYear();
+          if (year > 1930 && year < 2010) patch.geburtsjahr = year;
+        }
+        return Object.keys(patch).length ? { ...prev, ...patch } : prev;
+      });
+    }).catch(() => {});
+  }, []);
 
   const update = useCallback((partial: Partial<WizardData>) => {
     setWizardData((prev) => ({ ...prev, ...partial }));
@@ -1643,6 +1677,7 @@ export default function Wizard() {
         estimated_netto_monthly: computeNettoEinkommen(wizardData),
         subscription_total: subscriptionTotal,
       });
+      localStorage.removeItem(STORAGE_KEY);
       navigate("/");
     } catch (err) {
       console.error("Wizard submit failed:", err);

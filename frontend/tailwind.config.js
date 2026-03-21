@@ -89,10 +89,12 @@ export default {
       },
 
       borderRadius: {
-        DEFAULT: "0.5rem",
-        card: "0.75rem",
-        xl: "1rem",
-        "2xl": "1.25rem",
+        none: "0",
+        sm: "2px",      // Level 4 – Badges, Icon-Container, Tags
+        DEFAULT: "4px", // Level 3 – Inputs, Buttons
+        md: "6px",      // Level 2 – Sub-Cards, Accordions, Toggle-Cards
+        lg: "8px",      // Level 1 – Haupt-Cards, Sections
+        full: "9999px", // Kreise, Progress-Bars, Avatare
       },
 
       boxShadow: {

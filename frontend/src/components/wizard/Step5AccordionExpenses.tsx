@@ -16,7 +16,7 @@ import {
 import { clsx } from "clsx";
 import { toMonthlyCHF } from "@/services/faviconService";
 import type { Frequency, SupportedCurrency } from "@/services/faviconService";
-import ProviderIcon from "./ProviderIcon";
+import ProviderBrandIcon from "./ProviderBrandIcon";
 import ProviderSidebar from "./ProviderSidebar";
 import CustomProviderSidebar from "./CustomProviderSidebar";
 
@@ -779,7 +779,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
         </div>
 
         {/* Summary bar */}
-        <div className="flex items-center justify-between rounded-xl bg-bg-surface2 border border-border/50 px-4 py-2.5">
+        <div className="flex items-center justify-between rounded-lg bg-bg-surface2 border border-border/50 px-4 py-2.5">
           <div className="flex items-center gap-2 text-text-secondary text-sm">
             <Check className="w-3.5 h-3.5 text-gain" />
             <span>{totalCount} Positionen ausgewählt</span>
@@ -795,7 +795,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
             data.customExpenseEntries.filter(e => e.categoryId === cat.id).length;
 
           return (
-            <div key={cat.id} className="bg-bg-surface border border-border/50 rounded-xl overflow-hidden">
+            <div key={cat.id} className="bg-bg-surface border border-border/50 rounded-lg overflow-hidden">
 
               {/* Accordion toggle */}
               <button
@@ -853,7 +853,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
                         </div>
 
                         {/* Provider icon (favicon) */}
-                        <ProviderIcon website={prov.website} name={prov.name} size={20} />
+                        <ProviderBrandIcon providerId={prov.id} size={20} />
 
                         {/* Name + tagline */}
                         <div className="flex-1 min-w-0">
@@ -947,11 +947,11 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
                                 type="button"
                                 onClick={() => handleSearchSelect(provider, resCat)}
                                 className={clsx(
-                                  "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-white/[0.04] transition-colors text-left",
+                                  "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md hover:bg-white/[0.04] transition-colors text-left",
                                   selectedMap[provider.id] && "opacity-60"
                                 )}
                               >
-                                <ProviderIcon website={provider.website} name={provider.name} size={16} />
+                                <ProviderBrandIcon providerId={provider.id} size={16} />
                                 <div className="flex-1 min-w-0">
                                   <span className="text-text-primary text-xs font-medium">{provider.name}</span>
                                   <span className="text-text-tertiary text-[10px] ml-2">{resCat.label}</span>
@@ -967,7 +967,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
                             <button
                               type="button"
                               onClick={() => openCustomNew(cat.id, searchQuery)}
-                              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-accent/8 text-accent text-left transition-colors border border-dashed border-accent/30 mt-1"
+                              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md hover:bg-accent/8 text-accent text-left transition-colors border border-dashed border-accent/30 mt-1"
                             >
                               <Plus className="w-3.5 h-3.5 flex-shrink-0" />
                               <span className="text-xs font-medium">
@@ -985,7 +985,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
                         <button
                           type="button"
                           onClick={() => openCustomNew(cat.id)}
-                          className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-accent/8 text-accent text-left transition-colors border border-dashed border-accent/30"
+                          className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md hover:bg-accent/8 text-accent text-left transition-colors border border-dashed border-accent/30"
                         >
                           <Plus className="w-3.5 h-3.5 flex-shrink-0" />
                           <span className="text-xs font-medium">Eigenen Anbieter anlegen</span>

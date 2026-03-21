@@ -60,27 +60,27 @@
 
 @layer components {
   .card {
-    @apply bg-bg-surface border border-border/50 rounded-card p-4 shadow-card;
+    @apply bg-bg-surface border border-border/50 rounded-lg p-4 shadow-card;
   }
 
   .card-elevated {
-    @apply bg-bg-surface2 border border-border/50 rounded-card p-4;
+    @apply bg-bg-surface2 border border-border/50 rounded-lg p-4;
   }
 
   .btn-primary {
-    @apply bg-accent hover:bg-accent-dark text-white font-medium px-4 py-2 rounded-lg transition-colors duration-150 text-sm;
+    @apply bg-accent hover:bg-accent-dark text-white font-medium px-4 py-2 rounded transition-colors duration-150 text-sm;
   }
 
   .btn-secondary {
-    @apply bg-bg-surface2 hover:bg-bg-elevated border border-border text-text-primary font-medium px-4 py-2 rounded-lg transition-colors duration-150 text-sm;
+    @apply bg-bg-surface2 hover:bg-bg-elevated border border-border text-text-primary font-medium px-4 py-2 rounded transition-colors duration-150 text-sm;
   }
 
   .btn-ghost {
-    @apply hover:bg-bg-surface2 text-text-secondary hover:text-text-primary px-3 py-2 rounded-lg transition-colors duration-150 text-sm;
+    @apply hover:bg-bg-surface2 text-text-secondary hover:text-text-primary px-3 py-2 rounded transition-colors duration-150 text-sm;
   }
 
   .input {
-    @apply bg-bg-surface2 border border-border text-text-primary placeholder-text-tertiary rounded-lg px-3 py-2 text-sm w-full focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/30 transition-colors duration-150;
+    @apply bg-bg-surface2 border border-border text-text-primary placeholder-text-tertiary rounded px-3 py-2 text-sm w-full focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/30 transition-colors duration-150;
   }
 
   .label {
@@ -104,11 +104,11 @@
   }
 
   .badge {
-    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium;
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-xs font-medium;
   }
 
   .skeleton {
-    @apply bg-bg-surface2 rounded animate-pulse;
+    @apply bg-bg-surface2 rounded-sm animate-pulse;
   }
 
   /* Nivo chart overrides */
