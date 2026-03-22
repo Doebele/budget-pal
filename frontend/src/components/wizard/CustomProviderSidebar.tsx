@@ -107,7 +107,7 @@ export default function CustomProviderSidebar({
   }
 
   return (
-    <div className="sticky top-4 flex flex-col bg-bg-surface border border-border/50 rounded-xl overflow-hidden shadow-2xl max-h-[calc(100vh-2rem)]">
+    <div className="flex flex-col h-full bg-bg-surface border border-border/50 rounded-lg overflow-hidden shadow-2xl">
 
       {/* ── Fixed Header ──────────────────────────────────── */}
       <header className="flex items-center gap-3 px-4 py-3 border-b border-border/50 bg-bg-surface2 flex-shrink-0">

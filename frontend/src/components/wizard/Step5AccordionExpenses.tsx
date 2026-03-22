@@ -6,7 +6,8 @@
  *  RIGHT – Sticky detail sidebar for focused provider OR custom provider sidebar
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   ChevronDown, ChevronRight, Plus, X,
   Check, Tv, Music, Cloud, Smartphone, Newspaper,
@@ -762,6 +763,24 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
 
   const totalCount = data.expenseEntries.length + data.customExpenseEntries.length;
 
+  // Mobile overlay open state
+  const mobileOverlayOpen = !!(focusedProvider || customSidebarState);
+
+  // Lock body scroll when mobile overlay is open
+  useEffect(() => {
+    if (mobileOverlayOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [mobileOverlayOpen]);
+
+  function closeMobileOverlay() {
+    closeSidebarProvider();
+    closeCustomSidebar();
+  }
+
   // ── Render ────────────────────────────────────────────────────
 
   return (
@@ -1015,10 +1034,10 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
         })}
       </div>
 
-      {/* ── RIGHT: Sticky Sidebar ────────────────────────────── */}
+      {/* ── RIGHT: Sticky Sidebar (desktop lg+) ──────────────── */}
       <div className={clsx(
-        "hidden lg:block w-72 flex-shrink-0",
-        !focusedProvider && !customSidebarState && "invisible"
+        "hidden lg:block w-72 flex-shrink-0 sticky top-4 max-h-[calc(100vh-2rem)]",
+        !focusedProvider && !customSidebarState && "invisible pointer-events-none"
       )}>
         {focusedProvider && focusedCategory && !customSidebarState && (
           <ProviderSidebar
@@ -1048,6 +1067,56 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
           />
         )}
       </div>
+
+      {/* ── Mobile Bottom-Sheet Overlay (< lg) — rendered in portal to escape transform context ── */}
+      {mobileOverlayOpen && createPortal(
+        <div className="lg:hidden">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+            onClick={closeMobileOverlay}
+          />
+
+          {/* Bottom sheet */}
+          <div className="fixed bottom-0 left-0 right-0 z-50 flex flex-col max-h-[88vh] animate-slide-up">
+            {/* Drag handle */}
+            <div className="flex justify-center pt-2 pb-1 bg-bg-surface rounded-t-lg border-t border-x border-border/50">
+              <div className="w-10 h-1 rounded-full bg-white/20" />
+            </div>
+
+            <div className="flex-1 min-h-0 overflow-hidden border-x border-b border-border/50 rounded-b-lg">
+              {focusedProvider && focusedCategory && !customSidebarState && (
+                <ProviderSidebar
+                  provider={focusedProvider}
+                  category={focusedCategory}
+                  entry={focusedEntry}
+                  onClose={closeMobileOverlay}
+                  onSelect={() => handleProviderClick(focusedProvider, focusedCategory.id)}
+                  onDeselect={() => removeProvider(focusedProvider.id)}
+                  onUpdate={(patch) => updateEntry(focusedProvider.id, patch)}
+                />
+              )}
+              {customSidebarState && (
+                <CustomProviderSidebar
+                  key={customSidebarState.mode === "new" ? "new" : customSidebarState.entryId}
+                  categories={EXPENSE_CATEGORIES}
+                  initialCategoryId={customSidebarState.mode === "new" ? customSidebarState.categoryId : undefined}
+                  initialName={customSidebarState.mode === "new" ? customSidebarState.initialName : undefined}
+                  entry={
+                    customSidebarState.mode === "edit"
+                      ? (data.customExpenseEntries.find(e => e.id === customSidebarState.entryId) ?? null)
+                      : null
+                  }
+                  onClose={closeMobileOverlay}
+                  onSave={handleCustomSave}
+                  onDelete={(id) => { removeCustomEntry(id); closeMobileOverlay(); }}
+                />
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
