@@ -766,9 +766,9 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
   // Mobile overlay open state
   const mobileOverlayOpen = !!(focusedProvider || customSidebarState);
 
-  // Lock body scroll when mobile overlay is open
+  // Lock body scroll ONLY on mobile (< lg = 1024px) when the overlay is open
   useEffect(() => {
-    if (mobileOverlayOpen) {
+    if (mobileOverlayOpen && window.innerWidth < 1024) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
@@ -1036,7 +1036,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
 
       {/* ── RIGHT: Sticky Sidebar (desktop lg+) ──────────────── */}
       <div className={clsx(
-        "hidden lg:block w-72 flex-shrink-0 sticky top-4 max-h-[calc(100vh-2rem)]",
+        "hidden lg:flex lg:flex-col w-72 flex-shrink-0 sticky top-4 max-h-[calc(100vh-2rem)] overflow-hidden",
         !focusedProvider && !customSidebarState && "invisible pointer-events-none"
       )}>
         {focusedProvider && focusedCategory && !customSidebarState && (
@@ -1084,7 +1084,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
               <div className="w-10 h-1 rounded-full bg-white/20" />
             </div>
 
-            <div className="flex-1 min-h-0 overflow-hidden border-x border-b border-border/50 rounded-b-lg">
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden border-x border-b border-border/50 rounded-b-lg">
               {focusedProvider && focusedCategory && !customSidebarState && (
                 <ProviderSidebar
                   provider={focusedProvider}
