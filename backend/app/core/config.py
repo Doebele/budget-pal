@@ -41,6 +41,13 @@ class Settings(BaseSettings):
     def openai_enabled(self) -> bool:
         return bool(self.openai_api_key)
 
+    # ── Mistral (optional — OCR fallback) ─────────────────────
+    mistral_api_key: str = ""
+
+    @property
+    def mistral_ocr_enabled(self) -> bool:
+        return bool(self.mistral_api_key)
+
     # ── Uploads ───────────────────────────────────────────────
     uploads_dir: str = "/app/data/uploads"
     max_upload_size_mb: int = 50

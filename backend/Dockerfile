@@ -67,13 +67,7 @@ COPY --chown=appuser:appuser alembic.ini ./alembic.ini
 
 USER appuser
 
-# Pre-download sentence-transformers model at build time to avoid cold start
-# Comment out if you want to reduce image size and download on first run
-RUN python -c "\
-from sentence_transformers import SentenceTransformer; \
-model = SentenceTransformer('all-MiniLM-L6-v2'); \
-print('Model cached successfully')" || \
-    echo "Warning: sentence-transformers model pre-download failed. Will download on first run."
+# Model wird beim ersten API-Aufruf lazy-geladen (spart ~400MB Build-Cache)
 
 EXPOSE 8000
 

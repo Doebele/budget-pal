@@ -6,12 +6,17 @@ POST /imports/pdf         — upload PDF, OCR, parse, categorize
 GET  /imports/history     — list past imports
 GET  /imports/{id}/preview — preview a past import result
 """
+import base64
 import hashlib
 import io
+import logging
 import os
+import re
 import tempfile
 from datetime import datetime
 from typing import List, Optional
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel
@@ -559,6 +564,79 @@ async def import_csv(
     )
 
 
+async def _ocr_pdf_to_text(tmp_path: str) -> str:
+    """
+    Two-stage OCR pipeline for scanned PDF bank statements.
+
+    Stage 1 — pytesseract (local, zero cost):
+        Converts each PDF page to an image via pdf2image and runs
+        Tesseract with German+English language packs.  Fast and private.
+
+    Stage 2 — Mistral OCR fallback (API, ~$0.001/page):
+        Triggered only when pytesseract yields fewer than 100 characters.
+        Sends the raw PDF as base64 to mistral-ocr-latest which handles
+        complex layouts and handwriting far better than Tesseract.
+        Skipped gracefully when MISTRAL_API_KEY is not configured.
+
+    Returns a newline-separated plain-text string consumed by
+    _parse_pdf_text().
+    """
+    import asyncio
+    import pytesseract
+    from pdf2image import convert_from_path
+
+    images = convert_from_path(tmp_path, dpi=200)
+    tess_config = "--oem 3 --psm 6 -l deu+eng"
+    loop = asyncio.get_event_loop()
+
+    # ── Stage 1: pytesseract (local) ──────────────────────────
+    pages_text = []
+    for img in images:
+        page_text = await loop.run_in_executor(
+            None, lambda i=img: pytesseract.image_to_string(i, config=tess_config)
+        )
+        pages_text.append(page_text)
+    full_text = "\n".join(pages_text)
+
+    if len(full_text.strip()) >= 100:
+        logger.info("OCR: pytesseract succeeded (%d chars).", len(full_text))
+        return full_text
+
+    logger.info("OCR: pytesseract sparse (%d chars), trying Mistral fallback.", len(full_text))
+
+    # ── Stage 2: Mistral OCR fallback ─────────────────────────
+    if not settings.mistral_ocr_enabled:
+        logger.warning("OCR: Mistral fallback skipped — MISTRAL_API_KEY not set.")
+        return full_text
+
+    try:
+        from mistralai import Mistral
+
+        with open(tmp_path, "rb") as f:
+            pdf_b64 = base64.b64encode(f.read()).decode("utf-8")
+
+        client = Mistral(api_key=settings.mistral_api_key)
+        response = await loop.run_in_executor(
+            None,
+            lambda: client.ocr.process(
+                model="mistral-ocr-latest",
+                document={
+                    "type": "document_url",
+                    "document_url": f"data:application/pdf;base64,{pdf_b64}",
+                },
+            ),
+        )
+        mistral_text = "\n".join(
+            getattr(page, "markdown", "") or "" for page in response.pages
+        )
+        logger.info("OCR: Mistral succeeded (%d chars).", len(mistral_text))
+        return mistral_text
+
+    except Exception as mistral_err:
+        logger.warning("OCR: Mistral fallback failed: %s", mistral_err)
+        return full_text
+
+
 @router.post("/pdf", response_model=ImportResultResponse, status_code=status.HTTP_201_CREATED)
 async def import_pdf(
     file: UploadFile = File(...),
@@ -592,24 +670,12 @@ async def import_pdf(
                 page.extract_text() or "" for page in pdf.pages
             )
 
-        # If pdfplumber extraction is too sparse, fall back to EasyOCR
+        # If pdfplumber extraction is too sparse, fall back to OCR pipeline
         if len(full_text.strip()) < 100:
             try:
-                import easyocr
-                from pdf2image import convert_from_path
-
-                reader = easyocr.Reader(["de", "en"], gpu=False)
-                images = convert_from_path(tmp_path, dpi=200)
-                full_text = ""
-                for img in images:
-                    ocr_result = reader.readtext(
-                        img,
-                        detail=0,
-                        paragraph=True,
-                    )
-                    full_text += "\n".join(ocr_result) + "\n"
+                full_text = await _ocr_pdf_to_text(tmp_path)
             except Exception as ocr_err:
-                pass
+                logger.warning("OCR pipeline failed: %s", ocr_err)
 
         # Basic line-by-line parsing for UBS-style PDF statements
         detected_bank = bank or "ubs"
@@ -704,7 +770,6 @@ async def import_pdf(
 
 def _parse_pdf_text(text: str, bank: str) -> List[dict]:
     """Simple regex-based line parser for PDF statement text."""
-    import re
     from datetime import datetime
 
     rows = []

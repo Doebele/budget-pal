@@ -13,7 +13,7 @@ from typing import Dict, Optional
 import aiofiles
 import httpx
 
-from app.core.database import async_session_maker
+from app.core.database import AsyncSessionLocal as async_session_maker
 from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
