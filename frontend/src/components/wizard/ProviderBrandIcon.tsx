@@ -74,7 +74,7 @@ export default function ProviderBrandIcon({ providerId, size = 20, className }: 
         )}
         style={{ width: size, height: size }}
       >
-        <BrandIcon size={Math.round(size * 0.65)} className="text-text-secondary" />
+        <BrandIcon size={Math.round(size * 0.65)} className="filter-grayscale text-text-secondary" />
       </div>
     );
   }

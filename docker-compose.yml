@@ -7,6 +7,8 @@ volumes:
     driver: local
   budget-pal-uploads:
     driver: local
+  budget-pal-cache:
+    driver: local
 
 services:
   budget-pal-db:
@@ -48,10 +50,12 @@ services:
       AHV_MAX_PENSION_CHF: ${AHV_MAX_PENSION_CHF:-2520}
       AHV_CONVERSION_RATE_BVG: ${AHV_CONVERSION_RATE_BVG:-0.068}
       UPLOADS_DIR: /app/data/uploads
+      RATES_CACHE_PATH: /app/data/cache/rates.json
       ENVIRONMENT: ${ENVIRONMENT:-production}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:8011,https://budgetpal.doebele12.de}
     volumes:
       - budget-pal-uploads:/app/data/uploads
+      - budget-pal-cache:/app/data/cache
     depends_on:
       budget-pal-db:
         condition: service_healthy

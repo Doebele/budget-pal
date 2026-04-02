@@ -11,7 +11,8 @@ from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.core.database import init_db
-from app.api import auth, transactions, imports, projections, accounts, categories, budgets, pension, assets, wizard
+from app.api import auth, transactions, imports, projections, accounts, categories, budgets, pension, assets, wizard, currency
+from app.services.currency_service import currency_service
 
 logging.basicConfig(
     level=logging.INFO,
@@ -30,6 +31,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Database init failed: {e}")
         raise
+
+    # Load currency exchange rates
+    try:
+        rates = await currency_service.load_rates()
+        logger.info(f"Loaded {len(rates)} currency exchange rates")
+    except Exception as e:
+        logger.error(f"Failed to load currency rates: {e}")
+        # Non-fatal: fallback rates will be used
 
     yield
 
@@ -70,6 +79,7 @@ app.include_router(budgets.router, prefix="/api/budgets", tags=["budgets"])
 app.include_router(pension.router, prefix="/api/pension", tags=["pension"])
 app.include_router(assets.router, prefix="/api/assets", tags=["assets"])
 app.include_router(wizard.router, prefix="/api/wizard", tags=["wizard"])
+app.include_router(currency.router, prefix="/api/currency", tags=["currency"])
 
 
 # ── Health Check ──────────────────────────────────────────────

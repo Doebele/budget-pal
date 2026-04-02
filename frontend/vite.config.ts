@@ -13,7 +13,7 @@ export default defineConfig({
   },
 
   server: {
-    port: 5173,
+    port: parseInt(process.env.PORT || "5173"),
     proxy: {
       // Proxy /api requests to the backend during development
       "/api": {

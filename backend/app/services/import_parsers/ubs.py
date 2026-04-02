@@ -142,23 +142,31 @@ class UBSParser:
         return transactions
 
     def _recalculate_amounts_from_balance(self, transactions: List[Dict]) -> List[Dict]:
-        """Recalculate transaction amounts from balance differences in chronological order."""
+        """
+        Recalculate transaction amounts from saldo differences in chronological order.
+
+        UBS balance-based CSVs are ambiguous whether the "Saldo" value is before or after booking.
+        To avoid losing the opening balance change on the first transaction, we compute amounts via
+        look-ahead differences (next_balance - current_balance).
+        """
         if not transactions:
             return transactions
 
         # Sort by date (oldest first)
         sorted_txns = sorted(transactions, key=lambda x: x["date"])
 
-        prev_balance: Optional[float] = None
-        for txn in sorted_txns:
+        for idx, txn in enumerate(sorted_txns):
             balance = txn.get("balance")
-            if balance is not None and prev_balance is not None:
-                # Amount = current balance - previous balance
-                txn["amount"] = balance - prev_balance
-            elif balance is not None and prev_balance is None:
-                # First transaction - set amount to 0 (we don't know the starting balance)
+            next_txn = sorted_txns[idx + 1] if idx + 1 < len(sorted_txns) else None
+            next_balance = next_txn.get("balance") if next_txn else None
+
+            # If we can't determine either side, fall back to 0.
+            if balance is None or next_balance is None:
                 txn["amount"] = 0.0
-            prev_balance = balance
+                continue
+
+            # Amount = next saldo - current saldo.
+            txn["amount"] = next_balance - balance
 
         return sorted_txns
 

@@ -18,7 +18,8 @@ class AccountCreate(BaseModel):
     bank: str
     account_number: Optional[str] = None
     iban: Optional[str] = None
-    currency: str
+    # Backward compatible default: many clients relied on CHF implicitly.
+    currency: str = "CHF"
     balance: float = 0.0
     account_type: AccountType = AccountType.checking
     color: Optional[str] = None

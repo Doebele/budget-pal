@@ -3,10 +3,11 @@
   "configurations": [
     {
       "name": "Frontend (Vite Dev)",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeExecutable": "/opt/homebrew/opt/node/bin/node",
+      "runtimeArgs": ["./node_modules/.bin/vite"],
       "cwd": "frontend",
-      "port": 5173
+      "port": 5173,
+      "autoPort": true
     },
     {
       "name": "Backend (FastAPI + Uvicorn)",
