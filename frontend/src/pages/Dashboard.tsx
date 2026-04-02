@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { ArrowUpRight, ArrowDownRight, Wallet, TrendingUp, Upload, ArrowRight } from "lucide-react";
+import { ArrowUpRight, ArrowDownRight, Wallet, TrendingUp, Upload, ArrowRight, BarChart3, Target, FileUp } from "lucide-react";
 import { transactionsApi, accountsApi } from "@/lib/api";
 import { formatCHF, colors } from "@/lib/theme";
 import { format, startOfMonth, endOfMonth } from "date-fns";
@@ -212,17 +212,17 @@ export default function Dashboard() {
       {/* Quick nav */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { to: "/transactions", label: "Transaktionen", desc: "Alle ansehen & filtern", icon: "📊" },
-          { to: "/budget", label: "Budget", desc: "Ziele verwalten", icon: "🎯" },
-          { to: "/projections", label: "Prognosen", desc: "Monte Carlo & Rente", icon: "📈" },
-          { to: "/import", label: "Import", desc: "CSV / PDF hochladen", icon: "📂" },
-        ].map(({ to, label, desc, icon }) => (
+          { to: "/transactions", label: "Transaktionen", desc: "Alle ansehen & filtern", Icon: BarChart3 },
+          { to: "/budget", label: "Budget", desc: "Ziele verwalten", Icon: Target },
+          { to: "/projections", label: "Prognosen", desc: "Monte Carlo & Rente", Icon: TrendingUp },
+          { to: "/import", label: "Import", desc: "CSV / PDF hochladen", Icon: FileUp },
+        ].map(({ to, label, desc, Icon }) => (
           <Link
             key={to}
             to={to}
             className="card hover:border-accent/30 transition-colors cursor-pointer group"
           >
-            <span className="text-2xl mb-2 block">{icon}</span>
+            <Icon className="w-7 h-7 mb-2 text-accent" />
             <p className="text-text-primary text-sm font-semibold group-hover:text-accent transition-colors">{label}</p>
             <p className="text-text-tertiary text-xs mt-0.5">{desc}</p>
           </Link>

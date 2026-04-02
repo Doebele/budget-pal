@@ -96,6 +96,7 @@ class User(Base):
     assets: Mapped[List["Asset"]] = relationship("Asset", back_populates="user", cascade="all, delete-orphan")
     scenarios: Mapped[List["Scenario"]] = relationship("Scenario", back_populates="user", cascade="all, delete-orphan")
     import_logs: Mapped[List["ImportLog"]] = relationship("ImportLog", back_populates="user", cascade="all, delete-orphan")
+    activity_logs: Mapped[List["ActivityLog"]] = relationship("ActivityLog", back_populates="user")
 
 
 # ── Account ───────────────────────────────────────────────────
@@ -167,6 +168,11 @@ class Transaction(Base):
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     is_transfer: Mapped[bool] = mapped_column(Boolean, default=False)
     is_recurring: Mapped[bool] = mapped_column(Boolean, default=False)
+    periodicity: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+    # Soft delete fields
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
@@ -369,3 +375,26 @@ class ImportLog(Base):
 
     user: Mapped["User"] = relationship("User", back_populates="import_logs")
     account: Mapped[Optional["Account"]] = relationship("Account", back_populates="import_logs")
+
+
+# ── ActivityLog (audit: deletes / bulk archive) ───────────────
+
+class ActivityLog(Base):
+    """Append-only log for financial data mutations (compliance / support)."""
+
+    __tablename__ = "activity_log"
+    __table_args__ = (Index("ix_activity_log_user_created", "user_id", "created_at"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    action: Mapped[str] = mapped_column(String(64), nullable=False)
+    method: Mapped[str] = mapped_column(String(16), nullable=False)
+    affected_rows: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    detail: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    user: Mapped[Optional["User"]] = relationship("User", back_populates="activity_logs")

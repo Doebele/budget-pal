@@ -43,7 +43,13 @@ class UBSParser:
         # Map column names to indices
         col_map = self._map_columns(header)
 
+        # Check if we have explicit debit/credit columns or need to calculate from balance
+        has_debit_credit = col_map.get("debit") is not None or col_map.get("credit") is not None
+        has_balance = col_map.get("balance") is not None
+
         transactions = []
+        prev_balance: Optional[float] = None
+
         for line in data_lines:
             line = line.strip()
             if not line:
@@ -76,16 +82,45 @@ class UBSParser:
             if not description.strip():
                 continue
 
-            # Amount: debit is negative, credit is positive
-            debit_str = self._get_col(row, col_map.get("debit")) or ""
-            credit_str = self._get_col(row, col_map.get("credit")) or ""
+            amount: float = 0.0
 
-            amount = self._parse_amount(credit_str) or 0.0
-            debit_amount = self._parse_amount(debit_str)
-            if debit_amount:
-                amount = -abs(debit_amount)
+            if has_debit_credit:
+                # Standard case: use explicit Belastung/Gutschrift columns
+                debit_str = self._get_col(row, col_map.get("debit")) or ""
+                credit_str = self._get_col(row, col_map.get("credit")) or ""
 
-            if amount == 0.0 and not debit_str and not credit_str:
+                credit_amount = self._parse_amount(credit_str) or 0.0
+                debit_amount = self._parse_amount(debit_str)
+                if debit_amount:
+                    amount = -abs(debit_amount)
+                else:
+                    amount = credit_amount
+
+            elif has_balance:
+                # Calculate amount from balance difference (Saldo-based CSV)
+                # CSV rows are typically in reverse chronological order (newest first)
+                balance_str = self._get_col(row, col_map.get("balance")) or ""
+                current_balance = self._parse_amount(balance_str)
+
+                if current_balance is None:
+                    continue
+
+                if prev_balance is not None:
+                    # Amount = previous balance - current balance
+                    # If previous balance was higher, it's a debit (negative)
+                    # If current balance is higher, it's a credit (positive)
+                    amount = prev_balance - current_balance
+                else:
+                    # First row - can't calculate amount without previous balance
+                    # Skip or use amount as 0
+                    amount = 0.0
+
+                prev_balance = current_balance
+            else:
+                # Neither debit/credit nor balance columns found
+                continue
+
+            if amount == 0.0 and not has_balance:
                 continue
 
             transactions.append({
@@ -94,9 +129,38 @@ class UBSParser:
                 "description": description,
                 "amount": amount,
                 "currency": "CHF",
+                "balance": prev_balance if has_balance else None,
             })
 
+        # If we calculated amounts from balance, the transactions are in reverse order
+        # Reverse them to get chronological order (oldest first)
+        if has_balance and not has_debit_credit:
+            transactions.reverse()
+            # Recalculate amounts after reversing since we need forward calculation
+            transactions = self._recalculate_amounts_from_balance(transactions)
+
         return transactions
+
+    def _recalculate_amounts_from_balance(self, transactions: List[Dict]) -> List[Dict]:
+        """Recalculate transaction amounts from balance differences in chronological order."""
+        if not transactions:
+            return transactions
+
+        # Sort by date (oldest first)
+        sorted_txns = sorted(transactions, key=lambda x: x["date"])
+
+        prev_balance: Optional[float] = None
+        for txn in sorted_txns:
+            balance = txn.get("balance")
+            if balance is not None and prev_balance is not None:
+                # Amount = current balance - previous balance
+                txn["amount"] = balance - prev_balance
+            elif balance is not None and prev_balance is None:
+                # First transaction - set amount to 0 (we don't know the starting balance)
+                txn["amount"] = 0.0
+            prev_balance = balance
+
+        return sorted_txns
 
     def _find_header_line(self, lines: List[str]) -> Optional[int]:
         """Scan lines to find the header row."""

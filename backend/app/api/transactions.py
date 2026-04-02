@@ -9,7 +9,7 @@ POST   /transactions/bulk-categorize
 GET    /transactions/stats
 GET    /transactions/monthly-summary
 """
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status, BackgroundTasks
@@ -22,6 +22,7 @@ from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.models import Transaction, Account, User, Category
 from app.services.categorization import CategorizationService
+from app.services.audit_log import record_activity
 
 router = APIRouter()
 categorization_service = CategorizationService()
@@ -46,7 +47,25 @@ class TransactionResponse(BaseModel):
     notes: Optional[str]
     is_transfer: bool
     is_recurring: bool
+    periodicity: Optional[str] = None
     created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ArchivedTransactionResponse(BaseModel):
+    """Soft-deleted transaction for archive / restore UI."""
+
+    id: int
+    account_id: int
+    account_name: str
+    date: datetime
+    description: str
+    amount: float
+    currency: str
+    category: Optional[str]
+    deleted_at: Optional[datetime]
 
     class Config:
         from_attributes = True
@@ -62,6 +81,8 @@ class TransactionCreate(BaseModel):
     subcategory: Optional[str] = None
     notes: Optional[str] = None
     is_transfer: bool = False
+    is_recurring: bool = False
+    periodicity: Optional[str] = None  # 'weekly', 'monthly', 'quarterly', 'halfyearly', 'yearly'
 
 
 class TransactionUpdate(BaseModel):
@@ -73,6 +94,7 @@ class TransactionUpdate(BaseModel):
     notes: Optional[str] = None
     is_transfer: Optional[bool] = None
     is_recurring: Optional[bool] = None
+    periodicity: Optional[str] = None
     user_verified: Optional[bool] = None
     merchant_normalized: Optional[str] = None
 
@@ -100,24 +122,192 @@ class StatsResponse(BaseModel):
     transaction_count: int
 
 
+class RecurringCostItem(BaseModel):
+    description: str
+    category: Optional[str]
+    amount: float
+    periodicity: str
+    monthly_equivalent: float
+
+
+class BudgetAnalysisResponse(BaseModel):
+    total_monthly_income: float
+    fixed_recurring_costs: float  # Sum of all recurring transactions * periodicity factor
+    variable_costs: float  # Sum of all non-recurring transactions
+    monthly_budget_limit: float  # Configurable or calculated
+    variance: float  # Limit - (Fixed + Variable)
+    recurring_items: List[RecurringCostItem]
+    period_start: date
+    period_end: date
+
+
 # ── Helper ────────────────────────────────────────────────────
+
+# Periodicity factors to convert to monthly equivalent
+PERIODICITY_MONTHLY_FACTOR = {
+    "weekly": 4.33,      # ~52 weeks / 12 months
+    "monthly": 1.0,
+    "quarterly": 1.0 / 3,  # 4 times per year
+    "halfyearly": 1.0 / 6,  # 2 times per year
+    "yearly": 1.0 / 12,    # 1 time per year
+}
 
 async def get_user_transaction(
     transaction_id: int,
     current_user: User,
     db: AsyncSession,
+    *,
+    only_active: bool = True,
 ) -> Transaction:
-    """Fetch a transaction that belongs to the current user."""
+    """Fetch a transaction that belongs to the current user (excludes archived by default)."""
+    filters = [
+        Transaction.id == transaction_id,
+        Account.user_id == current_user.id,
+    ]
+    if only_active:
+        filters.append(Transaction.is_deleted.isnot(True))
     result = await db.execute(
         select(Transaction)
         .join(Account)
-        .where(Transaction.id == transaction_id, Account.user_id == current_user.id)
+        .where(and_(*filters))
         .options(selectinload(Transaction.account))
     )
     txn = result.scalar_one_or_none()
     if not txn:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found.")
     return txn
+
+
+async def get_user_archived_transaction(
+    transaction_id: int,
+    current_user: User,
+    db: AsyncSession,
+) -> Transaction:
+    """Fetch a soft-deleted transaction owned by the user."""
+    result = await db.execute(
+        select(Transaction)
+        .join(Account)
+        .where(
+            Transaction.id == transaction_id,
+            Account.user_id == current_user.id,
+            Transaction.is_deleted.is_(True),
+        )
+        .options(selectinload(Transaction.account))
+    )
+    txn = result.scalar_one_or_none()
+    if not txn:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Archived transaction not found.",
+        )
+    return txn
+
+
+def _to_archived_response(t: Transaction) -> ArchivedTransactionResponse:
+    return ArchivedTransactionResponse(
+        id=t.id,
+        account_id=t.account_id,
+        account_name=t.account.name,
+        date=t.date,
+        description=t.description,
+        amount=t.amount,
+        currency=t.currency,
+        category=t.category,
+        deleted_at=t.deleted_at,
+    )
+
+
+# ── Routes (specific paths before `/{id}`) ────────────────────
+
+@router.get("/archived", response_model=List[ArchivedTransactionResponse])
+async def list_archived_transactions(
+    account_id: Optional[int] = Query(None),
+    limit: int = Query(200, le=500),
+    offset: int = Query(0),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List soft-deleted (archived) transactions for recovery."""
+    filters = [
+        Account.user_id == current_user.id,
+        Transaction.is_deleted.is_(True),
+    ]
+    if account_id is not None:
+        filters.append(Transaction.account_id == account_id)
+
+    result = await db.execute(
+        select(Transaction)
+        .join(Account)
+        .where(and_(*filters))
+        .options(selectinload(Transaction.account))
+        .order_by(desc(Transaction.deleted_at), desc(Transaction.date))
+        .limit(limit)
+        .offset(offset)
+    )
+    rows = result.scalars().all()
+    return [_to_archived_response(t) for t in rows]
+
+
+@router.post("/{transaction_id}/restore", response_model=TransactionResponse)
+async def restore_transaction(
+    transaction_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Restore a soft-deleted transaction to the main ledger."""
+    txn = await get_user_archived_transaction(transaction_id, current_user, db)
+    txn.is_deleted = False
+    txn.deleted_at = None
+    await db.flush()
+    await db.refresh(txn)
+    await record_activity(
+        db,
+        user_id=current_user.id,
+        action="transaction_restore",
+        method="single",
+        affected_rows=1,
+        detail={"transaction_id": transaction_id, "account_id": txn.account_id},
+    )
+    return TransactionResponse(
+        id=txn.id,
+        account_id=txn.account_id,
+        account_name=txn.account.name,
+        date=txn.date,
+        booking_date=txn.booking_date,
+        description=txn.description,
+        merchant_normalized=txn.merchant_normalized,
+        amount=txn.amount,
+        currency=txn.currency,
+        category=txn.category,
+        subcategory=txn.subcategory,
+        confidence_score=txn.confidence_score,
+        user_verified=txn.user_verified,
+        notes=txn.notes,
+        is_transfer=txn.is_transfer,
+        is_recurring=txn.is_recurring,
+        periodicity=txn.periodicity,
+        created_at=txn.created_at,
+    )
+
+
+@router.delete("/archived/{transaction_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def purge_archived_transaction(
+    transaction_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Permanently remove an archived transaction (hard delete)."""
+    txn = await get_user_archived_transaction(transaction_id, current_user, db)
+    aid = txn.account_id
+    await db.delete(txn)
+    await record_activity(
+        db,
+        user_id=current_user.id,
+        action="transaction_purge_archived",
+        method="single",
+        affected_rows=1,
+        detail={"transaction_id": transaction_id, "account_id": aid},
+    )
 
 
 # ── Routes ────────────────────────────────────────────────────
@@ -138,7 +328,12 @@ async def list_transactions(
     db: AsyncSession = Depends(get_db),
 ):
     """List transactions for the current user with optional filters."""
-    filters = [Account.user_id == current_user.id]
+    # Filter out soft-deleted transactions (is_deleted is False or NULL)
+    # SQLite stores booleans as 0/1, so we check for both False and None/NULL
+    filters = [
+        Account.user_id == current_user.id,
+        Transaction.is_deleted.isnot(True)  # Filters out True (1), keeps False (0) and NULL
+    ]
 
     if start:
         filters.append(Transaction.date >= datetime.combine(start, datetime.min.time()))
@@ -238,6 +433,8 @@ async def create_transaction(
         merchant_normalized=merchant_normalized,
         notes=payload.notes,
         is_transfer=payload.is_transfer,
+        is_recurring=payload.is_recurring,
+        periodicity=payload.periodicity,
         user_verified=bool(payload.category),
     )
     db.add(txn)
@@ -261,6 +458,7 @@ async def create_transaction(
         notes=txn.notes,
         is_transfer=txn.is_transfer,
         is_recurring=txn.is_recurring,
+        periodicity=txn.periodicity,
         created_at=txn.created_at,
     )
 
@@ -302,6 +500,7 @@ async def update_transaction(
         notes=txn.notes,
         is_transfer=txn.is_transfer,
         is_recurring=txn.is_recurring,
+        periodicity=txn.periodicity,
         created_at=txn.created_at,
     )
 
@@ -309,12 +508,39 @@ async def update_transaction(
 @router.delete("/{transaction_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_transaction(
     transaction_id: int,
+    hard: bool = Query(
+        False,
+        description="Permanent remove from DB. Default false = soft archive (hidden from main views).",
+    ),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Delete a transaction."""
-    txn = await get_user_transaction(transaction_id, current_user, db)
-    await db.delete(txn)
+    """
+    Remove a transaction. Default: soft-delete (archive). Use ?hard=true only for irreversible purge.
+    All paths are audited (activity_log). SQLAlchemy ORM — no string concatenation.
+    """
+    txn = await get_user_transaction(transaction_id, current_user, db, only_active=True)
+    if hard:
+        await db.delete(txn)
+        await record_activity(
+            db,
+            user_id=current_user.id,
+            action="transaction_hard_delete",
+            method="single",
+            affected_rows=1,
+            detail={"transaction_id": transaction_id, "account_id": txn.account_id},
+        )
+    else:
+        txn.is_deleted = True
+        txn.deleted_at = datetime.now(timezone.utc)
+        await record_activity(
+            db,
+            user_id=current_user.id,
+            action="transaction_soft_delete",
+            method="single",
+            affected_rows=1,
+            detail={"transaction_id": transaction_id, "account_id": txn.account_id},
+        )
 
 
 @router.post("/bulk-categorize")
@@ -331,6 +557,7 @@ async def bulk_categorize(
         .where(
             Transaction.id.in_(payload.transaction_ids),
             Account.user_id == current_user.id,
+            Transaction.is_deleted.isnot(True),
         )
     )
     transactions = result.scalars().all()
@@ -359,7 +586,11 @@ async def get_stats(
     db: AsyncSession = Depends(get_db),
 ):
     """Aggregated transaction statistics for the given period."""
-    filters = [Account.user_id == current_user.id, Transaction.is_transfer == False]
+    filters = [
+        Account.user_id == current_user.id,
+        Transaction.is_transfer == False,
+        Transaction.is_deleted.isnot(True)
+    ]
     if start:
         filters.append(Transaction.date >= datetime.combine(start, datetime.min.time()))
     if end:
@@ -426,7 +657,11 @@ async def monthly_summary(
     db: AsyncSession = Depends(get_db),
 ):
     """Monthly income vs expense summary."""
-    filters = [Account.user_id == current_user.id, Transaction.is_transfer == False]
+    filters = [
+        Account.user_id == current_user.id,
+        Transaction.is_transfer == False,
+        Transaction.is_deleted.isnot(True)
+    ]
     if year:
         filters.append(func.extract("year", Transaction.date) == year)
     if account_id:
@@ -468,3 +703,107 @@ async def monthly_summary(
         )
         for row in rows
     ]
+
+
+@router.get("/budget-analysis", response_model=BudgetAnalysisResponse)
+async def budget_analysis(
+    start: Optional[date] = Query(None, description="Analysis period start (YYYY-MM-DD)"),
+    end: Optional[date] = Query(None, description="Analysis period end (YYYY-MM-DD)"),
+    account_id: Optional[int] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Analyze budget composition with fixed recurring costs vs variable costs.
+    Recurring costs are annualized to monthly equivalents based on periodicity.
+    """
+    # Default to current month if no dates provided
+    today = date.today()
+    period_start = start or date(today.year, today.month, 1)
+    period_end = end or date(today.year, today.month, today.day)
+
+    filters = [
+        Account.user_id == current_user.id,
+        Transaction.is_transfer == False,
+        Transaction.is_deleted.isnot(True)
+    ]
+    if account_id:
+        filters.append(Transaction.account_id == account_id)
+    if period_start:
+        filters.append(Transaction.date >= datetime.combine(period_start, datetime.min.time()))
+    if period_end:
+        filters.append(Transaction.date <= datetime.combine(period_end, datetime.max.time()))
+
+    # Get all transactions in the period
+    result = await db.execute(
+        select(Transaction)
+        .join(Account)
+        .where(and_(*filters))
+        .order_by(desc(Transaction.date))
+    )
+    transactions = result.scalars().all()
+
+    # Calculate income (positive amounts)
+    total_income = sum(
+        t.amount for t in transactions if t.amount > 0
+    )
+
+    # Separate recurring and non-recurring expenses
+    recurring_items: List[RecurringCostItem] = []
+    fixed_recurring_total = 0.0
+    variable_total = 0.0
+
+    for t in transactions:
+        if t.amount >= 0:
+            continue  # Skip income
+
+        expense_amount = abs(t.amount)
+
+        if t.is_recurring and t.periodicity:
+            # Calculate monthly equivalent
+            factor = PERIODICITY_MONTHLY_FACTOR.get(t.periodicity, 1.0)
+            monthly_equivalent = expense_amount * factor
+
+            recurring_items.append(
+                RecurringCostItem(
+                    description=t.description,
+                    category=t.category,
+                    amount=expense_amount,
+                    periodicity=t.periodicity,
+                    monthly_equivalent=monthly_equivalent,
+                )
+            )
+            fixed_recurring_total += monthly_equivalent
+        else:
+            variable_total += expense_amount
+
+    # Calculate budget metrics
+    # For a monthly view, variable costs are the actual observed variable expenses
+    # In a multi-month view, we average the variable costs
+    months_in_period = max(
+        1,
+        (period_end.year - period_start.year) * 12 + (period_end.month - period_start.month) + 1
+    )
+    avg_monthly_variable = variable_total / months_in_period
+
+    # Total monthly equivalent costs
+    monthly_fixed = fixed_recurring_total
+    monthly_variable = avg_monthly_variable
+
+    # Budget limit could be user's configured limit or income-based calculation
+    # For now, use 90% of income as suggested budget limit
+    monthly_budget_limit = total_income / months_in_period * 0.9 if total_income > 0 else 0
+
+    # Variance = how much room left in budget
+    variance = monthly_budget_limit - monthly_fixed - monthly_variable
+
+    return BudgetAnalysisResponse(
+        total_monthly_income=total_income / months_in_period,
+        fixed_recurring_costs=monthly_fixed,
+        variable_costs=monthly_variable,
+        monthly_budget_limit=monthly_budget_limit,
+        variance=variance,
+        recurring_items=recurring_items,
+        period_start=period_start,
+        period_end=period_end,
+    )

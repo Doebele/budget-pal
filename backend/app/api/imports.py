@@ -41,14 +41,44 @@ PARSERS = {
 
 # ── Schemas ───────────────────────────────────────────────────
 
+class ColumnMapping(BaseModel):
+    date_col: Optional[str] = None
+    description_col: Optional[str] = None
+    amount_col: Optional[str] = None
+    debit_col: Optional[str] = None
+    credit_col: Optional[str] = None
+    balance_col: Optional[str] = None
+    date_format: Optional[str] = None
+
+
 class ImportPreviewTransaction(BaseModel):
-    date: str
-    description: str
-    amount: float
-    currency: str
-    category: Optional[str]
-    confidence_score: Optional[float]
-    is_duplicate: bool
+    row_index: int
+    date: Optional[str] = None
+    description: Optional[str] = None
+    amount: Optional[float] = None
+    raw_data: dict
+    parsed: bool
+    errors: List[str]
+    currency: str = "CHF"
+    category: Optional[str] = None
+    confidence_score: Optional[float] = None
+    is_duplicate: bool = False
+
+
+class PreviewRequest(BaseModel):
+    bank: str
+    column_mapping: Optional[ColumnMapping] = None
+
+
+class PreviewResponse(BaseModel):
+    bank: str
+    detected_columns: dict
+    column_mapping: Optional[ColumnMapping]
+    rows: List[ImportPreviewTransaction]
+    total_rows: int
+    parsed_rows: int
+    error_rows: int
+    sample_raw: List[dict]
 
 
 class ImportResultResponse(BaseModel):
@@ -111,6 +141,272 @@ def compute_import_hash(account_id: int, date: str, amount: float, description: 
 
 
 # ── Routes ────────────────────────────────────────────────────
+
+@router.post("/preview", response_model=PreviewResponse)
+async def preview_import(
+    file: UploadFile = File(...),
+    bank: Optional[str] = Form(None),
+    account_id: Optional[int] = Form(None),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Preview CSV data before import. Returns parsed rows with detected columns
+    and allows manual column mapping adjustment.
+    """
+    content = await file.read()
+
+    # Detect bank format
+    detected_bank = bank or detect_bank_format(content)
+
+    # Read first 100 rows for preview
+    try:
+        for enc in ("utf-8-sig", "latin-1", "cp1252", "utf-8"):
+            try:
+                text = content.decode(enc)
+                break
+            except UnicodeDecodeError:
+                continue
+        else:
+            text = content.decode("utf-8", errors="replace")
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Could not decode file: {e}")
+
+    lines = text.splitlines()
+
+    # Find header
+    header_idx = None
+    delimiter = ";" if detected_bank in ("ubs", "comdirect") else ","
+
+    for idx, line in enumerate(lines[:50]):
+        if not line.strip():
+            continue
+        lower_line = line.lower()
+        if any(keyword in lower_line for keyword in ["date", "datum", "valuta", "buchung", "amount", "betrag", "description", "text"]):
+            header_idx = idx
+            break
+
+    if header_idx is None:
+        raise HTTPException(status_code=422, detail="Could not find CSV header row.")
+
+    header = lines[header_idx].split(delimiter)
+    header = [h.strip().strip('"').strip() for h in header]
+
+    # Detect columns automatically
+    detected_columns = detect_columns(header, detected_bank)
+
+    # Parse preview rows
+    preview_rows: List[ImportPreviewTransaction] = []
+    sample_raw = []
+
+    data_lines = lines[header_idx + 1:header_idx + 51]  # First 50 data rows
+
+    for row_idx, line in enumerate(data_lines):
+        if not line.strip():
+            continue
+
+        parts = line.split(delimiter)
+        parts = [p.strip().strip('"').strip() for p in parts]
+
+        if len(parts) < 2:
+            continue
+
+        raw_data = {header[i]: parts[i] if i < len(parts) else "" for i in range(len(header))}
+
+        if row_idx < 3:
+            sample_raw.append(raw_data)
+
+        # Try to parse the row
+        parsed_row = parse_preview_row(
+            parts, header, detected_columns, detected_bank, row_idx
+        )
+        preview_rows.append(parsed_row)
+
+    return PreviewResponse(
+        bank=detected_bank,
+        detected_columns=detected_columns,
+        column_mapping=None,
+        rows=preview_rows[:20],  # Return first 20 parsed rows
+        total_rows=len([l for l in lines[header_idx+1:] if l.strip()]),
+        parsed_rows=sum(1 for r in preview_rows if r.parsed),
+        error_rows=sum(1 for r in preview_rows if not r.parsed),
+        sample_raw=sample_raw,
+    )
+
+
+def detect_columns(header: List[str], bank: str) -> dict:
+    """Detect column types from header names."""
+    result = {}
+    header_lower = [h.lower() for h in header]
+
+    # Date columns
+    date_keywords = ["date", "datum", "valuta", "buchungsdatum", "buchungstag", "wertstellung"]
+    for i, h in enumerate(header_lower):
+        if any(kw in h for kw in date_keywords):
+            result["date"] = header[i]
+            break
+
+    # Description columns
+    desc_keywords = ["description", "text", "buchungstext", "vorgang", "zweck", "verwendungszweck", "beschreibung"]
+    for i, h in enumerate(header_lower):
+        if any(kw in h for kw in desc_keywords):
+            result["description"] = header[i]
+            break
+
+    # Amount columns
+    amount_keywords = ["amount", "betrag", "umsatz", "saldo", "balance"]
+    for i, h in enumerate(header_lower):
+        if any(kw in h for kw in amount_keywords):
+            result["amount"] = header[i]
+            break
+
+    # Debit/Belastung columns
+    debit_keywords = ["debit", "belastung", "ausgang", "soll", "lastschrift"]
+    for i, h in enumerate(header_lower):
+        if any(kw in h for kw in debit_keywords):
+            result["debit"] = header[i]
+            break
+
+    # Credit/Gutschrift columns
+    credit_keywords = ["credit", "gutschrift", "eingang", "haben", "einzahlung"]
+    for i, h in enumerate(header_lower):
+        if any(kw in h for kw in credit_keywords):
+            result["credit"] = header[i]
+            break
+
+    return result
+
+
+def parse_preview_row(
+    parts: List[str],
+    header: List[str],
+    detected_columns: dict,
+    bank: str,
+    row_idx: int,
+) -> ImportPreviewTransaction:
+    """Parse a single CSV row for preview."""
+    errors = []
+    raw_data = {header[i]: parts[i] if i < len(parts) else "" for i in range(len(header))}
+
+    # Parse date
+    date_str = None
+    date_val = None
+    if "date" in detected_columns:
+        date_col = detected_columns["date"]
+        if date_col in raw_data:
+            date_str = raw_data[date_col].strip()
+            if date_str:
+                date_formats = ["%d.%m.%Y", "%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y"]
+                for fmt in date_formats:
+                    try:
+                        date_val = datetime.strptime(date_str, fmt)
+                        break
+                    except ValueError:
+                        continue
+                if date_val is None:
+                    errors.append(f"Could not parse date: {date_str}")
+
+    # Parse description
+    description = None
+    if "description" in detected_columns:
+        desc_col = detected_columns["description"]
+        if desc_col in raw_data:
+            description = raw_data[desc_col].strip()
+            if not description:
+                errors.append("Empty description")
+
+    # Parse amount
+    amount = None
+    amount_str = None
+
+    # Try debit/credit columns first
+    if "debit" in detected_columns:
+        debit_col = detected_columns["debit"]
+        if debit_col in raw_data:
+            debit_str = raw_data[debit_col].strip()
+            if debit_str:
+                try:
+                    amount = -abs(parse_amount(debit_str, bank))
+                    amount_str = debit_str
+                except:
+                    pass
+
+    if amount is None and "credit" in detected_columns:
+        credit_col = detected_columns["credit"]
+        if credit_col in raw_data:
+            credit_str = raw_data[credit_col].strip()
+            if credit_str:
+                try:
+                    amount = abs(parse_amount(credit_str, bank))
+                    amount_str = credit_str
+                except:
+                    pass
+
+    # Fallback to amount column
+    if amount is None and "amount" in detected_columns:
+        amount_col = detected_columns["amount"]
+        if amount_col in raw_data:
+            amount_str = raw_data[amount_col].strip()
+            if amount_str:
+                try:
+                    amount = parse_amount(amount_str, bank)
+                except Exception as e:
+                    errors.append(f"Could not parse amount: {amount_str}")
+
+    if amount is None:
+        errors.append("Could not determine amount")
+
+    parsed = date_val is not None and description and amount is not None
+
+    return ImportPreviewTransaction(
+        row_index=row_idx,
+        date=date_str,
+        description=description,
+        amount=amount,
+        raw_data=raw_data,
+        parsed=parsed,
+        errors=errors,
+    )
+
+
+def parse_amount(value: str, bank: str) -> float:
+    """Parse amount string based on bank format."""
+    if not value:
+        raise ValueError("Empty amount")
+
+    cleaned = value.strip()
+
+    # Detect sign
+    negative = cleaned.startswith("-") or cleaned.endswith("-")
+    cleaned = cleaned.lstrip("+-").strip().rstrip("-").strip()
+
+    # Remove currency symbols and whitespace
+    cleaned = re.sub(r"[^\d.,'-]", "", cleaned)
+
+    # Handle different formats
+    if bank in ("comdirect",) and "," in cleaned and "." in cleaned:
+        # German format: 1.234,56
+        cleaned = cleaned.replace(".", "").replace(",", ".")
+    elif bank in ("ubs", "n26", "revolut"):
+        # Swiss/International: 1'234.56 or 1,234.56
+        cleaned = cleaned.replace("'", "").replace(",", "")
+    else:
+        # Try to auto-detect: if comma as decimal separator
+        if cleaned.count(",") == 1 and cleaned.count(".") == 0:
+            cleaned = cleaned.replace(",", ".")
+        elif cleaned.count(",") == 1 and cleaned.count(".") == 1:
+            # 1,234.56 -> remove comma, it's thousands
+            if cleaned.find(",") < cleaned.find("."):
+                cleaned = cleaned.replace(",", "")
+            else:
+                # 1.234,56 -> German format
+                cleaned = cleaned.replace(".", "").replace(",", ".")
+        else:
+            cleaned = cleaned.replace("'", "").replace(",", "")
+
+    result = float(cleaned)
+    return -result if negative else result
+
 
 @router.post("/csv", response_model=ImportResultResponse, status_code=status.HTTP_201_CREATED)
 async def import_csv(
@@ -489,4 +785,90 @@ async def import_preview(
         "rows_imported": log.rows_imported,
         "rows_skipped": log.rows_skipped,
         "preview": log.preview_json or [],
+    }
+
+
+@router.delete("/{import_id}", status_code=status.HTTP_200_OK)
+async def delete_import(
+    import_id: int,
+    delete_transactions: bool = True,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Delete an import log and ALL associated transactions.
+    This allows users to completely undo an import.
+    """
+    from sqlalchemy import delete, or_, and_
+    from datetime import timedelta
+
+    # Verify import exists and belongs to user
+    result = await db.execute(
+        select(ImportLog).where(
+            ImportLog.id == import_id,
+            ImportLog.user_id == current_user.id,
+        )
+    )
+    log = result.scalar_one_or_none()
+    if not log:
+        raise HTTPException(status_code=404, detail="Import not found.")
+
+    deleted_count = 0
+    if delete_transactions and log.account_id:
+        # Strategy 1: Delete by import_hash if available in preview
+        # Extract import hashes from the preview JSON
+        import_hashes = []
+        if log.preview_json and isinstance(log.preview_json, dict):
+            preview = log.preview_json.get("preview", [])
+            for item in preview:
+                if isinstance(item, dict) and not item.get("is_duplicate"):
+                    # Reconstruct the import hash
+                    import_hash = compute_import_hash(
+                        log.account_id,
+                        str(item.get("date", "")),
+                        float(item.get("amount", 0)),
+                        str(item.get("description", "")),
+                    )
+                    import_hashes.append(import_hash)
+
+        # Strategy 2: Also use a wide time window as backup
+        time_window_start = log.created_at - timedelta(minutes=30)
+        time_window_end = log.created_at + timedelta(minutes=30)
+
+        # Build the delete query
+        if import_hashes:
+            # Delete by import_hash OR by time window
+            delete_result = await db.execute(
+                delete(Transaction).where(
+                    Transaction.account_id == log.account_id,
+                    or_(
+                        Transaction.import_hash.in_(import_hashes[:100]),  # Limit to avoid query size issues
+                        and_(
+                            Transaction.created_at >= time_window_start,
+                            Transaction.created_at <= time_window_end,
+                        ),
+                    ),
+                )
+            )
+            deleted_count = delete_result.rowcount
+        else:
+            # Fallback: delete by time window only
+            delete_result = await db.execute(
+                delete(Transaction).where(
+                    Transaction.account_id == log.account_id,
+                    Transaction.created_at >= time_window_start,
+                    Transaction.created_at <= time_window_end,
+                )
+            )
+            deleted_count = delete_result.rowcount
+
+    # Delete the import log
+    await db.delete(log)
+    await db.commit()  # Important: commit the transaction!
+
+    return {
+        "success": True,
+        "import_id": import_id,
+        "deleted_transactions": deleted_count,
+        "message": f"Import gelöscht. {deleted_count} Transaktionen wurden entfernt." if delete_transactions else f"Import {import_id} Log gelöscht."
     }

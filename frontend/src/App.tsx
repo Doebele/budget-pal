@@ -8,6 +8,7 @@ import LoadingScreen from "@/components/layout/LoadingScreen";
 // ── Lazy loaded pages ─────────────────────────────────────────
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const Transactions = lazy(() => import("@/pages/Transactions"));
+const ArchivedTransactions = lazy(() => import("@/pages/ArchivedTransactions"));
 const Budget = lazy(() => import("@/pages/Budget"));
 const Projections = lazy(() => import("@/pages/Projections"));
 const Import = lazy(() => import("@/pages/Import"));
@@ -35,11 +36,10 @@ function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen bg-bg overflow-hidden">
       <Sidebar />
-      <main className="flex-1 overflow-y-auto">
-        <div className="min-h-full p-6">
-          <Suspense fallback={<LoadingScreen />}>{children}</Suspense>
-        </div>
-      </main>
+      <div className="min-h-full p-6">
+        <Suspense fallback={<LoadingScreen />}>{children}</Suspense>
+      </div>
+      <main className="flex-1 overflow-y-auto"></main>
     </div>
   );
 }
@@ -84,6 +84,16 @@ export default function App() {
             <ProtectedRoute>
               <AppShell>
                 <Transactions />
+              </AppShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/transactions/archived"
+          element={
+            <ProtectedRoute>
+              <AppShell>
+                <ArchivedTransactions />
               </AppShell>
             </ProtectedRoute>
           }

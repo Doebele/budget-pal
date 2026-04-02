@@ -1,11 +1,16 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { transactionsApi } from "@/lib/api";
+import { transactionsApi, accountsApi } from "@/lib/api";
 import { formatCHF, categoryColors } from "@/lib/theme";
-import { format } from "date-fns";
-import { Search, Filter, Upload, ChevronDown, Check, X } from "lucide-react";
+import { format, startOfMonth, endOfMonth, subMonths, addMonths, isSameMonth } from "date-fns";
+import { de } from "date-fns/locale";
+import { Search, Filter, Upload, ChevronDown, Check, X, ChevronLeft, ChevronRight, Calendar, LayoutGrid, Building2, Repeat, Wallet, TrendingUp, PieChart } from "lucide-react";
 import { Link } from "react-router-dom";
 import { clsx } from "clsx";
+import { getBankByName } from "@/data/banks-with-logos";
+import { TransactionOverviewHeader } from "@/components/transactions/TransactionOverviewHeader";
+
+type RecurrenceType = "weekly" | "monthly" | "quarterly" | "halfyearly" | "yearly";
 
 interface Transaction {
   id: number;
@@ -20,6 +25,27 @@ interface Transaction {
   confidence_score?: number;
   user_verified: boolean;
   notes?: string;
+  is_recurring?: boolean;
+  periodicity?: RecurrenceType;
+}
+
+interface RecurringCostItem {
+  description: string;
+  category?: string;
+  amount: number;
+  periodicity: RecurrenceType;
+  monthly_equivalent: number;
+}
+
+interface BudgetAnalysis {
+  total_monthly_income: number;
+  fixed_recurring_costs: number;
+  variable_costs: number;
+  monthly_budget_limit: number;
+  variance: number;
+  recurring_items: RecurringCostItem[];
+  period_start: string;
+  period_end: string;
 }
 
 export default function Transactions() {
@@ -27,14 +53,75 @@ export default function Transactions() {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editCategory, setEditCategory] = useState("");
+  const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
+  const [showMonthDropdown, setShowMonthDropdown] = useState(false);
   const queryClient = useQueryClient();
+  const [viewMode, setViewMode] = useState("all");
+  const [showBudgetAnalysis, setShowBudgetAnalysis] = useState(false);
+  const [recurringEditTxn, setRecurringEditTxn] = useState<Transaction | null>(null);
+  const [editPeriodicity, setEditPeriodicity] = useState<RecurrenceType>("monthly");
+  const [showAccountDropdown, setShowAccountDropdown] = useState(false);
+
+  // Fetch accounts for filter
+  const { data: accounts } = useQuery({
+    queryKey: ["accounts"],
+    queryFn: () => accountsApi.list().then((r) => r.data),
+  });
+
+  type AccountRow = { id: number | string; name: string; bank: string };
+
+  const selectedAccount = useMemo(() => {
+    if (viewMode === "all" || !accounts?.length) return null;
+    return (accounts as AccountRow[]).find((a) => String(a.id) === String(viewMode)) ?? null;
+  }, [viewMode, accounts]);
+
+  /** Avoid preview/delete with a stale id after the account disappeared from the list (e.g. deactivated). */
+  useEffect(() => {
+    if (viewMode === "all" || accounts === undefined) return;
+    const exists = (accounts as AccountRow[]).some((a) => String(a.id) === String(viewMode));
+    if (!exists) setViewMode("all");
+  }, [viewMode, accounts]);
+
+  // Generate last 24 months for the dropdown
+  const availableMonths = useMemo(() => {
+    const months: Date[] = [];
+    const today = new Date();
+    for (let i = 0; i < 24; i++) {
+      months.push(subMonths(today, i));
+    }
+    return months;
+  }, []);
+
+  const monthStart = startOfMonth(selectedMonth);
+  const monthEnd = endOfMonth(selectedMonth);
 
   const { data: transactions, isLoading } = useQuery({
-    queryKey: ["transactions", search, categoryFilter],
+    queryKey: ["transactions", search, categoryFilter, selectedMonth.toISOString(), viewMode],
     queryFn: () =>
       transactionsApi
-        .list({ q: search || undefined, category: categoryFilter || undefined, limit: 200 })
+        .list({
+          q: search || undefined,
+          category: categoryFilter || undefined,
+          account_id: viewMode === "all" ? undefined : Number(viewMode),
+          start: format(monthStart, "yyyy-MM-dd"),
+          end: format(monthEnd, "yyyy-MM-dd"),
+          limit: 500,
+        })
         .then((r) => r.data),
+  });
+
+  // Budget analysis query
+  const { data: budgetAnalysis } = useQuery({
+    queryKey: ["budget-analysis", selectedMonth.toISOString(), viewMode],
+    queryFn: () =>
+      transactionsApi
+        .budgetAnalysis({
+          account_id: viewMode === "all" ? undefined : Number(viewMode),
+          start: format(monthStart, "yyyy-MM-dd"),
+          end: format(monthEnd, "yyyy-MM-dd"),
+        })
+        .then((r) => r.data as BudgetAnalysis),
+    enabled: showBudgetAnalysis,
   });
 
   const updateMutation = useMutation({
@@ -55,6 +142,30 @@ export default function Transactions() {
     updateMutation.mutate({ id, data: { category: editCategory, user_verified: true } });
   };
 
+  const handleRecurringToggle = (txn: Transaction) => {
+    if (txn.is_recurring) {
+      // Remove recurring status
+      updateMutation.mutate({
+        id: txn.id,
+        data: { is_recurring: false, periodicity: null }
+      });
+    } else {
+      // Open edit modal to select periodicity
+      setRecurringEditTxn(txn);
+      setEditPeriodicity("monthly");
+    }
+  };
+
+  const handleRecurringSave = () => {
+    if (recurringEditTxn) {
+      updateMutation.mutate({
+        id: recurringEditTxn.id,
+        data: { is_recurring: true, periodicity: editPeriodicity }
+      });
+      setRecurringEditTxn(null);
+    }
+  };
+
   const categories = Array.from(
     new Set(
       (transactions || [])
@@ -70,7 +181,7 @@ export default function Transactions() {
         <div>
           <h1 className="text-2xl font-display text-text-primary">Transaktionen</h1>
           <p className="text-text-tertiary text-sm mt-0.5">
-            {transactions?.length || 0} Einträge
+            {format(selectedMonth, "MMMM yyyy", { locale: de })} · {transactions?.length || 0} Einträge
           </p>
         </div>
         <Link to="/import" className="btn-primary flex items-center gap-2">
@@ -79,8 +190,363 @@ export default function Transactions() {
         </Link>
       </div>
 
+      {/* TransactionFilterBar - Account Selection */}
+      <div className="sticky top-0 z-20 bg-slate-900 border-b border-slate-700 rounded-lg mb-4">
+        <div className="flex items-center justify-between p-4">
+          <div className="flex items-center gap-3">
+            {viewMode === "all" ? (
+              <LayoutGrid className="w-5 h-5 text-accent" />
+            ) : (
+              <Building2 className="w-5 h-5 text-accent" />
+            )}
+            <div>
+              <h2 className="text-white text-lg font-medium">
+                {viewMode === "all"
+                  ? "Alle Konten"
+                  : selectedAccount?.name || "Konto"}
+              </h2>
+              <p className="text-slate-400 text-xs">
+                {viewMode === "all"
+                  ? `${accounts?.length || 0} Konten aggregiert`
+                  : "Einzelkonto-Ansicht"}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 flex-wrap justify-end">
+            {selectedAccount && (
+              <TransactionOverviewHeader
+                accountId={Number(selectedAccount.id)}
+                accountName={selectedAccount.name}
+              />
+            )}
+            <button
+              onClick={() => setShowBudgetAnalysis(!showBudgetAnalysis)}
+              className={clsx(
+                "flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors",
+                showBudgetAnalysis
+                  ? "bg-accent/20 text-accent border border-accent/30"
+                  : "text-text-tertiary hover:text-text-primary hover:bg-bg-surface2 border border-transparent"
+              )}
+            >
+              <PieChart className="w-4 h-4" />
+              <span className="hidden sm:inline">Budget-Analyse</span>
+            </button>
+            <span className="text-text-tertiary text-sm hidden sm:inline">Übersicht:</span>
+
+            {/* Custom Account Dropdown with Logos */}
+            <div className="relative">
+              <button
+                onClick={() => setShowAccountDropdown(!showAccountDropdown)}
+                className="flex items-center gap-2 bg-slate-800 text-white px-3 py-2 pr-8 rounded-md border border-slate-600 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent cursor-pointer min-w-[180px] hover:bg-slate-700 transition-colors"
+              >
+                {viewMode === "all" ? (
+                  <>
+                    <LayoutGrid className="w-4 h-4 text-accent" />
+                    <span>Alle Konten</span>
+                  </>
+                ) : (
+                  (() => {
+                    const acc = accounts?.find(
+                      (a: AccountRow) => String(a.id) === String(viewMode)
+                    );
+                    if (!acc) return <span>Konto</span>;
+                    const bank = getBankByName(acc.bank);
+                    return (
+                      <>
+                        {bank ? (
+                          <img
+                            src={bank.logoUrl}
+                            alt={bank.name}
+                            className="w-5 h-5 object-contain rounded"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <Building2 className="w-4 h-4 text-slate-400" />
+                        )}
+                        <span className="truncate">{acc.name}</span>
+                      </>
+                    );
+                  })()
+                )}
+              </button>
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+
+              {/* Dropdown Menu */}
+              {showAccountDropdown && (
+                <>
+                  {/* Backdrop to close */}
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setShowAccountDropdown(false)}
+                  />
+                  <div className="absolute top-full right-0 mt-1 w-64 bg-slate-800 border border-slate-700 rounded-md shadow-xl z-20 py-1 max-h-72 overflow-y-auto">
+                    {/* All Accounts Option */}
+                    <button
+                      onClick={() => {
+                        setViewMode("all");
+                        setShowAccountDropdown(false);
+                      }}
+                      className={clsx(
+                        "w-full flex items-center gap-3 px-3 py-2.5 text-left text-sm hover:bg-slate-700 transition-colors",
+                        viewMode === "all" && "bg-slate-700/80"
+                      )}
+                    >
+                      <div className="w-6 h-6 rounded bg-accent/20 flex items-center justify-center flex-shrink-0">
+                        <LayoutGrid className="w-3.5 h-3.5 text-accent" />
+                      </div>
+                      <span className="text-white">Alle Konten</span>
+                      {viewMode === "all" && (
+                        <Check className="w-4 h-4 text-accent ml-auto" />
+                      )}
+                    </button>
+
+                    <div className="border-t border-slate-700 my-1" />
+
+                    {/* Account Options */}
+                    {(accounts || []).map((acc: AccountRow) => {
+                      const bank = getBankByName(acc.bank);
+                      return (
+                        <button
+                          key={acc.id}
+                          onClick={() => {
+                            setViewMode(String(acc.id));
+                            setShowAccountDropdown(false);
+                          }}
+                          className={clsx(
+                            "w-full flex items-center gap-3 px-3 py-2.5 text-left text-sm hover:bg-slate-700 transition-colors",
+                            String(viewMode) === String(acc.id) && "bg-slate-700/80"
+                          )}
+                        >
+                          <div className="w-6 h-6 rounded bg-white/10 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                            {bank ? (
+                              <img
+                                src={bank.logoUrl}
+                                alt={bank.name}
+                                className="w-5 h-5 object-contain"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                  const parent = (e.target as HTMLImageElement).parentElement;
+                                  if (parent) parent.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-slate-400"><path d="M2 10h20M6 10V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v4"/><path d="M12 14v7"/><path d="M4 10v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10"/></svg>';
+                                }}
+                              />
+                            ) : (
+                              <Building2 className="w-3.5 h-3.5 text-slate-400" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-white truncate">{acc.name}</p>
+                            <p className="text-slate-500 text-xs truncate">{acc.bank}</p>
+                          </div>
+                          {String(viewMode) === String(acc.id) && (
+                            <Check className="w-4 h-4 text-accent flex-shrink-0" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Budget Analysis Panel */}
+      {showBudgetAnalysis && budgetAnalysis && (
+        <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4 space-y-4 animate-fade-in">
+          <div className="flex items-center gap-2 text-accent mb-2">
+            <Wallet className="w-5 h-5" />
+            <h3 className="font-medium">Budget-Analyse: {format(selectedMonth, "MMMM yyyy", { locale: de })}</h3>
+          </div>
+
+          {/* Summary Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="bg-slate-900 rounded-lg p-3">
+              <p className="text-slate-400 text-xs mb-1">Monatliches Einkommen</p>
+              <p className="text-gain font-mono text-lg">+{formatCHF(budgetAnalysis.total_monthly_income)}</p>
+            </div>
+            <div className="bg-slate-900 rounded-lg p-3">
+              <p className="text-slate-400 text-xs mb-1">Fixe Kosten</p>
+              <p className="text-loss font-mono text-lg">-{formatCHF(budgetAnalysis.fixed_recurring_costs)}</p>
+            </div>
+            <div className="bg-slate-900 rounded-lg p-3">
+              <p className="text-slate-400 text-xs mb-1">Variable Kosten</p>
+              <p className="text-loss font-mono text-lg">-{formatCHF(budgetAnalysis.variable_costs)}</p>
+            </div>
+            <div className={clsx(
+              "rounded-lg p-3",
+              budgetAnalysis.variance >= 0 ? "bg-gain/10" : "bg-loss/10"
+            )}>
+              <p className="text-slate-400 text-xs mb-1">Verbleibend</p>
+              <p className={clsx(
+                "font-mono text-lg",
+                budgetAnalysis.variance >= 0 ? "text-gain" : "text-loss"
+              )}>
+                {budgetAnalysis.variance >= 0 ? "+" : ""}{formatCHF(budgetAnalysis.variance)}
+              </p>
+            </div>
+          </div>
+
+          {/* Recurring Items List */}
+          {budgetAnalysis.recurring_items.length > 0 && (
+            <div className="mt-4">
+              <h4 className="text-sm text-slate-300 mb-2 flex items-center gap-2">
+                <Repeat className="w-4 h-4 text-accent" />
+                Wiederkehrende Zahlungen
+              </h4>
+              <div className="bg-slate-900 rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-800 text-slate-400 text-xs">
+                    <tr>
+                      <th className="text-left px-3 py-2">Beschreibung</th>
+                      <th className="text-left px-3 py-2">Periode</th>
+                      <th className="text-right px-3 py-2">Betrag</th>
+                      <th className="text-right px-3 py-2">Monatl. Äquiv.</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800">
+                    {budgetAnalysis.recurring_items.map((item, idx) => (
+                      <tr key={idx} className="hover:bg-slate-800/50">
+                        <td className="px-3 py-2 text-slate-300">{item.description}</td>
+                        <td className="px-3 py-2">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-slate-700 text-slate-300">
+                            {item.periodicity === "weekly" && "Wöchentlich"}
+                            {item.periodicity === "monthly" && "Monatlich"}
+                            {item.periodicity === "quarterly" && "Vierteljährlich"}
+                            {item.periodicity === "halfyearly" && "Halbjährlich"}
+                            {item.periodicity === "yearly" && "Jährlich"}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono text-slate-400">
+                          {formatCHF(item.amount)}
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono text-loss">
+                          {formatCHF(item.monthly_equivalent)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Progress Bar */}
+          <div className="mt-4">
+            <div className="flex justify-between text-xs text-slate-400 mb-1">
+              <span>Budget-Auslastung</span>
+              <span>
+                {budgetAnalysis.monthly_budget_limit > 0
+                  ? `${Math.round((budgetAnalysis.fixed_recurring_costs + budgetAnalysis.variable_costs) / budgetAnalysis.monthly_budget_limit * 100)}%`
+                  : "0%"}
+              </span>
+            </div>
+            <div className="h-2 bg-slate-700 rounded-full overflow-hidden flex">
+              <div
+                className="h-full bg-loss transition-all"
+                style={{
+                  width: `${Math.min(100, (budgetAnalysis.fixed_recurring_costs / (budgetAnalysis.fixed_recurring_costs + budgetAnalysis.variable_costs || 1)) * 100)}%`,
+                  opacity: 0.7
+                }}
+                title="Fixe Kosten"
+              />
+              <div
+                className="h-full bg-loss-light transition-all"
+                style={{
+                  width: `${Math.min(100, (budgetAnalysis.variable_costs / (budgetAnalysis.fixed_recurring_costs + budgetAnalysis.variable_costs || 1)) * 100)}%`,
+                  opacity: 0.7
+                }}
+                title="Variable Kosten"
+              />
+            </div>
+            <div className="flex gap-4 mt-2 text-xs">
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-loss opacity-70" />
+                <span className="text-slate-400">Fix</span>
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-loss-light opacity-70" />
+                <span className="text-slate-400">Variable</span>
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Filters */}
-      <div className="flex gap-3 flex-wrap">
+      <div className="flex gap-3 flex-wrap items-center">
+        {/* Month Selector */}
+        <div className="relative">
+          <button
+            onClick={() => setShowMonthDropdown(!showMonthDropdown)}
+            className="input flex items-center gap-2 min-w-[140px]"
+          >
+            <Calendar className="w-4 h-4 text-text-tertiary" />
+            <span className="text-sm">
+              {format(selectedMonth, "MMM yyyy", { locale: de })}
+            </span>
+            <ChevronDown className="w-4 h-4 text-text-tertiary ml-auto" />
+          </button>
+          {showMonthDropdown && (
+            <>
+              <div
+                className="fixed inset-0 z-10"
+                onClick={() => setShowMonthDropdown(false)}
+              />
+              <div className="absolute top-full left-0 mt-1 w-48 max-h-64 overflow-y-auto bg-bg-card border border-border rounded-md shadow-lg z-20 py-1">
+                {availableMonths.map((month) => (
+                  <button
+                    key={month.toISOString()}
+                    onClick={() => {
+                      setSelectedMonth(month);
+                      setShowMonthDropdown(false);
+                    }}
+                    className={clsx(
+                      "w-full text-left px-3 py-2 text-sm hover:bg-bg-surface2 transition-colors",
+                      isSameMonth(month, selectedMonth) && "bg-accent/20 text-accent"
+                    )}
+                  >
+                    {format(month, "MMMM yyyy", { locale: de })}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Navigation Arrows */}
+        <div className="flex gap-1">
+          <button
+            onClick={() => setSelectedMonth(subMonths(selectedMonth, 1))}
+            className="p-2 rounded-md hover:bg-bg-surface2 text-text-tertiary hover:text-text-primary transition-colors"
+            title="Vorheriger Monat"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setSelectedMonth(addMonths(selectedMonth, 1))}
+            className="p-2 rounded-md hover:bg-bg-surface2 text-text-tertiary hover:text-text-primary transition-colors"
+            title="Nächster Monat"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setSelectedMonth(new Date())}
+            className={clsx(
+              "px-3 py-2 rounded-md text-sm transition-colors",
+              isSameMonth(selectedMonth, new Date())
+                ? "text-accent bg-accent/10"
+                : "text-text-tertiary hover:text-text-primary hover:bg-bg-surface2"
+            )}
+          >
+            Aktuell
+          </button>
+        </div>
+
+        <div className="w-px h-8 bg-border/50 mx-1" />
+
         <div className="relative flex-1 min-w-48">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary" />
           <input
@@ -105,11 +571,11 @@ export default function Transactions() {
 
       {/* Table */}
       <div className="card p-0 overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-auto max-h-[calc(100vh-220px)]">
           <table className="w-full">
-            <thead>
+            <thead className="sticky top-0 z-10 bg-bg-card">
               <tr className="border-b border-border/50">
-                {["Datum", "Beschreibung", "Konto", "Kategorie", "Betrag"].map((h) => (
+                {["Datum", "Beschreibung", "Konto", "Kategorie", "Wiederkehrend", "Betrag"].map((h) => (
                   <th key={h} className="text-left text-text-tertiary text-xs uppercase tracking-wide px-4 py-3 font-medium">
                     {h}
                   </th>
@@ -187,6 +653,31 @@ export default function Transactions() {
                         </button>
                       )}
                     </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => handleRecurringToggle(txn)}
+                        className={clsx(
+                          "flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-colors",
+                          txn.is_recurring
+                            ? "bg-accent/20 text-accent hover:bg-accent/30"
+                            : "text-slate-500 hover:text-slate-300 hover:bg-slate-800"
+                        )}
+                        title={txn.is_recurring ? "Wiederkehrende Zahlung" : "Als wiederkehrend markieren"}
+                      >
+                        <Repeat className="w-3.5 h-3.5" />
+                        {txn.is_recurring ? (
+                          <span className="capitalize">
+                            {txn.periodicity === "weekly" && "W"}
+                            {txn.periodicity === "monthly" && "M"}
+                            {txn.periodicity === "quarterly" && "Q"}
+                            {txn.periodicity === "halfyearly" && "H"}
+                            {txn.periodicity === "yearly" && "J"}
+                          </span>
+                        ) : (
+                          <span>—</span>
+                        )}
+                      </button>
+                    </td>
                     <td className="px-4 py-3 text-right">
                       <span className={clsx("text-sm font-mono", txn.amount >= 0 ? "text-gain" : "text-loss")}>
                         {txn.amount >= 0 ? "+" : ""}{formatCHF(txn.amount)}
@@ -196,8 +687,8 @@ export default function Transactions() {
                 ))}
               {!isLoading && (!transactions || transactions.length === 0) && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-12 text-center text-text-tertiary text-sm">
-                    Keine Transaktionen gefunden.{" "}
+                  <td colSpan={6} className="px-4 py-12 text-center text-text-tertiary text-sm">
+                    Keine Transaktionen für {format(selectedMonth, "MMMM yyyy", { locale: de })} gefunden.{" "}
                     <Link to="/import" className="text-accent hover:text-accent-light">
                       CSV importieren
                     </Link>
@@ -208,6 +699,91 @@ export default function Transactions() {
           </table>
         </div>
       </div>
+
+      {/* Recurring Edit Modal */}
+      {recurringEditTxn && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-700 rounded-lg p-6 w-full max-w-md mx-4 shadow-xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center">
+                <Repeat className="w-5 h-5 text-accent" />
+              </div>
+              <div>
+                <h3 className="text-lg font-medium text-white">Wiederkehrende Zahlung</h3>
+                <p className="text-slate-400 text-sm truncate max-w-xs">
+                  {recurringEditTxn.description}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-sm text-slate-400 mb-2">Periodizität</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { value: "weekly", label: "Wöchentlich", desc: "~4.3x/Monat" },
+                    { value: "monthly", label: "Monatlich", desc: "1x/Monat" },
+                    { value: "quarterly", label: "Vierteljährlich", desc: "~0.33x/Monat" },
+                    { value: "halfyearly", label: "Halbjährlich", desc: "~0.17x/Monat" },
+                    { value: "yearly", label: "Jährlich", desc: "~0.08x/Monat" },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => setEditPeriodicity(option.value as RecurrenceType)}
+                      className={clsx(
+                        "p-3 rounded-lg border text-left transition-all",
+                        editPeriodicity === option.value
+                          ? "border-accent bg-accent/20 text-white"
+                          : "border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-600"
+                      )}
+                    >
+                      <div className="font-medium text-sm">{option.label}</div>
+                      <div className="text-xs opacity-70">{option.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-slate-800 rounded-lg p-3 text-sm">
+                <div className="flex justify-between text-slate-400 mb-1">
+                  <span>Betrag:</span>
+                  <span className="font-mono">{formatCHF(Math.abs(recurringEditTxn.amount))}</span>
+                </div>
+                <div className="flex justify-between text-slate-400 mb-1">
+                  <span>Monatliche Äquivalenz:</span>
+                  <span className={clsx(
+                    "font-mono",
+                    recurringEditTxn.amount < 0 ? "text-loss" : "text-gain"
+                  )}>
+                    {recurringEditTxn.amount < 0 ? "-" : "+"}
+                    {formatCHF(Math.abs(recurringEditTxn.amount) * (
+                      editPeriodicity === "weekly" ? 4.33 :
+                      editPeriodicity === "monthly" ? 1 :
+                      editPeriodicity === "quarterly" ? 0.33 :
+                      editPeriodicity === "halfyearly" ? 0.17 : 0.08
+                    ))}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setRecurringEditTxn(null)}
+                className="flex-1 px-4 py-2 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 transition-colors"
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={handleRecurringSave}
+                className="flex-1 px-4 py-2 rounded-lg bg-accent text-slate-900 font-medium hover:bg-accent-light transition-colors"
+              >
+                Speichern
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

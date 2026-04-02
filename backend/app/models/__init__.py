@@ -14,4 +14,5 @@ from app.models.models import (  # noqa: F401
     Scenario,
     ProjectionCache,
     ImportLog,
+    ActivityLog,
 )

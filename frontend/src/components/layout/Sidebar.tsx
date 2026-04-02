@@ -15,6 +15,7 @@ import {
   X,
   BarChart3,
   Wand2,
+  Archive,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { clsx } from "clsx";
@@ -22,6 +23,7 @@ import { clsx } from "clsx";
 const NAV_ITEMS = [
   { path: "/", icon: LayoutDashboard, label: "Dashboard" },
   { path: "/transactions", icon: ArrowLeftRight, label: "Transaktionen" },
+  { path: "/transactions/archived", icon: Archive, label: "Archiv" },
   { path: "/budget", icon: PiggyBank, label: "Budget" },
   { path: "/projections", icon: TrendingUp, label: "Prognosen" },
   { path: "/import", icon: Upload, label: "Import" },
@@ -41,7 +43,8 @@ export default function Sidebar() {
 
   const isActive = (path: string) => {
     if (path === "/") return location.pathname === "/";
-    return location.pathname.startsWith(path);
+    if (path === "/transactions") return location.pathname === "/transactions";
+    return location.pathname === path || location.pathname.startsWith(`${path}/`);
   };
 
   const sidebarContent = (

@@ -1,12 +1,14 @@
 """Accounts API — CRUD for bank accounts."""
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import datetime, timezone
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func, desc, update, delete
 from app.core.database import get_db
 from app.core.security import get_current_user
-from app.models.models import Account, AccountType, User
+from app.models.models import Account, AccountType, User, Transaction
+from app.services.audit_log import record_activity
 
 router = APIRouter()
 
@@ -16,7 +18,7 @@ class AccountCreate(BaseModel):
     bank: str
     account_number: Optional[str] = None
     iban: Optional[str] = None
-    currency: str = "CHF"
+    currency: str
     balance: float = 0.0
     account_type: AccountType = AccountType.checking
     color: Optional[str] = None
@@ -116,3 +118,198 @@ async def delete_account(
         raise HTTPException(status_code=404, detail="Account not found.")
     account.is_active = False  # Soft delete
     await db.flush()
+
+
+class BulkDeletePreviewResponse(BaseModel):
+    transaction_count: int
+    total_amount: float
+    date_range: dict
+    sample_transactions: List[dict]
+
+
+class BulkDeleteResponse(BaseModel):
+    deleted_count: int
+    hard_delete: bool
+    account_id: int
+
+
+async def _build_bulk_delete_preview(
+    db: AsyncSession,
+    current_user: User,
+    account_id: int,
+) -> BulkDeletePreviewResponse:
+    acct_result = await db.execute(
+        select(Account).where(Account.id == account_id, Account.user_id == current_user.id)
+    )
+    account = acct_result.scalar_one_or_none()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found.")
+
+    count_result = await db.execute(
+        select(func.count(Transaction.id))
+        .where(
+            Transaction.account_id == account_id,
+            Transaction.is_deleted.isnot(True),
+        )
+    )
+    transaction_count = count_result.scalar()
+
+    total_result = await db.execute(
+        select(
+            func.coalesce(func.sum(Transaction.amount), 0.0),
+            func.min(Transaction.date),
+            func.max(Transaction.date),
+        )
+        .where(
+            Transaction.account_id == account_id,
+            Transaction.is_deleted.isnot(True),
+        )
+    )
+    total_row = total_result.one()
+    total_amount = float(total_row[0])
+    min_date = total_row[1]
+    max_date = total_row[2]
+
+    sample_result = await db.execute(
+        select(Transaction)
+        .where(
+            Transaction.account_id == account_id,
+            Transaction.is_deleted.isnot(True),
+        )
+        .order_by(desc(Transaction.date))
+        .limit(5)
+    )
+    sample_transactions = [
+        {
+            "id": t.id,
+            "date": t.date.isoformat() if t.date else None,
+            "description": t.description,
+            "amount": t.amount,
+            "category": t.category,
+        }
+        for t in sample_result.scalars().all()
+    ]
+
+    return BulkDeletePreviewResponse(
+        transaction_count=transaction_count,
+        total_amount=total_amount,
+        date_range={
+            "from": min_date.isoformat() if min_date else None,
+            "to": max_date.isoformat() if max_date else None,
+        },
+        sample_transactions=sample_transactions,
+    )
+
+
+async def _execute_bulk_delete_transactions(
+    db: AsyncSession,
+    current_user: User,
+    account_id: int,
+    hard: bool,
+) -> BulkDeleteResponse:
+    acct_result = await db.execute(
+        select(Account).where(Account.id == account_id, Account.user_id == current_user.id)
+    )
+    account = acct_result.scalar_one_or_none()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found.")
+
+    count_result = await db.execute(
+        select(func.count(Transaction.id))
+        .where(
+            Transaction.account_id == account_id,
+            Transaction.is_deleted.isnot(True),
+        )
+    )
+    delete_count = count_result.scalar()
+
+    if delete_count == 0:
+        return BulkDeleteResponse(
+            deleted_count=0,
+            hard_delete=hard,
+            account_id=account_id,
+        )
+
+    if hard:
+        await db.execute(
+            delete(Transaction).where(
+                Transaction.account_id == account_id,
+                Transaction.is_deleted.isnot(True),
+            )
+        )
+    else:
+        await db.execute(
+            update(Transaction)
+            .where(
+                Transaction.account_id == account_id,
+                Transaction.is_deleted.isnot(True),
+            )
+            .values(
+                is_deleted=True,
+                deleted_at=datetime.now(timezone.utc),
+            )
+        )
+
+    await db.flush()
+    await record_activity(
+        db,
+        user_id=current_user.id,
+        action="account_transactions_hard_delete" if hard else "account_transactions_archive",
+        method="bulk",
+        affected_rows=delete_count,
+        detail={"account_id": account_id, "hard": hard},
+    )
+
+    return BulkDeleteResponse(
+        deleted_count=delete_count,
+        hard_delete=hard,
+        account_id=account_id,
+    )
+
+
+@router.get("/bulk-delete/preview", response_model=BulkDeletePreviewResponse)
+async def preview_bulk_delete_by_query(
+    account_id: int = Query(..., gt=0),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Preview transactions affected by bulk archive/delete.
+    Uses a shallow path so reverse proxies reliably reach this handler.
+    """
+    return await _build_bulk_delete_preview(db, current_user, account_id)
+
+
+@router.delete("/bulk-delete/transactions", response_model=BulkDeleteResponse)
+async def delete_all_transactions_by_query(
+    account_id: int = Query(..., gt=0),
+    hard: bool = Query(False),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Bulk archive (soft) or hard-delete all active transactions for an account.
+    Shallow path for proxy compatibility.
+    """
+    return await _execute_bulk_delete_transactions(db, current_user, account_id, hard)
+
+
+@router.get("/{account_id}/transactions/preview", response_model=BulkDeletePreviewResponse)
+async def preview_transactions_for_deletion(
+    account_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Legacy nested path — identical behaviour as GET /bulk-delete/preview."""
+    return await _build_bulk_delete_preview(db, current_user, account_id)
+
+
+@router.delete("/{account_id}/transactions", response_model=BulkDeleteResponse)
+async def delete_all_transactions_for_account(
+    account_id: int,
+    hard: bool = False,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Legacy nested path — identical behaviour as DELETE /bulk-delete/transactions."""
+    return await _execute_bulk_delete_transactions(db, current_user, account_id, hard)
