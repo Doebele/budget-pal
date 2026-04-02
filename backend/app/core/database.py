@@ -80,10 +80,20 @@ async def init_db() -> None:
     logger = logging.getLogger(__name__)
     from app.models import models  # noqa: F401 — import to register models
 
+    # Migrations-first policy:
+    # - production/staging should use Alembic and skip create_all by default
+    # - local dev can explicitly enable auto_create_schema if desired
+    if not settings.auto_create_schema:
+        logger.info(
+            "AUTO_CREATE_SCHEMA disabled; skipping create_all(). "
+            "Run Alembic migrations (e.g. `alembic upgrade head`)."
+        )
+        return
+
     try:
         async with engine.begin() as conn:
             await conn.run_sync(lambda c: Base.metadata.create_all(c, checkfirst=True))
-        logger.info("Database schema ready.")
+        logger.info("Database schema ready via create_all (AUTO_CREATE_SCHEMA=true).")
     except ProgrammingError as exc:
         if "already exists" in str(exc).lower():
             logger.warning("DB objects already exist — schema is up to date. Use Alembic for migrations.")

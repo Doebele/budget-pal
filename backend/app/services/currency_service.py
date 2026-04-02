@@ -158,23 +158,31 @@ class CurrencyService:
             raise
 
     async def _load_cached_rates(self) -> Optional[Dict[str, float]]:
-        """Load rates from JSON cache file."""
+        """Load numeric rates from JSON cache file (metadata excluded)."""
         try:
-            if not self.cache_file.exists():
+            data = await self._load_cached_payload()
+            if not data:
                 return None
-
-            async with aiofiles.open(self.cache_file, "r", encoding="utf-8") as f:
-                content = await f.read()
-                data = json.loads(content)
-
-            # Filter out metadata keys
-            return {
-                k: v for k, v in data.items()
-                if not k.startswith("_") and isinstance(v, (int, float))
-            }
+            return self._extract_rates(data)
         except Exception as e:
             logger.warning(f"[CurrencyService] Failed to load cached rates: {e}")
             return None
+
+    async def _load_cached_payload(self) -> Optional[Dict]:
+        """Load full JSON payload from cache (including metadata)."""
+        if not self.cache_file.exists():
+            return None
+        async with aiofiles.open(self.cache_file, "r", encoding="utf-8") as f:
+            content = await f.read()
+        data = json.loads(content)
+        return data if isinstance(data, dict) else None
+
+    def _extract_rates(self, payload: Dict) -> Dict[str, float]:
+        """Extract only currency numeric values from a mixed payload."""
+        return {
+            k: float(v) for k, v in payload.items()
+            if not str(k).startswith("_") and isinstance(v, (int, float))
+        }
 
     async def _update_database(
         self, rates: Dict[str, float], source: str
@@ -281,9 +289,9 @@ class CurrencyService:
     async def get_last_update_time(self) -> Optional[datetime]:
         """Get the timestamp of the last rate update."""
         try:
-            rates = await self._load_cached_rates()
-            if rates and "_meta" in rates:
-                meta = rates["_meta"]
+            payload = await self._load_cached_payload()
+            if payload and "_meta" in payload:
+                meta = payload["_meta"]
                 if "last_updated" in meta:
                     return datetime.fromisoformat(meta["last_updated"])
         except Exception:

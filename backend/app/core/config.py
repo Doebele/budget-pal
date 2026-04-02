@@ -54,6 +54,8 @@ class Settings(BaseSettings):
 
     # ── Environment ───────────────────────────────────────────
     environment: str = "production"
+    # If false, startup will not run SQLAlchemy create_all() and expects Alembic migrations.
+    auto_create_schema: bool = False
 
     @property
     def is_development(self) -> bool:

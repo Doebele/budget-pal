@@ -9,7 +9,7 @@ PUT  /auth/me        — update profile
 from datetime import datetime, date
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,9 +17,11 @@ from sqlalchemy import select
 
 from app.core.database import get_db
 from app.core.security import hash_password, verify_password, create_access_token, get_current_user
+from app.core.rate_limit import SlidingWindowRateLimiter
 from app.models.models import User
 
 router = APIRouter()
+login_rate_limiter = SlidingWindowRateLimiter(max_requests=8, window_seconds=60)
 
 
 # ── Schemas ───────────────────────────────────────────────────
@@ -113,8 +115,18 @@ async def register(payload: UserRegisterRequest, db: AsyncSession = Depends(get_
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(payload: UserLoginRequest, db: AsyncSession = Depends(get_db)):
+async def login(payload: UserLoginRequest, request: Request, db: AsyncSession = Depends(get_db)):
     """Authenticate and receive a JWT access token."""
+    # Basic brute-force protection: limit attempts per client+email.
+    client_ip = request.client.host if request.client else "unknown"
+    limit_key = f"{client_ip}:{payload.email.lower()}"
+    decision = login_rate_limiter.check(limit_key)
+    if not decision.allowed:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Too many login attempts. Try again in {decision.retry_after_seconds}s.",
+        )
+
     result = await db.execute(select(User).where(User.email == payload.email))
     user = result.scalar_one_or_none()
 
@@ -130,6 +142,8 @@ async def login(payload: UserLoginRequest, db: AsyncSession = Depends(get_db)):
         )
 
     token = create_access_token(str(user.id))
+    # Successful login resets the attempt window for this key.
+    login_rate_limiter.reset(limit_key)
     return TokenResponse(
         access_token=token,
         user_id=user.id,

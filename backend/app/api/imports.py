@@ -464,6 +464,7 @@ async def import_csv(
     skipped = 0
     failed = 0
     preview_items: List[ImportPreviewTransaction] = []
+    imported_hashes: List[str] = []
 
     for raw in raw_transactions:
         try:
@@ -519,6 +520,7 @@ async def import_csv(
             )
             db.add(txn)
             imported += 1
+            imported_hashes.append(import_hash)
 
             if len(preview_items) < 20:
                 preview_items.append(
@@ -547,7 +549,10 @@ async def import_csv(
         rows_skipped=skipped,
         rows_failed=failed,
         status=ImportStatus.completed,
-        preview_json={"preview": [p.model_dump() for p in preview_items]},
+        preview_json={
+            "preview": [p.model_dump() for p in preview_items],
+            "import_hashes": imported_hashes,
+        },
     )
     db.add(log)
     await db.flush()
@@ -689,6 +694,7 @@ async def import_pdf(
     skipped = 0
     failed = 0
     preview_items: List[ImportPreviewTransaction] = []
+    imported_hashes: List[str] = []
 
     for raw in raw_transactions:
         try:
@@ -725,6 +731,7 @@ async def import_pdf(
             )
             db.add(txn)
             imported += 1
+            imported_hashes.append(import_hash)
 
             if len(preview_items) < 20:
                 preview_items.append(
@@ -751,7 +758,10 @@ async def import_pdf(
         rows_skipped=skipped,
         rows_failed=failed,
         status=ImportStatus.completed,
-        preview_json={"preview": [p.model_dump() for p in preview_items]},
+        preview_json={
+            "preview": [p.model_dump() for p in preview_items],
+            "import_hashes": imported_hashes,
+        },
     )
     db.add(log)
     await db.flush()
@@ -863,9 +873,9 @@ async def delete_import(
     """
     Delete an import log and ALL associated transactions.
     This allows users to completely undo an import.
+    Safety policy: delete only records we can match by persisted import hashes.
     """
-    from sqlalchemy import delete, or_, and_
-    from datetime import timedelta
+    from sqlalchemy import delete
 
     # Verify import exists and belongs to user
     result = await db.execute(
@@ -880,49 +890,18 @@ async def delete_import(
 
     deleted_count = 0
     if delete_transactions and log.account_id:
-        # Strategy 1: Delete by import_hash if available in preview
-        # Extract import hashes from the preview JSON
-        import_hashes = []
+        import_hashes: List[str] = []
         if log.preview_json and isinstance(log.preview_json, dict):
-            preview = log.preview_json.get("preview", [])
-            for item in preview:
-                if isinstance(item, dict) and not item.get("is_duplicate"):
-                    # Reconstruct the import hash
-                    import_hash = compute_import_hash(
-                        log.account_id,
-                        str(item.get("date", "")),
-                        float(item.get("amount", 0)),
-                        str(item.get("description", "")),
-                    )
-                    import_hashes.append(import_hash)
+            raw_hashes = log.preview_json.get("import_hashes", [])
+            if isinstance(raw_hashes, list):
+                import_hashes = [str(h) for h in raw_hashes if h]
 
-        # Strategy 2: Also use a wide time window as backup
-        time_window_start = log.created_at - timedelta(minutes=30)
-        time_window_end = log.created_at + timedelta(minutes=30)
-
-        # Build the delete query
+        # Safety first: no heuristic time-window deletes.
         if import_hashes:
-            # Delete by import_hash OR by time window
             delete_result = await db.execute(
                 delete(Transaction).where(
                     Transaction.account_id == log.account_id,
-                    or_(
-                        Transaction.import_hash.in_(import_hashes[:100]),  # Limit to avoid query size issues
-                        and_(
-                            Transaction.created_at >= time_window_start,
-                            Transaction.created_at <= time_window_end,
-                        ),
-                    ),
-                )
-            )
-            deleted_count = delete_result.rowcount
-        else:
-            # Fallback: delete by time window only
-            delete_result = await db.execute(
-                delete(Transaction).where(
-                    Transaction.account_id == log.account_id,
-                    Transaction.created_at >= time_window_start,
-                    Transaction.created_at <= time_window_end,
+                    Transaction.import_hash.in_(import_hashes),
                 )
             )
             deleted_count = delete_result.rowcount
