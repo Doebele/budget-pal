@@ -17,6 +17,7 @@ const Settings = lazy(() => import("@/pages/Settings"));
 const Login = lazy(() => import("@/pages/Login"));
 const Register = lazy(() => import("@/pages/Register"));
 const Wizard = lazy(() => import("@/pages/Wizard"));
+const Forecast = lazy(() => import("@/pages/Forecast"));
 
 // ── Protected Route ───────────────────────────────────────────
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -114,6 +115,16 @@ export default function App() {
             <ProtectedRoute>
               <AppShell>
                 <Projections />
+              </AppShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/forecast"
+          element={
+            <ProtectedRoute>
+              <AppShell>
+                <Forecast />
               </AppShell>
             </ProtectedRoute>
           }

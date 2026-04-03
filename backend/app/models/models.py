@@ -97,6 +97,7 @@ class User(Base):
     assets: Mapped[List["Asset"]] = relationship("Asset", back_populates="user", cascade="all, delete-orphan")
     scenarios: Mapped[List["Scenario"]] = relationship("Scenario", back_populates="user", cascade="all, delete-orphan")
     import_logs: Mapped[List["ImportLog"]] = relationship("ImportLog", back_populates="user", cascade="all, delete-orphan")
+    forecast_scenarios: Mapped[List["ForecastScenario"]] = relationship("ForecastScenario", back_populates="user", cascade="all, delete-orphan")
     activity_logs: Mapped[List["ActivityLog"]] = relationship("ActivityLog", back_populates="user")
 
 
@@ -382,6 +383,30 @@ class ImportLog(Base):
 
     user: Mapped["User"] = relationship("User", back_populates="import_logs")
     account: Mapped[Optional["Account"]] = relationship("Account", back_populates="import_logs")
+
+
+# ── ForecastScenario ──────────────────────────────────────────
+
+class ForecastScenario(Base):
+    """Saved predictive budget forecast scenarios."""
+
+    __tablename__ = "forecast_scenarios"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    parameters: Mapped[Optional[dict]] = mapped_column(PortableJSON, nullable=True)
+    result_json: Mapped[Optional[dict]] = mapped_column(PortableJSON, nullable=True)
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    user: Mapped["User"] = relationship("User", back_populates="forecast_scenarios")
 
 
 # ── ActivityLog (audit: deletes / bulk archive) ───────────────

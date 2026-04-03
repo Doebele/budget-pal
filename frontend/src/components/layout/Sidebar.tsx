@@ -16,6 +16,7 @@ import {
   BarChart3,
   Wand2,
   Archive,
+  Brain,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { clsx } from "clsx";
@@ -25,7 +26,8 @@ const NAV_ITEMS = [
   { path: "/transactions", icon: ArrowLeftRight, label: "Transaktionen" },
   { path: "/transactions/archived", icon: Archive, label: "Archiv" },
   { path: "/budget", icon: PiggyBank, label: "Budget" },
-  { path: "/projections", icon: TrendingUp, label: "Prognosen" },
+  { path: "/forecast", icon: Brain, label: "Budgetprognose" },
+  { path: "/projections", icon: TrendingUp, label: "Rentenprognose" },
   { path: "/import", icon: Upload, label: "Import" },
   { path: "/accounts", icon: Wallet, label: "Konten" },
 ] as const;
