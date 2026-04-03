@@ -430,3 +430,59 @@ class ActivityLog(Base):
     detail: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     user: Mapped[Optional["User"]] = relationship("User", back_populates="activity_logs")
+
+
+# ── UserWizardConfig ──────────────────────────────────────────
+
+class UserWizardConfig(Base):
+    """Persistent wizard configuration — supplements data spread across budgets/scenarios."""
+
+    __tablename__ = "user_wizard_config"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True, index=True
+    )
+    fiscal_year_type: Mapped[str] = mapped_column(String(20), default="calendar")
+    monthly_income_target: Mapped[float] = mapped_column(Float, default=0.0)
+    fixed_monthly_expenses: Mapped[float] = mapped_column(Float, default=0.0)
+    target_savings_percentage: Mapped[float] = mapped_column(Float, default=15.0)
+    retirement_age_target: Mapped[int] = mapped_column(Integer, default=67)
+    current_age: Mapped[int] = mapped_column(Integer, default=28)
+    category_weights: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON
+    peer_group_comparison_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    peer_group_age_range_start: Mapped[int] = mapped_column(Integer, default=25)
+    peer_group_age_range_end: Mapped[int] = mapped_column(Integer, default=35)
+    use_peer_group_defaults: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+# ── PeerGroupBenchmark ────────────────────────────────────────
+
+class PeerGroupBenchmark(Base):
+    """Swiss peer-group spending benchmarks, seeded from migration 007."""
+
+    __tablename__ = "peer_group_benchmarks"
+    __table_args__ = (
+        UniqueConstraint("age_range_start", "age_range_end", "household_type", name="uq_pgb_range_household"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    age_range_start: Mapped[int] = mapped_column(Integer, nullable=False)
+    age_range_end: Mapped[int] = mapped_column(Integer, nullable=False)
+    household_type: Mapped[str] = mapped_column(String(30), nullable=False, default="single")
+    median_income_monthly: Mapped[float] = mapped_column(Float, default=0.0)
+    p25_income_monthly: Mapped[float] = mapped_column(Float, default=0.0)
+    p75_income_monthly: Mapped[float] = mapped_column(Float, default=0.0)
+    housing_avg: Mapped[float] = mapped_column(Float, default=0.0)
+    food_avg: Mapped[float] = mapped_column(Float, default=0.0)
+    transport_avg: Mapped[float] = mapped_column(Float, default=0.0)
+    insurance_avg: Mapped[float] = mapped_column(Float, default=0.0)
+    health_avg: Mapped[float] = mapped_column(Float, default=0.0)
+    leisure_avg: Mapped[float] = mapped_column(Float, default=0.0)
+    savings_rate_pct: Mapped[float] = mapped_column(Float, default=15.0)
+    peer_count: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

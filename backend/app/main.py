@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal, init_db
-from app.api import auth, transactions, imports, projections, accounts, categories, budgets, pension, assets, wizard, currency, forecasting
+from app.api import auth, transactions, imports, projections, accounts, categories, budgets, pension, assets, wizard, currency, forecasting, budget_multimodal
 from app.services.currency_service import currency_service
 
 logging.basicConfig(
@@ -92,6 +92,7 @@ app.include_router(assets.router, prefix="/api/assets", tags=["assets"])
 app.include_router(wizard.router, prefix="/api/wizard", tags=["wizard"])
 app.include_router(currency.router, prefix="/api/currency", tags=["currency"])
 app.include_router(forecasting.router, prefix="/api/forecasting", tags=["forecasting"])
+app.include_router(budget_multimodal.router, prefix="/api/budget", tags=["budget"])
 
 
 # ── Health Check ──────────────────────────────────────────────

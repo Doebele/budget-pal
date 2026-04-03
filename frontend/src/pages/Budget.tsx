@@ -1,12 +1,14 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { budgetsApi, transactionsApi } from "@/lib/api";
+import { budgetsApi, transactionsApi, budgetApi } from "@/lib/api";
 import { formatCHF } from "@/lib/theme";
 import { format, subMonths } from "date-fns";
 import { clsx } from "clsx";
-import { RefreshCw, Sparkles } from "lucide-react";
+import { RefreshCw, Sparkles, TrendingDown, TrendingUp, Minus } from "lucide-react";
 import GranularityNavigator from "@/components/GranularityNavigator";
+import BudgetAnalysisModes from "@/components/BudgetAnalysisModes";
 import { computeDateRange, TimeGranularity } from "@/lib/granularity";
+import type { AnalysisMode, MultiAnalysisResult } from "@/types/budgetAnalysis";
 
 interface RecurringExpense {
   category: string;
@@ -19,6 +21,7 @@ interface RecurringExpense {
 export default function Budget() {
   const [granularity, setGranularity] = useState<TimeGranularity>("monthly");
   const [anchor, setAnchor] = useState<Date>(new Date());
+  const [analysisMode, setAnalysisMode] = useState<AnalysisMode>("past");
 
   const range = useMemo(() => computeDateRange(granularity, anchor), [granularity, anchor]);
   const periodStart = format(range.from, "yyyy-MM-dd");
@@ -52,6 +55,17 @@ export default function Budget() {
       return result.data;
     },
     enabled: true,
+  });
+
+  // Multi-modal analysis query (non-past modes)
+  const { data: multiAnalysis, isLoading: isMultiLoading } = useQuery<MultiAnalysisResult>({
+    queryKey: ["multi-analysis", analysisMode, periodStart, periodEnd],
+    queryFn: () =>
+      budgetApi
+        .multiAnalysis({ mode: analysisMode, start: periodStart, end: periodEnd })
+        .then((r) => r.data),
+    enabled: analysisMode !== "past",
+    staleTime: 30_000,
   });
 
   // Identify recurring expenses from historical data
@@ -163,6 +177,17 @@ export default function Budget() {
           granularity={granularity}
           anchor={anchor}
           onChange={(g, a) => { setGranularity(g); setAnchor(a); }}
+        />
+      </div>
+
+      {/* Analysis mode selector */}
+      <div className="card p-4">
+        <p className="text-text-tertiary text-xs uppercase tracking-wide mb-3">Analysemodus</p>
+        <BudgetAnalysisModes
+          mode={analysisMode}
+          onChange={setAnalysisMode}
+          wizardAvailable={multiAnalysis?.wizard_available ?? false}
+          peerAvailable={multiAnalysis?.peer_data_available ?? false}
         />
       </div>
 
@@ -290,6 +315,149 @@ export default function Budget() {
           )}
         </div>
       </div>
+
+      {/* ── Multi-Modal Analysis Results ─────────────────────── */}
+      {analysisMode !== "past" && (
+        <div className="card">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-text-primary font-semibold text-sm">
+              {{
+                wizard:   "Planung vs. Ist-Ausgaben",
+                combined: "Kombinierte Analyse (60 % Ist / 40 % Planung)",
+                peer:     "Peer-Vergleich: Deine Ausgaben vs. Benchmarks",
+              }[analysisMode]}
+            </h2>
+            {multiAnalysis?.peer_info && (
+              <span className="text-xs text-text-tertiary bg-bg-surface2 px-2 py-1 rounded">
+                Vergleichsgruppe: {multiAnalysis.peer_info.age_range} Jahre ·{" "}
+                {multiAnalysis.peer_info.household_type} ·{" "}
+                {multiAnalysis.peer_info.peer_count.toLocaleString("de-CH")} Personen
+              </span>
+            )}
+          </div>
+
+          {isMultiLoading && (
+            <p className="text-text-tertiary text-sm text-center py-8">Analyse wird berechnet…</p>
+          )}
+
+          {!isMultiLoading && multiAnalysis && (
+            <>
+              {/* Summary row */}
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                <div className="bg-bg-surface2 rounded-lg p-3">
+                  <p className="text-text-tertiary text-xs mb-1">Einnahmen</p>
+                  <p className="text-gain font-mono font-semibold">{formatCHF(multiAnalysis.income)}</p>
+                </div>
+                <div className="bg-bg-surface2 rounded-lg p-3">
+                  <p className="text-text-tertiary text-xs mb-1">Ausgaben</p>
+                  <p className="text-loss font-mono font-semibold">{formatCHF(multiAnalysis.total_expenses)}</p>
+                </div>
+                <div className="bg-bg-surface2 rounded-lg p-3">
+                  <p className="text-text-tertiary text-xs mb-1">Sparquote</p>
+                  <p className={clsx("font-mono font-semibold", multiAnalysis.savings_rate >= 0 ? "text-gain" : "text-loss")}>
+                    {multiAnalysis.savings_rate.toFixed(1)} %
+                  </p>
+                </div>
+              </div>
+
+              {/* Category table */}
+              {multiAnalysis.categories.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border/50 text-text-tertiary text-xs">
+                        <th className="text-left py-2 pr-3">Kategorie</th>
+                        {analysisMode === "wizard" && <th className="text-right py-2 px-3">Planung</th>}
+                        {(analysisMode === "wizard" || analysisMode === "combined") && (
+                          <th className="text-right py-2 px-3">Ist</th>
+                        )}
+                        {analysisMode === "combined" && <th className="text-right py-2 px-3">Gewichtet</th>}
+                        {analysisMode === "peer" && <th className="text-right py-2 px-3">Deine Ausgaben</th>}
+                        {analysisMode === "peer" && <th className="text-right py-2 px-3">Benchmark</th>}
+                        {analysisMode === "peer" && <th className="text-right py-2 px-3">Delta</th>}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/30">
+                      {multiAnalysis.categories.map((cat) => (
+                        <tr key={cat.category} className="hover:bg-bg-surface2/50">
+                          <td className="py-2 pr-3 text-text-secondary font-medium">{cat.category}</td>
+
+                          {/* Wizard columns */}
+                          {analysisMode === "wizard" && (
+                            <td className="text-right py-2 px-3 font-mono text-text-primary">
+                              {cat.planned != null ? formatCHF(cat.planned) : "—"}
+                            </td>
+                          )}
+                          {(analysisMode === "wizard") && (
+                            <td className="text-right py-2 px-3 font-mono text-text-tertiary">
+                              {cat.actual != null ? formatCHF(cat.actual) : "—"}
+                            </td>
+                          )}
+
+                          {/* Combined columns */}
+                          {analysisMode === "combined" && (
+                            <>
+                              <td className="text-right py-2 px-3 font-mono text-text-tertiary">
+                                {cat.actual != null ? formatCHF(cat.actual) : "—"}
+                              </td>
+                              <td className="text-right py-2 px-3 font-mono text-text-primary font-medium">
+                                {cat.blended != null ? formatCHF(cat.blended) : "—"}
+                              </td>
+                            </>
+                          )}
+
+                          {/* Peer columns */}
+                          {analysisMode === "peer" && (
+                            <>
+                              <td className="text-right py-2 px-3 font-mono text-text-primary">
+                                {cat.actual != null ? formatCHF(cat.actual) : "—"}
+                              </td>
+                              <td className="text-right py-2 px-3 font-mono text-text-tertiary">
+                                {cat.peer_benchmark != null ? formatCHF(cat.peer_benchmark) : "—"}
+                              </td>
+                              <td className="text-right py-2 px-3 font-mono">
+                                {cat.delta_vs_peer != null ? (
+                                  <span className={clsx(
+                                    "inline-flex items-center gap-1",
+                                    cat.delta_vs_peer > 0 ? "text-loss" : "text-gain"
+                                  )}>
+                                    {cat.delta_vs_peer > 0
+                                      ? <TrendingUp className="w-3 h-3" />
+                                      : cat.delta_vs_peer < 0
+                                        ? <TrendingDown className="w-3 h-3" />
+                                        : <Minus className="w-3 h-3" />
+                                    }
+                                    {formatCHF(Math.abs(cat.delta_vs_peer))}
+                                  </span>
+                                ) : "—"}
+                              </td>
+                            </>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-text-tertiary text-sm text-center py-8">
+                  {analysisMode === "wizard"
+                    ? "Keine Wizard-Planungsdaten vorhanden. Bitte Setup-Wizard abschliessen."
+                    : "Keine Daten für diesen Zeitraum verfügbar."}
+                </p>
+              )}
+
+              {/* Peer info banner */}
+              {multiAnalysis.peer_info && analysisMode === "peer" && (
+                <div className="mt-4 border-t border-border/30 pt-3 text-xs text-text-tertiary flex flex-wrap gap-4">
+                  <span>Median-Einkommen Peer-Gruppe: <span className="text-text-secondary font-mono">{formatCHF(multiAnalysis.peer_info.median_income)}</span></span>
+                  <span>Sparquote Peer-Gruppe: <span className="text-text-secondary">{multiAnalysis.peer_info.savings_rate_pct} %</span></span>
+                  <span className="ml-auto text-slate-600">Grün = unter Durchschnitt (gut) · Rot = über Durchschnitt</span>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
