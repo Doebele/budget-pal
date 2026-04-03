@@ -87,6 +87,17 @@ const PERIODICITY_LABELS: Record<string, string> = {
   yearly: "Jährlich",
 };
 
+/** Returns Tailwind classes for the periodicity select based on current value. */
+function getFrequencyStyle(periodicity: string | null | undefined): string {
+  switch (periodicity) {
+    case "monthly":    return "bg-blue-900/20 border-blue-800 text-blue-300";
+    case "quarterly":  return "bg-purple-900/20 border-purple-800 text-purple-300";
+    case "halfyearly": return "bg-violet-900/20 border-violet-800 text-violet-300";
+    case "yearly":     return "bg-emerald-900/20 border-emerald-800 text-emerald-300";
+    default:           return "bg-slate-700/50 border-slate-600 text-slate-400";
+  }
+}
+
 /** Extra import-specific categories always shown in the dropdown. */
 const EXTRA_IMPORT_CATEGORIES = ["Einzahlungen", "Gebühren", "Kontoübertrag"];
 
@@ -513,8 +524,8 @@ export default function Import() {
                       <th className="text-left px-2 py-2.5 text-slate-400 font-medium min-w-[220px]">Beschreibung</th>
                       {/* Amount */}
                       <th className="text-right px-2 py-2.5 text-slate-400 font-medium w-[110px]">Betrag (CHF)</th>
-                      {/* AI Category */}
-                      <th className="text-left px-2 py-2.5 text-slate-400 font-medium w-[180px]">KI-Kategorie</th>
+                      {/* AI Category + Frequency */}
+                      <th className="text-left px-2 py-2.5 text-slate-400 font-medium w-[310px]">Kategorie / Frequenz</th>
                       {/* Duplicate action — only shown if there are duplicates */}
                       {hasDuplicates && (
                         <th className="text-left px-2 py-2.5 text-slate-400 font-medium w-[160px]">Duplikat-Aktion</th>
@@ -609,50 +620,54 @@ export default function Import() {
                             />
                           </td>
 
-                          {/* ── AI Category badge + override dropdown + periodicity ── */}
+                          {/* ── Kategorie + Frequenz (side-by-side) ── */}
                           <td className="px-2 py-2 align-middle">
-                            <div className="flex flex-col gap-1">
-                              {/* Show AI-assigned category as a coloured badge */}
+                            {/* AI badge row */}
+                            <div className="mb-1">
                               {row.category ? (
-                                <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-accent/20 text-accent text-[10px] font-semibold leading-tight self-start">
+                                <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-accent/20 text-accent text-[10px] font-semibold leading-tight">
                                   <span className="w-1.5 h-1.5 rounded-full bg-accent flex-shrink-0" />
                                   {row.category}
                                 </span>
                               ) : (
                                 <span className="text-slate-600 text-[10px] italic">KI: –</span>
                               )}
+                            </div>
+                            {/* Dropdowns side-by-side */}
+                            <div className="flex flex-row gap-2 items-center">
                               {/* Category override — smart: auto-applies to same-description rows */}
                               <select
                                 value={row.category ?? ""}
                                 onChange={(e) => handleCategoryChange(row.id, idx, e.target.value)}
-                                className="bg-slate-800 border border-slate-700 rounded px-1.5 py-1 text-slate-300 w-full text-[11px]"
+                                className="flex-1 min-w-0 bg-slate-800 border border-slate-700 rounded px-1.5 py-1 text-slate-300 text-[11px]"
                               >
                                 <option value="">↩ Zurücksetzen</option>
                                 {pdfCategoryOptions.map((name) => (
                                   <option key={name} value={name}>{name}</option>
                                 ))}
                               </select>
-                              {/* Periodicity selector — only for recurring transactions */}
-                              {row.is_recurring && (
-                                <select
-                                  value={row.periodicity ?? ""}
-                                  onChange={(e) =>
-                                    setPdfPreview((prev) => {
-                                      if (!prev) return prev;
-                                      const next = [...prev.rows];
-                                      next[idx] = { ...next[idx], periodicity: e.target.value || null };
-                                      return { ...prev, rows: next };
-                                    })
-                                  }
-                                  className="bg-violet-900/30 border border-violet-700/50 rounded px-1.5 py-1 text-violet-300 w-full text-[11px]"
-                                >
-                                  <option value="">Frequenz wählen</option>
-                                  <option value="monthly">Monatlich</option>
-                                  <option value="quarterly">Vierteljährlich</option>
-                                  <option value="halfyearly">Halbjährlich</option>
-                                  <option value="yearly">Jährlich</option>
-                                </select>
-                              )}
+                              {/* Frequency select — shown for all rows, color-coded by value */}
+                              <select
+                                value={row.periodicity ?? ""}
+                                onChange={(e) =>
+                                  setPdfPreview((prev) => {
+                                    if (!prev) return prev;
+                                    const next = [...prev.rows];
+                                    next[idx] = { ...next[idx], periodicity: e.target.value || null, is_recurring: !!e.target.value };
+                                    return { ...prev, rows: next };
+                                  })
+                                }
+                                className={clsx(
+                                  "w-[130px] flex-shrink-0 rounded border px-1.5 py-1 text-[11px] focus:outline-none",
+                                  getFrequencyStyle(row.periodicity)
+                                )}
+                              >
+                                <option value="">Einmalig</option>
+                                <option value="monthly">Monatlich</option>
+                                <option value="quarterly">Vierteljährlich</option>
+                                <option value="halfyearly">Halbjährlich</option>
+                                <option value="yearly">Jährlich</option>
+                              </select>
                             </div>
                           </td>
 
