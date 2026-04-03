@@ -22,10 +22,10 @@ from sqlalchemy import (
     Index,
     func,
 )
-from sqlalchemy.dialects.postgresql import JSONB, ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.core.json_type import PortableJSON
 
 
 # ── Enums ─────────────────────────────────────────────────────
@@ -63,6 +63,7 @@ class ImportStatus(str, enum.Enum):
     pending = "pending"
     processing = "processing"
     completed = "completed"
+    partial = "partial"
     failed = "failed"
 
 
@@ -113,7 +114,7 @@ class Account(Base):
     currency: Mapped[str] = mapped_column(String(3), default="CHF", nullable=False)
     balance: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     account_type: Mapped[AccountType] = mapped_column(
-        Enum(AccountType), default=AccountType.checking, nullable=False
+        Enum(AccountType, native_enum=False), default=AccountType.checking, nullable=False
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     color: Mapped[Optional[str]] = mapped_column(String(7), nullable=True)  # hex color
@@ -255,7 +256,9 @@ class Budget(Base):
         Integer, ForeignKey("categories.id", ondelete="CASCADE"), nullable=True
     )
     amount: Mapped[float] = mapped_column(Float, nullable=False)
-    period: Mapped[BudgetPeriod] = mapped_column(Enum(BudgetPeriod), default=BudgetPeriod.monthly)
+    period: Mapped[BudgetPeriod] = mapped_column(
+        Enum(BudgetPeriod, native_enum=False), default=BudgetPeriod.monthly
+    )
     year: Mapped[int] = mapped_column(Integer, nullable=False)
     month: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # NULL = all months
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -272,7 +275,9 @@ class PensionData(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    pillar: Mapped[PensionPillar] = mapped_column(Enum(PensionPillar), nullable=False)
+    pillar: Mapped[PensionPillar] = mapped_column(
+        Enum(PensionPillar, native_enum=False), nullable=False
+    )
     provider: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     current_balance: Mapped[float] = mapped_column(Float, default=0.0)
     annual_contribution: Mapped[float] = mapped_column(Float, default=0.0)
@@ -297,14 +302,14 @@ class Asset(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    asset_type: Mapped[AssetType] = mapped_column(Enum(AssetType), nullable=False)
+    asset_type: Mapped[AssetType] = mapped_column(Enum(AssetType, native_enum=False), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     current_value: Mapped[float] = mapped_column(Float, nullable=False)
     currency: Mapped[str] = mapped_column(String(3), default="CHF")
     as_of_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     expected_return_rate: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    metadata_json: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    metadata_json: Mapped[Optional[dict]] = mapped_column(PortableJSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -322,7 +327,7 @@ class Scenario(Base):
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    parameters_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    parameters_json: Mapped[dict] = mapped_column(PortableJSON, nullable=False, default=dict)
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
@@ -345,7 +350,7 @@ class ProjectionCache(Base):
     scenario_id: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("scenarios.id", ondelete="CASCADE"), nullable=True
     )
-    result_json: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    result_json: Mapped[dict] = mapped_column(PortableJSON, nullable=False)
     computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
@@ -368,9 +373,11 @@ class ImportLog(Base):
     rows_imported: Mapped[int] = mapped_column(Integer, default=0)
     rows_skipped: Mapped[int] = mapped_column(Integer, default=0)
     rows_failed: Mapped[int] = mapped_column(Integer, default=0)
-    status: Mapped[ImportStatus] = mapped_column(Enum(ImportStatus), default=ImportStatus.pending)
+    status: Mapped[ImportStatus] = mapped_column(
+        Enum(ImportStatus, native_enum=False), default=ImportStatus.pending
+    )
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    preview_json: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    preview_json: Mapped[Optional[dict]] = mapped_column(PortableJSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped["User"] = relationship("User", back_populates="import_logs")

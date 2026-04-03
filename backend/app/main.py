@@ -10,7 +10,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import settings
-from app.core.database import init_db
+from app.core.database import AsyncSessionLocal, init_db
 from app.api import auth, transactions, imports, projections, accounts, categories, budgets, pension, assets, wizard, currency
 from app.services.currency_service import currency_service
 
@@ -31,6 +31,17 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Database init failed: {e}")
         raise
+
+    try:
+        from app.services.peer_group_seed import seed_peer_group_system_categories
+
+        async with AsyncSessionLocal() as session:
+            n = await seed_peer_group_system_categories(session)
+            await session.commit()
+            if n:
+                logger.info("Seeded %d peer-group system categories.", n)
+    except Exception as e:
+        logger.warning("Peer-group category seed skipped: %s", e)
 
     # Load currency exchange rates
     try:

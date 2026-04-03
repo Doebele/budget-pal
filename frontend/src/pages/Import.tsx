@@ -1,6 +1,6 @@
 import { useState, useRef, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { importsApi, accountsApi } from "@/lib/api";
+import { importsApi, accountsApi, categoriesApi } from "@/lib/api";
 import { Upload, FileText, CheckCircle2, AlertCircle, Clock, Trash2, X, Eye, Settings2, ChevronDown, ChevronUp, Check, AlertTriangle, Table2, MapPin, Database } from "lucide-react";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
@@ -45,6 +45,43 @@ interface PreviewData {
   sample_raw: Record<string, string>[];
 }
 
+type PdfDuplicateKind = "none" | "database" | "pdf";
+type PdfMergeAction = "import" | "skip" | "overwrite" | "keep_existing" | "delete_both";
+
+interface PdfPreviewRow {
+  id: string;
+  original_date: string;
+  sign: string;
+  amount: number;
+  description: string;
+  currency: string;
+  category?: string;
+  account_id?: number;
+  is_duplicate: boolean;
+  parsed: boolean;
+  errors: string[];
+  duplicate_kind: PdfDuplicateKind;
+  existing_transaction_id?: number | null;
+  duplicate_of_row_id?: string | null;
+  merge_action: PdfMergeAction;
+}
+
+interface PdfPreviewData {
+  bank: string;
+  filename: string;
+  rows: PdfPreviewRow[];
+  total_rows: number;
+  parsed_rows: number;
+  error_rows: number;
+}
+
+interface CategoryRow {
+  id: number;
+  name: string;
+  slug: string;
+  is_system: boolean;
+}
+
 export default function Import() {
   const queryClient = useQueryClient();
   const csvRef = useRef<HTMLInputElement>(null);
@@ -63,6 +100,8 @@ export default function Import() {
   const [showColumnMapping, setShowColumnMapping] = useState(false);
   const [manualMapping, setManualMapping] = useState<Partial<ColumnMapping>>({});
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [pdfPreview, setPdfPreview] = useState<PdfPreviewData | null>(null);
+  const [pdfFileName, setPdfFileName] = useState<string>("");
 
   const { data: accounts } = useQuery({
     queryKey: ["accounts"],
@@ -73,6 +112,20 @@ export default function Import() {
     queryKey: ["import-history"],
     queryFn: () => importsApi.history().then((r) => r.data),
   });
+
+  const { data: categoriesList } = useQuery({
+    queryKey: ["categories"],
+    queryFn: () => categoriesApi.list().then((r) => r.data as CategoryRow[]),
+  });
+
+  const pdfCategoryOptions = useMemo(() => {
+    const names = new Set<string>();
+    (categoriesList ?? []).forEach((c) => names.add(c.name));
+    pdfPreview?.rows.forEach((r) => {
+      if (r.category) names.add(r.category);
+    });
+    return Array.from(names).sort((a, b) => a.localeCompare(b, "de"));
+  }, [categoriesList, pdfPreview?.rows]);
 
   const csvMutation = useMutation({
     mutationFn: (file: File) => {
@@ -89,15 +142,37 @@ export default function Import() {
     },
   });
 
-  const pdfMutation = useMutation({
+  const pdfPreviewMutation = useMutation({
     mutationFn: (file: File) => {
       const fd = new FormData();
       fd.append("file", file);
       fd.append("account_id", selectedAccount);
       if (selectedBank) fd.append("bank", selectedBank);
-      return importsApi.uploadPdf(fd).then((r) => r.data);
+      return importsApi.previewPdf(fd).then((r) => r.data as PdfPreviewData);
     },
     onSuccess: (data) => {
+      const rows: PdfPreviewRow[] = (data.rows ?? []).map((r) => ({
+        ...r,
+        duplicate_kind: (r as PdfPreviewRow).duplicate_kind ?? "none",
+        merge_action: ((r as PdfPreviewRow).merge_action ?? "import") as PdfMergeAction,
+        existing_transaction_id: (r as PdfPreviewRow).existing_transaction_id ?? undefined,
+        duplicate_of_row_id: (r as PdfPreviewRow).duplicate_of_row_id ?? undefined,
+      }));
+      setPdfPreview({ ...data, rows });
+      setPdfFileName(data.filename);
+    },
+  });
+
+  const pdfConfirmMutation = useMutation({
+    mutationFn: () =>
+      importsApi.confirmPdf({
+        account_id: Number(selectedAccount),
+        bank: selectedBank || (pdfPreview?.bank ?? "ubs"),
+        filename: pdfFileName || "upload.pdf",
+        rows: pdfPreview?.rows ?? [],
+      }).then((r) => r.data),
+    onSuccess: (data) => {
+      setPdfPreview(null);
       setImportResult(data);
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
       queryClient.invalidateQueries({ queryKey: ["import-history"] });
@@ -175,10 +250,19 @@ export default function Import() {
 
   const handlePdfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && selectedAccount) pdfMutation.mutate(file);
+    if (!file) return;
+    if (!selectedAccount) {
+      alert("Bitte zuerst ein Ziel-Konto auswählen.");
+      return;
+    }
+    pdfPreviewMutation.mutate(file);
   };
 
-  const isLoading = csvMutation.isPending || pdfMutation.isPending || previewMutation.isPending;
+  const isLoading =
+    csvMutation.isPending ||
+    previewMutation.isPending ||
+    pdfPreviewMutation.isPending ||
+    pdfConfirmMutation.isPending;
 
   // Get all available columns from sample data
   const availableColumns = previewData?.sample_raw?.[0]
@@ -287,7 +371,7 @@ export default function Import() {
         >
           <FileText className="w-8 h-8 text-text-tertiary mx-auto mb-3" />
           <p className="text-text-primary font-medium text-sm">PDF importieren</p>
-          <p className="text-text-tertiary text-xs mt-1">OCR-Extraktion (direkter Import)</p>
+          <p className="text-text-tertiary text-xs mt-1">OCR-Extraktion mit interaktiver Vorschau</p>
           <input ref={pdfRef} type="file" accept=".pdf" className="hidden" onChange={handlePdfChange} />
         </div>
       </div>
@@ -298,11 +382,202 @@ export default function Import() {
           <div className="w-8 h-8 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
           <div>
             <p className="text-text-primary text-sm font-medium">
-              {previewMutation.isPending ? "Vorschau wird erstellt..." : "Import läuft..."}
+              {previewMutation.isPending || pdfPreviewMutation.isPending
+                ? "Vorschau wird erstellt..."
+                : "Import läuft..."}
             </p>
             <p className="text-text-tertiary text-xs">
-              {previewMutation.isPending ? "CSV wird analysiert" : "KI-Kategorisierung wird durchgeführt"}
+              {previewMutation.isPending
+                ? "CSV wird analysiert"
+                : pdfPreviewMutation.isPending
+                  ? "PDF wird per OCR extrahiert"
+                  : "KI-Kategorisierung wird durchgeführt"}
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* PDF Preview Modal */}
+      {pdfPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-5xl max-h-[90vh] overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-2xl">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700">
+              <div>
+                <h3 className="text-white font-semibold">PDF Vorschau</h3>
+                <p className="text-slate-400 text-xs">
+                  {pdfPreview.filename} · {pdfPreview.total_rows} Zeilen · {pdfPreview.parsed_rows} erkannt
+                </p>
+              </div>
+              <button
+                onClick={() => setPdfPreview(null)}
+                className="text-slate-400 hover:text-white"
+                type="button"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4 overflow-auto max-h-[70vh]">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                <div className="rounded-lg bg-slate-800 p-3 text-slate-300">Bank: <span className="text-white">{pdfPreview.bank.toUpperCase()}</span></div>
+                <div className="rounded-lg bg-slate-800 p-3 text-slate-300">
+                  Duplikat DB: <span className="text-amber-300">{pdfPreview.rows.filter((r) => r.duplicate_kind === "database").length}</span>
+                </div>
+                <div className="rounded-lg bg-slate-800 p-3 text-slate-300">
+                  Duplikat PDF: <span className="text-amber-200">{pdfPreview.rows.filter((r) => r.duplicate_kind === "pdf").length}</span>
+                </div>
+                <div className="rounded-lg bg-slate-800 p-3 text-slate-300">Fehler: <span className="text-red-300">{pdfPreview.error_rows}</span></div>
+              </div>
+              <p className="text-slate-500 text-xs">
+                Bei Konto-Duplikaten: überschreiben, bestehende behalten oder bestehende Buchung endgültig löschen (kein neuer Eintrag). Bei wiederholten PDF-Zeilen: importieren oder überspringen.
+              </p>
+
+              <div className="overflow-auto border border-slate-700 rounded-lg">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-800">
+                    <tr>
+                      <th className="text-left px-3 py-2 text-slate-400 w-28">Typ</th>
+                      <th className="text-left px-3 py-2 text-slate-400">Datum</th>
+                      <th className="text-left px-3 py-2 text-slate-400">Beschreibung</th>
+                      <th className="text-right px-3 py-2 text-slate-400">Betrag</th>
+                      <th className="text-left px-3 py-2 text-slate-400">Kategorie</th>
+                      <th className="text-left px-3 py-2 text-slate-400 min-w-[11rem]">Duplikat-Aktion</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-700">
+                    {pdfPreview.rows.map((row, idx) => (
+                      <tr
+                        key={row.id}
+                        className={clsx(row.is_duplicate && "bg-amber-950/20", !row.parsed && "opacity-60")}
+                      >
+                        <td className="px-3 py-2 align-top">
+                          {row.duplicate_kind === "database" && (
+                            <span className="inline-flex rounded px-1.5 py-0.5 bg-amber-900/50 text-amber-200 text-[10px] font-medium">
+                              Konto
+                            </span>
+                          )}
+                          {row.duplicate_kind === "pdf" && (
+                            <span className="inline-flex rounded px-1.5 py-0.5 bg-slate-700 text-slate-200 text-[10px] font-medium" title={row.duplicate_of_row_id ?? ""}>
+                              PDF{row.duplicate_of_row_id ? " · Zeile 2+" : ""}
+                            </span>
+                          )}
+                          {row.duplicate_kind === "none" && <span className="text-slate-600">—</span>}
+                        </td>
+                        <td className="px-3 py-2">
+                          <input
+                            value={row.original_date}
+                            onChange={(e) => setPdfPreview((prev) => {
+                              if (!prev) return prev;
+                              const next = [...prev.rows];
+                              next[idx] = { ...next[idx], original_date: e.target.value };
+                              return { ...prev, rows: next };
+                            })}
+                            className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white w-32"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <input
+                            value={row.description}
+                            onChange={(e) => setPdfPreview((prev) => {
+                              if (!prev) return prev;
+                              const next = [...prev.rows];
+                              next[idx] = { ...next[idx], description: e.target.value };
+                              return { ...prev, rows: next };
+                            })}
+                            className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white w-full"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <input
+                            type="number"
+                            value={row.amount}
+                            onChange={(e) => setPdfPreview((prev) => {
+                              if (!prev) return prev;
+                              const next = [...prev.rows];
+                              next[idx] = { ...next[idx], amount: Number(e.target.value) };
+                              return { ...prev, rows: next };
+                            })}
+                            className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-right w-32 ml-auto block"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <select
+                            value={row.category ?? ""}
+                            onChange={(e) =>
+                              setPdfPreview((prev) => {
+                                if (!prev) return prev;
+                                const next = [...prev.rows];
+                                next[idx] = {
+                                  ...next[idx],
+                                  category: e.target.value ? e.target.value : undefined,
+                                };
+                                return { ...prev, rows: next };
+                              })
+                            }
+                            className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white w-full max-w-[12rem] text-xs"
+                          >
+                            <option value="">Auto (KI)</option>
+                            {pdfCategoryOptions.map((name) => (
+                              <option key={name} value={name}>
+                                {name}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-3 py-2 align-top">
+                          {row.duplicate_kind === "database" ? (
+                            <select
+                              className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-xs w-full max-w-[13rem]"
+                              value={row.merge_action}
+                              onChange={(e) =>
+                                setPdfPreview((prev) => {
+                                  if (!prev) return prev;
+                                  const next = [...prev.rows];
+                                  next[idx] = { ...next[idx], merge_action: e.target.value as PdfMergeAction };
+                                  return { ...prev, rows: next };
+                                })
+                              }
+                            >
+                              <option value="keep_existing">Bestehende behalten</option>
+                              <option value="overwrite">Mit PDF überschreiben</option>
+                              <option value="delete_both">Bestehende endgültig löschen</option>
+                              <option value="import">Trotzdem neu importieren</option>
+                            </select>
+                          ) : row.duplicate_kind === "pdf" ? (
+                            <select
+                              className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-xs w-full max-w-[13rem]"
+                              value={row.merge_action === "import" ? "import" : "skip"}
+                              onChange={(e) =>
+                                setPdfPreview((prev) => {
+                                  if (!prev) return prev;
+                                  const next = [...prev.rows];
+                                  next[idx] = { ...next[idx], merge_action: e.target.value as PdfMergeAction };
+                                  return { ...prev, rows: next };
+                                })
+                              }
+                            >
+                              <option value="skip">Doppelte Zeile überspringen</option>
+                              <option value="import">Trotzdem importieren</option>
+                            </select>
+                          ) : (
+                            <span className="text-slate-600 text-xs">Import</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 px-5 py-4 border-t border-slate-700">
+              <button onClick={() => setPdfPreview(null)} className="btn-secondary">Abbrechen</button>
+              <button
+                onClick={() => pdfConfirmMutation.mutate()}
+                disabled={pdfConfirmMutation.isPending || pdfPreview.rows.length === 0}
+                className="btn-primary"
+              >
+                {pdfConfirmMutation.isPending ? "Importiere..." : "Transaktionen importieren"}
+              </button>
+            </div>
           </div>
         </div>
       )}

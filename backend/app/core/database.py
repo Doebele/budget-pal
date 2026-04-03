@@ -2,25 +2,38 @@
 SQLAlchemy async database setup.
 Provides engine, session factory, and base model class.
 """
+import os
 from typing import AsyncGenerator
 
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy import DateTime, func
+from sqlalchemy.engine.url import make_url
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from app.core.config import settings
 
 
+def _build_async_engine():
+    url = settings.database_url
+    if url.startswith("sqlite"):
+        return create_async_engine(
+            url,
+            echo=settings.is_development,
+            connect_args={"check_same_thread": False},
+        )
+    return create_async_engine(
+        url,
+        echo=settings.is_development,
+        pool_size=10,
+        max_overflow=20,
+        pool_pre_ping=True,
+        pool_recycle=3600,
+    )
+
+
 # ── Engine ────────────────────────────────────────────────────
 
-engine = create_async_engine(
-    settings.database_url,
-    echo=settings.is_development,
-    pool_size=10,
-    max_overflow=20,
-    pool_pre_ping=True,
-    pool_recycle=3600,
-)
+engine = _build_async_engine()
 
 AsyncSessionLocal = async_sessionmaker(
     engine,
@@ -70,6 +83,33 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 # ── DB Init ───────────────────────────────────────────────────
 
+def _ensure_app_data_subdirs() -> None:
+    """Ensure upload and FX cache directories exist (empty Docker volume may hide image paths)."""
+    from pathlib import Path
+
+    Path(settings.uploads_dir).mkdir(parents=True, exist_ok=True)
+    cache_path = os.getenv("RATES_CACHE_PATH", "/app/data/cache/rates.json")
+    Path(cache_path).parent.mkdir(parents=True, exist_ok=True)
+
+
+def _ensure_sqlite_parent_directory() -> None:
+    """Create parent dirs for file-based SQLite (e.g. /app/data/budget-pal.db)."""
+    url_s = settings.database_url
+    if not url_s.startswith("sqlite"):
+        return
+    try:
+        u = make_url(url_s)
+    except Exception:
+        return
+    dbname = u.database
+    if not dbname or dbname == ":memory:":
+        return
+    path = dbname if os.path.isabs(dbname) else os.path.abspath(dbname)
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+
+
 async def init_db() -> None:
     """Create all tables if they do not exist. (Dev/initial setup.)
     In production, use Alembic migrations instead.
@@ -79,6 +119,9 @@ async def init_db() -> None:
 
     logger = logging.getLogger(__name__)
     from app.models import models  # noqa: F401 — import to register models
+
+    _ensure_sqlite_parent_directory()
+    _ensure_app_data_subdirs()
 
     # Migrations-first policy:
     # - production/staging should use Alembic and skip create_all by default

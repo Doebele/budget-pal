@@ -28,6 +28,16 @@ router = APIRouter()
 categorization_service = CategorizationService()
 
 
+def _utc_start_of_day(d: date) -> datetime:
+    """Inclusive lower bound for TIMESTAMPTZ columns (asyncpg rejects naive datetimes)."""
+    return datetime.combine(d, datetime.min.time(), tzinfo=timezone.utc)
+
+
+def _utc_end_of_day(d: date) -> datetime:
+    """Inclusive upper bound for TIMESTAMPTZ columns."""
+    return datetime.combine(d, datetime.max.time(), tzinfo=timezone.utc)
+
+
 # ── Schemas ───────────────────────────────────────────────────
 
 class TransactionResponse(BaseModel):
@@ -336,9 +346,9 @@ async def list_transactions(
     ]
 
     if start:
-        filters.append(Transaction.date >= datetime.combine(start, datetime.min.time()))
+        filters.append(Transaction.date >= _utc_start_of_day(start))
     if end:
-        filters.append(Transaction.date <= datetime.combine(end, datetime.max.time()))
+        filters.append(Transaction.date <= _utc_end_of_day(end))
     if category:
         filters.append(Transaction.category == category)
     if account_id:
@@ -387,6 +397,7 @@ async def list_transactions(
             notes=t.notes,
             is_transfer=t.is_transfer,
             is_recurring=t.is_recurring,
+            periodicity=t.periodicity,
             created_at=t.created_at,
         )
         for t in transactions
@@ -592,9 +603,9 @@ async def get_stats(
         Transaction.is_deleted.isnot(True)
     ]
     if start:
-        filters.append(Transaction.date >= datetime.combine(start, datetime.min.time()))
+        filters.append(Transaction.date >= _utc_start_of_day(start))
     if end:
-        filters.append(Transaction.date <= datetime.combine(end, datetime.max.time()))
+        filters.append(Transaction.date <= _utc_end_of_day(end))
     if account_id:
         filters.append(Transaction.account_id == account_id)
 
@@ -730,9 +741,9 @@ async def budget_analysis(
     if account_id:
         filters.append(Transaction.account_id == account_id)
     if period_start:
-        filters.append(Transaction.date >= datetime.combine(period_start, datetime.min.time()))
+        filters.append(Transaction.date >= _utc_start_of_day(period_start))
     if period_end:
-        filters.append(Transaction.date <= datetime.combine(period_end, datetime.max.time()))
+        filters.append(Transaction.date <= _utc_end_of_day(period_end))
 
     # Get all transactions in the period
     result = await db.execute(

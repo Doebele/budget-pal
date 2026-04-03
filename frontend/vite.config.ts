@@ -27,12 +27,23 @@ export default defineConfig({
   build: {
     outDir: "dist",
     sourcemap: false,
+    // Nivo + Recharts exceed Vite’s default 500 kB warning; gzip is typically ~150 kB.
+    chunkSizeWarningLimit: 900,
     rollupOptions: {
       output: {
         manualChunks: {
           "react-vendor": ["react", "react-dom", "react-router-dom"],
           "query": ["@tanstack/react-query"],
-          "charts": ["recharts", "@nivo/core", "@nivo/sankey", "@nivo/bar", "@nivo/line"],
+          "charts": [
+            "recharts",
+            "@nivo/core",
+            "@nivo/bar",
+            "@nivo/heatmap",
+            "@nivo/line",
+            "@nivo/pie",
+            "@nivo/sankey",
+            "@nivo/treemap",
+          ],
           "ui": [
             "@radix-ui/react-dialog",
             "@radix-ui/react-dropdown-menu",

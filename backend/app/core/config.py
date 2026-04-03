@@ -15,7 +15,10 @@ class Settings(BaseSettings):
     )
 
     # ── Database ─────────────────────────────────────────────
+    # PostgreSQL (default) or SQLite file, e.g. sqlite+aiosqlite:////app/data/budget-pal.db
     database_url: str = "postgresql+asyncpg://budgetpal:budgetpal@localhost:5432/budgetpal"
+    # Documented default path for Docker volume + SQLite (use with DATABASE_URL).
+    sqlite_database_path: str = "/app/data/budget-pal.db"
     postgres_db: str = "budgetpal"
     postgres_user: str = "budgetpal"
     postgres_password: str = "budgetpal"

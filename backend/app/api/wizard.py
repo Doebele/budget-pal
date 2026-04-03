@@ -19,7 +19,7 @@ from datetime import datetime, timezone, date
 from typing import List, Literal, Optional
 
 from fastapi import APIRouter, Depends, status
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -38,6 +38,19 @@ from app.models.models import (
 )
 
 router = APIRouter()
+
+
+# ── Peer group (BFS-style reference — mirrors peerGroupAnalyzer.ts) ──
+
+
+class PeerGroupProfileIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    ageGroup: Literal["25-34", "35-44", "45-54", "55-64", "65+"]
+    canton: str
+    householdType: Literal["single", "couple", "family", "single-parent"]
+    employmentStatus: Literal["employed", "self-employed", "mixed", "retired"]
+    incomeLevel: Literal["low", "medium", "high"]
 
 
 # ── Pydantic Schemas ───────────────────────────────────────────
@@ -217,6 +230,39 @@ def _build_scenario_params(p: WizardCompletePayload) -> dict:
         "bvg_rentenalter": p.bvg_rentenalter,
         "pillar_3a_total": sum(a.balance for a in p.pillar_3a_accounts),
     }
+
+
+# ── Peer group endpoints (no auth — static / derived reference data) ──
+
+
+@router.get(
+    "/peer-reference",
+    summary="Swiss cantons and common subscription catalog",
+)
+async def wizard_peer_reference():
+    from app.services.peer_group import COMMON_SUBSCRIPTIONS, swiss_cantons_list
+
+    return {
+        "cantons": swiss_cantons_list(),
+        "subscriptions": list(COMMON_SUBSCRIPTIONS),
+    }
+
+
+@router.post(
+    "/peer-defaults",
+    summary="Computed peer-group monthly defaults for a demographic profile",
+)
+async def wizard_peer_defaults(profile: PeerGroupProfileIn):
+    from app.services.peer_group import PeerGroupProfile, get_peer_group_defaults
+
+    p = PeerGroupProfile(
+        age_group=profile.ageGroup,
+        canton=profile.canton,
+        household_type=profile.householdType,
+        employment_status=profile.employmentStatus,
+        income_level=profile.incomeLevel,
+    )
+    return get_peer_group_defaults(p)
 
 
 # ── Main endpoint ──────────────────────────────────────────────

@@ -13,13 +13,14 @@ import logging
 import os
 import re
 import tempfile
-from datetime import datetime
-from typing import List, Optional
+from uuid import uuid4
+from datetime import datetime, timezone
+from typing import List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 
@@ -32,6 +33,8 @@ from app.services.import_parsers.ubs import UBSParser
 from app.services.import_parsers.n26 import N26Parser
 from app.services.import_parsers.revolut import RevolutParser
 from app.services.import_parsers.comdirect import ComdirectParser
+from app.services.pdf_duplicate_detection import find_database_duplicate_transaction_id
+from app.services.pdf_import_row_match import find_pdf_internal_duplicate_of, normalize_preview_date_str
 
 router = APIRouter()
 categorization_service = CategorizationService()
@@ -57,13 +60,14 @@ class ColumnMapping(BaseModel):
 
 
 class ImportPreviewTransaction(BaseModel):
-    row_index: int
+    # Defaults so CSV/PDF legacy paths can omit fields (Pydantic v2 otherwise rejects response build).
+    row_index: int = 0
     date: Optional[str] = None
     description: Optional[str] = None
     amount: Optional[float] = None
-    raw_data: dict
-    parsed: bool
-    errors: List[str]
+    raw_data: dict = Field(default_factory=dict)
+    parsed: bool = True
+    errors: List[str] = Field(default_factory=list)
     currency: str = "CHF"
     category: Optional[str] = None
     confidence_score: Optional[float] = None
@@ -103,9 +107,46 @@ class ImportLogResponse(BaseModel):
     file_type: str
     rows_imported: int
     rows_skipped: int
+    rows_failed: int = 0
     status: str
     created_at: datetime
     account_id: Optional[int]
+
+
+class PdfPreviewTransaction(BaseModel):
+    id: str
+    original_date: str
+    sign: str = ""
+    amount: float
+    description: str
+    currency: str = "CHF"
+    category: Optional[str] = None
+    account_id: Optional[int] = None
+    is_duplicate: bool = False
+    parsed: bool = True
+    errors: List[str] = []
+    # Duplicates: "none" | "database" (matches existing txn) | "pdf" (repeated line in file)
+    duplicate_kind: str = "none"
+    existing_transaction_id: Optional[int] = None
+    duplicate_of_row_id: Optional[str] = None
+    # import | skip | overwrite | keep_existing | delete_both
+    merge_action: str = "import"
+
+
+class PdfPreviewResponse(BaseModel):
+    bank: str
+    filename: str
+    rows: List[PdfPreviewTransaction]
+    total_rows: int
+    parsed_rows: int
+    error_rows: int
+
+
+class PdfImportConfirmRequest(BaseModel):
+    account_id: int
+    bank: Optional[str] = None
+    filename: Optional[str] = None
+    rows: List[PdfPreviewTransaction]
 
 
 # ── Helper: detect bank format from CSV content ────────────────
@@ -137,6 +178,20 @@ def detect_bank_format(content: bytes) -> str:
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         detail="Could not detect bank format. Supported formats: UBS, N26, Revolut, comdirect.",
     )
+
+
+def _transaction_date_utc(d: datetime) -> datetime:
+    """TIMESTAMPTZ / asyncpg: naive datetimes are rejected."""
+    if d.tzinfo is None:
+        return d.replace(tzinfo=timezone.utc)
+    return d.astimezone(timezone.utc)
+
+
+def _date_str_for_import_hash(date_val: object) -> str:
+    if isinstance(date_val, datetime):
+        return date_val.strftime("%Y-%m-%d")
+    s = str(date_val or "").strip()
+    return s[:10] if len(s) >= 10 else s
 
 
 def compute_import_hash(account_id: int, date: str, amount: float, description: str) -> str:
@@ -446,6 +501,7 @@ async def import_csv(
     try:
         raw_transactions = parser.parse(content)
     except Exception as e:
+        logger.error("CSV parse error for bank=%s file=%s: %s", detected_bank, file.filename, e)
         log = ImportLog(
             user_id=current_user.id,
             account_id=account_id,
@@ -457,6 +513,7 @@ async def import_csv(
         )
         db.add(log)
         await db.flush()
+        await db.commit()
         raise HTTPException(status_code=422, detail=f"Parse error: {e}")
 
     # Process transactions
@@ -470,7 +527,7 @@ async def import_csv(
         try:
             import_hash = compute_import_hash(
                 account_id,
-                str(raw.get("date", "")),
+                _date_str_for_import_hash(raw.get("date")),
                 float(raw.get("amount", 0)),
                 str(raw.get("description", "")),
             )
@@ -480,6 +537,7 @@ async def import_csv(
                 select(Transaction.id).where(
                     Transaction.account_id == account_id,
                     Transaction.import_hash == import_hash,
+                    Transaction.is_deleted.isnot(True),
                 )
             )
             is_duplicate = dup_result.scalar_one_or_none() is not None
@@ -489,6 +547,7 @@ async def import_csv(
                 if len(preview_items) < 5:
                     preview_items.append(
                         ImportPreviewTransaction(
+                            row_index=len(preview_items),
                             date=str(raw.get("date", "")),
                             description=raw.get("description", ""),
                             amount=float(raw.get("amount", 0)),
@@ -503,10 +562,20 @@ async def import_csv(
             # Categorize
             cat_result = await categorization_service.categorize(raw.get("description", ""))
 
+            raw_dt = raw["date"]
+            txn_dt = (
+                _transaction_date_utc(raw_dt)
+                if isinstance(raw_dt, datetime)
+                else datetime.strptime(str(raw_dt)[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            )
+
+            bd = raw.get("booking_date")
+            booking_utc = _transaction_date_utc(bd) if isinstance(bd, datetime) else None
+
             txn = Transaction(
                 account_id=account_id,
-                date=raw["date"],
-                booking_date=raw.get("booking_date"),
+                date=txn_dt,
+                booking_date=booking_utc,
                 description=raw["description"],
                 amount=float(raw["amount"]),
                 currency=raw.get("currency", account.currency),
@@ -525,6 +594,7 @@ async def import_csv(
             if len(preview_items) < 20:
                 preview_items.append(
                     ImportPreviewTransaction(
+                        row_index=len(preview_items),
                         date=str(raw["date"]),
                         description=raw["description"],
                         amount=float(raw["amount"]),
@@ -536,7 +606,16 @@ async def import_csv(
                 )
 
         except Exception as e:
+            logger.warning("CSV row processing failed (row_index=%d): %s", len(preview_items), e)
             failed += 1
+
+    # Determine import status
+    if failed > 0 and imported == 0:
+        csv_status = ImportStatus.failed
+    elif failed > 0:
+        csv_status = ImportStatus.partial
+    else:
+        csv_status = ImportStatus.completed
 
     # Save import log
     log = ImportLog(
@@ -548,7 +627,7 @@ async def import_csv(
         rows_imported=imported,
         rows_skipped=skipped,
         rows_failed=failed,
-        status=ImportStatus.completed,
+        status=csv_status,
         preview_json={
             "preview": [p.model_dump() for p in preview_items],
             "import_hashes": imported_hashes,
@@ -564,7 +643,7 @@ async def import_csv(
         rows_imported=imported,
         rows_skipped=skipped,
         rows_failed=failed,
-        status="completed",
+        status=csv_status.value,
         preview=preview_items,
     )
 
@@ -642,6 +721,353 @@ async def _ocr_pdf_to_text(tmp_path: str) -> str:
         return full_text
 
 
+@router.post("/pdf/preview", response_model=PdfPreviewResponse)
+async def preview_pdf_import(
+    file: UploadFile = File(...),
+    bank: Optional[str] = Form(None),
+    account_id: Optional[int] = Form(None),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Extract PDF transactions and return editable preview rows."""
+    if account_id is not None:
+        acct_result = await db.execute(
+            select(Account).where(Account.id == account_id, Account.user_id == current_user.id)
+        )
+        if not acct_result.scalar_one_or_none():
+            raise HTTPException(status_code=404, detail="Account not found.")
+
+    content = await file.read()
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+        tmp.write(content)
+        tmp_path = tmp.name
+
+    try:
+        import pdfplumber
+        with pdfplumber.open(tmp_path) as pdf:
+            full_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+        if len(full_text.strip()) < 100:
+            full_text = await _ocr_pdf_to_text(tmp_path)
+    finally:
+        os.unlink(tmp_path)
+
+    detected_bank = bank or "ubs"
+    raw_transactions = _parse_pdf_text(full_text, detected_bank)
+
+    rows: List[PdfPreviewTransaction] = []
+    parsed_rows = 0
+    error_rows = 0
+    prior_for_pdf: List[Tuple[str, str, float, str]] = []
+
+    for row in raw_transactions:
+        date_val = row.get("date")
+        amount_val = float(row.get("amount", 0))
+        description_val = str(row.get("description", "")).strip()
+        errors: List[str] = []
+        if not date_val:
+            errors.append("Missing date")
+        if not description_val:
+            errors.append("Missing description")
+
+        date_str = normalize_preview_date_str(date_val)
+
+        parsed = len(errors) == 0
+        duplicate_kind = "none"
+        existing_transaction_id: Optional[int] = None
+        duplicate_of_row_id: Optional[str] = None
+        merge_action = "import"
+        is_duplicate = False
+
+        if parsed and account_id and date_str and description_val:
+            import_hash = compute_import_hash(account_id, date_str, amount_val, description_val)
+            existing_transaction_id = await find_database_duplicate_transaction_id(
+                db,
+                account_id,
+                date_str,
+                amount_val,
+                description_val,
+                import_hash,
+            )
+            if existing_transaction_id is not None:
+                duplicate_kind = "database"
+                is_duplicate = True
+                merge_action = "keep_existing"
+
+        if parsed and duplicate_kind == "none" and description_val and date_str:
+            dup_rid = find_pdf_internal_duplicate_of(
+                prior_for_pdf,
+                date_str,
+                amount_val,
+                description_val,
+            )
+            if dup_rid:
+                duplicate_kind = "pdf"
+                duplicate_of_row_id = dup_rid
+                is_duplicate = True
+                merge_action = "skip"
+
+        if parsed:
+            parsed_rows += 1
+        else:
+            error_rows += 1
+
+        row_id = str(uuid4())
+        display_date = date_str or (
+            date_val.strftime("%Y-%m-%d") if isinstance(date_val, datetime) else str(date_val or "")
+        )
+        rows.append(
+            PdfPreviewTransaction(
+                id=row_id,
+                original_date=display_date,
+                sign="+" if amount_val > 0 else "",
+                amount=amount_val,
+                description=description_val,
+                currency=row.get("currency", "CHF"),
+                category=None,
+                account_id=account_id,
+                is_duplicate=is_duplicate,
+                parsed=parsed,
+                errors=errors,
+                duplicate_kind=duplicate_kind,
+                existing_transaction_id=existing_transaction_id,
+                duplicate_of_row_id=duplicate_of_row_id,
+                merge_action=merge_action,
+            )
+        )
+        if parsed:
+            prior_for_pdf.append((row_id, date_str, amount_val, description_val))
+
+    return PdfPreviewResponse(
+        bank=detected_bank,
+        filename=file.filename or "upload.pdf",
+        rows=rows,
+        total_rows=len(rows),
+        parsed_rows=parsed_rows,
+        error_rows=error_rows,
+    )
+
+
+@router.post("/pdf/confirm", response_model=ImportResultResponse, status_code=status.HTTP_201_CREATED)
+async def confirm_pdf_import(
+    payload: PdfImportConfirmRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Persist user-reviewed PDF preview rows."""
+    acct_result = await db.execute(
+        select(Account).where(Account.id == payload.account_id, Account.user_id == current_user.id)
+    )
+    account = acct_result.scalar_one_or_none()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found.")
+
+    imported = 0
+    skipped = 0
+    failed = 0
+    preview_items: List[ImportPreviewTransaction] = []
+    imported_hashes: List[str] = []
+    bank_name = payload.bank or "ubs"
+    allowed_merge = frozenset({"import", "skip", "overwrite", "keep_existing", "delete_both"})
+
+    def append_preview_sample(
+        *,
+        date_s: str,
+        description: str,
+        amount: float,
+        currency: str,
+        category: Optional[str],
+        confidence_score: Optional[float],
+        is_duplicate: bool,
+    ) -> None:
+        if len(preview_items) >= 20:
+            return
+        preview_items.append(
+            ImportPreviewTransaction(
+                row_index=imported + skipped + failed,
+                date=date_s,
+                description=description,
+                amount=amount,
+                raw_data={},
+                parsed=True,
+                errors=[],
+                currency=currency,
+                category=category,
+                confidence_score=confidence_score,
+                is_duplicate=is_duplicate,
+            )
+        )
+
+    for row in payload.rows:
+        if not row.parsed:
+            skipped += 1
+            continue
+
+        action = row.merge_action if row.merge_action in allowed_merge else "import"
+
+        if row.duplicate_kind == "pdf" and action == "skip":
+            skipped += 1
+            continue
+
+        try:
+            date_norm = row.original_date.strip()[:10]
+            dt = datetime.strptime(date_norm, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        except ValueError:
+            failed += 1
+            continue
+
+        description = row.description.strip()
+        amount = float(row.amount)
+        import_hash = compute_import_hash(payload.account_id, date_norm, amount, description)
+        cur = row.currency or "CHF"
+
+        if row.duplicate_kind == "database":
+            if action in ("keep_existing", "skip"):
+                skipped += 1
+                continue
+            if action == "delete_both":
+                try:
+                    if row.existing_transaction_id:
+                        txn_res = await db.execute(
+                            select(Transaction).where(
+                                Transaction.id == row.existing_transaction_id,
+                                Transaction.account_id == payload.account_id,
+                                Transaction.is_deleted.isnot(True),
+                            )
+                        )
+                        ex = txn_res.scalar_one_or_none()
+                        if ex:
+                            await db.delete(ex)
+                except Exception as del_err:
+                    logger.warning("delete_both failed for txn_id=%s: %s", row.existing_transaction_id, del_err)
+                skipped += 1
+                continue
+            if action == "overwrite":
+                if not row.existing_transaction_id:
+                    failed += 1
+                    continue
+                txn_res = await db.execute(
+                    select(Transaction).where(
+                        Transaction.id == row.existing_transaction_id,
+                        Transaction.account_id == payload.account_id,
+                        Transaction.is_deleted.isnot(True),
+                    )
+                )
+                ex = txn_res.scalar_one_or_none()
+                if not ex:
+                    failed += 1
+                    continue
+                category = row.category
+                confidence_score = None
+                if not category:
+                    cat_result = await categorization_service.categorize(description)
+                    category = cat_result["category"]
+                    confidence_score = cat_result["confidence_score"]
+                else:
+                    confidence_score = ex.confidence_score
+                ex.date = dt
+                ex.description = description
+                ex.amount = amount
+                ex.currency = cur or account.currency
+                ex.category = category
+                ex.confidence_score = confidence_score
+                ex.import_hash = import_hash
+                imported += 1
+                imported_hashes.append(import_hash)
+                append_preview_sample(
+                    date_s=date_norm,
+                    description=description,
+                    amount=amount,
+                    currency=cur,
+                    category=category,
+                    confidence_score=confidence_score,
+                    is_duplicate=False,
+                )
+                continue
+            # action == import: fall through to insert if hash unique
+
+        dup_result = await db.execute(
+            select(Transaction.id).where(
+                Transaction.account_id == payload.account_id,
+                Transaction.import_hash == import_hash,
+                Transaction.is_deleted.isnot(True),
+            )
+        )
+        if dup_result.scalar_one_or_none():
+            skipped += 1
+            continue
+
+        try:
+            category = row.category
+            confidence_score = None
+            if not category:
+                cat_result = await categorization_service.categorize(description)
+                category = cat_result["category"]
+                confidence_score = cat_result["confidence_score"]
+
+            txn = Transaction(
+                account_id=payload.account_id,
+                date=dt,
+                description=description,
+                amount=amount,
+                currency=cur or account.currency,
+                category=category,
+                confidence_score=confidence_score,
+                import_hash=import_hash,
+            )
+            db.add(txn)
+            imported += 1
+            imported_hashes.append(import_hash)
+            append_preview_sample(
+                date_s=date_norm,
+                description=description,
+                amount=amount,
+                currency=cur,
+                category=category,
+                confidence_score=confidence_score,
+                is_duplicate=False,
+            )
+        except Exception as e:
+            logger.warning("PDF confirm row processing failed: %s", e)
+            failed += 1
+
+    # Determine import status
+    if failed > 0 and imported == 0:
+        pdf_confirm_status = ImportStatus.failed
+    elif failed > 0:
+        pdf_confirm_status = ImportStatus.partial
+    else:
+        pdf_confirm_status = ImportStatus.completed
+
+    log = ImportLog(
+        user_id=current_user.id,
+        account_id=payload.account_id,
+        filename=payload.filename or "upload.pdf",
+        bank=bank_name,
+        file_type="pdf",
+        rows_imported=imported,
+        rows_skipped=skipped,
+        rows_failed=failed,
+        status=pdf_confirm_status,
+        preview_json={
+            "preview": [p.model_dump() for p in preview_items],
+            "import_hashes": imported_hashes,
+        },
+    )
+    db.add(log)
+    await db.flush()
+    await db.refresh(log)
+
+    return ImportResultResponse(
+        import_id=log.id,
+        bank=bank_name,
+        rows_imported=imported,
+        rows_skipped=skipped,
+        rows_failed=failed,
+        status=pdf_confirm_status.value,
+        preview=preview_items,
+    )
+
+
 @router.post("/pdf", response_model=ImportResultResponse, status_code=status.HTTP_201_CREATED)
 async def import_pdf(
     file: UploadFile = File(...),
@@ -700,7 +1126,7 @@ async def import_pdf(
         try:
             import_hash = compute_import_hash(
                 account_id,
-                str(raw.get("date", "")),
+                _date_str_for_import_hash(raw.get("date")),
                 float(raw.get("amount", 0)),
                 str(raw.get("description", "")),
             )
@@ -709,6 +1135,7 @@ async def import_pdf(
                 select(Transaction.id).where(
                     Transaction.account_id == account_id,
                     Transaction.import_hash == import_hash,
+                    Transaction.is_deleted.isnot(True),
                 )
             )
             if dup_result.scalar_one_or_none():
@@ -717,9 +1144,16 @@ async def import_pdf(
 
             cat_result = await categorization_service.categorize(raw.get("description", ""))
 
+            raw_dt = raw["date"]
+            txn_dt = (
+                _transaction_date_utc(raw_dt)
+                if isinstance(raw_dt, datetime)
+                else datetime.strptime(str(raw_dt)[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            )
+
             txn = Transaction(
                 account_id=account_id,
-                date=raw["date"],
+                date=txn_dt,
                 description=raw["description"],
                 amount=float(raw["amount"]),
                 currency=raw.get("currency", account.currency),
@@ -736,6 +1170,7 @@ async def import_pdf(
             if len(preview_items) < 20:
                 preview_items.append(
                     ImportPreviewTransaction(
+                        row_index=len(preview_items),
                         date=str(raw["date"]),
                         description=raw["description"],
                         amount=float(raw["amount"]),
@@ -745,8 +1180,17 @@ async def import_pdf(
                         is_duplicate=False,
                     )
                 )
-        except Exception:
+        except Exception as e:
+            logger.warning("Legacy PDF row processing failed: %s", e)
             failed += 1
+
+    # Determine import status
+    if failed > 0 and imported == 0:
+        pdf_status = ImportStatus.failed
+    elif failed > 0:
+        pdf_status = ImportStatus.partial
+    else:
+        pdf_status = ImportStatus.completed
 
     log = ImportLog(
         user_id=current_user.id,
@@ -757,7 +1201,7 @@ async def import_pdf(
         rows_imported=imported,
         rows_skipped=skipped,
         rows_failed=failed,
-        status=ImportStatus.completed,
+        status=pdf_status,
         preview_json={
             "preview": [p.model_dump() for p in preview_items],
             "import_hashes": imported_hashes,
@@ -773,7 +1217,7 @@ async def import_pdf(
         rows_imported=imported,
         rows_skipped=skipped,
         rows_failed=failed,
-        status="completed",
+        status=pdf_status.value,
         preview=preview_items,
     )
 
@@ -827,6 +1271,7 @@ async def import_history(
             file_type=log.file_type,
             rows_imported=log.rows_imported,
             rows_skipped=log.rows_skipped,
+            rows_failed=log.rows_failed or 0,
             status=log.status.value,
             created_at=log.created_at,
             account_id=log.account_id,
@@ -906,9 +1351,8 @@ async def delete_import(
             )
             deleted_count = delete_result.rowcount
 
-    # Delete the import log
+    # Delete the import log (get_db() commits on success)
     await db.delete(log)
-    await db.commit()  # Important: commit the transaction!
 
     return {
         "success": True,
