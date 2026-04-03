@@ -491,7 +491,7 @@ export default function Transactions() {
                 className="fixed inset-0 z-10"
                 onClick={() => setShowMonthDropdown(false)}
               />
-              <div className="absolute top-full left-0 mt-1 w-48 max-h-64 overflow-y-auto bg-bg-card border border-border rounded-md shadow-lg z-20 py-1">
+              <div className="absolute top-full left-0 mt-1 w-48 max-h-64 overflow-y-auto bg-slate-800 border border-slate-700 rounded-md shadow-xl z-20 py-1">
                 {availableMonths.map((month) => (
                   <button
                     key={month.toISOString()}
