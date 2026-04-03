@@ -2,10 +2,11 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { budgetsApi, transactionsApi } from "@/lib/api";
 import { formatCHF } from "@/lib/theme";
-import { format, startOfMonth, endOfMonth, subMonths, addMonths, isSameMonth, isFuture, isPast } from "date-fns";
-import { de } from "date-fns/locale";
+import { format, subMonths } from "date-fns";
 import { clsx } from "clsx";
-import { ChevronLeft, ChevronRight, Calendar, RefreshCw, Sparkles } from "lucide-react";
+import { RefreshCw, Sparkles } from "lucide-react";
+import GranularityNavigator from "@/components/GranularityNavigator";
+import { computeDateRange, TimeGranularity } from "@/lib/granularity";
 
 interface RecurringExpense {
   category: string;
@@ -16,47 +17,36 @@ interface RecurringExpense {
 }
 
 export default function Budget() {
-  const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
-  const [showMonthDropdown, setShowMonthDropdown] = useState(false);
+  const [granularity, setGranularity] = useState<TimeGranularity>("monthly");
+  const [anchor, setAnchor] = useState<Date>(new Date());
 
-  // Generate last 24 months for the dropdown
-  const availableMonths = useMemo(() => {
-    const months: Date[] = [];
-    const today = new Date();
-    for (let i = -12; i < 12; i++) {
-      months.push(addMonths(today, i));
-    }
-    return months;
-  }, []);
+  const range = useMemo(() => computeDateRange(granularity, anchor), [granularity, anchor]);
+  const periodStart = format(range.from, "yyyy-MM-dd");
+  const periodEnd   = format(range.to,   "yyyy-MM-dd");
 
-  const year = selectedMonth.getFullYear();
-  const month = selectedMonth.getMonth() + 1;
-  const monthStart = format(startOfMonth(selectedMonth), "yyyy-MM-dd");
-  const monthEnd = format(endOfMonth(selectedMonth), "yyyy-MM-dd");
-
-  const isFutureMonth = isFuture(startOfMonth(selectedMonth));
-  const isPastMonth = isPast(endOfMonth(selectedMonth));
-  const isCurrentMonth = isSameMonth(selectedMonth, new Date());
+  const year = anchor.getFullYear();
+  const now = new Date();
+  const isFuturePeriod = range.from > now;
 
   const { data: budgets } = useQuery({
     queryKey: ["budgets", year],
     queryFn: () => budgetsApi.list({ year }).then((r) => r.data),
   });
 
-  // Get stats for selected month
+  // Get stats for selected period
   const { data: stats } = useQuery({
-    queryKey: ["transaction-stats-budget", monthStart, monthEnd],
-    queryFn: () => transactionsApi.stats({ start: monthStart, end: monthEnd }).then((r) => r.data),
+    queryKey: ["transaction-stats-budget", periodStart, periodEnd],
+    queryFn: () => transactionsApi.stats({ start: periodStart, end: periodEnd }).then((r) => r.data),
   });
 
   // Get transactions from last 6 months to identify recurring expenses
   const { data: historicalTransactions } = useQuery({
-    queryKey: ["historical-transactions-budget", selectedMonth.toISOString()],
+    queryKey: ["historical-transactions-budget", granularity, anchor.toISOString()],
     queryFn: async () => {
-      const sixMonthsAgo = format(subMonths(selectedMonth, 6), "yyyy-MM-dd");
+      const sixMonthsAgo = format(subMonths(anchor, 6), "yyyy-MM-dd");
       const result = await transactionsApi.list({
         start: sixMonthsAgo,
-        end: monthEnd,
+        end: periodEnd,
         limit: 1000,
       });
       return result.data;
@@ -124,19 +114,19 @@ export default function Budget() {
 
   // Calculate projected expenses for future months
   const projectedTotal = useMemo(() => {
-    if (!isFutureMonth) return 0;
+    if (!isFuturePeriod) return 0;
     return recurringExpenses.reduce((sum, exp) => {
       if (exp.frequency === "monthly") return sum + exp.amount;
-      if (exp.frequency === "quarterly" && selectedMonth.getMonth() % 3 === 0) return sum + exp.amount;
+      if (exp.frequency === "quarterly" && anchor.getMonth() % 3 === 0) return sum + exp.amount;
       return sum;
     }, 0);
-  }, [recurringExpenses, isFutureMonth, selectedMonth]);
+  }, [recurringExpenses, isFuturePeriod, anchor]);
 
   // Combine actual and projected categories
   const allCategories = useMemo(() => {
     const actual = (stats?.top_categories || []) as { category: string; total: number }[];
 
-    if (!isFutureMonth) {
+    if (!isFuturePeriod) {
       return actual.map(cat => ({ ...cat, isProjected: false }));
     }
 
@@ -150,17 +140,17 @@ export default function Budget() {
     }));
 
     return projected;
-  }, [stats, recurringExpenses, isFutureMonth]);
+  }, [stats, recurringExpenses, isFuturePeriod]);
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header with Month Selector */}
+      {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-display text-text-primary">Budget</h1>
           <p className="text-text-tertiary text-sm mt-0.5">
-            {format(selectedMonth, "MMMM yyyy", { locale: de })}
-            {isFutureMonth && (
+            {range.label}
+            {isFuturePeriod && (
               <span className="ml-2 inline-flex items-center gap-1 text-accent">
                 <Sparkles className="w-3 h-3" />
                 Prognose
@@ -169,75 +159,11 @@ export default function Budget() {
           </p>
         </div>
 
-        {/* Month Navigation */}
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <button
-              onClick={() => setShowMonthDropdown(!showMonthDropdown)}
-              className="input flex items-center gap-2 min-w-[160px]"
-            >
-              <Calendar className="w-4 h-4 text-text-tertiary" />
-              <span className="text-sm">
-                {format(selectedMonth, "MMM yyyy", { locale: de })}
-              </span>
-              <ChevronLeft className="w-3 h-3 text-text-tertiary rotate-[-90deg] ml-auto" />
-            </button>
-            {showMonthDropdown && (
-              <>
-                <div
-                  className="fixed inset-0 z-10"
-                  onClick={() => setShowMonthDropdown(false)}
-                />
-                <div className="absolute top-full right-0 mt-1 w-48 max-h-64 overflow-y-auto bg-bg-card border border-border rounded-md shadow-lg z-20 py-1">
-                  {availableMonths.map((month) => (
-                    <button
-                      key={month.toISOString()}
-                      onClick={() => {
-                        setSelectedMonth(month);
-                        setShowMonthDropdown(false);
-                      }}
-                      className={clsx(
-                        "w-full text-left px-3 py-2 text-sm hover:bg-bg-surface2 transition-colors flex items-center justify-between",
-                        isSameMonth(month, selectedMonth) && "bg-accent/20 text-accent"
-                      )}
-                    >
-                      <span>{format(month, "MMMM yyyy", { locale: de })}</span>
-                      {isFuture(startOfMonth(month)) && (
-                        <Sparkles className="w-3 h-3 text-accent" />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-
-          <button
-            onClick={() => setSelectedMonth(subMonths(selectedMonth, 1))}
-            className="p-2 rounded-md hover:bg-bg-surface2 text-text-tertiary hover:text-text-primary transition-colors"
-            title="Vorheriger Monat"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setSelectedMonth(addMonths(selectedMonth, 1))}
-            className="p-2 rounded-md hover:bg-bg-surface2 text-text-tertiary hover:text-text-primary transition-colors"
-            title="Nächster Monat"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setSelectedMonth(new Date())}
-            className={clsx(
-              "px-3 py-2 rounded-md text-sm transition-colors",
-              isCurrentMonth
-                ? "text-accent bg-accent/10"
-                : "text-text-tertiary hover:text-text-primary hover:bg-bg-surface2"
-            )}
-          >
-            Aktuell
-          </button>
-        </div>
+        <GranularityNavigator
+          granularity={granularity}
+          anchor={anchor}
+          onChange={(g, a) => { setGranularity(g); setAnchor(a); }}
+        />
       </div>
 
       {/* Overview */}
@@ -248,10 +174,10 @@ export default function Budget() {
         </div>
         <div className="card">
           <p className="text-text-tertiary text-xs uppercase tracking-wide mb-2">
-            {isFutureMonth ? "Erwartete Ausgaben" : "Ausgaben"}
+            {isFuturePeriod ? "Erwartete Ausgaben" : "Ausgaben"}
           </p>
-          <p className={clsx("font-mono text-xl font-semibold", isFutureMonth ? "text-warning" : "text-loss")}>
-            {formatCHF(isFutureMonth ? projectedTotal : (stats?.total_expenses || 0))}
+          <p className={clsx("font-mono text-xl font-semibold", isFuturePeriod ? "text-warning" : "text-loss")}>
+            {formatCHF(isFuturePeriod ? projectedTotal : (stats?.total_expenses || 0))}
           </p>
         </div>
         <div className="card">
@@ -272,7 +198,7 @@ export default function Budget() {
       </div>
 
       {/* Recurring Expenses Summary (only for future months) */}
-      {isFutureMonth && recurringExpenses.length > 0 && (
+      {isFuturePeriod && recurringExpenses.length > 0 && (
         <div className="card bg-accent/5 border-accent/20">
           <div className="flex items-center gap-2 mb-4">
             <RefreshCw className="w-4 h-4 text-accent" />
@@ -300,7 +226,7 @@ export default function Budget() {
       {/* Category budgets */}
       <div className="card">
         <h2 className="text-text-primary font-semibold text-sm mb-4">
-          {isFutureMonth ? "Erwartete Ausgaben nach Kategorie" : "Budgets nach Kategorie"}
+          {isFuturePeriod ? "Erwartete Ausgaben nach Kategorie" : "Budgets nach Kategorie"}
         </h2>
         <div className="space-y-4">
           {(allCategories).map((cat: { category: string; total: number; isProjected?: boolean; frequency?: string; confidence?: number }) => {
@@ -345,7 +271,7 @@ export default function Budget() {
                   />
                 </div>
                 <p className="text-text-tertiary text-xs mt-0.5 text-right">
-                  {isFutureMonth
+                  {isFuturePeriod
                     ? `${formatCHF(limit - spent)} verfügbar`
                     : over
                       ? `${formatCHF(spent - limit)} über Budget`
@@ -357,7 +283,7 @@ export default function Budget() {
           })}
           {(allCategories.length === 0) && (
             <p className="text-text-tertiary text-sm text-center py-8">
-              {isFutureMonth
+              {isFuturePeriod
                 ? "Keine wiederkehrenden Ausgaben erkannt. Importiere mehr Transaktionen für bessere Prognosen."
                 : "Keine Ausgaben in diesem Monat"}
             </p>

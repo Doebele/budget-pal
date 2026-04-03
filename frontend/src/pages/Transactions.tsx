@@ -2,9 +2,11 @@ import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { transactionsApi, accountsApi } from "@/lib/api";
 import { formatCHF, categoryColors, getFrequencyStyle, getFrequencyBadgeStyle, PERIODICITY_LABELS } from "@/lib/theme";
-import { format, startOfMonth, endOfMonth, subMonths, addMonths, isSameMonth } from "date-fns";
+import { format } from "date-fns";
 import { de } from "date-fns/locale";
-import { Search, Filter, Upload, ChevronDown, Check, X, ChevronLeft, ChevronRight, Calendar, LayoutGrid, Building2, Repeat, Wallet, TrendingUp, PieChart } from "lucide-react";
+import { Search, Upload, ChevronDown, Check, X, LayoutGrid, Building2, Repeat, Wallet, TrendingUp, PieChart } from "lucide-react";
+import GranularityNavigator from "@/components/GranularityNavigator";
+import { computeDateRange, TimeGranularity } from "@/lib/granularity";
 import { Link } from "react-router-dom";
 import { clsx } from "clsx";
 import { getBankByName } from "@/data/banks-with-logos";
@@ -53,8 +55,8 @@ export default function Transactions() {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editCategory, setEditCategory] = useState("");
-  const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
-  const [showMonthDropdown, setShowMonthDropdown] = useState(false);
+  const [granularity, setGranularity] = useState<TimeGranularity>("monthly");
+  const [anchor, setAnchor] = useState<Date>(new Date());
   const queryClient = useQueryClient();
   const [viewMode, setViewMode] = useState("all");
   const [showBudgetAnalysis, setShowBudgetAnalysis] = useState(false);
@@ -82,29 +84,20 @@ export default function Transactions() {
     if (!exists) setViewMode("all");
   }, [viewMode, accounts]);
 
-  // Generate last 24 months for the dropdown
-  const availableMonths = useMemo(() => {
-    const months: Date[] = [];
-    const today = new Date();
-    for (let i = 0; i < 24; i++) {
-      months.push(subMonths(today, i));
-    }
-    return months;
-  }, []);
-
-  const monthStart = startOfMonth(selectedMonth);
-  const monthEnd = endOfMonth(selectedMonth);
+  const range = useMemo(() => computeDateRange(granularity, anchor), [granularity, anchor]);
+  const periodStart = format(range.from, "yyyy-MM-dd");
+  const periodEnd   = format(range.to,   "yyyy-MM-dd");
 
   const { data: transactions, isLoading } = useQuery({
-    queryKey: ["transactions", search, categoryFilter, selectedMonth.toISOString(), viewMode],
+    queryKey: ["transactions", search, categoryFilter, granularity, anchor.toISOString(), viewMode],
     queryFn: () =>
       transactionsApi
         .list({
           q: search || undefined,
           category: categoryFilter || undefined,
           account_id: viewMode === "all" ? undefined : Number(viewMode),
-          start: format(monthStart, "yyyy-MM-dd"),
-          end: format(monthEnd, "yyyy-MM-dd"),
+          start: periodStart,
+          end: periodEnd,
           limit: 500,
         })
         .then((r) => r.data),
@@ -112,13 +105,13 @@ export default function Transactions() {
 
   // Budget analysis query
   const { data: budgetAnalysis } = useQuery({
-    queryKey: ["budget-analysis", selectedMonth.toISOString(), viewMode],
+    queryKey: ["budget-analysis", granularity, anchor.toISOString(), viewMode],
     queryFn: () =>
       transactionsApi
         .budgetAnalysis({
           account_id: viewMode === "all" ? undefined : Number(viewMode),
-          start: format(monthStart, "yyyy-MM-dd"),
-          end: format(monthEnd, "yyyy-MM-dd"),
+          start: periodStart,
+          end: periodEnd,
         })
         .then((r) => r.data as BudgetAnalysis),
     enabled: showBudgetAnalysis,
@@ -181,7 +174,7 @@ export default function Transactions() {
         <div>
           <h1 className="text-2xl font-display text-text-primary">Transaktionen</h1>
           <p className="text-text-tertiary text-sm mt-0.5">
-            {format(selectedMonth, "MMMM yyyy", { locale: de })} · {transactions?.length || 0} Einträge
+            {range.label} · {transactions?.length || 0} Einträge
           </p>
         </div>
         <Link to="/import" className="btn-primary flex items-center gap-2">
@@ -358,7 +351,7 @@ export default function Transactions() {
         <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4 space-y-4 animate-fade-in">
           <div className="flex items-center gap-2 text-accent mb-2">
             <Wallet className="w-5 h-5" />
-            <h3 className="font-medium">Budget-Analyse: {format(selectedMonth, "MMMM yyyy", { locale: de })}</h3>
+            <h3 className="font-medium">Budget-Analyse: {range.label}</h3>
           </div>
 
           {/* Summary Cards */}
@@ -473,73 +466,12 @@ export default function Transactions() {
 
       {/* Filters */}
       <div className="flex gap-3 flex-wrap items-center">
-        {/* Month Selector */}
-        <div className="relative">
-          <button
-            onClick={() => setShowMonthDropdown(!showMonthDropdown)}
-            className="input flex items-center gap-2 min-w-[140px]"
-          >
-            <Calendar className="w-4 h-4 text-text-tertiary" />
-            <span className="text-sm">
-              {format(selectedMonth, "MMM yyyy", { locale: de })}
-            </span>
-            <ChevronDown className="w-4 h-4 text-text-tertiary ml-auto" />
-          </button>
-          {showMonthDropdown && (
-            <>
-              <div
-                className="fixed inset-0 z-10"
-                onClick={() => setShowMonthDropdown(false)}
-              />
-              <div className="absolute top-full left-0 mt-1 w-48 max-h-64 overflow-y-auto bg-slate-800 border border-slate-700 rounded-md shadow-xl z-20 py-1">
-                {availableMonths.map((month) => (
-                  <button
-                    key={month.toISOString()}
-                    onClick={() => {
-                      setSelectedMonth(month);
-                      setShowMonthDropdown(false);
-                    }}
-                    className={clsx(
-                      "w-full text-left px-3 py-2 text-sm hover:bg-bg-surface2 transition-colors",
-                      isSameMonth(month, selectedMonth) && "bg-accent/20 text-accent"
-                    )}
-                  >
-                    {format(month, "MMMM yyyy", { locale: de })}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Navigation Arrows */}
-        <div className="flex gap-1">
-          <button
-            onClick={() => setSelectedMonth(subMonths(selectedMonth, 1))}
-            className="p-2 rounded-md hover:bg-bg-surface2 text-text-tertiary hover:text-text-primary transition-colors"
-            title="Vorheriger Monat"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setSelectedMonth(addMonths(selectedMonth, 1))}
-            className="p-2 rounded-md hover:bg-bg-surface2 text-text-tertiary hover:text-text-primary transition-colors"
-            title="Nächster Monat"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setSelectedMonth(new Date())}
-            className={clsx(
-              "px-3 py-2 rounded-md text-sm transition-colors",
-              isSameMonth(selectedMonth, new Date())
-                ? "text-accent bg-accent/10"
-                : "text-text-tertiary hover:text-text-primary hover:bg-bg-surface2"
-            )}
-          >
-            Aktuell
-          </button>
-        </div>
+        {/* Period Navigator */}
+        <GranularityNavigator
+          granularity={granularity}
+          anchor={anchor}
+          onChange={(g, a) => { setGranularity(g); setAnchor(a); }}
+        />
 
         <div className="w-px h-8 bg-border/50 mx-1" />
 
@@ -678,7 +610,7 @@ export default function Transactions() {
               {!isLoading && (!transactions || transactions.length === 0) && (
                 <tr>
                   <td colSpan={6} className="px-4 py-12 text-center text-text-tertiary text-sm">
-                    Keine Transaktionen für {format(selectedMonth, "MMMM yyyy", { locale: de })} gefunden.{" "}
+                    Keine Transaktionen für {range.label} gefunden.{" "}
                     <Link to="/import" className="text-accent hover:text-accent-light">
                       CSV importieren
                     </Link>
