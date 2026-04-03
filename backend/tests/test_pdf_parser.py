@@ -17,38 +17,51 @@ from typing import List, Optional
 
 def _parse_pdf_text(text: str, bank: str) -> List[dict]:
     """
-    Regex-based line parser for PDF statement text.
+    Robust line parser for UBS PDF statement text.
 
-    UBS PDF layout (as extracted by pdfplumber):
-        DD.MM.YYYY  <description>  [+-]amount  DD.MM.YYYY  saldo
+    Strategy — two-date anchor:
+    1. Find the first and second DD.MM.YYYY on the line.
+    2. Everything between them is "Description + Betrag".
+    3. The LAST amount-like number in that section is the Betrag.
+    4. Everything before it is the description.
+    5. The trailing number after the Valuta date (Saldo) is discarded.
 
-    Root-cause fix: the old single-date regex anchored to the LAST number on
-    the line which is the running Saldo — NOT the transaction amount.
-
-    Fix: detect lines with TWO dates and capture the amount that appears
-    BETWEEN the description and the Valuta date (second date), discarding
-    the trailing Saldo entirely.
+    Works even when pdfplumber collapses all whitespace between columns.
     """
-    _DATE = r"\d{2}\.\d{2}\.\d{4}"
-    _AMT = r"[+-]?[\d']+[.,]\d{2}"
-
-    ubs_pattern = re.compile(
-        rf"^({_DATE})\s+"
-        rf"(.+?)\s+"
-        rf"({_AMT})\s+"
-        rf"{_DATE}\s+"
-        rf"[\d',.]+\s*$"
-    )
-
-    simple_pattern = re.compile(
-        r"^(\d{2}\.\d{2}\.\d{4})\s+(.+?)\s+"
-        r"([+-]?\d{1,3}(?:[',]\d{3})*(?:[',\.]\d{2}))\s*$"
-    )
+    _DATE_RE = re.compile(r"\d{2}\.\d{2}\.\d{4}")
+    _AMT_RE  = re.compile(r"[+-]?[\d']+[.,]\d{2}")
 
     _SKIP_RE = re.compile(
         r"^(Seite\s+\d|Saldo\s|Datum\s|Buchungsdatum|Valuta|IBAN\s|BIC\s|"
         r"Kontonummer|Konto\s|Total\s|Page\s+\d|\d+\s*$)",
         re.IGNORECASE,
+    )
+
+    def _parse_ubs_line(line: str) -> Optional[dict]:
+        dates = list(_DATE_RE.finditer(line))
+        if len(dates) < 2:
+            return None
+        buch_m, valuta_m = dates[0], dates[1]
+        middle = line[buch_m.end(): valuta_m.start()].strip()
+        if not middle:
+            return None
+        amounts = list(_AMT_RE.finditer(middle))
+        if not amounts:
+            return None
+        betrag_m = amounts[-1]
+        desc = middle[: betrag_m.start()].strip()
+        if not desc:
+            return None
+        amount_str = betrag_m.group().replace("'", "").replace(",", ".")
+        try:
+            dt = datetime.strptime(buch_m.group(), "%d.%m.%Y")
+            return {"date": dt, "description": desc, "amount": float(amount_str), "currency": "CHF"}
+        except ValueError:
+            return None
+
+    _SIMPLE_RE = re.compile(
+        r"^(\d{2}\.\d{2}\.\d{4})\s+(.+?)\s+"
+        r"([+-]?\d{1,3}(?:[',]\d{3})*(?:[',\.]\d{2}))\s*$"
     )
 
     rows: list = []
@@ -59,25 +72,14 @@ def _parse_pdf_text(text: str, bank: str) -> List[dict]:
         if not line:
             continue
 
-        m = ubs_pattern.match(line)
-        if m:
+        parsed = _parse_ubs_line(line)
+        if parsed:
             if pending and pending.get("description"):
                 rows.append(pending)
-            date_str, desc, amount_str = m.group(1), m.group(2), m.group(3)
-            try:
-                dt = datetime.strptime(date_str, "%d.%m.%Y")
-                amount_clean = amount_str.replace("'", "").replace(",", ".")
-                pending = {
-                    "date": dt,
-                    "description": desc.strip(),
-                    "amount": float(amount_clean),
-                    "currency": "CHF",
-                }
-            except ValueError:
-                pass
+            pending = parsed
             continue
 
-        m2 = simple_pattern.match(line)
+        m2 = _SIMPLE_RE.match(line)
         if m2:
             if pending and pending.get("description"):
                 rows.append(pending)
@@ -85,17 +87,12 @@ def _parse_pdf_text(text: str, bank: str) -> List[dict]:
             try:
                 dt = datetime.strptime(date_str, "%d.%m.%Y")
                 amount_clean = amount_str.replace("'", "").replace(",", ".")
-                pending = {
-                    "date": dt,
-                    "description": desc.strip(),
-                    "amount": float(amount_clean),
-                    "currency": "CHF",
-                }
+                pending = {"date": dt, "description": desc.strip(), "amount": float(amount_clean), "currency": "CHF"}
             except ValueError:
                 pass
             continue
 
-        if pending and not re.match(rf"^{_DATE}\s*$", line) and not _SKIP_RE.match(line):
+        if pending and not _DATE_RE.fullmatch(line) and not _SKIP_RE.match(line):
             pending["description"] = (pending["description"] + " " + line).strip()
 
     if pending and pending.get("description"):
@@ -131,6 +128,10 @@ Seite 1
 01.04.2026 Migros Bank AG -649.00 01.04.2026 3'437.09
 123
 """
+
+# pdfplumber sometimes collapses whitespace between PDF cells
+UBS_COLLAPSED_SPACES = "01.04.2026MigrosBankAG-649.0001.04.20263'437.09"
+UBS_PARTIAL_SPACES   = "01.04.2026 MigrosBankAG -649.00 01.04.2026 3437.09"
 
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
@@ -199,3 +200,19 @@ def test_date_parsed_correctly():
 def test_currency_set_to_chf():
     rows = _parse_pdf_text(UBS_SINGLE_LINE, bank="ubs")
     assert rows[0]["currency"] == "CHF"
+
+
+def test_collapsed_spaces_no_space_between_tokens():
+    """pdfplumber may collapse all spaces: still must get Betrag not Saldo."""
+    rows = _parse_pdf_text(UBS_COLLAPSED_SPACES, bank="ubs")
+    assert len(rows) == 1
+    assert rows[0]["amount"] == -649.00, (
+        f"Collapsed-space line: expected -649.00, got {rows[0]['amount']}"
+    )
+
+
+def test_partial_spaces_no_apostrophe_in_saldo():
+    """Saldo without apostrophe (3437.09) must still be discarded."""
+    rows = _parse_pdf_text(UBS_PARTIAL_SPACES, bank="ubs")
+    assert len(rows) == 1
+    assert rows[0]["amount"] == -649.00

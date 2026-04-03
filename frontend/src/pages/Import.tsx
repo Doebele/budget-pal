@@ -398,189 +398,276 @@ export default function Import() {
       )}
 
       {/* PDF Preview Modal */}
-      {pdfPreview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-5xl max-h-[90vh] overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-2xl">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700">
-              <div>
-                <h3 className="text-white font-semibold">PDF Vorschau</h3>
-                <p className="text-slate-400 text-xs">
-                  {pdfPreview.filename} · {pdfPreview.total_rows} Zeilen · {pdfPreview.parsed_rows} erkannt
-                </p>
-              </div>
-              <button
-                onClick={() => setPdfPreview(null)}
-                className="text-slate-400 hover:text-white"
-                type="button"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-5 space-y-4 overflow-auto max-h-[70vh]">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                <div className="rounded-lg bg-slate-800 p-3 text-slate-300">Bank: <span className="text-white">{pdfPreview.bank.toUpperCase()}</span></div>
-                <div className="rounded-lg bg-slate-800 p-3 text-slate-300">
-                  Duplikat DB: <span className="text-amber-300">{pdfPreview.rows.filter((r) => r.duplicate_kind === "database").length}</span>
-                </div>
-                <div className="rounded-lg bg-slate-800 p-3 text-slate-300">
-                  Duplikat PDF: <span className="text-amber-200">{pdfPreview.rows.filter((r) => r.duplicate_kind === "pdf").length}</span>
-                </div>
-                <div className="rounded-lg bg-slate-800 p-3 text-slate-300">Fehler: <span className="text-red-300">{pdfPreview.error_rows}</span></div>
-              </div>
-              <p className="text-slate-500 text-xs">
-                Bei Konto-Duplikaten: überschreiben, bestehende behalten oder bestehende Buchung endgültig löschen (kein neuer Eintrag). Bei wiederholten PDF-Zeilen: importieren oder überspringen.
-              </p>
+      {pdfPreview && (() => {
+        // ── Detect recurring amounts (same absolute amount ≥ 2×, value > 5 CHF) ──
+        const amtCounts: Record<string, number> = {};
+        pdfPreview.rows.forEach((r) => {
+          const key = Math.abs(r.amount).toFixed(2);
+          amtCounts[key] = (amtCounts[key] || 0) + 1;
+        });
+        const recurringAmts = new Set(
+          Object.entries(amtCounts)
+            .filter(([k, v]) => v >= 2 && parseFloat(k) > 5)
+            .map(([k]) => k)
+        );
+        const isRecurring = (r: PdfPreviewRow) => recurringAmts.has(Math.abs(r.amount).toFixed(2));
 
-              <div className="overflow-auto border border-slate-700 rounded-lg">
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-800">
+        const hasDuplicates = pdfPreview.rows.some((r) => r.duplicate_kind !== "none");
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-2 sm:p-4">
+            <div className="w-full max-w-[96vw] max-h-[95vh] overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-2xl flex flex-col">
+
+              {/* ── Header ── */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700 flex-shrink-0">
+                <div>
+                  <h3 className="text-white font-semibold">PDF Vorschau</h3>
+                  <p className="text-slate-400 text-xs">
+                    {pdfPreview.filename} · {pdfPreview.total_rows} Zeilen · {pdfPreview.parsed_rows} erkannt
+                  </p>
+                </div>
+                <button onClick={() => setPdfPreview(null)} className="text-slate-400 hover:text-white" type="button">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* ── Stats row ── */}
+              <div className="px-5 pt-4 pb-3 flex-shrink-0">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
+                  <div className="rounded-lg bg-slate-800 px-3 py-2 text-slate-300">
+                    Bank: <span className="text-white font-semibold">{pdfPreview.bank.toUpperCase()}</span>
+                  </div>
+                  <div className="rounded-lg bg-green-900/30 border border-green-800/40 px-3 py-2 text-slate-300">
+                    Erkannt: <span className="text-green-300 font-semibold">{pdfPreview.parsed_rows}</span>
+                  </div>
+                  <div className="rounded-lg bg-slate-800 px-3 py-2 text-slate-300">
+                    Wiederkehrend: <span className="text-violet-300 font-semibold">{recurringAmts.size > 0 ? `${recurringAmts.size} Beträge` : "–"}</span>
+                  </div>
+                  <div className="rounded-lg bg-slate-800 px-3 py-2 text-slate-300">
+                    Duplikate: <span className="text-amber-300 font-semibold">{pdfPreview.rows.filter((r) => r.duplicate_kind !== "none").length}</span>
+                  </div>
+                  <div className="rounded-lg bg-slate-800 px-3 py-2 text-slate-300">
+                    Fehler: <span className={pdfPreview.error_rows > 0 ? "text-red-300 font-semibold" : "text-slate-400"}>{pdfPreview.error_rows}</span>
+                  </div>
+                </div>
+                {hasDuplicates && (
+                  <p className="text-slate-500 text-[11px] mt-2">
+                    Konto-Duplikate: überschreiben, behalten oder löschen. PDF-Duplikate: importieren oder überspringen.
+                  </p>
+                )}
+              </div>
+
+              {/* ── Table ── */}
+              <div className="flex-1 overflow-auto px-5 pb-2">
+                <table className="w-full text-xs border-collapse">
+                  <thead className="sticky top-0 z-10 bg-slate-800">
                     <tr>
-                      <th className="text-left px-3 py-2 text-slate-400 w-28">Typ</th>
-                      <th className="text-left px-3 py-2 text-slate-400">Datum</th>
-                      <th className="text-left px-3 py-2 text-slate-400">Beschreibung</th>
-                      <th className="text-right px-3 py-2 text-slate-400">Betrag</th>
-                      <th className="text-left px-3 py-2 text-slate-400">Kategorie</th>
-                      <th className="text-left px-3 py-2 text-slate-400 min-w-[11rem]">Duplikat-Aktion</th>
+                      {/* Status badges column */}
+                      <th className="text-left px-2 py-2.5 text-slate-400 font-medium w-[90px] whitespace-nowrap">Status</th>
+                      {/* Date */}
+                      <th className="text-left px-2 py-2.5 text-slate-400 font-medium w-[108px]">Datum</th>
+                      {/* Description — gets max remaining space */}
+                      <th className="text-left px-2 py-2.5 text-slate-400 font-medium min-w-[220px]">Beschreibung</th>
+                      {/* Amount */}
+                      <th className="text-right px-2 py-2.5 text-slate-400 font-medium w-[110px]">Betrag (CHF)</th>
+                      {/* AI Category */}
+                      <th className="text-left px-2 py-2.5 text-slate-400 font-medium w-[180px]">KI-Kategorie</th>
+                      {/* Duplicate action — only shown if there are duplicates */}
+                      {hasDuplicates && (
+                        <th className="text-left px-2 py-2.5 text-slate-400 font-medium w-[160px]">Duplikat-Aktion</th>
+                      )}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-700">
-                    {pdfPreview.rows.map((row, idx) => (
-                      <tr
-                        key={row.id}
-                        className={clsx(row.is_duplicate && "bg-amber-950/20", !row.parsed && "opacity-60")}
-                      >
-                        <td className="px-3 py-2 align-top">
-                          {row.duplicate_kind === "database" && (
-                            <span className="inline-flex rounded px-1.5 py-0.5 bg-amber-900/50 text-amber-200 text-[10px] font-medium">
-                              Konto
-                            </span>
+                  <tbody className="divide-y divide-slate-700/60">
+                    {pdfPreview.rows.map((row, idx) => {
+                      const recurring = isRecurring(row);
+                      const isExpense = row.amount < 0;
+                      return (
+                        <tr
+                          key={row.id}
+                          className={clsx(
+                            "transition-colors hover:bg-slate-800/40",
+                            row.is_duplicate && "bg-amber-950/20",
+                            recurring && "bg-violet-950/10",
+                            !row.parsed && "opacity-50"
                           )}
-                          {row.duplicate_kind === "pdf" && (
-                            <span className="inline-flex rounded px-1.5 py-0.5 bg-slate-700 text-slate-200 text-[10px] font-medium" title={row.duplicate_of_row_id ?? ""}>
-                              PDF{row.duplicate_of_row_id ? " · Zeile 2+" : ""}
-                            </span>
-                          )}
-                          {row.duplicate_kind === "none" && <span className="text-slate-600">—</span>}
-                        </td>
-                        <td className="px-3 py-2">
-                          <input
-                            value={row.original_date}
-                            onChange={(e) => setPdfPreview((prev) => {
-                              if (!prev) return prev;
-                              const next = [...prev.rows];
-                              next[idx] = { ...next[idx], original_date: e.target.value };
-                              return { ...prev, rows: next };
-                            })}
-                            className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white w-32"
-                          />
-                        </td>
-                        <td className="px-3 py-2">
-                          <input
-                            value={row.description}
-                            onChange={(e) => setPdfPreview((prev) => {
-                              if (!prev) return prev;
-                              const next = [...prev.rows];
-                              next[idx] = { ...next[idx], description: e.target.value };
-                              return { ...prev, rows: next };
-                            })}
-                            className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white w-full"
-                          />
-                        </td>
-                        <td className="px-3 py-2">
-                          <input
-                            type="number"
-                            value={row.amount}
-                            onChange={(e) => setPdfPreview((prev) => {
-                              if (!prev) return prev;
-                              const next = [...prev.rows];
-                              next[idx] = { ...next[idx], amount: Number(e.target.value) };
-                              return { ...prev, rows: next };
-                            })}
-                            className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-right w-32 ml-auto block"
-                          />
-                        </td>
-                        <td className="px-3 py-2">
-                          <select
-                            value={row.category ?? ""}
-                            onChange={(e) =>
-                              setPdfPreview((prev) => {
+                        >
+                          {/* ── Status badges ── */}
+                          <td className="px-2 py-2 align-middle">
+                            <div className="flex flex-col gap-0.5">
+                              {row.duplicate_kind === "database" && (
+                                <span className="inline-flex rounded px-1.5 py-0.5 bg-amber-900/60 text-amber-200 text-[10px] font-medium leading-tight">
+                                  Konto
+                                </span>
+                              )}
+                              {row.duplicate_kind === "pdf" && (
+                                <span className="inline-flex rounded px-1.5 py-0.5 bg-slate-700 text-slate-300 text-[10px] font-medium leading-tight">
+                                  PDF-Dup
+                                </span>
+                              )}
+                              {recurring && (
+                                <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 bg-violet-900/50 text-violet-300 text-[10px] font-medium leading-tight" title="Wiederkehrender Betrag">
+                                  ↻ Abo
+                                </span>
+                              )}
+                              {row.duplicate_kind === "none" && !recurring && (
+                                <span className="text-slate-600 text-[10px]">—</span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* ── Date ── */}
+                          <td className="px-2 py-2 align-middle">
+                            <input
+                              value={row.original_date}
+                              onChange={(e) => setPdfPreview((prev) => {
                                 if (!prev) return prev;
                                 const next = [...prev.rows];
-                                next[idx] = {
-                                  ...next[idx],
-                                  category: e.target.value ? e.target.value : undefined,
-                                };
+                                next[idx] = { ...next[idx], original_date: e.target.value };
                                 return { ...prev, rows: next };
-                              })
-                            }
-                            className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white w-full max-w-[12rem] text-xs"
-                          >
-                            <option value="">Auto (KI)</option>
-                            {pdfCategoryOptions.map((name) => (
-                              <option key={name} value={name}>
-                                {name}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="px-3 py-2 align-top">
-                          {row.duplicate_kind === "database" ? (
-                            <select
-                              className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-xs w-full max-w-[13rem]"
-                              value={row.merge_action}
-                              onChange={(e) =>
-                                setPdfPreview((prev) => {
-                                  if (!prev) return prev;
-                                  const next = [...prev.rows];
-                                  next[idx] = { ...next[idx], merge_action: e.target.value as PdfMergeAction };
-                                  return { ...prev, rows: next };
-                                })
-                              }
-                            >
-                              <option value="keep_existing">Bestehende behalten</option>
-                              <option value="overwrite">Mit PDF überschreiben</option>
-                              <option value="delete_both">Bestehende endgültig löschen</option>
-                              <option value="import">Trotzdem neu importieren</option>
-                            </select>
-                          ) : row.duplicate_kind === "pdf" ? (
-                            <select
-                              className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-xs w-full max-w-[13rem]"
-                              value={row.merge_action === "import" ? "import" : "skip"}
-                              onChange={(e) =>
-                                setPdfPreview((prev) => {
-                                  if (!prev) return prev;
-                                  const next = [...prev.rows];
-                                  next[idx] = { ...next[idx], merge_action: e.target.value as PdfMergeAction };
-                                  return { ...prev, rows: next };
-                                })
-                              }
-                            >
-                              <option value="skip">Doppelte Zeile überspringen</option>
-                              <option value="import">Trotzdem importieren</option>
-                            </select>
-                          ) : (
-                            <span className="text-slate-600 text-xs">Import</span>
+                              })}
+                              className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white w-[100px] text-xs"
+                            />
+                          </td>
+
+                          {/* ── Description (wide) ── */}
+                          <td className="px-2 py-2 align-middle">
+                            <input
+                              value={row.description}
+                              onChange={(e) => setPdfPreview((prev) => {
+                                if (!prev) return prev;
+                                const next = [...prev.rows];
+                                next[idx] = { ...next[idx], description: e.target.value };
+                                return { ...prev, rows: next };
+                              })}
+                              className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white w-full min-w-[200px] text-xs"
+                              title={row.description}
+                            />
+                          </td>
+
+                          {/* ── Amount (colored) ── */}
+                          <td className="px-2 py-2 align-middle">
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={row.amount}
+                              onChange={(e) => setPdfPreview((prev) => {
+                                if (!prev) return prev;
+                                const next = [...prev.rows];
+                                next[idx] = { ...next[idx], amount: Number(e.target.value) };
+                                return { ...prev, rows: next };
+                              })}
+                              className={clsx(
+                                "bg-slate-800 border rounded px-2 py-1 text-right w-full font-mono font-semibold text-xs",
+                                isExpense
+                                  ? "border-red-800/50 text-red-300"
+                                  : "border-green-800/50 text-green-300"
+                              )}
+                            />
+                          </td>
+
+                          {/* ── AI Category badge + override dropdown ── */}
+                          <td className="px-2 py-2 align-middle">
+                            <div className="flex flex-col gap-1">
+                              {/* Show AI-assigned category as a coloured badge */}
+                              {row.category ? (
+                                <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-accent/20 text-accent text-[10px] font-semibold leading-tight self-start">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-accent flex-shrink-0" />
+                                  {row.category}
+                                </span>
+                              ) : (
+                                <span className="text-slate-600 text-[10px] italic">KI: –</span>
+                              )}
+                              {/* Override dropdown */}
+                              <select
+                                value={row.category ?? ""}
+                                onChange={(e) =>
+                                  setPdfPreview((prev) => {
+                                    if (!prev) return prev;
+                                    const next = [...prev.rows];
+                                    next[idx] = { ...next[idx], category: e.target.value || undefined };
+                                    return { ...prev, rows: next };
+                                  })
+                                }
+                                className="bg-slate-800 border border-slate-700 rounded px-1.5 py-1 text-slate-300 w-full text-[11px]"
+                              >
+                                <option value="">↩ Zurücksetzen</option>
+                                {pdfCategoryOptions.map((name) => (
+                                  <option key={name} value={name}>{name}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </td>
+
+                          {/* ── Duplicate action (only rendered when duplicates exist) ── */}
+                          {hasDuplicates && (
+                            <td className="px-2 py-2 align-middle">
+                              {row.duplicate_kind === "database" ? (
+                                <select
+                                  className="bg-slate-800 border border-slate-700 rounded px-1.5 py-1 text-white text-[11px] w-full"
+                                  value={row.merge_action}
+                                  onChange={(e) =>
+                                    setPdfPreview((prev) => {
+                                      if (!prev) return prev;
+                                      const next = [...prev.rows];
+                                      next[idx] = { ...next[idx], merge_action: e.target.value as PdfMergeAction };
+                                      return { ...prev, rows: next };
+                                    })
+                                  }
+                                >
+                                  <option value="keep_existing">Behalten</option>
+                                  <option value="overwrite">Überschreiben</option>
+                                  <option value="delete_both">Löschen</option>
+                                  <option value="import">Neu importieren</option>
+                                </select>
+                              ) : row.duplicate_kind === "pdf" ? (
+                                <select
+                                  className="bg-slate-800 border border-slate-700 rounded px-1.5 py-1 text-white text-[11px] w-full"
+                                  value={row.merge_action === "import" ? "import" : "skip"}
+                                  onChange={(e) =>
+                                    setPdfPreview((prev) => {
+                                      if (!prev) return prev;
+                                      const next = [...prev.rows];
+                                      next[idx] = { ...next[idx], merge_action: e.target.value as PdfMergeAction };
+                                      return { ...prev, rows: next };
+                                    })
+                                  }
+                                >
+                                  <option value="skip">Überspringen</option>
+                                  <option value="import">Importieren</option>
+                                </select>
+                              ) : (
+                                <span className="text-slate-600 text-[10px]">Import</span>
+                              )}
+                            </td>
                           )}
-                        </td>
-                      </tr>
-                    ))}
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
-            </div>
-            <div className="flex justify-end gap-3 px-5 py-4 border-t border-slate-700">
-              <button onClick={() => setPdfPreview(null)} className="btn-secondary">Abbrechen</button>
-              <button
-                onClick={() => pdfConfirmMutation.mutate()}
-                disabled={pdfConfirmMutation.isPending || pdfPreview.rows.length === 0}
-                className="btn-primary"
-              >
-                {pdfConfirmMutation.isPending ? "Importiere..." : "Transaktionen importieren"}
-              </button>
+
+              {/* ── Footer ── */}
+              <div className="flex items-center justify-between gap-3 px-5 py-4 border-t border-slate-700 flex-shrink-0">
+                <p className="text-slate-500 text-xs">
+                  {pdfPreview.rows.filter((r) => r.merge_action !== "skip" && r.merge_action !== "keep_existing" && r.merge_action !== "delete_both").length} Transaktionen werden importiert
+                </p>
+                <div className="flex gap-3">
+                  <button onClick={() => setPdfPreview(null)} className="btn-secondary text-sm">Abbrechen</button>
+                  <button
+                    onClick={() => pdfConfirmMutation.mutate()}
+                    disabled={pdfConfirmMutation.isPending || pdfPreview.rows.length === 0}
+                    className="btn-primary text-sm"
+                  >
+                    {pdfConfirmMutation.isPending ? "Importiere…" : "Transaktionen importieren"}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Preview Section */}
       {previewData && (

@@ -1233,52 +1233,83 @@ async def import_pdf(
 
 def _parse_pdf_text(text: str, bank: str) -> List[dict]:
     """
-    Regex-based line parser for PDF statement text.
+    Robust line parser for UBS PDF statement text.
 
-    UBS PDF layout (as extracted by pdfplumber):
+    UBS PDF layout per transaction:
+        BuchDatum  Description  Betrag  ValutaDatum  Saldo
 
-        DD.MM.YYYY  <description>  [+-]amount  DD.MM.YYYY  saldo
+    Strategy — two-date anchor:
+        1. Find the FIRST and SECOND occurrence of DD.MM.YYYY on the line.
+        2. Everything between the two dates is "Description + Betrag".
+        3. The LAST number in that middle section is the Betrag (transaction
+           amount).  Everything before it is the description.
+        4. The trailing number after the Valuta date is the Saldo — discarded.
 
-    Root-cause fix: the old single-date regex anchored to the LAST number on
-    the line which is the running Saldo — NOT the transaction amount.
+    This approach is robust against pdfplumber collapsing inter-column spaces
+    (e.g. "MigrosBankAG-649.00" with no space) because we use the TWO DATES
+    as fixed anchors instead of relying on whitespace between all tokens.
 
-    Fix: detect lines with TWO dates and capture the amount that appears
-    BETWEEN the description and the Valuta date (second date), discarding
-    the trailing Saldo entirely.
+    For non-UBS banks / OCR output (only one date per line) we fall back to a
+    simple end-of-line amount pattern.
 
-    Multi-line descriptions (continuation lines that contain no leading date)
-    are appended to the most-recently parsed transaction.
+    Multi-line descriptions are appended to the most recent transaction.
     """
     from datetime import datetime
 
-    _DATE = r"\d{2}\.\d{2}\.\d{4}"
-    # Swiss number format: optional sign, digits with optional ' thousands-sep,
-    # mandatory decimal separator followed by exactly 2 digits.
-    _AMT = r"[+-]?[\d']+[.,]\d{2}"
+    _DATE_RE = re.compile(r"\d{2}\.\d{2}\.\d{4}")
+    # Swiss number: optional sign, digits with optional ' thousands-sep,
+    # decimal sep (. or ,) followed by exactly 2 digits.
+    _AMT_RE = re.compile(r"[+-]?[\d']+[.,]\d{2}")
 
-    # ── Primary: UBS two-date format ──────────────────────────────────────────
-    # BuchDatum  Description  Amount  ValutaDatum  Saldo
-    # We keep groups 1 (booking date), 2 (description), 3 (amount).
-    # The Valuta date and Saldo are consumed but discarded.
-    ubs_pattern = re.compile(
-        rf"^({_DATE})\s+"   # Buchungsdatum   (group 1)
-        rf"(.+?)\s+"        # description     (group 2, non-greedy)
-        rf"({_AMT})\s+"     # transaction amt (group 3) ← the CORRECT amount
-        rf"{_DATE}\s+"      # Valuta date     (discarded)
-        rf"[\d',.]+\s*$"    # Saldo           (discarded)
-    )
-
-    # ── Fallback: single-date pattern (non-UBS banks / OCR output) ────────────
-    simple_pattern = re.compile(
-        r"^(\d{2}\.\d{2}\.\d{4})\s+(.+?)\s+"
-        r"([+-]?\d{1,3}(?:[',]\d{3})*(?:[',\.]\d{2}))\s*$"
-    )
-
-    # Lines that are clearly not part of a transaction description
+    # Lines that are clearly not transaction data
     _SKIP_RE = re.compile(
         r"^(Seite\s+\d|Saldo\s|Datum\s|Buchungsdatum|Valuta|IBAN\s|BIC\s|"
         r"Kontonummer|Konto\s|Total\s|Page\s+\d|\d+\s*$)",
         re.IGNORECASE,
+    )
+
+    def _parse_ubs_line(line: str) -> Optional[dict]:
+        """Two-date-anchor parser for a single UBS line."""
+        dates = list(_DATE_RE.finditer(line))
+        if len(dates) < 2:
+            return None
+
+        buch_m, valuta_m = dates[0], dates[1]
+
+        # Section between the two dates: "Description + Amount"
+        middle = line[buch_m.end(): valuta_m.start()].strip()
+        if not middle:
+            return None
+
+        # Last amount-like token in the middle section = Betrag
+        amounts = list(_AMT_RE.finditer(middle))
+        if not amounts:
+            return None
+
+        betrag_m = amounts[-1]
+        desc = middle[: betrag_m.start()].strip()
+        # If the description is entirely empty, use a cleaned form of the middle
+        if not desc:
+            desc = middle[: betrag_m.start()].strip() or middle.strip()
+        if not desc:
+            return None
+
+        amount_str = betrag_m.group().replace("'", "").replace(",", ".")
+        try:
+            dt = datetime.strptime(buch_m.group(), "%d.%m.%Y")
+            return {
+                "date": dt,
+                "description": desc,
+                "amount": float(amount_str),
+                "currency": "CHF",
+            }
+        except ValueError:
+            return None
+
+    # Simple single-date fallback (non-UBS / OCR output)
+    _SIMPLE_RE = re.compile(
+        r"^(\d{2}\.\d{2}\.\d{4})\s+(.+?)\s+"
+        r"([+-]?\d{1,3}(?:[',]\d{3})*(?:[',\.]\d{2}))\s*$"
     )
 
     rows: list = []
@@ -1289,27 +1320,16 @@ def _parse_pdf_text(text: str, bank: str) -> List[dict]:
         if not line:
             continue
 
-        # ── Try UBS two-date pattern first ────────────────────────────────────
-        m = ubs_pattern.match(line)
-        if m:
+        # ── 1st choice: UBS two-date-anchor ───────────────────────────────────
+        parsed = _parse_ubs_line(line)
+        if parsed:
             if pending and pending.get("description"):
                 rows.append(pending)
-            date_str, desc, amount_str = m.group(1), m.group(2), m.group(3)
-            try:
-                dt = datetime.strptime(date_str, "%d.%m.%Y")
-                amount_clean = amount_str.replace("'", "").replace(",", ".")
-                pending = {
-                    "date": dt,
-                    "description": desc.strip(),
-                    "amount": float(amount_clean),
-                    "currency": "CHF",
-                }
-            except ValueError:
-                pass
+            pending = parsed
             continue
 
-        # ── Fallback: single-date pattern ────────────────────────────────────
-        m2 = simple_pattern.match(line)
+        # ── 2nd choice: simple single-date pattern (fallback) ─────────────────
+        m2 = _SIMPLE_RE.match(line)
         if m2:
             if pending and pending.get("description"):
                 rows.append(pending)
@@ -1327,9 +1347,8 @@ def _parse_pdf_text(text: str, bank: str) -> List[dict]:
                 pass
             continue
 
-        # ── Continuation line: append to pending description ─────────────────
-        # Skip lines that look like headers/page info/bare dates.
-        if pending and not re.match(rf"^{_DATE}\s*$", line) and not _SKIP_RE.match(line):
+        # ── Continuation line ─────────────────────────────────────────────────
+        if pending and not _DATE_RE.fullmatch(line) and not _SKIP_RE.match(line):
             pending["description"] = (pending["description"] + " " + line).strip()
 
     if pending and pending.get("description"):
@@ -1356,10 +1375,10 @@ def _parse_ubs_pdf_tables(pdf) -> List[dict]:
     DATE_FMT = "%d.%m.%Y"
     rows: List[dict] = []
 
-    AMOUNT_HEADERS = {"betrag", "amount", "umsatz"}
-    DATE_HEADERS   = {"buchungsdatum", "datum", "buchungsdate"}
-    DESC_HEADERS   = {"buchungstext", "text", "beschreibung", "verwendungszweck"}
-    SALDO_HEADERS  = {"saldo", "balance"}
+    AMOUNT_HEADERS = {"betrag", "amount", "umsatz", "belastung/gutschrift", "betrag chf"}
+    DATE_HEADERS   = {"buchungsdatum", "datum", "buchungsdate", "buchungs-\ndatum"}
+    DESC_HEADERS   = {"buchungstext", "text", "beschreibung", "verwendungszweck", "buchungstext/\ngläubiger-id"}
+    SALDO_HEADERS  = {"saldo", "balance", "saldo chf"}
 
     for page in pdf.pages:
         tables = page.extract_tables()
