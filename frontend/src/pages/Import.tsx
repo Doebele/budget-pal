@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { importsApi, accountsApi, categoriesApi } from "@/lib/api";
 import { Upload, FileText, CheckCircle2, AlertCircle, Clock, Trash2, X, Eye, Settings2, ChevronDown, ChevronUp, Check, AlertTriangle, Table2, MapPin, Database } from "lucide-react";
@@ -64,7 +64,31 @@ interface PdfPreviewRow {
   existing_transaction_id?: number | null;
   duplicate_of_row_id?: string | null;
   merge_action: PdfMergeAction;
+  is_recurring: boolean;
+  periodicity?: string | null;
 }
+
+/** Normalise description for smart category grouping (strip digits, keep first 5 words ≥3 chars). */
+function descGroupKey(desc: string): string {
+  return desc
+    .toLowerCase()
+    .replace(/[\d'.,]+/g, "")
+    .replace(/[^\w\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length >= 3)
+    .slice(0, 5)
+    .join(" ");
+}
+
+const PERIODICITY_LABELS: Record<string, string> = {
+  monthly: "Monatlich",
+  quarterly: "Vierteljährlich",
+  halfyearly: "Halbjährlich",
+  yearly: "Jährlich",
+};
+
+/** Extra import-specific categories always shown in the dropdown. */
+const EXTRA_IMPORT_CATEGORIES = ["Einzahlungen", "Gebühren", "Kontoübertrag"];
 
 interface PdfPreviewData {
   bank: string;
@@ -102,6 +126,8 @@ export default function Import() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [pdfPreview, setPdfPreview] = useState<PdfPreviewData | null>(null);
   const [pdfFileName, setPdfFileName] = useState<string>("");
+  /** Row IDs where the user has manually picked a category — excluded from smart auto-apply. */
+  const manuallyChangedCategories = useRef<Set<string>>(new Set());
 
   const { data: accounts } = useQuery({
     queryKey: ["accounts"],
@@ -119,13 +145,38 @@ export default function Import() {
   });
 
   const pdfCategoryOptions = useMemo(() => {
-    const names = new Set<string>();
+    const names = new Set<string>(EXTRA_IMPORT_CATEGORIES);
     (categoriesList ?? []).forEach((c) => names.add(c.name));
     pdfPreview?.rows.forEach((r) => {
       if (r.category) names.add(r.category);
     });
     return Array.from(names).sort((a, b) => a.localeCompare(b, "de"));
   }, [categoriesList, pdfPreview?.rows]);
+
+  /**
+   * Smart category change handler.
+   * - Marks the changed row as manually overridden.
+   * - Auto-applies the same category to all other rows that share the same
+   *   normalised description group key AND haven't been manually overridden.
+   */
+  const handleCategoryChange = useCallback(
+    (rowId: string, rowIdx: number, newCat: string) => {
+      manuallyChangedCategories.current.add(rowId);
+      setPdfPreview((prev) => {
+        if (!prev) return prev;
+        const currentKey = descGroupKey(prev.rows[rowIdx].description);
+        const next = prev.rows.map((r, i) => {
+          if (i === rowIdx) return { ...r, category: newCat || undefined };
+          if (!manuallyChangedCategories.current.has(r.id) && descGroupKey(r.description) === currentKey) {
+            return { ...r, category: newCat || undefined };
+          }
+          return r;
+        });
+        return { ...prev, rows: next };
+      });
+    },
+    [],
+  );
 
   const csvMutation = useMutation({
     mutationFn: (file: File) => {
@@ -151,12 +202,15 @@ export default function Import() {
       return importsApi.previewPdf(fd).then((r) => r.data as PdfPreviewData);
     },
     onSuccess: (data) => {
+      manuallyChangedCategories.current = new Set();
       const rows: PdfPreviewRow[] = (data.rows ?? []).map((r) => ({
         ...r,
         duplicate_kind: (r as PdfPreviewRow).duplicate_kind ?? "none",
         merge_action: ((r as PdfPreviewRow).merge_action ?? "import") as PdfMergeAction,
         existing_transaction_id: (r as PdfPreviewRow).existing_transaction_id ?? undefined,
         duplicate_of_row_id: (r as PdfPreviewRow).duplicate_of_row_id ?? undefined,
+        is_recurring: (r as PdfPreviewRow).is_recurring ?? false,
+        periodicity: (r as PdfPreviewRow).periodicity ?? null,
       }));
       setPdfPreview({ ...data, rows });
       setPdfFileName(data.filename);
@@ -399,19 +453,8 @@ export default function Import() {
 
       {/* PDF Preview Modal */}
       {pdfPreview && (() => {
-        // ── Detect recurring amounts (same absolute amount ≥ 2×, value > 5 CHF) ──
-        const amtCounts: Record<string, number> = {};
-        pdfPreview.rows.forEach((r) => {
-          const key = Math.abs(r.amount).toFixed(2);
-          amtCounts[key] = (amtCounts[key] || 0) + 1;
-        });
-        const recurringAmts = new Set(
-          Object.entries(amtCounts)
-            .filter(([k, v]) => v >= 2 && parseFloat(k) > 5)
-            .map(([k]) => k)
-        );
-        const isRecurring = (r: PdfPreviewRow) => recurringAmts.has(Math.abs(r.amount).toFixed(2));
-
+        const isRecurring = (r: PdfPreviewRow) => r.is_recurring;
+        const recurringCount = pdfPreview.rows.filter((r) => r.is_recurring).length;
         const hasDuplicates = pdfPreview.rows.some((r) => r.duplicate_kind !== "none");
 
         return (
@@ -441,7 +484,7 @@ export default function Import() {
                     Erkannt: <span className="text-green-300 font-semibold">{pdfPreview.parsed_rows}</span>
                   </div>
                   <div className="rounded-lg bg-slate-800 px-3 py-2 text-slate-300">
-                    Wiederkehrend: <span className="text-violet-300 font-semibold">{recurringAmts.size > 0 ? `${recurringAmts.size} Beträge` : "–"}</span>
+                    Wiederkehrend: <span className="text-violet-300 font-semibold">{recurringCount > 0 ? `${recurringCount} Zahlungen` : "–"}</span>
                   </div>
                   <div className="rounded-lg bg-slate-800 px-3 py-2 text-slate-300">
                     Duplikate: <span className="text-amber-300 font-semibold">{pdfPreview.rows.filter((r) => r.duplicate_kind !== "none").length}</span>
@@ -506,8 +549,8 @@ export default function Import() {
                                 </span>
                               )}
                               {recurring && (
-                                <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 bg-violet-900/50 text-violet-300 text-[10px] font-medium leading-tight" title="Wiederkehrender Betrag">
-                                  ↻ Abo
+                                <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 bg-violet-900/50 text-violet-300 text-[10px] font-medium leading-tight" title={row.periodicity ? PERIODICITY_LABELS[row.periodicity] : "Wiederkehrend"}>
+                                  ↻ {row.periodicity ? PERIODICITY_LABELS[row.periodicity] : "Abo"}
                                 </span>
                               )}
                               {row.duplicate_kind === "none" && !recurring && (
@@ -566,7 +609,7 @@ export default function Import() {
                             />
                           </td>
 
-                          {/* ── AI Category badge + override dropdown ── */}
+                          {/* ── AI Category badge + override dropdown + periodicity ── */}
                           <td className="px-2 py-2 align-middle">
                             <div className="flex flex-col gap-1">
                               {/* Show AI-assigned category as a coloured badge */}
@@ -578,17 +621,10 @@ export default function Import() {
                               ) : (
                                 <span className="text-slate-600 text-[10px] italic">KI: –</span>
                               )}
-                              {/* Override dropdown */}
+                              {/* Category override — smart: auto-applies to same-description rows */}
                               <select
                                 value={row.category ?? ""}
-                                onChange={(e) =>
-                                  setPdfPreview((prev) => {
-                                    if (!prev) return prev;
-                                    const next = [...prev.rows];
-                                    next[idx] = { ...next[idx], category: e.target.value || undefined };
-                                    return { ...prev, rows: next };
-                                  })
-                                }
+                                onChange={(e) => handleCategoryChange(row.id, idx, e.target.value)}
                                 className="bg-slate-800 border border-slate-700 rounded px-1.5 py-1 text-slate-300 w-full text-[11px]"
                               >
                                 <option value="">↩ Zurücksetzen</option>
@@ -596,6 +632,27 @@ export default function Import() {
                                   <option key={name} value={name}>{name}</option>
                                 ))}
                               </select>
+                              {/* Periodicity selector — only for recurring transactions */}
+                              {row.is_recurring && (
+                                <select
+                                  value={row.periodicity ?? ""}
+                                  onChange={(e) =>
+                                    setPdfPreview((prev) => {
+                                      if (!prev) return prev;
+                                      const next = [...prev.rows];
+                                      next[idx] = { ...next[idx], periodicity: e.target.value || null };
+                                      return { ...prev, rows: next };
+                                    })
+                                  }
+                                  className="bg-violet-900/30 border border-violet-700/50 rounded px-1.5 py-1 text-violet-300 w-full text-[11px]"
+                                >
+                                  <option value="">Frequenz wählen</option>
+                                  <option value="monthly">Monatlich</option>
+                                  <option value="quarterly">Vierteljährlich</option>
+                                  <option value="halfyearly">Halbjährlich</option>
+                                  <option value="yearly">Jährlich</option>
+                                </select>
+                              )}
                             </div>
                           </td>
 

@@ -131,6 +131,9 @@ class PdfPreviewTransaction(BaseModel):
     duplicate_of_row_id: Optional[str] = None
     # import | skip | overwrite | keep_existing | delete_both
     merge_action: str = "import"
+    # Recurring detection
+    is_recurring: bool = False
+    periodicity: Optional[str] = None  # 'monthly' | 'quarterly' | 'halfyearly' | 'yearly'
 
 
 class PdfPreviewResponse(BaseModel):
@@ -852,6 +855,8 @@ async def preview_pdf_import(
         if parsed:
             prior_for_pdf.append((row_id, date_str, amount_val, description_val))
 
+    rows = _detect_recurring_periodicity(rows)
+
     return PdfPreviewResponse(
         bank=detected_bank,
         filename=file.filename or "upload.pdf",
@@ -986,6 +991,8 @@ async def confirm_pdf_import(
                 ex.category = category
                 ex.confidence_score = confidence_score
                 ex.import_hash = import_hash
+                ex.is_recurring = row.is_recurring
+                ex.periodicity = row.periodicity
                 imported += 1
                 imported_hashes.append(import_hash)
                 append_preview_sample(
@@ -1028,6 +1035,8 @@ async def confirm_pdf_import(
                 category=category,
                 confidence_score=confidence_score,
                 import_hash=import_hash,
+                is_recurring=row.is_recurring,
+                periodicity=row.periodicity,
             )
             db.add(txn)
             imported += 1
@@ -1239,6 +1248,86 @@ async def import_pdf(
         status=pdf_status.value,
         preview=preview_items,
     )
+
+
+def _detect_recurring_periodicity(rows: List[PdfPreviewTransaction]) -> List[PdfPreviewTransaction]:
+    """
+    Detect recurring transactions and annotate with is_recurring + periodicity.
+
+    Groups parsed rows by normalized description (first 5 significant words, digits
+    stripped), sorts by date, computes the median day-gap between consecutive
+    occurrences, and maps to the matching periodicity bucket:
+        monthly     ≈ 22-36 days
+        quarterly   ≈ 75-105 days
+        halfyearly  ≈ 155-205 days
+        yearly      ≈ 330-400 days
+
+    Rows that don't fall into a recognised bucket are left untouched.
+    """
+    import statistics
+    from collections import defaultdict
+
+    def _norm(desc: str) -> str:
+        cleaned = re.sub(r"[\d'.,]+", "", desc.lower())
+        cleaned = re.sub(r"[^\w\s]", " ", cleaned)
+        words = [w for w in cleaned.split() if len(w) >= 3][:5]
+        return " ".join(words)
+
+    groups: dict = defaultdict(list)
+    for row in rows:
+        if row.parsed:
+            key = _norm(row.description)
+            if key:
+                groups[key].append(row)
+
+    row_periodicity: dict = {}  # row.id → periodicity string
+
+    for key, group in groups.items():
+        if len(group) < 2:
+            continue
+        try:
+            sorted_group = sorted(
+                group,
+                key=lambda r: datetime.strptime(r.original_date[:10], "%Y-%m-%d"),
+            )
+        except (ValueError, IndexError):
+            continue
+
+        gaps = []
+        for i in range(1, len(sorted_group)):
+            try:
+                d1 = datetime.strptime(sorted_group[i - 1].original_date[:10], "%Y-%m-%d")
+                d2 = datetime.strptime(sorted_group[i].original_date[:10], "%Y-%m-%d")
+                gaps.append(abs((d2 - d1).days))
+            except ValueError:
+                continue
+
+        if not gaps:
+            continue
+
+        median_gap = statistics.median(gaps)
+
+        if 22 <= median_gap <= 36:
+            periodicity = "monthly"
+        elif 75 <= median_gap <= 105:
+            periodicity = "quarterly"
+        elif 155 <= median_gap <= 205:
+            periodicity = "halfyearly"
+        elif 330 <= median_gap <= 400:
+            periodicity = "yearly"
+        else:
+            continue
+
+        for row in sorted_group:
+            row_periodicity[row.id] = periodicity
+
+    result = []
+    for row in rows:
+        if row.id in row_periodicity:
+            result.append(row.model_copy(update={"is_recurring": True, "periodicity": row_periodicity[row.id]}))
+        else:
+            result.append(row)
+    return result
 
 
 def _parse_pdf_text(text: str, bank: str) -> List[dict]:

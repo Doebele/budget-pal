@@ -225,8 +225,25 @@ MERCHANT_RULES: Dict[str, Tuple[str, str, str]] = {
     "steuerverwaltung": ("Taxes", "Tax Authority", "Steuerverwaltung"),
     "ahv": ("Taxes", "Social Security", "AHV"),
     "ausgleichskasse": ("Taxes", "Social Security", "Ausgleichskasse"),
-    "gebühren": ("Services", "Government Fees", "Government Fees"),
-    "verwaltungsgebühr": ("Services", "Admin Fee", "Admin Fee"),
+    "verwaltungsgebühr": ("Gebühren", "Admin Fee", "Verwaltungsgebühr"),
+    # ── Fees / Gebühren ──────────────────────────────────────
+    "gebühren": ("Gebühren", "Bank Fees", "Gebühren"),
+    "kontoführungsgebühr": ("Gebühren", "Bank Fees", "Kontoführungsgebühr"),
+    "jahresgebühr": ("Gebühren", "Bank Fees", "Jahresgebühr"),
+    "kartengebühr": ("Gebühren", "Bank Fees", "Kartengebühr"),
+    "saldo dienstleistungspreisabschluss": ("Gebühren", "Bank Fees", "UBS Kontogebühr"),
+    "dienstleistungspreisabschluss": ("Gebühren", "Bank Fees", "UBS Kontogebühr"),
+    "bankgebühr": ("Gebühren", "Bank Fees", "Bankgebühr"),
+    "depotgebühr": ("Gebühren", "Bank Fees", "Depotgebühr"),
+    # ── Account Transfers / Kontoüberträge ────────────────────
+    "kontoübertrag": ("Kontoübertrag", "Account Transfer", "Kontoübertrag"),
+    "übertrag": ("Kontoübertrag", "Account Transfer", "Kontoübertrag"),
+    "dauerauftrag": ("Kontoübertrag", "Standing Order", "Dauerauftrag"),
+    "interne umbuchung": ("Kontoübertrag", "Internal Transfer", "Umbuchung"),
+    # ── Deposits / Einzahlungen ───────────────────────────────
+    "einzahlung": ("Einzahlungen", "Deposit", "Einzahlung"),
+    "gutschrift": ("Einzahlungen", "Credit", "Gutschrift"),
+    "bareinzahlung": ("Einzahlungen", "Cash Deposit", "Bareinzahlung"),
 }
 
 # ── Category embeddings for sentence-transformer fallback ─────
@@ -247,6 +264,9 @@ CATEGORY_DESCRIPTIONS = {
     "Taxes": "tax income tax withholding VAT government",
     "Salary": "salary wage payroll employer income payment",
     "Investment": "dividend interest ETF stock fund investment return",
+    "Einzahlungen": "deposit payment incoming credit cash deposit Einzahlung Gutschrift",
+    "Gebühren": "fee charge bank fee Gebühr Kontoführung Jahresgebühr service charge",
+    "Kontoübertrag": "account transfer wire Übertrag Dauerauftrag standing order internal transfer",
     "Other": "miscellaneous other unknown",
 }
 
