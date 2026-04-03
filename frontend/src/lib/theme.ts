@@ -1,0 +1,257 @@
+/**
+ * Design system constants — mirror of tailwind.config.js values.
+ * Use these in JS/TS contexts (chart configs, inline styles, etc.)
+ * that can't read Tailwind classes directly.
+ */
+
+export const colors = {
+  // ── Background ──────────────────────────────────────────────
+  bg: "#0d0e12",
+  bgSurface: "#13141a",
+  bgSurface2: "#1a1b23",
+  bgElevated: "#20212c",
+
+  // ── Border ───────────────────────────────────────────────────
+  border: "rgba(255,255,255,0.13)",
+  borderSubtle: "rgba(255,255,255,0.07)",
+  borderStrong: "rgba(255,255,255,0.22)",
+
+  // ── Text ─────────────────────────────────────────────────────
+  textPrimary: "#f0f1f5",
+  textSecondary: "#b4bfcc",
+  textTertiary: "#8896a8",
+  textDisabled: "#535e6b",
+
+  // ── Accent ────────────────────────────────────────────────────
+  accent: "#3b82f6",
+  accentLight: "#60a5fa",
+  accentDark: "#2563eb",
+  accentMuted: "rgba(59,130,246,0.15)",
+
+  // ── Financial ─────────────────────────────────────────────────
+  gain: "#4ade80",
+  gainLight: "#86efac",
+  gainMuted: "rgba(74,222,128,0.15)",
+
+  loss: "#f87171",
+  lossLight: "#fca5a5",
+  lossMuted: "rgba(248,113,113,0.15)",
+
+  warning: "#fbbf24",
+  warningLight: "#fde68a",
+  warningMuted: "rgba(251,191,36,0.15)",
+
+  purple: "#a78bfa",
+  purpleLight: "#c4b5fd",
+  purpleMuted: "rgba(167,139,250,0.15)",
+
+  teal: "#34d399",
+
+  // ── Chart palette ─────────────────────────────────────────────
+  chart: {
+    1: "#3b82f6",
+    2: "#4ade80",
+    3: "#f87171",
+    4: "#fbbf24",
+    5: "#a78bfa",
+    6: "#34d399",
+    7: "#fb923c",
+    8: "#38bdf8",
+  },
+
+  chartPalette: [
+    "#3b82f6",
+    "#4ade80",
+    "#f87171",
+    "#fbbf24",
+    "#a78bfa",
+    "#34d399",
+    "#fb923c",
+    "#38bdf8",
+    "#f472b6",
+    "#6ee7b7",
+  ],
+} as const;
+
+// ── Nivo chart theme ──────────────────────────────────────────
+
+export const nivoTheme = {
+  background: "transparent",
+  textColor: colors.textSecondary,
+  fontSize: 12,
+  fontFamily: "Syne, system-ui, sans-serif",
+  axis: {
+    domain: {
+      line: {
+        stroke: colors.border,
+        strokeWidth: 1,
+      },
+    },
+    legend: {
+      text: {
+        fill: colors.textTertiary,
+        fontSize: 11,
+      },
+    },
+    ticks: {
+      line: {
+        stroke: colors.borderSubtle,
+        strokeWidth: 1,
+      },
+      text: {
+        fill: colors.textTertiary,
+        fontSize: 11,
+      },
+    },
+  },
+  grid: {
+    line: {
+      stroke: colors.borderSubtle,
+      strokeWidth: 1,
+    },
+  },
+  legends: {
+    title: {
+      text: {
+        fill: colors.textSecondary,
+        fontSize: 11,
+      },
+    },
+    text: {
+      fill: colors.textSecondary,
+      fontSize: 11,
+    },
+    ticks: {
+      line: {},
+      text: {
+        fill: colors.textTertiary,
+        fontSize: 10,
+      },
+    },
+  },
+  annotations: {
+    text: {
+      fill: colors.textPrimary,
+      fontSize: 12,
+    },
+    link: {
+      stroke: colors.accent,
+      strokeWidth: 1,
+    },
+    outline: {
+      stroke: colors.border,
+      strokeWidth: 2,
+    },
+    symbol: {
+      fill: colors.bgSurface,
+      outlineWidth: 2,
+      outlineColor: colors.accent,
+    },
+  },
+  tooltip: {
+    container: {
+      background: colors.bgElevated,
+      color: colors.textPrimary,
+      fontSize: 12,
+      borderRadius: "6px",
+      border: `1px solid ${colors.border}`,
+      padding: "8px 12px",
+      boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+    },
+  },
+  crosshair: {
+    line: {
+      stroke: colors.textTertiary,
+      strokeWidth: 1,
+      strokeOpacity: 0.5,
+    },
+  },
+};
+
+// ── Category colors ───────────────────────────────────────────
+
+export const categoryColors: Record<string, string> = {
+  Groceries: "#4ade80",
+  "Food & Drink": "#fb923c",
+  Transport: "#38bdf8",
+  Travel: "#60a5fa",
+  Utilities: "#fbbf24",
+  Health: "#f472b6",
+  Insurance: "#a78bfa",
+  Finance: "#3b82f6",
+  Housing: "#34d399",
+  Shopping: "#f87171",
+  Entertainment: "#c084fc",
+  Education: "#67e8f9",
+  Services: "#94a3b8",
+  Taxes: "#f59e0b",
+  Salary: "#4ade80",
+  Investment: "#22d3ee",
+  Other: "#64748b",
+};
+
+// ── Formatters ────────────────────────────────────────────────
+
+export function formatCHF(amount: number, compact = false): string {
+  if (compact && Math.abs(amount) >= 1_000_000) {
+    return `CHF ${(amount / 1_000_000).toFixed(1)}M`;
+  }
+  if (compact && Math.abs(amount) >= 1_000) {
+    return `CHF ${(amount / 1_000).toFixed(0)}k`;
+  }
+  return new Intl.NumberFormat("de-CH", {
+    style: "currency",
+    currency: "CHF",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+export function formatAmount(amount: number, currency = "CHF"): string {
+  return new Intl.NumberFormat("de-CH", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+export function formatPercent(value: number): string {
+  return `${(value >= 0 ? "+" : "")}${(value * 100).toFixed(1)}%`;
+}
+
+// ── Periodicity / Frequency ───────────────────────────────────
+
+export type Periodicity = "monthly" | "quarterly" | "halfyearly" | "yearly";
+
+export const PERIODICITY_LABELS: Record<string, string> = {
+  monthly: "Monatlich",
+  quarterly: "Vierteljährlich",
+  halfyearly: "Halbjährlich",
+  yearly: "Jährlich",
+};
+
+/**
+ * Returns Tailwind class string (bg + border + text) for the periodicity value.
+ * Guaranteed to use full literal class names so Tailwind JIT keeps them.
+ */
+export function getFrequencyStyle(periodicity: string | null | undefined): string {
+  switch (periodicity) {
+    case "monthly":    return "bg-blue-900/20 border-blue-800 text-blue-300";
+    case "quarterly":  return "bg-orange-900/20 border-orange-800 text-orange-300";
+    case "halfyearly": return "bg-violet-900/20 border-violet-800 text-violet-300";
+    case "yearly":     return "bg-emerald-900/20 border-emerald-800 text-emerald-300";
+    default:           return "bg-slate-700/50 border-slate-600 text-slate-400";
+  }
+}
+
+/** Tailwind badge classes (no border) for inline status chips. */
+export function getFrequencyBadgeStyle(periodicity: string | null | undefined): string {
+  switch (periodicity) {
+    case "monthly":    return "bg-blue-900/50 text-blue-300";
+    case "quarterly":  return "bg-orange-900/50 text-orange-300";
+    case "halfyearly": return "bg-violet-900/50 text-violet-300";
+    case "yearly":     return "bg-emerald-900/50 text-emerald-300";
+    default:           return "bg-slate-700 text-slate-400";
+  }
+}

@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { transactionsApi, accountsApi } from "@/lib/api";
-import { formatCHF, categoryColors } from "@/lib/theme";
+import { formatCHF, categoryColors, getFrequencyStyle, getFrequencyBadgeStyle, PERIODICITY_LABELS } from "@/lib/theme";
 import { format, startOfMonth, endOfMonth, subMonths, addMonths, isSameMonth } from "date-fns";
 import { de } from "date-fns/locale";
 import { Search, Filter, Upload, ChevronDown, Check, X, ChevronLeft, ChevronRight, Calendar, LayoutGrid, Building2, Repeat, Wallet, TrendingUp, PieChart } from "lucide-react";
@@ -411,12 +411,8 @@ export default function Transactions() {
                       <tr key={idx} className="hover:bg-slate-800/50">
                         <td className="px-3 py-2 text-slate-300">{item.description}</td>
                         <td className="px-3 py-2">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-slate-700 text-slate-300">
-                            {item.periodicity === "weekly" && "Wöchentlich"}
-                            {item.periodicity === "monthly" && "Monatlich"}
-                            {item.periodicity === "quarterly" && "Vierteljährlich"}
-                            {item.periodicity === "halfyearly" && "Halbjährlich"}
-                            {item.periodicity === "yearly" && "Jährlich"}
+                          <span className={clsx("inline-flex items-center px-2 py-0.5 rounded text-xs", getFrequencyBadgeStyle(item.periodicity))}>
+                            {PERIODICITY_LABELS[item.periodicity] ?? item.periodicity}
                           </span>
                         </td>
                         <td className="px-3 py-2 text-right font-mono text-slate-400">
@@ -659,20 +655,14 @@ export default function Transactions() {
                         className={clsx(
                           "flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-colors",
                           txn.is_recurring
-                            ? "bg-accent/20 text-accent hover:bg-accent/30"
+                            ? getFrequencyBadgeStyle(txn.periodicity)
                             : "text-slate-500 hover:text-slate-300 hover:bg-slate-800"
                         )}
-                        title={txn.is_recurring ? "Wiederkehrende Zahlung" : "Als wiederkehrend markieren"}
+                        title={txn.is_recurring ? (PERIODICITY_LABELS[txn.periodicity ?? ""] ?? "Wiederkehrende Zahlung") : "Als wiederkehrend markieren"}
                       >
                         <Repeat className="w-3.5 h-3.5" />
                         {txn.is_recurring ? (
-                          <span className="capitalize">
-                            {txn.periodicity === "weekly" && "W"}
-                            {txn.periodicity === "monthly" && "M"}
-                            {txn.periodicity === "quarterly" && "Q"}
-                            {txn.periodicity === "halfyearly" && "H"}
-                            {txn.periodicity === "yearly" && "J"}
-                          </span>
+                          <span>{PERIODICITY_LABELS[txn.periodicity ?? ""] ?? txn.periodicity}</span>
                         ) : (
                           <span>—</span>
                         )}
@@ -733,7 +723,7 @@ export default function Transactions() {
                       className={clsx(
                         "p-3 rounded-lg border text-left transition-all",
                         editPeriodicity === option.value
-                          ? "border-accent bg-accent/20 text-white"
+                          ? getFrequencyStyle(option.value)
                           : "border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-600"
                       )}
                     >
