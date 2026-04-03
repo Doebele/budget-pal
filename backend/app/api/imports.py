@@ -745,14 +745,19 @@ async def preview_pdf_import(
     try:
         import pdfplumber
         with pdfplumber.open(tmp_path) as pdf:
-            full_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
-        if len(full_text.strip()) < 100:
-            full_text = await _ocr_pdf_to_text(tmp_path)
+            # 1st choice: structured table extraction (avoids Saldo-vs-Betrag ambiguity)
+            raw_transactions = _parse_ubs_pdf_tables(pdf)
+            if not raw_transactions:
+                # 2nd choice: text extraction + fixed two-date regex parser
+                full_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+                if len(full_text.strip()) < 100:
+                    full_text = await _ocr_pdf_to_text(tmp_path)
+                detected_bank = bank or "ubs"
+                raw_transactions = _parse_pdf_text(full_text, detected_bank)
     finally:
         os.unlink(tmp_path)
 
     detected_bank = bank or "ubs"
-    raw_transactions = _parse_pdf_text(full_text, detected_bank)
 
     rows: List[PdfPreviewTransaction] = []
     parsed_rows = 0
@@ -1097,20 +1102,24 @@ async def import_pdf(
         import pdfplumber
 
         with pdfplumber.open(tmp_path) as pdf:
-            full_text = "\n".join(
-                page.extract_text() or "" for page in pdf.pages
-            )
+            # 1st choice: structured table extraction (reads Betrag column directly,
+            # avoiding the Saldo-vs-Betrag confusion that plagued the old regex).
+            raw_transactions = _parse_ubs_pdf_tables(pdf)
 
-        # If pdfplumber extraction is too sparse, fall back to OCR pipeline
-        if len(full_text.strip()) < 100:
-            try:
-                full_text = await _ocr_pdf_to_text(tmp_path)
-            except Exception as ocr_err:
-                logger.warning("OCR pipeline failed: %s", ocr_err)
+            if not raw_transactions:
+                # 2nd choice: text extraction + fixed two-date regex parser
+                full_text = "\n".join(
+                    page.extract_text() or "" for page in pdf.pages
+                )
 
-        # Basic line-by-line parsing for UBS-style PDF statements
-        detected_bank = bank or "ubs"
-        raw_transactions = _parse_pdf_text(full_text, detected_bank)
+                if len(full_text.strip()) < 100:
+                    try:
+                        full_text = await _ocr_pdf_to_text(tmp_path)
+                    except Exception as ocr_err:
+                        logger.warning("OCR pipeline failed: %s", ocr_err)
+
+                detected_bank = bank or "ubs"
+                raw_transactions = _parse_pdf_text(full_text, detected_bank)
 
     finally:
         os.unlink(tmp_path)
@@ -1223,29 +1232,199 @@ async def import_pdf(
 
 
 def _parse_pdf_text(text: str, bank: str) -> List[dict]:
-    """Simple regex-based line parser for PDF statement text."""
+    """
+    Regex-based line parser for PDF statement text.
+
+    UBS PDF layout (as extracted by pdfplumber):
+
+        DD.MM.YYYY  <description>  [+-]amount  DD.MM.YYYY  saldo
+
+    Root-cause fix: the old single-date regex anchored to the LAST number on
+    the line which is the running Saldo — NOT the transaction amount.
+
+    Fix: detect lines with TWO dates and capture the amount that appears
+    BETWEEN the description and the Valuta date (second date), discarding
+    the trailing Saldo entirely.
+
+    Multi-line descriptions (continuation lines that contain no leading date)
+    are appended to the most-recently parsed transaction.
+    """
     from datetime import datetime
 
-    rows = []
-    # Match lines like: 12.03.2024  Payment to Migros  -42.50
-    pattern = re.compile(
-        r"(\d{2}\.\d{2}\.\d{4})\s+(.+?)\s+([+-]?\d{1,3}(?:[',\.]\d{3})*(?:[',\.]\d{2}))\s*$"
+    _DATE = r"\d{2}\.\d{2}\.\d{4}"
+    # Swiss number format: optional sign, digits with optional ' thousands-sep,
+    # mandatory decimal separator followed by exactly 2 digits.
+    _AMT = r"[+-]?[\d']+[.,]\d{2}"
+
+    # ── Primary: UBS two-date format ──────────────────────────────────────────
+    # BuchDatum  Description  Amount  ValutaDatum  Saldo
+    # We keep groups 1 (booking date), 2 (description), 3 (amount).
+    # The Valuta date and Saldo are consumed but discarded.
+    ubs_pattern = re.compile(
+        rf"^({_DATE})\s+"   # Buchungsdatum   (group 1)
+        rf"(.+?)\s+"        # description     (group 2, non-greedy)
+        rf"({_AMT})\s+"     # transaction amt (group 3) ← the CORRECT amount
+        rf"{_DATE}\s+"      # Valuta date     (discarded)
+        rf"[\d',.]+\s*$"    # Saldo           (discarded)
     )
-    for line in text.split("\n"):
-        m = pattern.match(line.strip())
+
+    # ── Fallback: single-date pattern (non-UBS banks / OCR output) ────────────
+    simple_pattern = re.compile(
+        r"^(\d{2}\.\d{2}\.\d{4})\s+(.+?)\s+"
+        r"([+-]?\d{1,3}(?:[',]\d{3})*(?:[',\.]\d{2}))\s*$"
+    )
+
+    # Lines that are clearly not part of a transaction description
+    _SKIP_RE = re.compile(
+        r"^(Seite\s+\d|Saldo\s|Datum\s|Buchungsdatum|Valuta|IBAN\s|BIC\s|"
+        r"Kontonummer|Konto\s|Total\s|Page\s+\d|\d+\s*$)",
+        re.IGNORECASE,
+    )
+
+    rows: list = []
+    pending: Optional[dict] = None
+
+    for raw_line in text.split("\n"):
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        # ── Try UBS two-date pattern first ────────────────────────────────────
+        m = ubs_pattern.match(line)
         if m:
-            date_str, desc, amount_str = m.groups()
+            if pending and pending.get("description"):
+                rows.append(pending)
+            date_str, desc, amount_str = m.group(1), m.group(2), m.group(3)
             try:
                 dt = datetime.strptime(date_str, "%d.%m.%Y")
                 amount_clean = amount_str.replace("'", "").replace(",", ".")
-                rows.append({
+                pending = {
                     "date": dt,
                     "description": desc.strip(),
                     "amount": float(amount_clean),
                     "currency": "CHF",
-                })
+                }
             except ValueError:
+                pass
+            continue
+
+        # ── Fallback: single-date pattern ────────────────────────────────────
+        m2 = simple_pattern.match(line)
+        if m2:
+            if pending and pending.get("description"):
+                rows.append(pending)
+            date_str, desc, amount_str = m2.groups()
+            try:
+                dt = datetime.strptime(date_str, "%d.%m.%Y")
+                amount_clean = amount_str.replace("'", "").replace(",", ".")
+                pending = {
+                    "date": dt,
+                    "description": desc.strip(),
+                    "amount": float(amount_clean),
+                    "currency": "CHF",
+                }
+            except ValueError:
+                pass
+            continue
+
+        # ── Continuation line: append to pending description ─────────────────
+        # Skip lines that look like headers/page info/bare dates.
+        if pending and not re.match(rf"^{_DATE}\s*$", line) and not _SKIP_RE.match(line):
+            pending["description"] = (pending["description"] + " " + line).strip()
+
+    if pending and pending.get("description"):
+        rows.append(pending)
+
+    return rows
+
+
+def _parse_ubs_pdf_tables(pdf) -> List[dict]:
+    """
+    Extract UBS transactions from pdfplumber using structured table parsing.
+
+    UBS PDF statements have a clear table layout:
+        Buchungsdatum | Buchungstext | Betrag | Valuta | Saldo
+
+    Using `extract_tables()` avoids the regex-vs-layout ambiguity entirely:
+    we read the Betrag (amount) column directly instead of guessing from the
+    reconstructed text line.
+
+    Returns [] if no recognisable table is found (caller falls back to text).
+    """
+    from datetime import datetime
+
+    DATE_FMT = "%d.%m.%Y"
+    rows: List[dict] = []
+
+    AMOUNT_HEADERS = {"betrag", "amount", "umsatz"}
+    DATE_HEADERS   = {"buchungsdatum", "datum", "buchungsdate"}
+    DESC_HEADERS   = {"buchungstext", "text", "beschreibung", "verwendungszweck"}
+    SALDO_HEADERS  = {"saldo", "balance"}
+
+    for page in pdf.pages:
+        tables = page.extract_tables()
+        for table in tables:
+            if not table or len(table) < 2:
                 continue
+
+            # Locate header row (must contain at least a date and amount column)
+            header_row_idx: Optional[int] = None
+            header: List[str] = []
+            for idx, row in enumerate(table):
+                if not row:
+                    continue
+                normalized = [str(c or "").lower().strip() for c in row]
+                has_date   = any(h in DATE_HEADERS   for h in normalized)
+                has_amount = any(h in AMOUNT_HEADERS for h in normalized)
+                if has_date and has_amount:
+                    header_row_idx = idx
+                    header = normalized
+                    break
+
+            if header_row_idx is None:
+                continue
+
+            # Map column names → indices
+            def _find(candidates: set) -> Optional[int]:
+                for i, h in enumerate(header):
+                    if h in candidates:
+                        return i
+                return None
+
+            date_col   = _find(DATE_HEADERS)
+            desc_col   = _find(DESC_HEADERS)
+            amount_col = _find(AMOUNT_HEADERS)
+
+            if date_col is None or amount_col is None:
+                continue
+
+            for data_row in table[header_row_idx + 1:]:
+                if not data_row:
+                    continue
+                date_str = str(data_row[date_col] or "").strip()
+                try:
+                    dt = datetime.strptime(date_str, DATE_FMT)
+                except ValueError:
+                    continue
+
+                desc = str(data_row[desc_col] or "").strip() if desc_col is not None else ""
+                if not desc:
+                    continue
+
+                amount_str = str(data_row[amount_col] or "").strip()
+                amount_clean = amount_str.replace("'", "").replace(",", ".")
+                try:
+                    amount = float(amount_clean)
+                except ValueError:
+                    continue
+
+                rows.append({
+                    "date": dt,
+                    "description": desc,
+                    "amount": amount,
+                    "currency": "CHF",
+                })
+
     return rows
 
 
