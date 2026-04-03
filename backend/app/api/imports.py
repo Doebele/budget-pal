@@ -820,6 +820,16 @@ async def preview_pdf_import(
         display_date = date_str or (
             date_val.strftime("%Y-%m-%d") if isinstance(date_val, datetime) else str(date_val or "")
         )
+
+        # AI category suggestion for preview
+        preview_category: Optional[str] = None
+        if parsed and description_val:
+            try:
+                cat_result = await categorization_service.categorize(description_val)
+                preview_category = cat_result.get("category") or None
+            except Exception:
+                pass
+
         rows.append(
             PdfPreviewTransaction(
                 id=row_id,
@@ -828,7 +838,7 @@ async def preview_pdf_import(
                 amount=amount_val,
                 description=description_val,
                 currency=row.get("currency", "CHF"),
-                category=None,
+                category=preview_category,
                 account_id=account_id,
                 is_duplicate=is_duplicate,
                 parsed=parsed,
@@ -1233,126 +1243,129 @@ async def import_pdf(
 
 def _parse_pdf_text(text: str, bank: str) -> List[dict]:
     """
-    Robust line parser for UBS PDF statement text.
+    UBS PDF line parser — Saldo-delta strategy with direct-extraction fallback.
 
-    UBS PDF layout per transaction:
-        BuchDatum  Description  Betrag  ValutaDatum  Saldo
+    UBS PDF layout per transaction (newest-first):
+        BuchDatum  Description  [Belastung|Gutschrift]  ValutaDatum  Saldo
 
-    Strategy — two-date anchor:
-        1. Find the FIRST and SECOND occurrence of DD.MM.YYYY on the line.
-        2. Everything between the two dates is "Description + Betrag".
-        3. The LAST number in that middle section is the Betrag (transaction
-           amount).  Everything before it is the description.
-        4. The trailing number after the Valuta date is the Saldo — discarded.
+    Primary strategy (Saldo-delta):
+        1. For each transaction line (2 dates), extract the Saldo from the tail
+           (everything after the last/ValutaDatum).
+        2. Also extract the Betrag from the middle section (between the two dates)
+           as a direct fallback.
+        3. Compute amount[i] = saldo[i] - saldo[i+1]  (PDF order = newest-first,
+           so subtracting the next row's older saldo gives the signed delta).
+        4. Negative delta = Belastung (expense), positive = Gutschrift (income).
+        5. For the last record (oldest transaction), no next-row exists — use the
+           directly-extracted Betrag from the middle section instead.
 
-    This approach is robust against pdfplumber collapsing inter-column spaces
-    (e.g. "MigrosBankAG-649.00" with no space) because we use the TWO DATES
-    as fixed anchors instead of relying on whitespace between all tokens.
-
-    For non-UBS banks / OCR output (only one date per line) we fall back to a
-    simple end-of-line amount pattern.
-
-    Multi-line descriptions are appended to the most recent transaction.
+    Multi-line descriptions (continuation lines) are appended to the pending record.
     """
     from datetime import datetime
 
     _DATE_RE = re.compile(r"\d{2}\.\d{2}\.\d{4}")
-    # Swiss number: optional sign, digits with optional ' thousands-sep,
-    # decimal sep (. or ,) followed by exactly 2 digits.
-    _AMT_RE = re.compile(r"[+-]?[\d']+[.,]\d{2}")
+    _AMT_RE  = re.compile(r"[+-]?[\d']+[.,]\d{2}")
 
-    # Lines that are clearly not transaction data
     _SKIP_RE = re.compile(
         r"^(Seite\s+\d|Saldo\s|Datum\s|Buchungsdatum|Valuta|IBAN\s|BIC\s|"
         r"Kontonummer|Konto\s|Total\s|Page\s+\d|\d+\s*$)",
         re.IGNORECASE,
     )
 
-    def _parse_ubs_line(line: str) -> Optional[dict]:
-        """Two-date-anchor parser for a single UBS line."""
+    def _parse_num(s: str) -> Optional[float]:
+        try:
+            return float(s.replace("'", "").replace(",", "."))
+        except ValueError:
+            return None
+
+    def _parse_ubs_line(line: str):
+        """
+        Returns (date, description, saldo, betrag) tuple or None.
+
+        Uses the LAST date on the line as ValutaDatum anchor (robust against
+        pdfplumber merging saldo digits with the next-line date, e.g.
+        "3'079.0431.03.2026" — the regex still finds "31.03.2026" correctly).
+        """
         dates = list(_DATE_RE.finditer(line))
         if len(dates) < 2:
             return None
 
-        buch_m, valuta_m = dates[0], dates[1]
+        buch_m  = dates[0]
+        valuta_m = dates[-1]  # last date = ValutaDatum (most robust anchor)
 
-        # Section between the two dates: "Description + Amount"
+        # Tail: after ValutaDatum → should be the Saldo
+        tail = line[valuta_m.end():].strip()
+        tail_amounts = list(_AMT_RE.finditer(tail))
+        saldo = _parse_num(tail_amounts[-1].group()) if tail_amounts else None
+
+        # Middle: between Buchungsdatum and ValutaDatum → Description + Betrag
         middle = line[buch_m.end(): valuta_m.start()].strip()
-        if not middle:
-            return None
+        mid_amounts = list(_AMT_RE.finditer(middle))
+        betrag: Optional[float] = None
+        desc_end = len(middle)
+        if mid_amounts:
+            betrag = _parse_num(mid_amounts[-1].group())
+            desc_end = mid_amounts[-1].start()
+        desc = middle[:desc_end].strip()
 
-        # Last amount-like token in the middle section = Betrag
-        amounts = list(_AMT_RE.finditer(middle))
-        if not amounts:
-            return None
-
-        betrag_m = amounts[-1]
-        desc = middle[: betrag_m.start()].strip()
-        # If the description is entirely empty, use a cleaned form of the middle
-        if not desc:
-            desc = middle[: betrag_m.start()].strip() or middle.strip()
         if not desc:
             return None
 
-        amount_str = betrag_m.group().replace("'", "").replace(",", ".")
         try:
             dt = datetime.strptime(buch_m.group(), "%d.%m.%Y")
-            return {
-                "date": dt,
-                "description": desc,
-                "amount": float(amount_str),
-                "currency": "CHF",
-            }
         except ValueError:
             return None
 
-    # Simple single-date fallback (non-UBS / OCR output)
-    _SIMPLE_RE = re.compile(
-        r"^(\d{2}\.\d{2}\.\d{4})\s+(.+?)\s+"
-        r"([+-]?\d{1,3}(?:[',]\d{3})*(?:[',\.]\d{2}))\s*$"
-    )
+        return (dt, desc, saldo, betrag)
 
-    rows: list = []
-    pending: Optional[dict] = None
+    # ── Pass 1: collect records (date, desc, saldo, betrag) in PDF order ──────
+    records: list = []  # list of (dt, desc, saldo, betrag)
+    pending: Optional[tuple] = None
 
     for raw_line in text.split("\n"):
         line = raw_line.strip()
         if not line:
             continue
 
-        # ── 1st choice: UBS two-date-anchor ───────────────────────────────────
         parsed = _parse_ubs_line(line)
         if parsed:
-            if pending and pending.get("description"):
-                rows.append(pending)
+            if pending is not None:
+                records.append(pending)
             pending = parsed
             continue
 
-        # ── 2nd choice: simple single-date pattern (fallback) ─────────────────
-        m2 = _SIMPLE_RE.match(line)
-        if m2:
-            if pending and pending.get("description"):
-                rows.append(pending)
-            date_str, desc, amount_str = m2.groups()
-            try:
-                dt = datetime.strptime(date_str, "%d.%m.%Y")
-                amount_clean = amount_str.replace("'", "").replace(",", ".")
-                pending = {
-                    "date": dt,
-                    "description": desc.strip(),
-                    "amount": float(amount_clean),
-                    "currency": "CHF",
-                }
-            except ValueError:
-                pass
-            continue
+        # Continuation line: append to pending description
+        if pending is not None and not _DATE_RE.fullmatch(line) and not _SKIP_RE.match(line):
+            dt, desc, saldo, betrag = pending
+            pending = (dt, (desc + " " + line).strip(), saldo, betrag)
 
-        # ── Continuation line ─────────────────────────────────────────────────
-        if pending and not _DATE_RE.fullmatch(line) and not _SKIP_RE.match(line):
-            pending["description"] = (pending["description"] + " " + line).strip()
+    if pending is not None:
+        records.append(pending)
 
-    if pending and pending.get("description"):
-        rows.append(pending)
+    if not records:
+        return []
+
+    # ── Pass 2: compute amounts via Saldo-delta ───────────────────────────────
+    rows: list = []
+    for i, (dt, desc, saldo, betrag) in enumerate(records):
+        next_rec = records[i + 1] if i + 1 < len(records) else None
+        next_saldo = next_rec[2] if next_rec else None  # next record's saldo
+
+        if saldo is not None and next_saldo is not None:
+            # Primary: Saldo-delta (newest-first → subtract next/older saldo)
+            amount = round(saldo - next_saldo, 2)
+        elif betrag is not None:
+            # Fallback: direct Betrag extraction from middle section
+            amount = betrag
+        else:
+            amount = 0.0
+
+        rows.append({
+            "date": dt,
+            "description": desc,
+            "amount": amount,
+            "currency": "CHF",
+        })
 
     return rows
 
@@ -1376,6 +1389,8 @@ def _parse_ubs_pdf_tables(pdf) -> List[dict]:
     rows: List[dict] = []
 
     AMOUNT_HEADERS = {"betrag", "amount", "umsatz", "belastung/gutschrift", "betrag chf"}
+    DEBIT_HEADERS  = {"belastung", "debit", "ausgabe", "belastung chf"}
+    CREDIT_HEADERS = {"gutschrift", "kredit", "einnahme", "gutschrift chf"}
     DATE_HEADERS   = {"buchungsdatum", "datum", "buchungsdate", "buchungs-\ndatum"}
     DESC_HEADERS   = {"buchungstext", "text", "beschreibung", "verwendungszweck", "buchungstext/\ngläubiger-id"}
     SALDO_HEADERS  = {"saldo", "balance", "saldo chf"}
@@ -1393,8 +1408,11 @@ def _parse_ubs_pdf_tables(pdf) -> List[dict]:
                 if not row:
                     continue
                 normalized = [str(c or "").lower().strip() for c in row]
-                has_date   = any(h in DATE_HEADERS   for h in normalized)
-                has_amount = any(h in AMOUNT_HEADERS for h in normalized)
+                has_date   = any(h in DATE_HEADERS for h in normalized)
+                has_amount = any(
+                    h in AMOUNT_HEADERS | DEBIT_HEADERS | CREDIT_HEADERS
+                    for h in normalized
+                )
                 if has_date and has_amount:
                     header_row_idx = idx
                     header = normalized
@@ -1410,11 +1428,22 @@ def _parse_ubs_pdf_tables(pdf) -> List[dict]:
                         return i
                 return None
 
+            def _parse_amt(s: str) -> Optional[float]:
+                cleaned = s.replace("'", "").replace(",", ".")
+                try:
+                    return float(cleaned) if cleaned else None
+                except ValueError:
+                    return None
+
             date_col   = _find(DATE_HEADERS)
             desc_col   = _find(DESC_HEADERS)
             amount_col = _find(AMOUNT_HEADERS)
+            debit_col  = _find(DEBIT_HEADERS)
+            credit_col = _find(CREDIT_HEADERS)
 
-            if date_col is None or amount_col is None:
+            if date_col is None:
+                continue
+            if amount_col is None and debit_col is None and credit_col is None:
                 continue
 
             for data_row in table[header_row_idx + 1:]:
@@ -1430,11 +1459,25 @@ def _parse_ubs_pdf_tables(pdf) -> List[dict]:
                 if not desc:
                     continue
 
-                amount_str = str(data_row[amount_col] or "").strip()
-                amount_clean = amount_str.replace("'", "").replace(",", ".")
-                try:
-                    amount = float(amount_clean)
-                except ValueError:
+                # Prefer explicit Belastung/Gutschrift columns (UBS standard)
+                if debit_col is not None or credit_col is not None:
+                    debit_str  = str(data_row[debit_col]  or "").strip() if debit_col  is not None else ""
+                    credit_str = str(data_row[credit_col] or "").strip() if credit_col is not None else ""
+                    debit_val  = _parse_amt(debit_str)
+                    credit_val = _parse_amt(credit_str)
+                    if debit_val:
+                        amount = -abs(debit_val)
+                    elif credit_val:
+                        amount = abs(credit_val)
+                    else:
+                        continue  # both columns empty → skip row
+                elif amount_col is not None:
+                    amount_str = str(data_row[amount_col] or "").strip()
+                    amt = _parse_amt(amount_str)
+                    if amt is None:
+                        continue
+                    amount = amt
+                else:
                     continue
 
                 rows.append({
