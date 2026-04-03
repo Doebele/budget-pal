@@ -567,9 +567,9 @@ export default function Transactions() {
 
       {/* Table */}
       <div className="card p-0 overflow-hidden">
-        <div className="overflow-auto max-h-[calc(100vh-220px)]">
+        <div className="overflow-auto max-h-[calc(100vh-320px)]">
           <table className="w-full">
-            <thead className="sticky top-0 z-10 bg-bg-card">
+            <thead className="sticky top-0 z-10 bg-slate-900">
               <tr className="border-b border-border/50">
                 {["Datum", "Beschreibung", "Konto", "Kategorie", "Wiederkehrend", "Betrag"].map((h) => (
                   <th key={h} className="text-left text-text-tertiary text-xs uppercase tracking-wide px-4 py-3 font-medium">
