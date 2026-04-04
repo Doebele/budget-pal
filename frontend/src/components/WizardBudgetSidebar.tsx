@@ -9,6 +9,7 @@ import {
   resolveSuperCategory,
   type SuperCategory,
 } from "@/lib/categories";
+import { deduplicateWizardBatch } from "@/lib/wizardUtils";
 
 interface WizardBudget {
   id: number;
@@ -49,29 +50,7 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
     if (!budgetsRaw || !Array.isArray(budgetsRaw)) return [];
     const withNotes = (budgetsRaw as WizardBudget[]).filter((b) => b.notes && b.notes.trim() !== "");
     if (!withNotes.length) return [];
-
-    // Strategy 1: use created_at timestamps when available
-    const hasTimestamps = withNotes.some((b) => !!b.created_at);
-    if (hasTimestamps) {
-      const maxTs = withNotes.reduce(
-        (max, b) => ((b.created_at || "") > max ? b.created_at || "" : max),
-        ""
-      );
-      const batch = withNotes.filter((b) => b.created_at === maxTs);
-      if (batch.length > 0) return batch;
-    }
-
-    // Strategy 2 (fallback): deduplicate by notes label — keep entry with highest id
-    // This handles the case where created_at is null (backend not yet reloaded)
-    const byNote = new Map<string, WizardBudget>();
-    for (const b of withNotes) {
-      const key = (b.notes ?? "").toLowerCase().trim();
-      const existing = byNote.get(key);
-      if (!existing || b.id > existing.id) {
-        byNote.set(key, b);
-      }
-    }
-    return [...byNote.values()];
+    return deduplicateWizardBatch(withNotes);
   }, [budgetsRaw]);
 
   // ── Filter by active supercategory ────────────────────────────

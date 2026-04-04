@@ -18,6 +18,7 @@ import {
   SUPER_CATEGORIES,
   type SuperCategory,
 } from "@/lib/categories";
+import { deduplicateWizardBatch } from "@/lib/wizardUtils";
 
 // ── Stat card ─────────────────────────────────────────────────
 
@@ -419,19 +420,8 @@ function buildSankeyDataEmpirical(
   const withNotes = budgetsRaw.filter((b) => b.notes && b.notes.trim() !== "");
   if (!withNotes.length) return { nodes: [], links: [] };
 
-  // Filter to the latest wizard batch when created_at is available.
-  // If the API does not return created_at (old backend), fall back to using all entries.
-  const hasTimestamps = withNotes.some((b) => !!b.created_at);
-  let latest = withNotes;
-  if (hasTimestamps) {
-    const maxTs = withNotes.reduce(
-      (max, b) => ((b.created_at || "") > max ? b.created_at || "" : max),
-      ""
-    );
-    const filtered = withNotes.filter((b) => b.created_at === maxTs);
-    // Only apply batch filter when it actually narrows the set
-    if (filtered.length > 0) latest = filtered;
-  }
+  // Deduplicate: latest batch by created_at, fallback to highest-id per label
+  const latest = deduplicateWizardBatch(withNotes);
 
   // Group by supercategory (monthly amounts → scale by months)
   const superMap = new Map<
