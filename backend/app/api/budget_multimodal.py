@@ -58,41 +58,79 @@ WIZARD_TO_PEER: dict[str, str] = {
 
 # Maps transaction category → peer-group column key
 TXN_TO_PEER: dict[str, str] = {
+    # Food / Lebensmittel
     "groceries": "food",
     "food & drink": "food",
     "lebensmittel": "food",
+    # Restaurant & Takeaway
+    "restaurant & takeaway": "restaurant",
+    "freizeit & restaurant": "restaurant",
+    # Transport
     "transport": "transport",
     "travel": "transport",
+    "reisen": "transport",
+    "öv-abonnements": "transport",
+    # Housing / Wohnen
     "housing": "housing",
     "wohnen": "housing",
     "utilities": "housing",
+    "nebenkosten": "housing",
+    # Insurance / Versicherungen
     "insurance": "insurance",
     "versicherungen": "insurance",
+    "krankenkasse": "insurance",
+    "weitere versicherungen": "insurance",
+    # Health / Gesundheit
     "health": "health",
     "gesundheit": "health",
+    "fitness": "health",
+    # Leisure / Freizeit
     "entertainment": "leisure",
-    "shopping": "leisure",
     "unterhaltung": "leisure",
+    "freizeit & unterhaltung": "leisure",
+    "abonnements": "leisure",
+    "streaming": "leisure",
+    "musik & medien": "leisure",
+    "nachrichten & medien": "leisure",
+    "cloud & backup": "leisure",
+    "software & apps": "leisure",
+    "treue & mitgliedschaften": "leisure",
+    "bildung & weiterbildung": "leisure",
+    "beruflich": "leisure",
+    # Communication / Kommunikation
+    "kommunikation": "communication",
+    "internet (festnetz)": "communication",
+    "mobilfunk": "communication",
+    # Clothing / Kleidung
+    "kleidung": "clothing",
+    "shopping": "clothing",
+    "shopping & lieferdienste": "clothing",
 }
 
 PEER_LABELS: dict[str, str] = {
-    "housing":   "Wohnen",
-    "food":      "Essen & Getränke",
-    "transport": "Transport",
-    "insurance": "Versicherungen",
-    "health":    "Gesundheit",
-    "leisure":   "Freizeit",
+    "housing":       "Wohnen",
+    "food":          "Lebensmittel",
+    "transport":     "Transport",
+    "insurance":     "Versicherungen",
+    "health":        "Gesundheit",
+    "leisure":       "Freizeit & Unterhaltung",
+    "communication": "Kommunikation",
+    "clothing":      "Kleidung",
+    "restaurant":    "Restaurant & Takeaway",
 }
 
 
 def _peer_col(key: str, benchmark: PeerGroupBenchmark) -> float:
     return {
-        "housing":   benchmark.housing_avg,
-        "food":      benchmark.food_avg,
-        "transport": benchmark.transport_avg,
-        "insurance": benchmark.insurance_avg,
-        "health":    benchmark.health_avg,
-        "leisure":   benchmark.leisure_avg,
+        "housing":       benchmark.housing_avg,
+        "food":          benchmark.food_avg,
+        "transport":     benchmark.transport_avg,
+        "insurance":     benchmark.insurance_avg,
+        "health":        benchmark.health_avg,
+        "leisure":       benchmark.leisure_avg,
+        "communication": benchmark.communication_avg,
+        "clothing":      benchmark.clothing_avg,
+        "restaurant":    benchmark.restaurant_avg,
     }.get(key, 0.0)
 
 
@@ -178,8 +216,19 @@ async def _get_wizard_scenario(user_id: int, db: AsyncSession) -> Optional[dict]
 
 
 async def _get_wizard_budgets(user_id: int, db: AsyncSession) -> list[Budget]:
+    """Return only the most-recent wizard batch (all entries share the same created_at)."""
+    # Find the latest creation timestamp
+    ts_result = await db.execute(
+        select(func.max(Budget.created_at)).where(Budget.user_id == user_id)
+    )
+    latest_ts = ts_result.scalar_one_or_none()
+    if latest_ts is None:
+        return []
+    # Load only entries from that batch
     result = await db.execute(
-        select(Budget).where(Budget.user_id == user_id)
+        select(Budget).where(
+            and_(Budget.user_id == user_id, Budget.created_at == latest_ts)
+        )
     )
     return list(result.scalars().all())
 
@@ -263,10 +312,13 @@ async def multi_analysis(
     if mode == "past":
         data_sources = ["transactions"]
         for cat, amount in sorted(actual_expenses.items(), key=lambda x: -x[1]):
+            peer_key = TXN_TO_PEER.get(cat.lower())
+            benchmark_val = _peer_col(peer_key, peer_benchmark) if (peer_key and peer_benchmark) else None
             categories.append(CategoryBreakdown(
                 category=cat,
-                peer_key=TXN_TO_PEER.get(cat.lower()),
+                peer_key=peer_key,
                 actual=round(amount, 2),
+                peer_benchmark=round(benchmark_val, 2) if benchmark_val else None,
             ))
         income = actual_income
         total_expenses = sum(actual_expenses.values())
@@ -380,7 +432,7 @@ async def multi_analysis(
     )
 
     peer_info: Optional[PeerGroupInfo] = None
-    if peer_benchmark and mode in ("peer", "combined"):
+    if peer_benchmark and mode in ("peer", "combined", "past"):
         age = _user_age(current_user)
         peer_info = PeerGroupInfo(
             age_range=f"{peer_benchmark.age_range_start}–{peer_benchmark.age_range_end}",
