@@ -4,11 +4,12 @@ import { budgetsApi, transactionsApi, budgetApi } from "@/lib/api";
 import { formatCHF } from "@/lib/theme";
 import { format, subMonths } from "date-fns";
 import { clsx } from "clsx";
-import { RefreshCw, Sparkles, TrendingDown, TrendingUp, Minus } from "lucide-react";
+import { RefreshCw, Sparkles, TrendingDown, TrendingUp, Minus, AlertTriangle, Lightbulb, Pencil } from "lucide-react";
 import GranularityNavigator from "@/components/GranularityNavigator";
 import BudgetAnalysisModes from "@/components/BudgetAnalysisModes";
+import TransactionSidebarEditor from "@/components/TransactionSidebarEditor";
 import { computeDateRange, TimeGranularity } from "@/lib/granularity";
-import type { AnalysisMode, MultiAnalysisResult } from "@/types/budgetAnalysis";
+import type { AnalysisMode, CategoryBreakdown, MultiAnalysisResult, SavingsOpportunity } from "@/types/budgetAnalysis";
 
 interface RecurringExpense {
   category: string;
@@ -22,6 +23,7 @@ export default function Budget() {
   const [granularity, setGranularity] = useState<TimeGranularity>("monthly");
   const [anchor, setAnchor] = useState<Date>(new Date());
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>("past");
+  const [showEditor, setShowEditor] = useState(false);
 
   const range = useMemo(() => computeDateRange(granularity, anchor), [granularity, anchor]);
   const periodStart = format(range.from, "yyyy-MM-dd");
@@ -57,7 +59,29 @@ export default function Budget() {
     enabled: true,
   });
 
-  // Multi-modal analysis query (non-past modes)
+  // Always-running capabilities query (mode=past) → gives wizard_available + peer_data_available
+  // Used to enable/disable mode buttons regardless of selected mode
+  const { data: capabilities } = useQuery<MultiAnalysisResult>({
+    queryKey: ["budget-capabilities", periodStart, periodEnd],
+    queryFn: () =>
+      budgetApi
+        .multiAnalysis({ mode: "past", start: periodStart, end: periodEnd })
+        .then((r) => r.data),
+    staleTime: 60_000,
+  });
+
+  // Always-running peer analysis → provides inline peer bars per category
+  const { data: peerData } = useQuery<MultiAnalysisResult>({
+    queryKey: ["peer-analysis", periodStart, periodEnd],
+    queryFn: () =>
+      budgetApi
+        .multiAnalysis({ mode: "peer", start: periodStart, end: periodEnd })
+        .then((r) => r.data),
+    enabled: capabilities?.peer_data_available === true,
+    staleTime: 60_000,
+  });
+
+  // Multi-modal analysis query (non-past modes — for the detail section below)
   const { data: multiAnalysis, isLoading: isMultiLoading } = useQuery<MultiAnalysisResult>({
     queryKey: ["multi-analysis", analysisMode, periodStart, periodEnd],
     queryFn: () =>
@@ -136,6 +160,32 @@ export default function Budget() {
     }, 0);
   }, [recurringExpenses, isFuturePeriod, anchor]);
 
+  // Transactions for the current period (passed to the sidebar editor)
+  const periodTransactions = useMemo(() => {
+    if (!historicalTransactions) return [];
+    return historicalTransactions.filter((t: { date: string }) => {
+      const d = new Date(t.date);
+      return d >= range.from && d <= range.to;
+    });
+  }, [historicalTransactions, range]);
+
+  // Peer benchmark lookup: category name → peer benchmark CHF
+  // Built from the always-running peerData query (keyed by peer_key)
+  const peerBenchmarkByCat = useMemo((): Map<string, number> => {
+    if (!peerData?.categories) return new Map();
+    return new Map(
+      peerData.categories
+        .filter((c) => c.peer_benchmark != null)
+        .map((c) => [c.category, c.peer_benchmark!])
+    );
+  }, [peerData]);
+
+  // Build lookup map: category name → multi-analysis breakdown (for non-past mode detail section)
+  const comparisonByCategory = useMemo((): Map<string, CategoryBreakdown> => {
+    if (!multiAnalysis?.categories) return new Map();
+    return new Map(multiAnalysis.categories.map((c) => [c.category, c]));
+  }, [multiAnalysis]);
+
   // Combine actual and projected categories
   const allCategories = useMemo(() => {
     const actual = (stats?.top_categories || []) as { category: string; total: number }[];
@@ -186,8 +236,8 @@ export default function Budget() {
         <BudgetAnalysisModes
           mode={analysisMode}
           onChange={setAnalysisMode}
-          wizardAvailable={multiAnalysis?.wizard_available ?? false}
-          peerAvailable={multiAnalysis?.peer_data_available ?? false}
+          wizardAvailable={capabilities?.wizard_available ?? false}
+          peerAvailable={capabilities?.peer_data_available ?? false}
         />
       </div>
 
@@ -248,11 +298,97 @@ export default function Budget() {
         </div>
       )}
 
+      {/* Aktionspunkte — Sparpotenzial vs. Peer-Group */}
+      {peerData?.opportunities && peerData.opportunities.length > 0 && (
+        <div className="card border-orange-800/40 bg-orange-900/5">
+          <div className="flex items-center gap-2 mb-4">
+            <Lightbulb className="w-4 h-4 text-orange-400" />
+            <h2 className="text-text-primary font-semibold text-sm">Sparpotenzial vs. Peer-Group</h2>
+            <span className="ml-auto text-xs text-text-tertiary bg-bg-surface2 px-2 py-0.5 rounded-full">
+              {peerData.opportunities.length} Aktionspunkt{peerData.opportunities.length !== 1 ? "e" : ""}
+            </span>
+          </div>
+          <div className="space-y-3">
+            {peerData.opportunities.map((opp: SavingsOpportunity) => (
+              <div key={opp.peer_key} className="flex items-start gap-3 p-3 rounded-lg bg-bg-surface2/60 border border-border/30">
+                <AlertTriangle className="w-4 h-4 text-orange-400 mt-0.5 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <span className="text-text-primary text-sm font-medium">{opp.category}</span>
+                    <span className="text-orange-400 text-xs font-mono shrink-0">
+                      +{opp.excess_pct}% über Ø
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-4 mb-1.5">
+                    <span className="text-xs text-text-tertiary">
+                      Du: <span className="text-text-secondary font-mono">{formatCHF(opp.actual)}/M</span>
+                    </span>
+                    <span className="text-xs text-text-tertiary">
+                      Peer Ø: <span className="text-orange-400/80 font-mono">{formatCHF(opp.peer_benchmark)}/M</span>
+                    </span>
+                    <span className="text-xs text-gain font-mono ml-auto">
+                      → spare {formatCHF(opp.monthly_saving)}/M
+                    </span>
+                  </div>
+                  {/* Visual bar comparison */}
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-text-tertiary w-8">Du</span>
+                      <div className="flex-1 h-1.5 bg-bg-surface2 rounded-full overflow-hidden">
+                        <div className="h-full bg-orange-500/70 rounded-full" style={{ width: "100%" }} />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-text-tertiary w-8">Ø</span>
+                      <div className="flex-1 h-1.5 bg-bg-surface2 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-accent/60 rounded-full"
+                          style={{ width: `${Math.round((opp.peer_benchmark / opp.actual) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          {peerData.peer_info && (
+            <p className="text-xs text-text-tertiary mt-3 pt-3 border-t border-border/20">
+              Vergleichsgruppe: {peerData.peer_info.age_range} Jahre · {peerData.peer_info.household_type} · {peerData.peer_info.peer_count.toLocaleString("de-CH")} Personen · Sparquote Ø {peerData.peer_info.savings_rate_pct}%
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Category budgets */}
       <div className="card">
-        <h2 className="text-text-primary font-semibold text-sm mb-4">
-          {isFuturePeriod ? "Erwartete Ausgaben nach Kategorie" : "Budgets nach Kategorie"}
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-text-primary font-semibold text-sm">
+            {isFuturePeriod ? "Erwartete Ausgaben nach Kategorie" : "Budgets nach Kategorie"}
+          </h2>
+          <div className="flex items-center gap-3">
+            {peerData?.peer_info && (
+              <div className="flex items-center gap-3 text-xs text-text-tertiary">
+                <span className="flex items-center gap-1">
+                  <span className="inline-block w-3 h-1.5 rounded-full bg-accent" />
+                  Du
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="inline-block w-3 h-1.5 rounded-full bg-orange-500/70" />
+                  Peer Ø ({peerData.peer_info.age_range} J. · {peerData.peer_info.household_type})
+                </span>
+              </div>
+            )}
+            <button
+              onClick={() => setShowEditor(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-text-secondary border border-border/50 hover:bg-bg-surface2 hover:text-text-primary transition-colors"
+              title="Transaktionen bearbeiten"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              Bearbeiten
+            </button>
+          </div>
+        </div>
         <div className="space-y-4">
           {(allCategories).map((cat: { category: string; total: number; isProjected?: boolean; frequency?: string; confidence?: number }) => {
             const budget = (budgets || []).find(
@@ -262,6 +398,24 @@ export default function Budget() {
             const limit = budget?.amount || 500;
             const pct = Math.min(100, (spent / limit) * 100);
             const over = spent > limit;
+
+            // Inline peer benchmark (always shown when data available)
+            const inlinePeer = peerBenchmarkByCat.get(cat.category) ?? null;
+
+            // Comparison mode data (for wizard/combined/peer detail section)
+            const comparison = comparisonByCategory.get(cat.category);
+            const showComparison = analysisMode !== "past" && !!comparison;
+            const peerVal = showComparison ? (comparison?.peer_benchmark ?? null) : inlinePeer;
+            const plannedVal = comparison?.planned ?? null;
+            const actualVal = comparison?.actual ?? spent;
+
+            // Show grouped bars when: inline peer exists, OR in a comparison mode with data
+            const showBars = inlinePeer != null || showComparison;
+            const showPeer = showBars && peerVal != null;
+            const showPlanned = showComparison && (analysisMode === "wizard" || analysisMode === "combined") && plannedVal != null;
+            const compMax = showBars
+              ? Math.max(actualVal, peerVal ?? 0, plannedVal ?? 0, 1)
+              : limit;
 
             return (
               <div key={cat.category}>
@@ -285,16 +439,62 @@ export default function Budget() {
                     )}
                   </div>
                 </div>
-                <div className="h-2 bg-bg-surface2 rounded-full overflow-hidden">
-                  <div
-                    className={clsx(
-                      "h-full rounded-full transition-all duration-500",
-                      cat.isProjected ? "bg-accent/60" :
-                      over ? "bg-loss" : pct > 80 ? "bg-warning" : "bg-accent"
+
+                {showBars ? (
+                  /* Grouped comparison bars */
+                  <div className="space-y-1">
+                    {/* Actual / "Du" */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-text-tertiary w-14 shrink-0 text-right">Du</span>
+                      <div className="flex-1 h-2 bg-bg-surface2 rounded-full overflow-hidden">
+                        <div
+                          className={clsx("h-full rounded-full transition-all duration-500", over ? "bg-loss" : pct > 80 ? "bg-warning" : "bg-accent")}
+                          style={{ width: `${Math.min(100, (actualVal / compMax) * 100)}%` }}
+                        />
+                      </div>
+                      <span className="text-xs font-mono text-text-primary w-20 shrink-0">{formatCHF(actualVal)}</span>
+                    </div>
+                    {/* Peer benchmark */}
+                    {showPeer && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-text-tertiary w-14 shrink-0 text-right">Peer Ø</span>
+                        <div className="flex-1 h-2 bg-bg-surface2 rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-orange-500/70 transition-all duration-500"
+                            style={{ width: `${Math.min(100, (peerVal! / compMax) * 100)}%` }}
+                          />
+                        </div>
+                        <span className="text-xs font-mono text-orange-400 w-20 shrink-0">{formatCHF(peerVal!)}</span>
+                      </div>
                     )}
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
+                    {/* Wizard planned */}
+                    {showPlanned && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-text-tertiary w-14 shrink-0 text-right">Planung</span>
+                        <div className="flex-1 h-2 bg-bg-surface2 rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-violet-500/70 transition-all duration-500"
+                            style={{ width: `${Math.min(100, (plannedVal! / compMax) * 100)}%` }}
+                          />
+                        </div>
+                        <span className="text-xs font-mono text-violet-400 w-20 shrink-0">{formatCHF(plannedVal!)}</span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* Single progress bar (past mode) */
+                  <div className="h-2 bg-bg-surface2 rounded-full overflow-hidden">
+                    <div
+                      className={clsx(
+                        "h-full rounded-full transition-all duration-500",
+                        cat.isProjected ? "bg-accent/60" :
+                        over ? "bg-loss" : pct > 80 ? "bg-warning" : "bg-accent"
+                      )}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                )}
+
                 <p className="text-text-tertiary text-xs mt-0.5 text-right">
                   {isFuturePeriod
                     ? `${formatCHF(limit - spent)} verfügbar`
@@ -457,6 +657,13 @@ export default function Budget() {
             </>
           )}
         </div>
+      )}
+      {showEditor && (
+        <TransactionSidebarEditor
+          transactions={periodTransactions}
+          periodLabel={range.label}
+          onClose={() => setShowEditor(false)}
+        />
       )}
     </div>
   );

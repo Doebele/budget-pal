@@ -20,6 +20,18 @@ export interface PeerGroupInfo {
   peer_count: number;
 }
 
+export interface SavingsOpportunity {
+  category: string;
+  peer_key: string;
+  peer_label: string;
+  actual: number;
+  peer_benchmark: number;
+  excess: number;
+  excess_pct: number;
+  monthly_saving: number;
+  action: string;
+}
+
 export interface MultiAnalysisResult {
   mode: AnalysisMode;
   period_start: string | null;
@@ -32,4 +44,5 @@ export interface MultiAnalysisResult {
   wizard_available: boolean;
   peer_data_available: boolean;
   data_sources: string[];
+  opportunities: SavingsOpportunity[];
 }

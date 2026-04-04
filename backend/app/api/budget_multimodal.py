@@ -118,6 +118,18 @@ class PeerGroupInfo(BaseModel):
     peer_count: int
 
 
+class SavingsOpportunity(BaseModel):
+    category: str
+    peer_key: str
+    peer_label: str
+    actual: float
+    peer_benchmark: float
+    excess: float           # actual - benchmark (positive = over peer)
+    excess_pct: float       # percentage over peer benchmark
+    monthly_saving: float   # potential monthly saving if reduced to benchmark
+    action: str             # human-readable recommendation
+
+
 class MultiAnalysisResponse(BaseModel):
     mode: str
     period_start: Optional[str]
@@ -130,6 +142,7 @@ class MultiAnalysisResponse(BaseModel):
     wizard_available: bool
     peer_data_available: bool
     data_sources: List[str]
+    opportunities: List[SavingsOpportunity] = []
 
 
 # ── Helpers ───────────────────────────────────────────────────
@@ -379,6 +392,42 @@ async def multi_analysis(
             peer_count=peer_benchmark.peer_count,
         )
 
+    # ── Savings opportunities (always computed when peer data exists) ──
+    opportunities: list[SavingsOpportunity] = []
+    if peer_benchmark:
+        # Aggregate actual spending by peer_key
+        actual_by_peer_key: dict[str, float] = {}
+        for cat_name, amount in actual_expenses.items():
+            pk = TXN_TO_PEER.get(cat_name.lower())
+            if pk:
+                actual_by_peer_key[pk] = actual_by_peer_key.get(pk, 0.0) + amount
+
+        threshold = 1.15  # flag if >15% over peer benchmark
+        for pk, label in PEER_LABELS.items():
+            benchmark_val = _peer_col(pk, peer_benchmark)
+            if benchmark_val <= 0:
+                continue
+            user_val = actual_by_peer_key.get(pk, 0.0)
+            if user_val <= 0:
+                continue
+            # Normalize: benchmark is monthly, user_val is for the whole period
+            monthly_user = user_val / months
+            if monthly_user > benchmark_val * threshold:
+                excess = round(monthly_user - benchmark_val, 2)
+                excess_pct = round((monthly_user / benchmark_val - 1) * 100, 1)
+                opportunities.append(SavingsOpportunity(
+                    category=label,
+                    peer_key=pk,
+                    peer_label=label,
+                    actual=round(monthly_user, 2),
+                    peer_benchmark=round(benchmark_val, 2),
+                    excess=excess,
+                    excess_pct=excess_pct,
+                    monthly_saving=excess,
+                    action=f"Reduziere {label} von {monthly_user:,.0f} auf ~{benchmark_val:,.0f} CHF/Monat → spare ~{excess:,.0f} CHF/Monat",
+                ))
+        opportunities.sort(key=lambda o: -o.excess)
+
     return MultiAnalysisResponse(
         mode=mode,
         period_start=period_start.isoformat(),
@@ -391,4 +440,5 @@ async def multi_analysis(
         wizard_available=wizard_available,
         peer_data_available=peer_data_available,
         data_sources=data_sources,
+        opportunities=opportunities,
     )
