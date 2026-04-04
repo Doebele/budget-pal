@@ -21,6 +21,16 @@ class BudgetCreate(BaseModel):
     notes: Optional[str] = None
 
 
+class BudgetUpdate(BaseModel):
+    """Partial-update model — all fields optional except amount."""
+    amount: float
+    category_id: Optional[int] = None
+    period: Optional[BudgetPeriod] = None
+    year: Optional[int] = None
+    month: Optional[int] = None
+    notes: Optional[str] = None
+
+
 class BudgetResponse(BaseModel):
     id: int
     category_id: Optional[int]
@@ -72,7 +82,7 @@ async def create_budget(
 @router.put("/{budget_id}", response_model=BudgetResponse)
 async def update_budget(
     budget_id: int,
-    payload: BudgetCreate,
+    payload: BudgetUpdate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -82,11 +92,13 @@ async def update_budget(
     budget = result.scalar_one_or_none()
     if not budget:
         raise HTTPException(status_code=404, detail="Budget not found.")
-    for k, v in payload.model_dump().items():
+    # Only overwrite fields that were explicitly provided
+    for k, v in payload.model_dump(exclude_none=True).items():
         setattr(budget, k, v)
     await db.flush()
     await db.refresh(budget)
     return BudgetResponse(
         id=budget.id, category_id=budget.category_id, amount=budget.amount,
         period=budget.period.value, year=budget.year, month=budget.month, notes=budget.notes,
+        created_at=budget.created_at,
     )

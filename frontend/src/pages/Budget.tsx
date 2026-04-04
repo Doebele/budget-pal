@@ -83,7 +83,9 @@ export default function Budget() {
   const [showPeer, setShowPeer] = useState(false);
   const [drillDown, setDrillDown] = useState<SuperRow | null>(null);
   const [showWizardEditor, setShowWizardEditor] = useState(false);
+  const [wizardEditorScId, setWizardEditorScId] = useState<string | undefined>();
   const [showTxnEditor, setShowTxnEditor] = useState(false);
+  const [txnEditorRows, setTxnEditorRows] = useState<DrillDownTransaction[]>([]);
   const [showSonstiges, setShowSonstiges] = useState(false);
 
   function toggleFreq(key: string) {
@@ -311,7 +313,7 @@ export default function Budget() {
           {capabilities?.wizard_available && (
             <button
               type="button"
-              onClick={() => setShowWizardEditor(true)}
+              onClick={() => { setWizardEditorScId(undefined); setShowWizardEditor(true); }}
               className="btn-secondary text-xs flex items-center gap-1.5"
             >
               Budgets bearbeiten
@@ -604,10 +606,12 @@ export default function Budget() {
           transactions={drillDown.transactions}
           onClose={closeDrillDown}
           onEditWizard={capabilities?.wizard_available ? () => {
+            setWizardEditorScId(drillDown?.sc.id);
             closeDrillDown();
             setShowWizardEditor(true);
           } : undefined}
           onEditTransactions={() => {
+            setTxnEditorRows(drillDown?.transactions ?? []);
             closeDrillDown();
             setShowTxnEditor(true);
           }}
@@ -619,6 +623,7 @@ export default function Budget() {
         <WizardBudgetSidebar
           periodLabel={range.label}
           months={months}
+          initialScId={wizardEditorScId}
           onClose={() => setShowWizardEditor(false)}
         />
       )}
@@ -627,7 +632,7 @@ export default function Budget() {
       {showTxnEditor && (
         <TransactionSidebarEditor
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          transactions={periodTransactions as any[]}
+          transactions={txnEditorRows as any[]}
           periodLabel={range.label}
           onClose={() => setShowTxnEditor(false)}
         />
