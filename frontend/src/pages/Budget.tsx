@@ -171,13 +171,21 @@ export default function Budget() {
   const wizardPlanned = useMemo((): Map<string, number> => {
     if (!wizardBudgets || !Array.isArray(wizardBudgets)) return new Map();
     const withNotes = (wizardBudgets as Array<{ notes: string | null; amount: number; created_at?: string }>)
-      .filter((b) => b.notes);
+      .filter((b) => b.notes && b.notes.trim() !== "");
     if (!withNotes.length) return new Map();
-    const maxTs = withNotes.reduce(
-      (max, b) => ((b.created_at || "") > max ? b.created_at || "" : max),
-      "",
-    );
-    const latest = withNotes.filter((b) => b.created_at === maxTs);
+
+    // Use latest batch when created_at is available; otherwise use all entries
+    const hasTimestamps = withNotes.some((b) => !!b.created_at);
+    let latest = withNotes;
+    if (hasTimestamps) {
+      const maxTs = withNotes.reduce(
+        (max, b) => ((b.created_at || "") > max ? b.created_at || "" : max),
+        "",
+      );
+      const filtered = withNotes.filter((b) => b.created_at === maxTs);
+      if (filtered.length > 0) latest = filtered;
+    }
+
     const map = new Map<string, number>();
     for (const b of latest) {
       const label = b.notes!;

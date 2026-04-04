@@ -96,11 +96,10 @@ export default function Dashboard() {
     queryFn: () => transactionsApi.list({ limit: 8 }).then((r) => r.data),
   });
 
-  // Fetch wizard budgets for the Empirisch Sankey view
-  const { data: wizardBudgets } = useQuery({
+  // Fetch wizard budgets for the Empirisch Sankey view (always fetched so toggle is instant)
+  const { data: wizardBudgets, isLoading: wizardLoading } = useQuery({
     queryKey: ["wizard-budgets-dashboard"],
     queryFn: () => budgetsApi.list().then((r) => r.data),
-    enabled: sankeySource === "empirisch",
     staleTime: 60_000,
   });
 
@@ -217,9 +216,11 @@ export default function Dashboard() {
             <SankeyChart data={sankeyData} height={280} />
           ) : (
             <div className="h-64 flex items-center justify-center text-text-tertiary text-sm text-center px-4">
-              {sankeySource === "empirisch"
-                ? "Keine empirischen Angaben. Bitte zuerst den Setup-Wizard abschliessen."
-                : `Noch keine Transaktionen im gewählten Zeitraum (${range.label})`}
+              {sankeySource === "empirisch" && wizardLoading
+                ? "Lade empirische Angaben…"
+                : sankeySource === "empirisch"
+                  ? "Keine empirischen Angaben. Bitte zuerst den Setup-Wizard abschliessen."
+                  : `Noch keine Transaktionen im gewählten Zeitraum (${range.label})`}
             </div>
           )}
         </div>
@@ -414,15 +415,23 @@ function buildSankeyDataEmpirical(
 ) {
   if (!budgetsRaw || budgetsRaw.length === 0) return { nodes: [], links: [] };
 
-  // Filter to latest batch (highest created_at)
-  const withNotes = budgetsRaw.filter((b) => b.notes);
+  // Only entries that have a notes label (= wizard-created entries)
+  const withNotes = budgetsRaw.filter((b) => b.notes && b.notes.trim() !== "");
   if (!withNotes.length) return { nodes: [], links: [] };
 
-  const maxTs = withNotes.reduce(
-    (max, b) => ((b.created_at || "") > max ? b.created_at || "" : max),
-    ""
-  );
-  const latest = withNotes.filter((b) => b.created_at === maxTs);
+  // Filter to the latest wizard batch when created_at is available.
+  // If the API does not return created_at (old backend), fall back to using all entries.
+  const hasTimestamps = withNotes.some((b) => !!b.created_at);
+  let latest = withNotes;
+  if (hasTimestamps) {
+    const maxTs = withNotes.reduce(
+      (max, b) => ((b.created_at || "") > max ? b.created_at || "" : max),
+      ""
+    );
+    const filtered = withNotes.filter((b) => b.created_at === maxTs);
+    // Only apply batch filter when it actually narrows the set
+    if (filtered.length > 0) latest = filtered;
+  }
 
   // Group by supercategory (monthly amounts → scale by months)
   const superMap = new Map<

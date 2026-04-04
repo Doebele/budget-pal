@@ -30,17 +30,20 @@ export default function WizardBudgetSidebar({ periodLabel, months, onClose }: Pr
   // Filter to wizard budgets (those with notes set) — latest batch
   const wizardBudgets: WizardBudget[] = useMemo(() => {
     if (!budgetsRaw || !Array.isArray(budgetsRaw)) return [];
-    // Latest created_at
-    const withNotes = budgetsRaw.filter((b: WizardBudget & { created_at?: string }) => b.notes);
+    const withNotes = (budgetsRaw as Array<WizardBudget & { created_at?: string }>)
+      .filter((b) => b.notes && b.notes.trim() !== "");
     if (!withNotes.length) return [];
+
+    // Filter to latest batch only when created_at is available from the API
+    const hasTimestamps = withNotes.some((b) => !!b.created_at);
+    if (!hasTimestamps) return withNotes;
+
     const maxTs = withNotes.reduce(
-      (max: string, b: WizardBudget & { created_at?: string }) =>
-        (b.created_at || "") > max ? b.created_at || "" : max,
+      (max, b) => ((b.created_at || "") > max ? b.created_at || "" : max),
       ""
     );
-    return withNotes.filter(
-      (b: WizardBudget & { created_at?: string }) => b.created_at === maxTs
-    );
+    const filtered = withNotes.filter((b) => b.created_at === maxTs);
+    return filtered.length > 0 ? filtered : withNotes;
   }, [budgetsRaw]);
 
   // ── Draft state: id → monthly amount ─────────────────────
