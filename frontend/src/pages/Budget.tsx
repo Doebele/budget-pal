@@ -1,19 +1,24 @@
 /**
  * Budget Analysis Page — v2
  *
+ * Data sources:
+ *   • transactionsApi.stats()    → KPI cards + actual category totals (authoritative)
+ *   • budgetsApi.list()          → wizard planned amounts
+ *   • transactionsApi.list()     → per-transaction drill-down list only
+ *
  * Layout:
  *   1. Header + GranularityNavigator
- *   2. Frequency-filter chips
+ *   2. Frequency-filter chips (affects drill-down display)
  *   3. 3 KPI cards (Netto, Ausgaben Ist/Soll, Ausschöpfung %)
- *   4. SuperCategory bars (click → CategoryDrillDown panel)
+ *   4. SuperCategory bars (Ist = stats, Soll = wizard × months)
  *   5. Peer-comparison section (collapsed by default)
  */
 import { useState, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { format, subMonths } from "date-fns";
+import { format } from "date-fns";
 import { clsx } from "clsx";
 import {
-  TrendingDown, TrendingUp, Minus, ChevronDown, ChevronUp,
+  TrendingDown, TrendingUp, ChevronDown, ChevronUp,
   Lightbulb, Target, Wallet,
 } from "lucide-react";
 
@@ -44,27 +49,12 @@ const FREQ_OPTIONS = [
   { key: "einmalig",   label: "Einmalig"      },
 ] as const;
 
-function matchesFreq(
-  t: { is_recurring?: boolean; periodicity?: string },
-  freqs: Set<string>,
-): boolean {
-  const p = t.periodicity ?? "";
-  const rec = !!t.is_recurring;
-  if (!rec || !p) return freqs.has("einmalig");
-  if (p === "weekly")     return freqs.has("weekly");
-  if (p === "monthly")    return freqs.has("monthly");
-  if (p === "quarterly")  return freqs.has("quarterly");
-  if (p === "halfyearly") return freqs.has("halfyearly");
-  if (p === "yearly")     return freqs.has("yearly");
-  return freqs.has("einmalig");
-}
-
 // ── Aggregated row (per supercategory) ────────────────────────
 interface SuperRow {
   sc: SuperCategory;
-  actual: number;        // freq-filtered real transactions
-  planned: number;       // wizard planned × months (0 if no wizard)
-  subItems: SubItem[];   // subcategory detail for drill-down
+  actual: number;
+  planned: number;
+  subItems: SubItem[];
   transactions: DrillDownTransaction[];
 }
 
@@ -81,12 +71,12 @@ export default function Budget() {
   const months = useMemo(
     () => Math.max(1,
       (range.to.getFullYear() - range.from.getFullYear()) * 12 +
-      (range.to.getMonth() - range.from.getMonth()) + 1,
+      (range.to.getMonth()   - range.from.getMonth()) + 1,
     ),
     [range],
   );
 
-  // ── Filter state ────────────────────────────────────────────
+  // ── UI state ────────────────────────────────────────────────
   const [selectedFreqs, setSelectedFreqs] = useState<Set<string>>(
     () => new Set(["monthly", "quarterly", "halfyearly", "yearly", "weekly", "einmalig"]),
   );
@@ -104,23 +94,31 @@ export default function Budget() {
     });
   }
 
-  // ── Data queries ────────────────────────────────────────────
-  // Wizard (planned) budgets — latest batch
+  // ── Data queries ─────────────────────────────────────────────
+
+  // Primary source for KPI + actual category totals
+  const { data: stats } = useQuery({
+    queryKey: ["transaction-stats-budget", periodStart, periodEnd],
+    queryFn: () =>
+      transactionsApi.stats({ start: periodStart, end: periodEnd }).then((r) => r.data),
+    staleTime: 30_000,
+  });
+
+  // Wizard (planned) budgets
   const { data: wizardBudgets } = useQuery({
     queryKey: ["wizard-budgets-budget"],
     queryFn: () => budgetsApi.list().then((r) => r.data),
     staleTime: 30_000,
   });
 
-  // Period transactions (for freq-filtered actuals + drill-down)
+  // Per-transaction list (drill-down only; limited to current period)
   const { data: periodTransactions = [] } = useQuery({
-    queryKey: ["period-transactions-budget", periodStart, periodEnd],
-    queryFn: async () => {
-      const sixMonthsAgo = format(subMonths(anchor, 6), "yyyy-MM-dd");
-      return transactionsApi
-        .list({ start: sixMonthsAgo, end: periodEnd, limit: 2000 })
-        .then((r) => r.data);
-    },
+    queryKey: ["period-transactions-drilldown", periodStart, periodEnd],
+    queryFn: () =>
+      transactionsApi
+        .list({ start: periodStart, end: periodEnd, limit: 500 })
+        .then((r) => r.data),
+    staleTime: 30_000,
   });
 
   // Capabilities (wizard_available / peer_data_available)
@@ -133,7 +131,7 @@ export default function Budget() {
     staleTime: 60_000,
   });
 
-  // Peer analysis (only when toggled on)
+  // Peer analysis (loaded only when panel opened)
   const { data: peerData } = useQuery<MultiAnalysisResult>({
     queryKey: ["peer-analysis-budget", periodStart, periodEnd],
     queryFn: () =>
@@ -144,37 +142,36 @@ export default function Budget() {
     staleTime: 60_000,
   });
 
-  // ── Computed values ─────────────────────────────────────────
+  // ── KPI from stats ───────────────────────────────────────────
+  const kpi = useMemo(() => ({
+    income:   stats?.total_income   ?? 0,
+    expenses: stats?.total_expenses ?? 0,
+    net: (stats?.total_income ?? 0) - (stats?.total_expenses ?? 0),
+  }), [stats]);
 
-  // Filter period transactions to the range + frequency selection
-  const filteredTxns = useMemo(
-    () =>
-      (periodTransactions as Array<{
-        id: number; date: string; amount: number; category?: string;
-        description: string; merchant_normalized?: string;
-        is_recurring?: boolean; periodicity?: string;
-      }>).filter((t) => {
-        const d = new Date(t.date);
-        return d >= range.from && d <= range.to && matchesFreq(t, selectedFreqs);
-      }),
-    [periodTransactions, range, selectedFreqs],
-  );
+  // ── Actual by supercategory: from stats.top_categories ───────
+  const actualBySuperCat = useMemo((): Map<string, { total: number; subs: Map<string, number> }> => {
+    const m = new Map<string, { total: number; subs: Map<string, number> }>();
+    for (const cat of (stats?.top_categories || [])) {
+      if (cat.total <= 0) continue;
+      const sc = resolveSuperCategory(cat.category, false);
+      if (sc.id === "sparen") continue;
 
-  // KPI stats from freq-filtered transactions
-  const kpi = useMemo(() => {
-    const income   = filteredTxns.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0);
-    const expenses = filteredTxns.filter((t) => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
-    return { income, expenses, net: income - expenses };
-  }, [filteredTxns]);
+      if (!m.has(sc.id)) m.set(sc.id, { total: 0, subs: new Map() });
+      const entry = m.get(sc.id)!;
+      entry.total += cat.total;
+      entry.subs.set(cat.category, (entry.subs.get(cat.category) ?? 0) + cat.total);
+    }
+    return m;
+  }, [stats]);
 
-  // Wizard planned amounts: notes → monthly CHF (latest batch)
+  // ── Wizard planned amounts by label → period CHF ─────────────
   const wizardPlanned = useMemo((): Map<string, number> => {
     if (!wizardBudgets || !Array.isArray(wizardBudgets)) return new Map();
     const withNotes = (wizardBudgets as Array<{ notes: string | null; amount: number; created_at?: string }>)
       .filter((b) => b.notes && b.notes.trim() !== "");
     if (!withNotes.length) return new Map();
 
-    // Use latest batch when created_at is available; otherwise use all entries
     const hasTimestamps = withNotes.some((b) => !!b.created_at);
     let latest = withNotes;
     if (hasTimestamps) {
@@ -194,22 +191,7 @@ export default function Budget() {
     return map;
   }, [wizardBudgets, months]);
 
-  // Actual expenses grouped by supercategory
-  const actualBySuperCat = useMemo((): Map<string, { total: number; subs: Map<string, number> }> => {
-    const m = new Map<string, { total: number; subs: Map<string, number> }>();
-    for (const t of filteredTxns) {
-      if (t.amount >= 0) continue;
-      const sc = resolveSuperCategory(t.category || "");
-      if (!m.has(sc.id)) m.set(sc.id, { total: 0, subs: new Map() });
-      const entry = m.get(sc.id)!;
-      entry.total += Math.abs(t.amount);
-      const cat = t.category || "Sonstiges";
-      entry.subs.set(cat, (entry.subs.get(cat) ?? 0) + Math.abs(t.amount));
-    }
-    return m;
-  }, [filteredTxns]);
-
-  // Planned expenses grouped by supercategory
+  // ── Planned by supercategory ──────────────────────────────────
   const plannedBySuperCat = useMemo((): Map<string, { total: number; subs: Map<string, number> }> => {
     const m = new Map<string, { total: number; subs: Map<string, number> }>();
     for (const [label, periodAmt] of wizardPlanned) {
@@ -223,16 +205,18 @@ export default function Budget() {
     return m;
   }, [wizardPlanned]);
 
-  // Total planned expenses (for budget-utilisation KPI)
   const totalPlanned = useMemo(
     () => [...plannedBySuperCat.values()].reduce((s, e) => s + e.total, 0),
     [plannedBySuperCat],
   );
 
-  // Transactions grouped by supercategory id for drill-down
+  // ── Transactions per supercategory for drill-down ─────────────
   const txnsBySuperCat = useMemo((): Map<string, DrillDownTransaction[]> => {
     const m = new Map<string, DrillDownTransaction[]>();
-    for (const t of filteredTxns) {
+    for (const t of (periodTransactions as Array<{
+      id: number; date: string; amount: number; category?: string;
+      description: string; merchant_normalized?: string;
+    }>)) {
       if (t.amount >= 0) continue;
       const sc = resolveSuperCategory(t.category || "");
       if (!m.has(sc.id)) m.set(sc.id, []);
@@ -245,12 +229,11 @@ export default function Budget() {
         category: t.category,
       });
     }
-    // Sort each group by date desc
     for (const [, txns] of m) txns.sort((a, b) => b.date.localeCompare(a.date));
     return m;
-  }, [filteredTxns]);
+  }, [periodTransactions]);
 
-  // Build unified SuperRow list
+  // ── Unified SuperRow list ─────────────────────────────────────
   const superRows = useMemo((): SuperRow[] => {
     const allScIds = new Set([
       ...actualBySuperCat.keys(),
@@ -267,7 +250,7 @@ export default function Budget() {
       const actual    = actEntry?.total  ?? 0;
       const planned   = planEntry?.total ?? 0;
 
-      // Build sub-items (merge actual subs + planned subs)
+      // Merge sub-items from actual and planned
       const subMap = new Map<string, SubItem>();
       for (const [label, amt] of actEntry?.subs ?? []) {
         subMap.set(label, { label, actual: amt, source: "txn" });
@@ -297,24 +280,23 @@ export default function Budget() {
     return rows.sort((a, b) => (b.actual || b.planned) - (a.actual || a.planned));
   }, [actualBySuperCat, plannedBySuperCat, txnsBySuperCat]);
 
-  // Separate "Sonstiges" and non-Sonstiges rows
   const mainRows     = superRows.filter((r) => r.sc.id !== "sonstiges");
   const sonstigesRow = superRows.find((r) => r.sc.id === "sonstiges");
 
-  // Budget utilisation (actual / planned, capped for display)
   const utilisation = totalPlanned > 0
     ? Math.min(200, Math.round((kpi.expenses / totalPlanned) * 100))
     : null;
 
-  // Open drill-down for a row
-  const openDrillDown = useCallback((row: SuperRow) => setDrillDown(row), []);
+  const openDrillDown  = useCallback((row: SuperRow) => setDrillDown(row), []);
   const closeDrillDown = useCallback(() => setDrillDown(null), []);
 
-  // ── Render ───────────────────────────────────────────────────
+  const hasSomeData = mainRows.length > 0 || (sonstigesRow != null);
+
+  // ── Render ────────────────────────────────────────────────────
   return (
     <div className="space-y-6 animate-fade-in">
 
-      {/* ── Header ─────────────────────────────────────────── */}
+      {/* ── Header ─────────────────────────────── */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-2xl font-display text-text-primary">Budgetanalyse</h1>
@@ -338,7 +320,7 @@ export default function Budget() {
         </div>
       </div>
 
-      {/* ── Frequency filter chips ─────────────────────────── */}
+      {/* ── Frequency filter chips ──────────────── */}
       <div className="flex flex-wrap gap-2">
         {FREQ_OPTIONS.map(({ key, label }) => (
           <button
@@ -355,9 +337,12 @@ export default function Budget() {
             {label}
           </button>
         ))}
+        <span className="text-text-disabled text-xs self-center ml-1">
+          (Filter gilt für Drill-down Transaktionen)
+        </span>
       </div>
 
-      {/* ── KPI strip ──────────────────────────────────────── */}
+      {/* ── KPI strip ──────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
 
         {/* Netto */}
@@ -392,7 +377,7 @@ export default function Budget() {
           <p className="text-2xl font-mono font-semibold text-text-primary">
             {formatCHF(kpi.expenses)}
           </p>
-          {totalPlanned > 0 && (
+          {totalPlanned > 0 ? (
             <div>
               <p className="text-text-tertiary text-xs mb-1">
                 von {formatCHF(totalPlanned)} geplant
@@ -407,6 +392,10 @@ export default function Budget() {
                 />
               </div>
             </div>
+          ) : (
+            <p className="text-text-tertiary text-xs">
+              {capabilities?.wizard_available ? "Empirische Budgets geladen…" : "Kein Soll-Budget definiert"}
+            </p>
           )}
         </div>
 
@@ -429,23 +418,19 @@ export default function Budget() {
               <p className="text-text-tertiary text-xs">
                 {utilisation > 100
                   ? `${utilisation - 100}% über Budget`
-                  : utilisation > 80
-                    ? "Nahe am Limit"
-                    : "Im grünen Bereich"}
+                  : utilisation > 80 ? "Nahe am Limit" : "Im grünen Bereich"}
               </p>
             </>
           ) : (
             <>
               <p className="text-2xl font-mono font-semibold text-text-disabled">—</p>
-              <p className="text-text-tertiary text-xs">
-                Kein Soll-Budget definiert
-              </p>
+              <p className="text-text-tertiary text-xs">Kein Soll-Budget definiert</p>
             </>
           )}
         </div>
       </div>
 
-      {/* ── Supercategory bars ─────────────────────────────── */}
+      {/* ── Supercategory bars ──────────────────── */}
       <div className="card !p-0 overflow-hidden">
         <div className="px-4 pt-4 pb-2 border-b border-border">
           <div className="flex items-baseline justify-between">
@@ -466,9 +451,16 @@ export default function Budget() {
           )}
         </div>
 
-        {mainRows.length === 0 && (
+        {!hasSomeData && (
           <p className="text-text-tertiary text-sm text-center py-10">
-            Keine Daten für den gewählten Zeitraum.
+            Keine Daten für den gewählten Zeitraum.{" "}
+            {!capabilities?.wizard_available && (
+              <span>
+                Starte den{" "}
+                <a href="/wizard" className="text-accent underline">Setup-Wizard</a>{" "}
+                um empirische Budgets zu erfassen.
+              </span>
+            )}
           </p>
         )}
 
@@ -477,14 +469,13 @@ export default function Budget() {
             <SuperCategoryBar
               key={row.sc.id}
               superCategory={row.sc}
-              actual={row.actual > 0 ? row.actual : undefined}
+              actual={row.actual  > 0 ? row.actual  : undefined}
               planned={row.planned > 0 ? row.planned : undefined}
               subItems={row.subItems}
               onClick={() => openDrillDown(row)}
             />
           ))}
 
-          {/* Sonstiges (collapsed by default) */}
           {sonstigesRow && (
             <>
               <button
@@ -494,14 +485,14 @@ export default function Budget() {
               >
                 <span className="flex items-center gap-1.5">
                   {showSonstiges ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                  Sonstiges
+                  💸 Sonstiges
                   {sonstigesRow.actual > 0 && ` · ${formatCHF(sonstigesRow.actual)}`}
                 </span>
               </button>
               {showSonstiges && (
                 <SuperCategoryBar
                   superCategory={sonstigesRow.sc}
-                  actual={sonstigesRow.actual > 0 ? sonstigesRow.actual : undefined}
+                  actual={sonstigesRow.actual  > 0 ? sonstigesRow.actual  : undefined}
                   planned={sonstigesRow.planned > 0 ? sonstigesRow.planned : undefined}
                   subItems={sonstigesRow.subItems}
                   onClick={() => openDrillDown(sonstigesRow)}
@@ -512,7 +503,7 @@ export default function Budget() {
         </div>
       </div>
 
-      {/* ── Peer comparison (collapsed) ────────────────────── */}
+      {/* ── Peer comparison (collapsed) ─────────── */}
       {capabilities?.peer_data_available && (
         <div className="card !p-0 overflow-hidden">
           <button
@@ -524,7 +515,9 @@ export default function Budget() {
               <Lightbulb className="w-4 h-4 text-warning" />
               Peer-Vergleich (Schweizer Durchschnitt)
             </span>
-            {showPeer ? <ChevronUp className="w-4 h-4 text-text-tertiary" /> : <ChevronDown className="w-4 h-4 text-text-tertiary" />}
+            {showPeer
+              ? <ChevronUp className="w-4 h-4 text-text-tertiary" />
+              : <ChevronDown className="w-4 h-4 text-text-tertiary" />}
           </button>
 
           {showPeer && peerData && (
@@ -545,7 +538,7 @@ export default function Budget() {
                   .map((cat) => {
                     const sc = resolveSuperCategory(cat.category);
                     const peerMax = Math.max(cat.actual ?? 0, cat.peer_benchmark ?? 0, 1);
-                    const actPct  = Math.min(100, ((cat.actual  ?? 0) / peerMax) * 100);
+                    const actPct  = Math.min(100, ((cat.actual         ?? 0) / peerMax) * 100);
                     const peerPct = Math.min(100, ((cat.peer_benchmark ?? 0) / peerMax) * 100);
                     const isOver  = (cat.actual ?? 0) > (cat.peer_benchmark ?? 0);
                     return (
@@ -563,18 +556,13 @@ export default function Budget() {
                           </div>
                         </div>
                         <div className="relative h-1.5 bg-bg-surface2 rounded-full overflow-hidden">
-                          {/* Peer benchmark reference line */}
                           <div
                             className="absolute top-0 bottom-0 left-0 rounded-full opacity-30"
                             style={{ width: `${peerPct}%`, backgroundColor: sc.color }}
                           />
-                          {/* Actual */}
                           <div
                             className="absolute top-0 bottom-0 left-0 rounded-full opacity-80"
-                            style={{
-                              width: `${actPct}%`,
-                              backgroundColor: isOver ? "#f87171" : sc.color,
-                            }}
+                            style={{ width: `${actPct}%`, backgroundColor: isOver ? "#f87171" : sc.color }}
                           />
                         </div>
                       </div>
@@ -582,7 +570,6 @@ export default function Budget() {
                   })}
               </div>
 
-              {/* Savings opportunities */}
               {peerData.opportunities && peerData.opportunities.length > 0 && (
                 <div className="border-t border-border pt-3">
                   <p className="text-text-tertiary text-xs font-semibold uppercase tracking-wide mb-2">
@@ -606,11 +593,11 @@ export default function Budget() {
         </div>
       )}
 
-      {/* ── Drill-down panel ───────────────────────────────── */}
+      {/* ── Drill-down panel ────────────────────── */}
       {drillDown && (
         <CategoryDrillDown
           superCategory={drillDown.sc}
-          actual={drillDown.actual > 0 ? drillDown.actual : undefined}
+          actual={drillDown.actual  > 0 ? drillDown.actual  : undefined}
           planned={drillDown.planned > 0 ? drillDown.planned : undefined}
           months={months}
           subItems={drillDown.subItems}
@@ -627,7 +614,7 @@ export default function Budget() {
         />
       )}
 
-      {/* ── Wizard budget sidebar ──────────────────────────── */}
+      {/* ── Wizard budget sidebar ────────────────── */}
       {showWizardEditor && (
         <WizardBudgetSidebar
           periodLabel={range.label}
@@ -636,11 +623,11 @@ export default function Budget() {
         />
       )}
 
-      {/* ── Transaction sidebar editor ─────────────────────── */}
+      {/* ── Transaction sidebar editor ───────────── */}
       {showTxnEditor && (
         <TransactionSidebarEditor
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          transactions={filteredTxns as any[]}
+          transactions={periodTransactions as any[]}
           periodLabel={range.label}
           onClose={() => setShowTxnEditor(false)}
         />
