@@ -390,8 +390,8 @@ export default function Budget() {
           </label>
         </div>
 
-        {/* Historisch: frequency filter + mean toggle */}
-        {analysisMode === "past" && !isFuturePeriod && (
+        {/* Historisch + Empirisch: frequency filter + mean toggle */}
+        {(analysisMode === "past" || analysisMode === "wizard") && !isFuturePeriod && (
           <div className="mt-4 pt-4 border-t border-border/30">
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
               <span className="text-text-tertiary text-xs uppercase tracking-wide shrink-0">Frequenz</span>
@@ -628,7 +628,7 @@ export default function Budget() {
           </div>
         </div>
         <div className="space-y-4">
-          {(analysisMode === "past" && !isFuturePeriod ? historischCategories : allCategories).map((cat: { category: string; total: number; isProjected?: boolean; frequency?: string; confidence?: number }) => {
+          {((analysisMode === "past" || analysisMode === "wizard") && !isFuturePeriod ? historischCategories : allCategories).map((cat: { category: string; total: number; isProjected?: boolean; frequency?: string; confidence?: number }) => {
             const budget = (budgets || []).find(
               (b: { category_id: number }) => b.category_id === null
             );
@@ -751,7 +751,7 @@ export default function Budget() {
               </div>
             );
           })}
-          {(analysisMode === "past" && !isFuturePeriod ? historischCategories : allCategories).length === 0 && (
+          {((analysisMode === "past" || analysisMode === "wizard") && !isFuturePeriod ? historischCategories : allCategories).length === 0 && (
             <p className="text-text-tertiary text-sm text-center py-8">
               {isFuturePeriod
                 ? "Keine wiederkehrenden Ausgaben erkannt. Importiere mehr Transaktionen für bessere Prognosen."
