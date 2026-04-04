@@ -86,7 +86,16 @@ export const SUPER_CATEGORIES: SuperCategory[] = [
       "treue & mitgliedschaften", "bildung & weiterbildung",
       "beruflich", "shopping & lieferdienste",
     ],
-    wizardLabels: ["abonnements"],
+    wizardLabels: [
+      // aggregate fallback (old wizard runs)
+      "abonnements",
+      // individual subscription services (new wizard runs)
+      "netflix", "spotify", "disney+", "nzz digital", "blick+",
+      "srf play (optional)", "icloud 200gb", "google one", "microsoft 365",
+      "migros cumulus extra", "adsl/fiber (swisscom)", "mobile abo (sunrise)",
+      "fitnesscenter", "adobe creative cloud", "linkedin premium",
+      "dropbox plus", "amazon prime", "youtube premium",
+    ],
   },
   {
     id: "shopping",

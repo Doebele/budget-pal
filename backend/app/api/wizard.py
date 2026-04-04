@@ -373,7 +373,22 @@ async def wizard_complete(
     # Daily life
     add_budget(payload.groceries, "Lebensmittel")
     add_budget(payload.freizeit, "Freizeit & Restaurant")
-    add_budget(payload.subscription_total, "Abonnements")
+
+    # Subscriptions — save one budget entry per selected service
+    # SBB entries are already handled via has_sbb_halbtax / has_sbb_ga above
+    _SBB_NAMES = {"SBB Halbtax", "SBB GA 2. Kl."}
+    from app.services.peer_group import COMMON_SUBSCRIPTIONS as _SUBS
+    _sub_price_map = {s["name"]: float(s["price"]) for s in _SUBS}
+    _any_sub_saved = False
+    for sub_name in payload.selected_subscriptions:
+        if sub_name in _SBB_NAMES:
+            continue
+        price = _sub_price_map.get(sub_name, 0.0)
+        add_budget(price, sub_name)
+        _any_sub_saved = True
+    # Fallback: if the user had a raw subscription_total but no named items
+    if not _any_sub_saved and payload.subscription_total > 0:
+        add_budget(payload.subscription_total, "Abonnements")
 
     # Transport
     if payload.transport_mode in ("car", "both"):
