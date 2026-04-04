@@ -380,12 +380,13 @@ export default function Budget() {
               </div>
             )}
             <button
+              type="button"
               onClick={() => setShowEditor(true)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-text-secondary border border-border/50 hover:bg-bg-surface2 hover:text-text-primary transition-colors"
+              className="flex items-center justify-center p-2 rounded-lg text-text-secondary border border-border/50 hover:bg-bg-surface2 hover:text-text-primary transition-colors"
               title="Transaktionen bearbeiten"
+              aria-label="Transaktionen bearbeiten"
             >
-              <Pencil className="w-3.5 h-3.5" />
-              Bearbeiten
+              <Pencil className="w-3.5 h-3.5" aria-hidden />
             </button>
           </div>
         </div>

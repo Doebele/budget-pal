@@ -5,7 +5,7 @@ import { Upload, FileText, CheckCircle2, AlertCircle, Clock, Trash2, X, Eye, Set
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { clsx } from "clsx";
-import { formatCHF } from "@/lib/theme";
+import { formatCHF, getFrequencyStyle, getFrequencyBadgeStyle, PERIODICITY_LABELS } from "@/lib/theme";
 
 const BANKS = [
   { value: "ubs", label: "UBS" },
@@ -78,24 +78,6 @@ function descGroupKey(desc: string): string {
     .filter((w) => w.length >= 3)
     .slice(0, 5)
     .join(" ");
-}
-
-const PERIODICITY_LABELS: Record<string, string> = {
-  monthly: "Monatlich",
-  quarterly: "Vierteljährlich",
-  halfyearly: "Halbjährlich",
-  yearly: "Jährlich",
-};
-
-/** Returns Tailwind classes for the periodicity select based on current value. */
-function getFrequencyStyle(periodicity: string | null | undefined): string {
-  switch (periodicity) {
-    case "monthly":    return "bg-blue-900/20 border-blue-800 text-blue-300";
-    case "quarterly":  return "bg-purple-900/20 border-purple-800 text-purple-300";
-    case "halfyearly": return "bg-violet-900/20 border-violet-800 text-violet-300";
-    case "yearly":     return "bg-emerald-900/20 border-emerald-800 text-emerald-300";
-    default:           return "bg-slate-700/50 border-slate-600 text-slate-400";
-  }
 }
 
 /** Extra import-specific categories always shown in the dropdown. */
@@ -560,7 +542,7 @@ export default function Import() {
                                 </span>
                               )}
                               {recurring && (
-                                <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 bg-violet-900/50 text-violet-300 text-[10px] font-medium leading-tight" title={row.periodicity ? PERIODICITY_LABELS[row.periodicity] : "Wiederkehrend"}>
+                                <span className={clsx("inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium leading-tight", getFrequencyBadgeStyle(row.periodicity))} title={row.periodicity ? PERIODICITY_LABELS[row.periodicity] : "Wiederkehrend"}>
                                   ↻ {row.periodicity ? PERIODICITY_LABELS[row.periodicity] : "Abo"}
                                 </span>
                               )}
@@ -622,18 +604,6 @@ export default function Import() {
 
                           {/* ── Kategorie + Frequenz (side-by-side) ── */}
                           <td className="px-2 py-2 align-middle">
-                            {/* AI badge row */}
-                            <div className="mb-1">
-                              {row.category ? (
-                                <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-accent/20 text-accent text-[10px] font-semibold leading-tight">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-accent flex-shrink-0" />
-                                  {row.category}
-                                </span>
-                              ) : (
-                                <span className="text-slate-600 text-[10px] italic">KI: –</span>
-                              )}
-                            </div>
-                            {/* Dropdowns side-by-side */}
                             <div className="flex flex-row gap-2 items-center">
                               {/* Category override — smart: auto-applies to same-description rows */}
                               <select

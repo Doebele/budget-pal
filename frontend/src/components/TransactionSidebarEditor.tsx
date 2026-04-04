@@ -299,9 +299,9 @@ export default function TransactionSidebarEditor({ transactions, periodLabel, on
           <div className="shrink-0 border-t border-slate-700 bg-slate-800 max-h-[55vh] overflow-y-auto">
 
             {/* Editor header */}
-            <div className="px-5 py-3 border-b border-slate-700/60 flex items-center justify-between">
-              <div className="min-w-0">
-                <p className="text-text-primary text-sm font-medium truncate">
+            <div className="px-5 py-3 border-b border-slate-700/60 flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-text-primary text-base font-medium whitespace-normal break-words">
                   {selected.merchant_normalized || selected.description}
                 </p>
                 <p className="text-text-tertiary text-xs mt-0.5">
