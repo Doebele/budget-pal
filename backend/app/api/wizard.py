@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Literal, Optional
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic.alias_generators import to_camel
-from sqlalchemy import select
+from sqlalchemy import delete as sa_delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -305,6 +305,28 @@ async def wizard_complete(
     scenarios_created = 0
 
     current_year = datetime.now().year
+    # Consistent timestamp for every budget row in this wizard run — used by
+    # the frontend's batch-deduplication (Strategy 1: filter to max created_at).
+    wizard_run_time = datetime.now(timezone.utc)
+
+    # ── 0. Remove previous wizard-generated data (idempotency) ────
+    # Budgets created by the wizard carry a non-null `notes` field.
+    # Manually created budgets (no notes) are intentionally preserved.
+    await db.execute(
+        sa_delete(Budget).where(
+            Budget.user_id == current_user.id,
+            Budget.notes.is_not(None),
+        )
+    )
+    # Pension and asset records are always fully wizard-managed.
+    await db.execute(
+        sa_delete(PensionData).where(PensionData.user_id == current_user.id)
+    )
+    await db.execute(
+        sa_delete(Asset).where(Asset.user_id == current_user.id)
+    )
+    # Flush deletes before inserting new rows to avoid constraint conflicts.
+    await db.flush()
 
     # ── 1. Update user profile ─────────────────────────────────
     if payload.geburtsjahr:
@@ -351,6 +373,10 @@ async def wizard_complete(
             period=BudgetPeriod.monthly,
             year=current_year,
             notes=notes,
+            # Explicit timestamp so every row in this batch shares the same
+            # created_at value — required for reliable Strategy-1 deduplication
+            # on the frontend (filter to max timestamp = latest wizard run).
+            created_at=wizard_run_time,
         )
         db.add(b)
         budgets_created += 1
