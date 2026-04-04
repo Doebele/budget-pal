@@ -1,9 +1,9 @@
 import { clsx } from "clsx";
-import { Clock, Settings, GitMerge, Users } from "lucide-react";
-import type { AnalysisMode } from "@/types/budgetAnalysis";
+import { BookOpen, FlaskConical, GitMerge } from "lucide-react";
+import type { BudgetAnalysisMode } from "@/types/budgetAnalysis";
 
 interface ModeOption {
-  value: AnalysisMode;
+  value: BudgetAnalysisMode;
   label: string;
   description: string;
   icon: React.ReactNode;
@@ -12,42 +12,34 @@ interface ModeOption {
 const MODES: ModeOption[] = [
   {
     value: "past",
-    label: "Vergangenheit",
-    description: "Basierend auf vergangenen Transaktionen",
-    icon: <Clock className="w-4 h-4" />,
+    label: "Historisch",
+    description: "Wiederkehrende & einmalige Transaktionen",
+    icon: <BookOpen className="w-4 h-4" />,
   },
   {
     value: "wizard",
-    label: "Planung",
+    label: "Empirisch",
     description: "Basierend auf Setup-Wizard-Eingaben",
-    icon: <Settings className="w-4 h-4" />,
+    icon: <FlaskConical className="w-4 h-4" />,
   },
   {
     value: "combined",
     label: "Kombiniert",
-    description: "60 % Ist-Daten + 40 % Planung",
+    description: "Historisch + Empirisch, keine Duplikate",
     icon: <GitMerge className="w-4 h-4" />,
-  },
-  {
-    value: "peer",
-    label: "Peer-Vergleich",
-    description: "Vergleich mit demografischen Benchmarks",
-    icon: <Users className="w-4 h-4" />,
   },
 ];
 
 interface Props {
-  mode: AnalysisMode;
-  onChange: (mode: AnalysisMode) => void;
+  mode: BudgetAnalysisMode;
+  onChange: (mode: BudgetAnalysisMode) => void;
   wizardAvailable?: boolean;
-  peerAvailable?: boolean;
 }
 
 export default function BudgetAnalysisModes({
   mode,
   onChange,
   wizardAvailable = false,
-  peerAvailable = false,
 }: Props) {
   return (
     <div className="flex flex-wrap gap-2">
