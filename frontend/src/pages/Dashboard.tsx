@@ -213,7 +213,7 @@ export default function Dashboard() {
           </div>
 
           {sankeyData.links.length > 0 ? (
-            <SankeyChart data={sankeyData} height={280} />
+            <SankeyChart data={sankeyData} height={360} />
           ) : (
             <div className="h-64 flex items-center justify-center text-text-tertiary text-sm text-center px-4">
               {sankeySource === "empirisch" && wizardLoading
@@ -398,7 +398,7 @@ function buildSankeyDataReal(stats: StatsPayload | undefined) {
     target: s.id,
     value: Math.round(s.value * scale * 100) / 100,
     color: s.color,
-    subItems: s.subs.length > 1
+    subItems: s.subs.length > 0
       ? s.subs
           .sort((a, b) => b.value - a.value)
           .map((sub) => ({ label: sub.label, value: Math.round(sub.value * scale * 100) / 100, source: "txn" as const }))
@@ -489,7 +489,7 @@ function buildSankeyDataEmpirical(
     target: s.id,
     value: Math.round(s.value * scale * 100) / 100,
     color: s.color,
-    subItems: s.subs.length > 1
+    subItems: s.subs.length > 0
       ? s.subs
           .sort((a, b) => b.value - a.value)
           .map((sub) => ({ label: sub.label, value: Math.round(sub.value * scale * 100) / 100, source: "wizard" as const }))

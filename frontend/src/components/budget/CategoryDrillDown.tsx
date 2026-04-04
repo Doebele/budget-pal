@@ -81,10 +81,10 @@ export default function CategoryDrillDown({
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 min-w-0">
               <span
-                className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0"
+                className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
                 style={{ backgroundColor: superCategory.color + "22" }}
               >
-                {superCategory.emoji}
+                <superCategory.icon className="w-5 h-5" style={{ color: superCategory.color }} />
               </span>
               <div className="min-w-0">
                 <h2 className="text-text-primary font-semibold text-base truncate">
@@ -273,7 +273,7 @@ export default function CategoryDrillDown({
               onClick={onEditTransactions}
               className="flex-1 btn-secondary text-xs"
             >
-              Transaktionen bearbeiten
+              Reale Angaben bearbeiten
             </button>
           )}
           {onEditWizard && (
@@ -282,7 +282,7 @@ export default function CategoryDrillDown({
               onClick={onEditWizard}
               className="flex-1 btn-secondary text-xs"
             >
-              Budget bearbeiten
+              Empirische Angaben bearbeiten
             </button>
           )}
         </div>

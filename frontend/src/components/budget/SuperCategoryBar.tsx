@@ -56,10 +56,15 @@ export default function SuperCategoryBar({
         "hover:bg-bg-surface2 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50",
       )}
     >
-      {/* Top row: emoji + label + amounts */}
+      {/* Top row: icon + label + amounts */}
       <div className="flex items-center justify-between mb-2 gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-base leading-none">{superCategory.emoji}</span>
+          <span
+            className="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
+            style={{ backgroundColor: superCategory.color + "22" }}
+          >
+            <superCategory.icon className="w-3.5 h-3.5" style={{ color: superCategory.color }} />
+          </span>
           <span className="text-text-primary text-sm font-medium truncate">
             {superCategory.label}
           </span>

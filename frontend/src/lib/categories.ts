@@ -5,15 +5,27 @@
  *   • Category colours  (used in Sankey, Budget bars, transaction badges)
  *   • Grouping logic    (transaction categories → supercategory)
  *   • Wizard label mapping (wizard notes → supercategory)
- *
- * The colours mirror the values in SankeyChart FLOW_COLORS so that
- * every chart always renders the same colour for the same concept.
+ *   • Monochrome icons  (used in all UI components instead of emojis)
  */
+import type { LucideIcon } from "lucide-react";
+import {
+  Home,
+  ShoppingCart,
+  Train,
+  ShieldCheck,
+  Clapperboard,
+  Smartphone,
+  ShoppingBag,
+  GraduationCap,
+  PiggyBank,
+  Layers,
+} from "lucide-react";
 
 export interface SuperCategory {
   id: string;
   label: string;         // German display label
-  emoji: string;
+  icon: LucideIcon;      // monochrome lucide icon (replaces emoji in UI)
+  emoji: string;         // kept for plain-text contexts (tooltips, <option>)
   color: string;         // hex – identical in Sankey + Budget + badges
   /** Lowercase transaction category names that belong here */
   txnCategories: string[];
@@ -25,6 +37,7 @@ export const SUPER_CATEGORIES: SuperCategory[] = [
   {
     id: "wohnen",
     label: "Wohnen",
+    icon: Home,
     emoji: "🏠",
     color: "#f0b429",
     txnCategories: ["housing", "wohnen", "utilities", "nebenkosten"],
@@ -33,6 +46,7 @@ export const SUPER_CATEGORIES: SuperCategory[] = [
   {
     id: "essen",
     label: "Essen & Trinken",
+    icon: ShoppingCart,
     emoji: "🛒",
     color: "#84cc16",
     txnCategories: ["groceries", "food & drink", "lebensmittel", "restaurant & takeaway"],
@@ -41,6 +55,7 @@ export const SUPER_CATEGORIES: SuperCategory[] = [
   {
     id: "mobilitaet",
     label: "Mobilität",
+    icon: Train,
     emoji: "🚆",
     color: "#38bdf8",
     txnCategories: [
@@ -55,6 +70,7 @@ export const SUPER_CATEGORIES: SuperCategory[] = [
   {
     id: "versicherungen",
     label: "Versicherungen & Gesundheit",
+    icon: ShieldCheck,
     emoji: "🛡️",
     color: "#a78bfa",
     txnCategories: [
@@ -69,6 +85,7 @@ export const SUPER_CATEGORIES: SuperCategory[] = [
   {
     id: "freizeit",
     label: "Freizeit & Unterhaltung",
+    icon: Clapperboard,
     emoji: "🎬",
     color: "#fb923c",
     txnCategories: ["entertainment", "unterhaltung", "freizeit & unterhaltung"],
@@ -77,6 +94,7 @@ export const SUPER_CATEGORIES: SuperCategory[] = [
   {
     id: "abos",
     label: "Abonnements & Kommunikation",
+    icon: Smartphone,
     emoji: "📱",
     color: "#22d3ee",
     txnCategories: [
@@ -100,6 +118,7 @@ export const SUPER_CATEGORIES: SuperCategory[] = [
   {
     id: "shopping",
     label: "Shopping & Kleidung",
+    icon: ShoppingBag,
     emoji: "👔",
     color: "#ec4899",
     txnCategories: ["shopping", "kleidung"],
@@ -108,6 +127,7 @@ export const SUPER_CATEGORIES: SuperCategory[] = [
   {
     id: "bildung",
     label: "Bildung",
+    icon: GraduationCap,
     emoji: "📚",
     color: "#6366f1",
     txnCategories: ["education"],
@@ -116,6 +136,7 @@ export const SUPER_CATEGORIES: SuperCategory[] = [
   {
     id: "sparen",
     label: "Sparen",
+    icon: PiggyBank,
     emoji: "💰",
     color: "#10b981",
     txnCategories: ["salary", "investment", "einzahlungen"],
@@ -124,6 +145,7 @@ export const SUPER_CATEGORIES: SuperCategory[] = [
   {
     id: "sonstiges",
     label: "Sonstiges",
+    icon: Layers,
     emoji: "💸",
     color: "#94a3b8",
     txnCategories: [],   // catch-all – everything not matched above

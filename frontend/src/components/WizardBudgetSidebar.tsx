@@ -184,7 +184,12 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
           <div className="mt-3 relative">
             <div className="flex items-center gap-1.5">
               {activeSCObj && (
-                <span className="text-base">{activeSCObj.emoji}</span>
+                <span
+                  className="w-7 h-7 rounded-md flex items-center justify-center shrink-0"
+                  style={{ backgroundColor: activeSCObj.color + "22" }}
+                >
+                  <activeSCObj.icon className="w-4 h-4" style={{ color: activeSCObj.color }} />
+                </span>
               )}
               <select
                 value={activeSc}
@@ -238,10 +243,10 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
                     <div className="flex items-center justify-between mb-2 gap-2">
                       <div className="flex items-center gap-2 min-w-0">
                         <span
-                          className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
+                          className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
                           style={{ backgroundColor: sc.color + "22" }}
                         >
-                          {sc.emoji}
+                          <sc.icon className="w-3.5 h-3.5" style={{ color: sc.color }} />
                         </span>
                         <span className="text-text-primary text-sm font-medium truncate">
                           {b.notes}

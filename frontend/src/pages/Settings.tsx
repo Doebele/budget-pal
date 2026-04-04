@@ -2,9 +2,10 @@ import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { authApi, settingsApi } from "@/lib/api";
-import { Save, ExternalLink, Wand2, RotateCcw, AlertCircle } from "lucide-react";
+import { Save, ExternalLink, Wand2, RotateCcw, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { Link } from "react-router-dom";
 import { differenceInYears, parseISO } from "date-fns";
+import { SUPER_CATEGORIES } from "@/lib/categories";
 
 function calcAge(birthdate: string): number | null {
   if (!birthdate) return null;
@@ -23,6 +24,7 @@ export default function Settings() {
   const [birthdate, setBirthdate] = useState(user?.birthdate || "");
   const [retirementAge, setRetirementAge] = useState(user?.retirement_age || 65);
   const [saved, setSaved] = useState(false);
+  const [expandedSc, setExpandedSc] = useState<string | null>(null);
 
   // Category mapping state
   const [mappingDrafts, setMappingDrafts] = useState<Record<string, string>>({});
@@ -261,6 +263,91 @@ export default function Settings() {
             </div>
           </>
         )}
+      </div>
+
+      {/* Supercategory taxonomy */}
+      <div className="card">
+        <div className="mb-4">
+          <h2 className="text-text-primary font-semibold text-sm">Superkategorie-Taxonomie</h2>
+          <p className="text-text-tertiary text-xs mt-0.5">
+            Übersicht, welche Transaktionskategorien (Reale Angaben) und Wizard-Labels (Empirische Angaben) jeder Superkategorie zugeordnet sind.
+          </p>
+        </div>
+        <div className="space-y-1">
+          {SUPER_CATEGORIES.filter((sc) => sc.id !== "sonstiges").map((sc) => {
+            const isOpen = expandedSc === sc.id;
+            return (
+              <div key={sc.id} className="rounded-lg border border-border/40 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setExpandedSc(isOpen ? null : sc.id)}
+                  className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-bg-surface2 transition-colors"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span
+                      className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+                      style={{ backgroundColor: sc.color + "22" }}
+                    >
+                      <sc.icon className="w-4 h-4" style={{ color: sc.color }} />
+                    </span>
+                    <span className="text-text-primary text-sm font-medium">{sc.label}</span>
+                    <span
+                      className="w-2.5 h-2.5 rounded-full shrink-0"
+                      style={{ backgroundColor: sc.color }}
+                    />
+                  </div>
+                  {isOpen
+                    ? <ChevronUp className="w-3.5 h-3.5 text-text-tertiary shrink-0" />
+                    : <ChevronDown className="w-3.5 h-3.5 text-text-tertiary shrink-0" />}
+                </button>
+                {isOpen && (
+                  <div className="px-4 pb-3 pt-1 border-t border-border/30 grid grid-cols-2 gap-4 text-xs">
+                    <div>
+                      <p className="text-text-tertiary font-semibold uppercase tracking-wide mb-1.5">
+                        Transaktionskategorien (Reale Angaben)
+                      </p>
+                      {sc.txnCategories.length === 0 ? (
+                        <span className="text-text-disabled italic">Keine — fällt in Sonstiges</span>
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          {sc.txnCategories.map((c) => (
+                            <span
+                              key={c}
+                              className="px-1.5 py-0.5 rounded text-text-secondary"
+                              style={{ backgroundColor: sc.color + "18" }}
+                            >
+                              {c}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-text-tertiary font-semibold uppercase tracking-wide mb-1.5">
+                        Empirische Labels (Wizard)
+                      </p>
+                      {sc.wizardLabels.length === 0 ? (
+                        <span className="text-text-disabled italic">Keine</span>
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          {sc.wizardLabels.map((l) => (
+                            <span
+                              key={l}
+                              className="px-1.5 py-0.5 rounded text-text-secondary"
+                              style={{ backgroundColor: sc.color + "18" }}
+                            >
+                              {l}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Info */}
