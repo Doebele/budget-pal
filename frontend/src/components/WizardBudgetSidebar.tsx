@@ -103,8 +103,10 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
 
   // ── Save mutation ─────────────────────────────────────────────
   const saveMutation = useMutation({
-    mutationFn: ({ id, amount }: { id: number; amount: number }) =>
-      budgetsApi.update(id, { amount }),
+    mutationFn: ({ id, amount, year, period }: { id: number; amount: number; year: number; period: string }) =>
+      // Send year + period alongside amount so the call works with both the
+      // old BudgetCreate endpoint (which required year) and the new BudgetUpdate one.
+      budgetsApi.update(id, { amount, year, period }),
     onSuccess: (_data, vars) => {
       setDirtyIds((prev) => { const n = new Set(prev); n.delete(vars.id); return n; });
       setSavedIds((prev) => new Set(prev).add(vars.id));
@@ -122,7 +124,9 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
     const raw = drafts[id];
     const amount = parseFloat(raw);
     if (isNaN(amount) || amount < 0) return;
-    saveMutation.mutate({ id, amount });
+    const budget = latestBatch.find((b) => b.id === id);
+    if (!budget) return;
+    saveMutation.mutate({ id, amount, year: budget.year, period: budget.period });
   }
 
   function handleSaveAll() {
