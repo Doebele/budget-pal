@@ -1,14 +1,23 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { ArrowUpRight, ArrowDownRight, Wallet, TrendingUp, Upload, ArrowRight, BarChart3, Target, FileUp, Wand2 } from "lucide-react";
-import { transactionsApi, accountsApi } from "@/lib/api";
+import {
+  ArrowUpRight, ArrowDownRight, Wallet, TrendingUp,
+  Upload, ArrowRight, BarChart3, Target, FileUp, Wand2,
+} from "lucide-react";
+import { transactionsApi, accountsApi, budgetsApi } from "@/lib/api";
 import { formatCHF } from "@/lib/theme";
 import { format } from "date-fns";
 import SankeyChart from "@/components/charts/SankeyChart";
+import type { SankeyLink } from "@/components/charts/SankeyChart";
 import GranularityNavigator from "@/components/GranularityNavigator";
 import { computeDateRange, TimeGranularity } from "@/lib/granularity";
 import { clsx } from "clsx";
+import {
+  resolveSuperCategory,
+  SUPER_CATEGORIES,
+  type SuperCategory,
+} from "@/lib/categories";
 
 // ── Stat card ─────────────────────────────────────────────────
 
@@ -58,10 +67,18 @@ function StatCard({
 export default function Dashboard() {
   const [granularity, setGranularity] = useState<TimeGranularity>("ytd");
   const [anchor, setAnchor] = useState<Date>(() => new Date());
+  const [sankeySource, setSankeySource] = useState<"real" | "empirisch">("real");
 
   const range = useMemo(() => computeDateRange(granularity, anchor), [granularity, anchor]);
   const periodStart = format(range.from, "yyyy-MM-dd");
-  const periodEnd = format(range.to, "yyyy-MM-dd");
+  const periodEnd   = format(range.to,   "yyyy-MM-dd");
+
+  // Number of calendar months in the selected period (for wizard scaling)
+  const months = useMemo(() => Math.max(
+    1,
+    (range.to.getFullYear() - range.from.getFullYear()) * 12 +
+    (range.to.getMonth() - range.from.getMonth()) + 1,
+  ), [range]);
 
   const { data: stats } = useQuery({
     queryKey: ["transaction-stats", granularity, anchor.toISOString(), periodStart, periodEnd],
@@ -79,9 +96,25 @@ export default function Dashboard() {
     queryFn: () => transactionsApi.list({ limit: 8 }).then((r) => r.data),
   });
 
-  const totalBalance = (accounts || []).reduce((sum: number, a: { balance: number }) => sum + a.balance, 0);
+  // Fetch wizard budgets for the Empirisch Sankey view
+  const { data: wizardBudgets } = useQuery({
+    queryKey: ["wizard-budgets-dashboard"],
+    queryFn: () => budgetsApi.list().then((r) => r.data),
+    enabled: sankeySource === "empirisch",
+    staleTime: 60_000,
+  });
 
-  const sankeyData = buildSankeyData(stats);
+  const totalBalance = (accounts || []).reduce(
+    (sum: number, a: { balance: number }) => sum + a.balance, 0
+  );
+
+  // ── Sankey data (mode-aware) ───────────────────────────────────
+  const sankeyData = useMemo(() => {
+    if (sankeySource === "empirisch") {
+      return buildSankeyDataEmpirical(wizardBudgets, months);
+    }
+    return buildSankeyDataReal(stats);
+  }, [sankeySource, stats, wizardBudgets, months]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -148,15 +181,45 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         {/* Sankey cash flow */}
         <div className="xl:col-span-2 card">
-          <div className="mb-4">
-            <h2 className="text-text-primary font-semibold text-sm">Cashflow</h2>
-            <p className="text-text-tertiary text-xs mt-0.5">{range.label}</p>
+          <div className="mb-4 flex items-start justify-between gap-2">
+            <div>
+              <h2 className="text-text-primary font-semibold text-sm">Cashflow</h2>
+              <p className="text-text-tertiary text-xs mt-0.5">{range.label}</p>
+            </div>
+            {/* Source toggle */}
+            <div className="flex rounded-lg border border-border overflow-hidden text-xs shrink-0">
+              <button
+                onClick={() => setSankeySource("real")}
+                className={clsx(
+                  "px-2.5 py-1.5 transition-colors",
+                  sankeySource === "real"
+                    ? "bg-accent text-white"
+                    : "text-text-tertiary hover:text-text-primary hover:bg-bg-surface2",
+                )}
+              >
+                Reale Angaben
+              </button>
+              <button
+                onClick={() => setSankeySource("empirisch")}
+                className={clsx(
+                  "px-2.5 py-1.5 transition-colors border-l border-border",
+                  sankeySource === "empirisch"
+                    ? "bg-accent text-white"
+                    : "text-text-tertiary hover:text-text-primary hover:bg-bg-surface2",
+                )}
+              >
+                Empirische Angaben
+              </button>
+            </div>
           </div>
-          {sankeyData.nodes.length > 2 ? (
+
+          {sankeyData.links.length > 0 ? (
             <SankeyChart data={sankeyData} height={280} />
           ) : (
             <div className="h-64 flex items-center justify-center text-text-tertiary text-sm text-center px-4">
-              Noch keine Transaktionen im gewählten Zeitraum ({range.label})
+              {sankeySource === "empirisch"
+                ? "Keine empirischen Angaben. Bitte zuerst den Setup-Wizard abschliessen."
+                : `Noch keine Transaktionen im gewählten Zeitraum (${range.label})`}
             </div>
           )}
         </div>
@@ -178,26 +241,32 @@ export default function Dashboard() {
               date: string;
               amount: number;
               currency: string;
-            }) => (
-              <div key={txn.id} className="flex items-center justify-between py-1.5">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-7 h-7 rounded-full bg-bg-surface2 flex items-center justify-center flex-shrink-0 text-xs">
-                    {getCategoryEmoji(txn.category || "")}
+            }) => {
+              const sc = resolveSuperCategory(txn.category || "");
+              return (
+                <div key={txn.id} className="flex items-center justify-between py-1.5">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div
+                      className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-xs"
+                      style={{ backgroundColor: sc.color + "22", color: sc.color }}
+                    >
+                      {sc.emoji}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-text-primary text-xs font-medium truncate">
+                        {txn.merchant_normalized || txn.description.slice(0, 30)}
+                      </p>
+                      <p className="text-text-tertiary text-xs">
+                        {format(new Date(txn.date), "dd.MM.")} · {txn.category || "Unkategorisiert"}
+                      </p>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-text-primary text-xs font-medium truncate">
-                      {txn.merchant_normalized || txn.description.slice(0, 30)}
-                    </p>
-                    <p className="text-text-tertiary text-xs">
-                      {format(new Date(txn.date), "dd.MM.")} · {txn.category || "Unkategorisiert"}
-                    </p>
-                  </div>
+                  <span className={clsx("text-xs font-mono flex-shrink-0 ml-2", txn.amount >= 0 ? "text-gain" : "text-loss")}>
+                    {txn.amount >= 0 ? "+" : ""}{formatCHF(txn.amount)}
+                  </span>
                 </div>
-                <span className={clsx("text-xs font-mono flex-shrink-0 ml-2", txn.amount >= 0 ? "text-gain" : "text-loss")}>
-                  {txn.amount >= 0 ? "+" : ""}{formatCHF(txn.amount)}
-                </span>
-              </div>
-            ))}
+              );
+            })}
             {(!recentTxns || recentTxns.length === 0) && (
               <p className="text-text-tertiary text-xs text-center py-8">Keine Transaktionen</p>
             )}
@@ -214,17 +283,25 @@ export default function Dashboard() {
           </div>
           <div className="space-y-3">
             {stats.top_categories.slice(0, 6).map((cat: { category: string; total: number }) => {
+              const sc = resolveSuperCategory(cat.category);
               const pct = stats.total_expenses > 0 ? (cat.total / stats.total_expenses) * 100 : 0;
               return (
                 <div key={cat.category}>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-text-secondary text-xs">{cat.category || "Sonstige"}</span>
+                    <span className="flex items-center gap-1.5 text-text-secondary text-xs">
+                      <span>{sc.emoji}</span>
+                      {cat.category || "Sonstige"}
+                    </span>
                     <span className="text-text-primary text-xs font-mono">{formatCHF(cat.total)}</span>
                   </div>
                   <div className="h-1.5 bg-bg-surface2 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-loss/70 rounded-full transition-all duration-500"
-                      style={{ width: `${Math.min(100, pct)}%` }}
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{
+                        width: `${Math.min(100, pct)}%`,
+                        backgroundColor: sc.color,
+                        opacity: 0.75,
+                      }}
                     />
                   </div>
                 </div>
@@ -237,11 +314,11 @@ export default function Dashboard() {
       {/* Quick nav */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         {[
-          { to: "/transactions", label: "Reale Angaben", desc: "Alle ansehen & filtern", Icon: BarChart3 },
-          { to: "/wizard", label: "Empirische Angaben", desc: "Profil & Planungsdaten", Icon: Wand2 },
-          { to: "/budget", label: "Budgetanalyse", desc: "Ziele verwalten", Icon: Target },
-          { to: "/projections", label: "Prognosen", desc: "Monte Carlo & Rente", Icon: TrendingUp },
-          { to: "/import", label: "Import", desc: "CSV / PDF hochladen", Icon: FileUp },
+          { to: "/transactions", label: "Reale Angaben",     desc: "Alle ansehen & filtern", Icon: BarChart3  },
+          { to: "/wizard",       label: "Empirische Angaben", desc: "Profil & Planungsdaten", Icon: Wand2      },
+          { to: "/budget",       label: "Budgetanalyse",     desc: "Ziele verwalten",         Icon: Target     },
+          { to: "/projections",  label: "Prognosen",         desc: "Monte Carlo & Rente",     Icon: TrendingUp },
+          { to: "/import",       label: "Import",            desc: "CSV / PDF hochladen",     Icon: FileUp     },
         ].map(({ to, label, desc, Icon }) => (
           <Link
             key={to}
@@ -258,50 +335,157 @@ export default function Dashboard() {
   );
 }
 
-// ── Helpers ───────────────────────────────────────────────────
+// ── Sankey data builders ──────────────────────────────────────
 
-function getCategoryEmoji(category: string): string {
-  const map: Record<string, string> = {
-    Groceries: "🛒", "Food & Drink": "🍔", Transport: "🚆",
-    Travel: "✈️", Health: "💊", Utilities: "⚡", Housing: "🏠",
-    Shopping: "🛍️", Entertainment: "🎬", Finance: "🏦",
-    Salary: "💰", Insurance: "🛡️", Education: "📚",
-  };
-  return map[category] || "💸";
-}
-
-function buildSankeyData(stats: {
+interface StatsPayload {
   total_income?: number;
   total_expenses?: number;
   top_categories?: Array<{ category: string; total: number }>;
-} | undefined) {
-  if (!stats || !stats.total_income) {
+}
+
+/** Build Sankey from real transaction data, grouped by supercategory */
+function buildSankeyDataReal(stats: StatsPayload | undefined) {
+  if (!stats?.total_income || stats.total_income <= 0) {
     return { nodes: [], links: [] };
   }
 
-  const nodes = [
-    { id: "Einnahmen" },
-    { id: "Verfügbar" },
-    { id: "Sparen" },
-    ...(stats.top_categories || []).slice(0, 6).map((c) => ({ id: c.category || "Sonstige" })),
-  ];
+  const income   = stats.total_income;
+  const expenses = stats.total_expenses || 0;
+  const savings  = Math.max(0, income - expenses);
 
-  const links = [
-    { source: "Einnahmen", target: "Verfügbar", value: stats.total_income },
-  ];
+  // Group top_categories into supercategories
+  const superMap = new Map<
+    string,
+    { sc: SuperCategory; total: number; subs: Array<{ label: string; value: number }> }
+  >();
 
-  const totalExpenses = stats.total_expenses || 0;
-  const savings = Math.max(0, stats.total_income - totalExpenses);
+  for (const cat of (stats.top_categories || [])) {
+    if (cat.total <= 0) continue;
+    const sc = resolveSuperCategory(cat.category, false);
+    if (sc.id === "sparen") continue; // skip salary / income rows
 
-  if (savings > 0) {
-    links.push({ source: "Verfügbar", target: "Sparen", value: savings });
+    if (!superMap.has(sc.id)) {
+      superMap.set(sc.id, { sc, total: 0, subs: [] });
+    }
+    const agg = superMap.get(sc.id)!;
+    agg.total += cat.total;
+    agg.subs.push({ label: cat.category, value: cat.total });
   }
 
-  (stats.top_categories || []).slice(0, 6).forEach((c) => {
-    if (c.total > 0) {
-      links.push({ source: "Verfügbar", target: c.category || "Sonstige", value: c.total });
+  // Build link segments (Sparen first, then by total desc, max 8 categories)
+  const expSegments = [...superMap.values()]
+    .filter((e) => e.total > 0)
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 8);
+
+  const segments: Array<{
+    id: string; value: number; color: string;
+    subs: Array<{ label: string; value: number }>;
+  }> = [
+    ...(savings > 0 ? [{ id: "Sparen", value: savings, color: "#10b981", subs: [] }] : []),
+    ...expSegments.map((e) => ({ id: e.sc.label, value: e.total, color: e.sc.color, subs: e.subs })),
+  ];
+
+  if (!segments.length) return { nodes: [], links: [] };
+
+  const totalSeg = segments.reduce((s, f) => s + f.value, 0);
+  const scale    = totalSeg > income ? income / totalSeg : 1;
+
+  const nodes = [{ id: "Einnahmen" }, ...segments.map((s) => ({ id: s.id }))];
+  const links: SankeyLink[] = segments.map((s) => ({
+    source: "Einnahmen",
+    target: s.id,
+    value: Math.round(s.value * scale * 100) / 100,
+    color: s.color,
+    subItems: s.subs.length > 1
+      ? s.subs
+          .sort((a, b) => b.value - a.value)
+          .map((sub) => ({ label: sub.label, value: Math.round(sub.value * scale * 100) / 100, source: "txn" as const }))
+      : undefined,
+  }));
+
+  return { nodes, links };
+}
+
+/** Build Sankey from wizard (empirical) budget data, grouped by supercategory */
+function buildSankeyDataEmpirical(
+  budgetsRaw: Array<{ id: number; notes: string | null; amount: number; created_at?: string }> | undefined,
+  months: number,
+) {
+  if (!budgetsRaw || budgetsRaw.length === 0) return { nodes: [], links: [] };
+
+  // Filter to latest batch (highest created_at)
+  const withNotes = budgetsRaw.filter((b) => b.notes);
+  if (!withNotes.length) return { nodes: [], links: [] };
+
+  const maxTs = withNotes.reduce(
+    (max, b) => ((b.created_at || "") > max ? b.created_at || "" : max),
+    ""
+  );
+  const latest = withNotes.filter((b) => b.created_at === maxTs);
+
+  // Group by supercategory (monthly amounts → scale by months)
+  const superMap = new Map<
+    string,
+    { sc: SuperCategory; total: number; subs: Array<{ label: string; value: number }> }
+  >();
+
+  let monthlyIncome = 0;
+
+  for (const b of latest) {
+    const label = b.notes || "Sonstiges";
+    const sc = resolveSuperCategory(label, true);
+
+    if (sc.id === "sparen") {
+      // Treat as income (e.g. lohn / nebeneinkommen wizard entries)
+      monthlyIncome += b.amount;
+      continue;
     }
-  });
+
+    const periodAmt = b.amount * months;
+    if (!superMap.has(sc.id)) {
+      superMap.set(sc.id, { sc, total: 0, subs: [] });
+    }
+    const agg = superMap.get(sc.id)!;
+    agg.total += periodAmt;
+    agg.subs.push({ label, value: periodAmt });
+  }
+
+  const expSegments = [...superMap.values()]
+    .filter((e) => e.total > 0)
+    .sort((a, b) => b.total - a.total);
+
+  const totalExp = expSegments.reduce((s, e) => s + e.total, 0);
+
+  // If wizard has no income entries, estimate income = expenses / 0.7 (≈ 30% savings)
+  const income = monthlyIncome > 0 ? monthlyIncome * months : totalExp / 0.70;
+  const savings = Math.max(0, income - totalExp);
+
+  const segments: Array<{
+    id: string; value: number; color: string;
+    subs: Array<{ label: string; value: number }>;
+  }> = [
+    ...(savings > 0 ? [{ id: "Sparen", value: savings, color: "#10b981", subs: [] }] : []),
+    ...expSegments.map((e) => ({ id: e.sc.label, value: e.total, color: e.sc.color, subs: e.subs })),
+  ];
+
+  if (!segments.length) return { nodes: [], links: [] };
+
+  const totalSeg = segments.reduce((s, f) => s + f.value, 0);
+  const scale    = totalSeg > income ? income / totalSeg : 1;
+
+  const nodes = [{ id: "Einnahmen" }, ...segments.map((s) => ({ id: s.id }))];
+  const links: SankeyLink[] = segments.map((s) => ({
+    source: "Einnahmen",
+    target: s.id,
+    value: Math.round(s.value * scale * 100) / 100,
+    color: s.color,
+    subItems: s.subs.length > 1
+      ? s.subs
+          .sort((a, b) => b.value - a.value)
+          .map((sub) => ({ label: sub.label, value: Math.round(sub.value * scale * 100) / 100, source: "wizard" as const }))
+      : undefined,
+  }));
 
   return { nodes, links };
 }

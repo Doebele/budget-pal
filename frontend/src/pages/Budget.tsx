@@ -1,91 +1,129 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+/**
+ * Budget Analysis Page — v2
+ *
+ * Layout:
+ *   1. Header + GranularityNavigator
+ *   2. Frequency-filter chips
+ *   3. 3 KPI cards (Netto, Ausgaben Ist/Soll, Ausschöpfung %)
+ *   4. SuperCategory bars (click → CategoryDrillDown panel)
+ *   5. Peer-comparison section (collapsed by default)
+ */
+import { useState, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { budgetsApi, transactionsApi, budgetApi } from "@/lib/api";
-import { formatCHF } from "@/lib/theme";
 import { format, subMonths } from "date-fns";
 import { clsx } from "clsx";
-import { RefreshCw, Sparkles, TrendingDown, TrendingUp, Minus, AlertTriangle, Lightbulb, Pencil, ChevronDown, BarChart2, CheckSquare, Square } from "lucide-react";
-import GranularityNavigator from "@/components/GranularityNavigator";
-import BudgetAnalysisModes from "@/components/BudgetAnalysisModes";
-import TransactionSidebarEditor from "@/components/TransactionSidebarEditor";
-import WizardBudgetSidebar from "@/components/WizardBudgetSidebar";
-import { computeDateRange, TimeGranularity } from "@/lib/granularity";
-import type {
-  BudgetAnalysisMode,
-  CategoryBreakdown,
-  MultiAnalysisResult,
-  SavingsOpportunity,
-} from "@/types/budgetAnalysis";
 import {
-  RECURRENCE_FILTER_OPTIONS,
-  recurrenceFilterToApiParams,
-  type RecurrenceFilterValue,
-} from "@/lib/recurrenceFilter";
+  TrendingDown, TrendingUp, Minus, ChevronDown, ChevronUp,
+  Lightbulb, Target, Wallet,
+} from "lucide-react";
 
-interface RecurringExpense {
-  category: string;
-  amount: number;
-  frequency: "monthly" | "quarterly" | "yearly";
-  confidence: number;
-  basedOn: number;
+import { budgetsApi, transactionsApi, budgetApi } from "@/lib/api";
+import { formatCHF } from "@/lib/theme";
+import GranularityNavigator from "@/components/GranularityNavigator";
+import WizardBudgetSidebar from "@/components/WizardBudgetSidebar";
+import TransactionSidebarEditor from "@/components/TransactionSidebarEditor";
+import SuperCategoryBar from "@/components/budget/SuperCategoryBar";
+import CategoryDrillDown from "@/components/budget/CategoryDrillDown";
+import type { SubItem } from "@/components/budget/SuperCategoryBar";
+import type { DrillDownTransaction } from "@/components/budget/CategoryDrillDown";
+import { computeDateRange, TimeGranularity } from "@/lib/granularity";
+import {
+  SUPER_CATEGORIES,
+  resolveSuperCategory,
+  type SuperCategory,
+} from "@/lib/categories";
+import type { MultiAnalysisResult } from "@/types/budgetAnalysis";
+
+// ── Frequency filter ──────────────────────────────────────────
+const FREQ_OPTIONS = [
+  { key: "monthly",    label: "Monatlich"    },
+  { key: "quarterly",  label: "Quartalsweise" },
+  { key: "halfyearly", label: "Halbjährlich"  },
+  { key: "yearly",     label: "Jährlich"      },
+  { key: "weekly",     label: "Wöchentlich"   },
+  { key: "einmalig",   label: "Einmalig"      },
+] as const;
+
+function matchesFreq(
+  t: { is_recurring?: boolean; periodicity?: string },
+  freqs: Set<string>,
+): boolean {
+  const p = t.periodicity ?? "";
+  const rec = !!t.is_recurring;
+  if (!rec || !p) return freqs.has("einmalig");
+  if (p === "weekly")     return freqs.has("weekly");
+  if (p === "monthly")    return freqs.has("monthly");
+  if (p === "quarterly")  return freqs.has("quarterly");
+  if (p === "halfyearly") return freqs.has("halfyearly");
+  if (p === "yearly")     return freqs.has("yearly");
+  return freqs.has("einmalig");
 }
 
-export default function Budget() {
-  const [granularity, setGranularity] = useState<TimeGranularity>("ytd");
-  const [anchor, setAnchor] = useState<Date>(new Date());
-  const [analysisMode, setAnalysisMode] = useState<BudgetAnalysisMode>("past");
-  const [showPeerComparison, setShowPeerComparison] = useState(false);
-  const [peerOpportunitiesOpen, setPeerOpportunitiesOpen] = useState(false);
-  const [showEditor, setShowEditor] = useState(false);
-  const [showWizardEditor, setShowWizardEditor] = useState(false);
-  const [recurrenceFilter, setRecurrenceFilter] = useState<RecurrenceFilterValue>("");
-  const [selectedFreqs, setSelectedFreqs] = useState<Set<string>>(
-    () => new Set(["monthly", "quarterly", "halfyearly", "yearly", "weekly", "einmalig"])
-  );
-  const [showMean, setShowMean] = useState(false);
+// ── Aggregated row (per supercategory) ────────────────────────
+interface SuperRow {
+  sc: SuperCategory;
+  actual: number;        // freq-filtered real transactions
+  planned: number;       // wizard planned × months (0 if no wizard)
+  subItems: SubItem[];   // subcategory detail for drill-down
+  transactions: DrillDownTransaction[];
+}
 
+// ── Page ──────────────────────────────────────────────────────
+
+export default function Budget() {
+  // ── Time navigation ─────────────────────────────────────────
+  const [granularity, setGranularity] = useState<TimeGranularity>("ytd");
+  const [anchor, setAnchor] = useState<Date>(() => new Date());
   const range = useMemo(() => computeDateRange(granularity, anchor), [granularity, anchor]);
   const periodStart = format(range.from, "yyyy-MM-dd");
   const periodEnd   = format(range.to,   "yyyy-MM-dd");
 
-  const year = anchor.getFullYear();
-  const now = new Date();
-  const isFuturePeriod = range.from > now;
+  const months = useMemo(
+    () => Math.max(1,
+      (range.to.getFullYear() - range.from.getFullYear()) * 12 +
+      (range.to.getMonth() - range.from.getMonth()) + 1,
+    ),
+    [range],
+  );
 
-  const { data: budgets } = useQuery({
-    queryKey: ["budgets", year],
-    queryFn: () => budgetsApi.list({ year }).then((r) => r.data),
+  // ── Filter state ────────────────────────────────────────────
+  const [selectedFreqs, setSelectedFreqs] = useState<Set<string>>(
+    () => new Set(["monthly", "quarterly", "halfyearly", "yearly", "weekly", "einmalig"]),
+  );
+  const [showPeer, setShowPeer] = useState(false);
+  const [drillDown, setDrillDown] = useState<SuperRow | null>(null);
+  const [showWizardEditor, setShowWizardEditor] = useState(false);
+  const [showTxnEditor, setShowTxnEditor] = useState(false);
+  const [showSonstiges, setShowSonstiges] = useState(false);
+
+  function toggleFreq(key: string) {
+    setSelectedFreqs((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  }
+
+  // ── Data queries ────────────────────────────────────────────
+  // Wizard (planned) budgets — latest batch
+  const { data: wizardBudgets } = useQuery({
+    queryKey: ["wizard-budgets-budget"],
+    queryFn: () => budgetsApi.list().then((r) => r.data),
+    staleTime: 30_000,
   });
 
-  // Get stats for selected period
-  const { data: stats } = useQuery({
-    queryKey: ["transaction-stats-budget", periodStart, periodEnd],
-    queryFn: () => transactionsApi.stats({ start: periodStart, end: periodEnd }).then((r) => r.data),
-  });
-
-  // Get transactions from last 6 months to identify recurring expenses
-  const { data: historicalTransactions } = useQuery({
-    queryKey: [
-      "historical-transactions-budget",
-      granularity,
-      anchor.toISOString(),
-      recurrenceFilter,
-    ],
+  // Period transactions (for freq-filtered actuals + drill-down)
+  const { data: periodTransactions = [] } = useQuery({
+    queryKey: ["period-transactions-budget", periodStart, periodEnd],
     queryFn: async () => {
       const sixMonthsAgo = format(subMonths(anchor, 6), "yyyy-MM-dd");
-      const result = await transactionsApi.list({
-        start: sixMonthsAgo,
-        end: periodEnd,
-        limit: 1000,
-        ...recurrenceFilterToApiParams(recurrenceFilter),
-      });
-      return result.data;
+      return transactionsApi
+        .list({ start: sixMonthsAgo, end: periodEnd, limit: 2000 })
+        .then((r) => r.data);
     },
-    enabled: true,
   });
 
-  // Always-running capabilities query (mode=past) → gives wizard_available + peer_data_available
-  // Used to enable/disable mode buttons regardless of selected mode
+  // Capabilities (wizard_available / peer_data_available)
   const { data: capabilities } = useQuery<MultiAnalysisResult>({
     queryKey: ["budget-capabilities", periodStart, periodEnd],
     queryFn: () =>
@@ -95,918 +133,508 @@ export default function Budget() {
     staleTime: 60_000,
   });
 
-  const peerDataAvailable = capabilities?.peer_data_available === true;
-
-  useEffect(() => {
-    if (!peerDataAvailable) setShowPeerComparison(false);
-  }, [peerDataAvailable]);
-
-  // Always-running peer analysis → provides inline peer bars per category
+  // Peer analysis (only when toggled on)
   const { data: peerData } = useQuery<MultiAnalysisResult>({
-    queryKey: ["peer-analysis", periodStart, periodEnd],
+    queryKey: ["peer-analysis-budget", periodStart, periodEnd],
     queryFn: () =>
       budgetApi
         .multiAnalysis({ mode: "peer", start: periodStart, end: periodEnd })
         .then((r) => r.data),
-    enabled: capabilities?.peer_data_available === true,
+    enabled: showPeer && capabilities?.peer_data_available === true,
     staleTime: 60_000,
   });
 
-  // Multi-modal analysis query (non-past modes — for the detail section below)
-  const { data: multiAnalysis, isLoading: isMultiLoading } = useQuery<MultiAnalysisResult>({
-    queryKey: ["multi-analysis", analysisMode, periodStart, periodEnd],
-    queryFn: () =>
-      budgetApi
-        .multiAnalysis({ mode: analysisMode, start: periodStart, end: periodEnd })
-        .then((r) => r.data),
-    enabled: analysisMode !== "past",
-    staleTime: 30_000,
-  });
+  // ── Computed values ─────────────────────────────────────────
 
-  // Identify recurring expenses from historical data
-  const recurringExpenses = useMemo((): RecurringExpense[] => {
-    if (!historicalTransactions || historicalTransactions.length === 0) return [];
-
-    // Group transactions by category
-    const byCategory: Record<string, { amounts: number[]; dates: Date[] }> = {};
-
-    historicalTransactions.forEach((txn: { category?: string; amount: number; date: string }) => {
-      if (!txn.category || txn.amount >= 0) return; // Only expenses
-
-      const cat = txn.category;
-      if (!byCategory[cat]) {
-        byCategory[cat] = { amounts: [], dates: [] };
-      }
-      byCategory[cat].amounts.push(Math.abs(txn.amount));
-      byCategory[cat].dates.push(new Date(txn.date));
-    });
-
-    // Find recurring patterns (transactions in same category appearing in multiple months)
-    const recurring: RecurringExpense[] = [];
-
-    Object.entries(byCategory).forEach(([category, data]) => {
-      const { amounts, dates } = data;
-      if (dates.length < 2) return; // Need at least 2 occurrences
-
-      // Count unique months with this expense
-      const uniqueMonths = new Set(dates.map(d => `${d.getFullYear()}-${d.getMonth()}`)).size;
-      const avgAmount = amounts.reduce((a, b) => a + b, 0) / amounts.length;
-
-      // Calculate frequency based on occurrence pattern
-      let frequency: "monthly" | "quarterly" | "yearly" = "monthly";
-      if (uniqueMonths >= 5) {
-        frequency = "monthly";
-      } else if (uniqueMonths >= 2) {
-        frequency = "quarterly";
-      } else {
-        frequency = "yearly";
-      }
-
-      // Confidence based on consistency of amounts and frequency
-      const amountVariance = Math.max(...amounts) - Math.min(...amounts);
-      const amountConsistency = amountVariance / avgAmount;
-      const confidence = Math.min(100, Math.round(
-        (uniqueMonths / 6) * 100 * (1 - Math.min(amountConsistency, 0.5))
-      ));
-
-      recurring.push({
-        category,
-        amount: avgAmount,
-        frequency,
-        confidence,
-        basedOn: uniqueMonths,
-      });
-    });
-
-    return recurring.sort((a, b) => b.amount - a.amount);
-  }, [historicalTransactions]);
-
-  // Calculate projected expenses for future months
-  const projectedTotal = useMemo(() => {
-    if (!isFuturePeriod) return 0;
-    return recurringExpenses.reduce((sum, exp) => {
-      if (exp.frequency === "monthly") return sum + exp.amount;
-      if (exp.frequency === "quarterly" && anchor.getMonth() % 3 === 0) return sum + exp.amount;
-      return sum;
-    }, 0);
-  }, [recurringExpenses, isFuturePeriod, anchor]);
-
-  // Transactions for the current period (passed to the sidebar editor)
-  const periodTransactions = useMemo(() => {
-    if (!historicalTransactions) return [];
-    return historicalTransactions.filter((t: { date: string }) => {
-      const d = new Date(t.date);
-      return d >= range.from && d <= range.to;
-    });
-  }, [historicalTransactions, range]);
-
-  // Peer benchmark lookup: category name → peer benchmark CHF
-  // Built from the always-running peerData query (keyed by peer_key)
-  const peerBenchmarkByCat = useMemo((): Map<string, number> => {
-    if (!peerData?.categories) return new Map();
-    return new Map(
-      peerData.categories
-        .filter((c) => c.peer_benchmark != null)
-        .map((c) => [c.category, c.peer_benchmark!])
-    );
-  }, [peerData]);
-
-
-  const peerRowByPeerKey = useMemo(() => {
-    const m = new Map<string, CategoryBreakdown>();
-    if (!peerData?.categories) return m;
-    for (const c of peerData.categories) {
-      if (!c.peer_key) continue;
-      const cur = m.get(c.peer_key);
-      if (!cur || (cur.peer_benchmark == null && c.peer_benchmark != null)) {
-        m.set(c.peer_key, c);
-      }
-    }
-    return m;
-  }, [peerData]);
-
-  const peerExtrasForRow = useCallback(
-    (cat: CategoryBreakdown): { benchmark: number | null; delta: number | null } => {
-      const direct = peerData?.categories.find(
-        (c) => c.category === cat.category && c.peer_benchmark != null
-      );
-      if (direct?.peer_benchmark != null) {
-        return { benchmark: direct.peer_benchmark, delta: direct.delta_vs_peer ?? null };
-      }
-      const byKey = cat.peer_key ? peerRowByPeerKey.get(cat.peer_key) : undefined;
-      if (byKey?.peer_benchmark != null) {
-        return { benchmark: byKey.peer_benchmark, delta: byKey.delta_vs_peer ?? null };
-      }
-      const bCat = peerBenchmarkByCat.get(cat.category);
-      if (bCat != null) {
-        const actual = cat.actual ?? cat.blended ?? null;
-        const delta =
-          actual != null ? Math.round((actual - bCat) * 100) / 100 : null;
-        return { benchmark: bCat, delta };
-      }
-      return { benchmark: null, delta: null };
-    },
-    [peerData?.categories, peerRowByPeerKey, peerBenchmarkByCat]
+  // Filter period transactions to the range + frequency selection
+  const filteredTxns = useMemo(
+    () =>
+      (periodTransactions as Array<{
+        id: number; date: string; amount: number; category?: string;
+        description: string; merchant_normalized?: string;
+        is_recurring?: boolean; periodicity?: string;
+      }>).filter((t) => {
+        const d = new Date(t.date);
+        return d >= range.from && d <= range.to && matchesFreq(t, selectedFreqs);
+      }),
+    [periodTransactions, range, selectedFreqs],
   );
 
-  // Months in current period (for mean calculation)
-  const monthsInPeriod = useMemo(() => {
-    const days = (range.to.getTime() - range.from.getTime()) / 86_400_000 + 1;
-    return Math.max(1, Math.round((days / 30.44) * 10) / 10);
-  }, [range]);
+  // KPI stats from freq-filtered transactions
+  const kpi = useMemo(() => {
+    const income   = filteredTxns.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0);
+    const expenses = filteredTxns.filter((t) => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
+    return { income, expenses, net: income - expenses };
+  }, [filteredTxns]);
 
-  // Historisch mode categories: computed from periodTransactions with freq filter
-  const historischCategories = useMemo(() => {
-    if (!periodTransactions.length) return [];
-    const txns = (periodTransactions as Array<{
-      amount: number; category?: string; is_recurring?: boolean; periodicity?: string;
-    }>).filter((t) => {
-      if (t.amount >= 0) return false; // expenses only
-      const p = t.periodicity ?? "";
-      const rec = !!t.is_recurring;
-      if (!rec || !p) return selectedFreqs.has("einmalig");
-      if (p === "weekly")     return selectedFreqs.has("weekly");
-      if (p === "monthly")    return selectedFreqs.has("monthly");
-      if (p === "quarterly")  return selectedFreqs.has("quarterly");
-      if (p === "halfyearly") return selectedFreqs.has("halfyearly");
-      if (p === "yearly")     return selectedFreqs.has("yearly");
-      return selectedFreqs.has("einmalig");
-    });
-    const byCat: Record<string, number> = {};
-    txns.forEach((t) => {
-      const c = t.category || "Sonstige";
-      byCat[c] = (byCat[c] || 0) + Math.abs(t.amount);
-    });
-    const divisor = showMean ? monthsInPeriod : 1;
-    return Object.entries(byCat)
-      .map(([category, total]) => ({ category, total: total / divisor, isProjected: false }))
-      .sort((a, b) => b.total - a.total);
-  }, [periodTransactions, selectedFreqs, showMean, monthsInPeriod]);
+  // Wizard planned amounts: notes → monthly CHF (latest batch)
+  const wizardPlanned = useMemo((): Map<string, number> => {
+    if (!wizardBudgets || !Array.isArray(wizardBudgets)) return new Map();
+    const withNotes = (wizardBudgets as Array<{ notes: string | null; amount: number; created_at?: string }>)
+      .filter((b) => b.notes);
+    if (!withNotes.length) return new Map();
+    const maxTs = withNotes.reduce(
+      (max, b) => ((b.created_at || "") > max ? b.created_at || "" : max),
+      "",
+    );
+    const latest = withNotes.filter((b) => b.created_at === maxTs);
+    const map = new Map<string, number>();
+    for (const b of latest) {
+      const label = b.notes!;
+      map.set(label, (map.get(label) ?? 0) + b.amount * months);
+    }
+    return map;
+  }, [wizardBudgets, months]);
 
-  // Freq-filtered KPI stats for past mode — mirrors historischCategories filter but covers all txns
-  const filteredStats = useMemo(() => {
-    if (!periodTransactions.length) return { income: 0, expenses: 0, net: 0, count: 0 };
-    const txns = (periodTransactions as Array<{
-      amount: number; is_recurring?: boolean; periodicity?: string;
-    }>).filter((t) => {
-      const p = t.periodicity ?? "";
-      const rec = !!t.is_recurring;
-      if (!rec || !p) return selectedFreqs.has("einmalig");
-      if (p === "weekly")     return selectedFreqs.has("weekly");
-      if (p === "monthly")    return selectedFreqs.has("monthly");
-      if (p === "quarterly")  return selectedFreqs.has("quarterly");
-      if (p === "halfyearly") return selectedFreqs.has("halfyearly");
-      if (p === "yearly")     return selectedFreqs.has("yearly");
-      return selectedFreqs.has("einmalig");
-    });
-    const income   = txns.reduce((s, t) => t.amount > 0 ? s + t.amount : s, 0);
-    const expenses = txns.reduce((s, t) => t.amount < 0 ? s + Math.abs(t.amount) : s, 0);
-    return { income, expenses, net: income - expenses, count: txns.length };
-  }, [periodTransactions, selectedFreqs]);
+  // Actual expenses grouped by supercategory
+  const actualBySuperCat = useMemo((): Map<string, { total: number; subs: Map<string, number> }> => {
+    const m = new Map<string, { total: number; subs: Map<string, number> }>();
+    for (const t of filteredTxns) {
+      if (t.amount >= 0) continue;
+      const sc = resolveSuperCategory(t.category || "");
+      if (!m.has(sc.id)) m.set(sc.id, { total: 0, subs: new Map() });
+      const entry = m.get(sc.id)!;
+      entry.total += Math.abs(t.amount);
+      const cat = t.category || "Sonstiges";
+      entry.subs.set(cat, (entry.subs.get(cat) ?? 0) + Math.abs(t.amount));
+    }
+    return m;
+  }, [filteredTxns]);
 
-  // Fast lookup for historisch actuals by category name
-  const historischByCat = useMemo((): Map<string, number> => {
-    return new Map(historischCategories.map(c => [c.category, c.total]));
-  }, [historischCategories]);
+  // Planned expenses grouped by supercategory
+  const plannedBySuperCat = useMemo((): Map<string, { total: number; subs: Map<string, number> }> => {
+    const m = new Map<string, { total: number; subs: Map<string, number> }>();
+    for (const [label, periodAmt] of wizardPlanned) {
+      const sc = resolveSuperCategory(label, true);
+      if (sc.id === "sparen") continue;
+      if (!m.has(sc.id)) m.set(sc.id, { total: 0, subs: new Map() });
+      const entry = m.get(sc.id)!;
+      entry.total += periodAmt;
+      entry.subs.set(label, (entry.subs.get(label) ?? 0) + periodAmt);
+    }
+    return m;
+  }, [wizardPlanned]);
 
-  // Unified rows for wizard/combined: merge multiAnalysis planned values with freq-filtered actuals
-  const unifiedRows = useMemo(() => {
-    if (!multiAnalysis?.categories) return [];
-    const wizardCats = new Set(multiAnalysis.categories.map(c => c.category));
-    const rows: Array<{
-      category: string;
-      planned: number | null;
-      blended: number | null;
-      actual: number | null;
-      peer_key: string | null;
-    }> = multiAnalysis.categories.map(cat => ({
-      category: cat.category,
-      planned: cat.planned ?? null,
-      blended: cat.blended ?? null,
-      // prefer freq-filtered historisch actual, fall back to API actual
-      actual: historischByCat.get(cat.category) ?? cat.actual ?? null,
-      peer_key: cat.peer_key ?? null,
-    }));
-    // Append historisch-only categories not covered by wizard/combined
-    historischCategories.forEach(h => {
-      if (!wizardCats.has(h.category)) {
-        rows.push({ category: h.category, planned: null, blended: null, actual: h.total, peer_key: null });
+  // Total planned expenses (for budget-utilisation KPI)
+  const totalPlanned = useMemo(
+    () => [...plannedBySuperCat.values()].reduce((s, e) => s + e.total, 0),
+    [plannedBySuperCat],
+  );
+
+  // Transactions grouped by supercategory id for drill-down
+  const txnsBySuperCat = useMemo((): Map<string, DrillDownTransaction[]> => {
+    const m = new Map<string, DrillDownTransaction[]>();
+    for (const t of filteredTxns) {
+      if (t.amount >= 0) continue;
+      const sc = resolveSuperCategory(t.category || "");
+      if (!m.has(sc.id)) m.set(sc.id, []);
+      m.get(sc.id)!.push({
+        id: t.id,
+        date: t.date,
+        description: t.description,
+        merchant_normalized: t.merchant_normalized,
+        amount: t.amount,
+        category: t.category,
+      });
+    }
+    // Sort each group by date desc
+    for (const [, txns] of m) txns.sort((a, b) => b.date.localeCompare(a.date));
+    return m;
+  }, [filteredTxns]);
+
+  // Build unified SuperRow list
+  const superRows = useMemo((): SuperRow[] => {
+    const allScIds = new Set([
+      ...actualBySuperCat.keys(),
+      ...plannedBySuperCat.keys(),
+    ]);
+
+    const rows: SuperRow[] = [];
+    for (const scId of allScIds) {
+      const sc = SUPER_CATEGORIES.find((s) => s.id === scId);
+      if (!sc || sc.id === "sparen") continue;
+
+      const actEntry  = actualBySuperCat.get(scId);
+      const planEntry = plannedBySuperCat.get(scId);
+      const actual    = actEntry?.total  ?? 0;
+      const planned   = planEntry?.total ?? 0;
+
+      // Build sub-items (merge actual subs + planned subs)
+      const subMap = new Map<string, SubItem>();
+      for (const [label, amt] of actEntry?.subs ?? []) {
+        subMap.set(label, { label, actual: amt, source: "txn" });
       }
-    });
-    rows.sort((a, b) => (b.planned ?? b.actual ?? 0) - (a.planned ?? a.actual ?? 0));
-    return rows;
-  }, [multiAnalysis?.categories, historischByCat, historischCategories]);
+      for (const [label, amt] of planEntry?.subs ?? []) {
+        const existing = subMap.get(label);
+        if (existing) {
+          existing.planned = amt;
+          existing.source  = "both";
+        } else {
+          subMap.set(label, { label, planned: amt, source: "wizard" });
+        }
+      }
+      const subItems = [...subMap.values()].sort(
+        (a, b) => (b.actual ?? b.planned ?? 0) - (a.actual ?? a.planned ?? 0),
+      );
 
-  // Combine actual and projected categories
-  const allCategories = useMemo(() => {
-    const actual = (stats?.top_categories || []) as { category: string; total: number }[];
-
-    if (!isFuturePeriod) {
-      return actual.map(cat => ({ ...cat, isProjected: false }));
+      rows.push({
+        sc,
+        actual,
+        planned,
+        subItems,
+        transactions: txnsBySuperCat.get(scId) ?? [],
+      });
     }
 
-    // For future months, merge actual (should be empty) with projected
-    const projected = recurringExpenses.map(exp => ({
-      category: exp.category,
-      total: exp.frequency === "monthly" ? exp.amount : 0,
-      isProjected: true,
-      frequency: exp.frequency,
-      confidence: exp.confidence,
-    }));
+    return rows.sort((a, b) => (b.actual || b.planned) - (a.actual || a.planned));
+  }, [actualBySuperCat, plannedBySuperCat, txnsBySuperCat]);
 
-    return projected;
-  }, [stats, recurringExpenses, isFuturePeriod]);
+  // Separate "Sonstiges" and non-Sonstiges rows
+  const mainRows     = superRows.filter((r) => r.sc.id !== "sonstiges");
+  const sonstigesRow = superRows.find((r) => r.sc.id === "sonstiges");
 
-  const CATEGORY_LABELS: Record<string, string> = {
-    Utilities: "Nebenkosten",
-    Finance: "Finanzen",
-    Taxes: "Steuern",
-    Other: "Sonstige",
-    Entertainment: "Unterhaltung & Kultur",
-  };
-  const displayCat = (name: string) => CATEGORY_LABELS[name] ?? name;
+  // Budget utilisation (actual / planned, capped for display)
+  const utilisation = totalPlanned > 0
+    ? Math.min(200, Math.round((kpi.expenses / totalPlanned) * 100))
+    : null;
 
+  // Open drill-down for a row
+  const openDrillDown = useCallback((row: SuperRow) => setDrillDown(row), []);
+  const closeDrillDown = useCallback(() => setDrillDown(null), []);
+
+  // ── Render ───────────────────────────────────────────────────
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
+
+      {/* ── Header ─────────────────────────────────────────── */}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-2xl font-display text-text-primary">Budgetanalyse</h1>
-          <p className="text-text-tertiary text-sm mt-0.5">
-            {range.label}
-            {isFuturePeriod && (
-              <span className="ml-2 inline-flex items-center gap-1 text-accent">
-                <Sparkles className="w-3 h-3" />
-                Prognose
-              </span>
-            )}
-          </p>
+          <p className="text-text-tertiary text-sm mt-0.5">{range.label}</p>
         </div>
-
-        <div className="flex flex-wrap items-end gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
           <GranularityNavigator
             granularity={granularity}
             anchor={anchor}
             onChange={(g, a) => { setGranularity(g); setAnchor(a); }}
           />
-          <div className="flex flex-col gap-1">
-            <label className="label text-xs text-text-tertiary">Wiederkehrend</label>
-            <select
-              className="input w-auto min-w-[12rem]"
-              value={recurrenceFilter}
-              onChange={(e) =>
-                setRecurrenceFilter(e.target.value as RecurrenceFilterValue)
-              }
-              aria-label="Transaktionen nach Rhythmus filtern"
+          {capabilities?.wizard_available && (
+            <button
+              type="button"
+              onClick={() => setShowWizardEditor(true)}
+              className="btn-secondary text-xs flex items-center gap-1.5"
             >
-              {RECURRENCE_FILTER_OPTIONS.map(({ value, label }) => (
-                <option key={value || "all"} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </div>
+              Budgets bearbeiten
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Analysis mode selector */}
-      <div className="card p-4">
-        <p className="text-text-tertiary text-xs uppercase tracking-wide mb-3">Analysemodus</p>
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <BudgetAnalysisModes
-            mode={analysisMode}
-            onChange={setAnalysisMode}
-            wizardAvailable={capabilities?.wizard_available ?? false}
-          />
-          <label
+      {/* ── Frequency filter chips ─────────────────────────── */}
+      <div className="flex flex-wrap gap-2">
+        {FREQ_OPTIONS.map(({ key, label }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => toggleFreq(key)}
             className={clsx(
-              "flex items-center gap-2 text-sm text-text-secondary shrink-0 cursor-pointer select-none",
-              !peerDataAvailable && "opacity-50 cursor-not-allowed"
+              "px-3 py-1.5 rounded-lg text-xs border transition-colors",
+              selectedFreqs.has(key)
+                ? "bg-accent/15 border-accent/40 text-accent"
+                : "bg-bg-surface2 border-border text-text-tertiary hover:text-text-primary",
             )}
           >
-            <input
-              type="checkbox"
-              className="rounded border-border bg-bg-surface2 text-accent focus:ring-accent/40"
-              checked={showPeerComparison}
-              disabled={!peerDataAvailable}
-              onChange={(e) => setShowPeerComparison(e.target.checked)}
-              aria-label="Peer einblenden"
-            />
-            Peer einblenden
-          </label>
-        </div>
-
-        {/* Historisch + Empirisch: frequency filter + mean toggle */}
-        {(analysisMode === "past" || analysisMode === "wizard") && !isFuturePeriod && (
-          <div className="mt-4 pt-4 border-t border-border/30">
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-              <span className="text-text-tertiary text-xs uppercase tracking-wide shrink-0">Frequenz</span>
-              {[
-                { key: "monthly",    label: "Monatlich" },
-                { key: "quarterly",  label: "Vierteljährlich" },
-                { key: "halfyearly", label: "Halbjährlich" },
-                { key: "yearly",     label: "Jährlich" },
-                { key: "weekly",     label: "Wöchentlich" },
-                { key: "einmalig",   label: "Einmalig" },
-              ].map(({ key, label }) => {
-                const checked = selectedFreqs.has(key);
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setSelectedFreqs((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(key)) next.delete(key); else next.add(key);
-                      return next;
-                    })}
-                    className="flex items-center gap-1.5 text-xs text-text-secondary hover:text-text-primary transition-colors"
-                  >
-                    {checked
-                      ? <CheckSquare className="w-3.5 h-3.5 text-accent" />
-                      : <Square className="w-3.5 h-3.5 text-slate-600" />}
-                    {label}
-                  </button>
-                );
-              })}
-              <div className="ml-auto flex items-center gap-1 bg-bg-surface2 rounded-lg p-0.5">
-                <button
-                  type="button"
-                  onClick={() => setShowMean(false)}
-                  className={clsx(
-                    "px-2.5 py-1 rounded-md text-xs transition-all",
-                    !showMean ? "bg-accent/20 text-accent" : "text-text-tertiary hover:text-text-secondary"
-                  )}
-                >Summe</button>
-                <button
-                  type="button"
-                  onClick={() => setShowMean(true)}
-                  className={clsx(
-                    "px-2.5 py-1 rounded-md text-xs transition-all",
-                    showMean ? "bg-accent/20 text-accent" : "text-text-tertiary hover:text-text-secondary"
-                  )}
-                ><BarChart2 className="w-3 h-3 inline mr-1" />Ø/M</button>
-              </div>
-            </div>
-          </div>
-        )}
+            {label}
+          </button>
+        ))}
       </div>
 
-      {/* Empirisch: wizard not completed warning */}
-      {analysisMode === "wizard" && !(capabilities?.wizard_available) && (
-        <div className="card border-warning/30 bg-warning/5 flex items-start gap-3 p-4">
-          <AlertTriangle className="w-5 h-5 text-warning shrink-0 mt-0.5" />
-          <div>
-            <p className="text-text-primary text-sm font-medium">Empirische Angaben noch nicht abgeschlossen</p>
-            <p className="text-text-tertiary text-xs mt-1">
-              Die Ansicht «Empirisch» nutzt die Planungsdaten aus deinen empirischen Angaben.
-              Vervollständige die Erfassung unter «Empirische Angaben», um eine Planung auf Basis deiner Lebenshaltungskosten zu erhalten.
-            </p>
-          </div>
-        </div>
-      )}
+      {/* ── KPI strip ──────────────────────────────────────── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
 
-      {/* Overview — mode-aware KPI cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {analysisMode === "past" ? (
-          <>
-            <div className="card">
-              <p className="text-text-tertiary text-xs uppercase tracking-wide mb-2">Einnahmen</p>
-              <p className="text-gain font-mono text-xl font-semibold">
-                {formatCHF(isFuturePeriod ? (stats?.total_income || 0) : filteredStats.income)}
-              </p>
+        {/* Netto */}
+        <div className="card flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-text-tertiary text-xs uppercase tracking-wide">Netto-Überschuss</span>
+            <div className="w-8 h-8 rounded-lg bg-bg-surface2 flex items-center justify-center">
+              {kpi.net >= 0
+                ? <TrendingUp className="w-4 h-4 text-gain" />
+                : <TrendingDown className="w-4 h-4 text-loss" />}
             </div>
-            <div className="card">
-              <p className="text-text-tertiary text-xs uppercase tracking-wide mb-2">
-                {isFuturePeriod ? "Erwartete Ausgaben" : "Ausgaben"}
-              </p>
-              <p className={clsx("font-mono text-xl font-semibold", isFuturePeriod ? "text-warning" : "text-loss")}>
-                {formatCHF(isFuturePeriod ? projectedTotal : filteredStats.expenses)}
-              </p>
-            </div>
-            <div className="card">
-              <p className="text-text-tertiary text-xs uppercase tracking-wide mb-2">Netto</p>
-              <p className={clsx(
-                "font-mono text-xl font-semibold",
-                (isFuturePeriod ? (stats?.net || 0) : filteredStats.net) >= 0 ? "text-gain" : "text-loss"
-              )}>
-                {formatCHF(isFuturePeriod ? (stats?.net || 0) : filteredStats.net)}
-              </p>
-            </div>
-            <div className="card">
-              <p className="text-text-tertiary text-xs uppercase tracking-wide mb-2">Transaktionen</p>
-              <p className="text-text-primary font-mono text-xl font-semibold">
-                {isFuturePeriod ? (stats?.transaction_count || 0) : filteredStats.count}
-              </p>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="card">
-              <p className="text-text-tertiary text-xs uppercase tracking-wide mb-2">Einnahmen</p>
-              <p className="text-gain font-mono text-xl font-semibold">{formatCHF(multiAnalysis?.income || 0)}</p>
-              <p className="text-text-tertiary text-xs mt-1 truncate">{range.label}</p>
-            </div>
-            <div className="card">
-              <p className="text-text-tertiary text-xs uppercase tracking-wide mb-2">Ausgaben</p>
-              <p className="text-loss font-mono text-xl font-semibold">{formatCHF(multiAnalysis?.total_expenses || 0)}</p>
-              <p className="text-text-tertiary text-xs mt-1 truncate">{range.label}</p>
-            </div>
-            <div className="card">
-              <p className="text-text-tertiary text-xs uppercase tracking-wide mb-2">Netto</p>
-              {(() => {
-                const net = (multiAnalysis?.income || 0) - (multiAnalysis?.total_expenses || 0);
-                return (
-                  <p className={clsx("font-mono text-xl font-semibold", net >= 0 ? "text-gain" : "text-loss")}>
-                    {formatCHF(net)}
-                  </p>
-                );
-              })()}
-              <p className="text-text-tertiary text-xs mt-1 truncate">{range.label}</p>
-            </div>
-            <div className="card">
-              <p className="text-text-tertiary text-xs uppercase tracking-wide mb-2">Sparquote</p>
-              <p className={clsx("font-mono text-xl font-semibold", (multiAnalysis?.savings_rate || 0) >= 0 ? "text-gain" : "text-loss")}>
-                {(multiAnalysis?.savings_rate || 0).toFixed(1)} %
-              </p>
-              <p className="text-text-tertiary text-xs mt-1">% Sparquote · {multiAnalysis?.categories.length || 0} Pos.</p>
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Recurring Expenses Summary (only for future months) */}
-      {isFuturePeriod && recurringExpenses.length > 0 && (
-        <div className="card bg-accent/5 border-accent/20">
-          <div className="flex items-center gap-2 mb-4">
-            <RefreshCw className="w-4 h-4 text-accent" />
-            <h2 className="text-text-primary font-semibold text-sm">Wiederkehrende Ausgaben (Prognose)</h2>
           </div>
-          <p className="text-text-tertiary text-xs mb-4">
-            Basierend auf {recurringExpenses.reduce((sum, r) => sum + r.basedOn, 0)} wiederkehrenden Transaktionen aus den letzten 6 Monaten
+          <p className={clsx(
+            "text-2xl font-mono font-semibold",
+            kpi.net >= 0 ? "text-gain" : "text-loss",
+          )}>
+            {kpi.net >= 0 ? "+" : ""}{formatCHF(kpi.net)}
           </p>
-          <div className="flex flex-wrap gap-2">
-            {recurringExpenses.slice(0, 5).map((exp) => (
-              <div
-                key={exp.category}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-bg-card border border-border/50 text-xs"
-              >
-                <span className="text-text-secondary">{exp.category}</span>
-                <span className="text-text-primary font-mono">{formatCHF(exp.amount)}</span>
-                <span className="text-text-tertiary">({exp.frequency})</span>
-                <span className="text-accent">{exp.confidence}%</span>
-              </div>
-            ))}
-          </div>
+          <p className="text-text-tertiary text-xs">
+            {formatCHF(kpi.income)} Einnahmen · {formatCHF(kpi.expenses)} Ausgaben
+          </p>
         </div>
-      )}
 
-      {/* Aktionspunkte — Sparpotenzial vs. Peer-Group */}
-      {showPeerComparison &&
-        peerData?.opportunities &&
-        peerData.opportunities.length > 0 && (
-        <div className="card border-orange-800/40 bg-orange-900/5">
+        {/* Ausgaben Ist vs Soll */}
+        <div className="card flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-text-tertiary text-xs uppercase tracking-wide">Ausgaben</span>
+            <div className="w-8 h-8 rounded-lg bg-bg-surface2 flex items-center justify-center">
+              <Wallet className="w-4 h-4 text-text-tertiary" />
+            </div>
+          </div>
+          <p className="text-2xl font-mono font-semibold text-text-primary">
+            {formatCHF(kpi.expenses)}
+          </p>
+          {totalPlanned > 0 && (
+            <div>
+              <p className="text-text-tertiary text-xs mb-1">
+                von {formatCHF(totalPlanned)} geplant
+              </p>
+              <div className="h-1.5 bg-bg-surface2 rounded-full overflow-hidden">
+                <div
+                  className={clsx(
+                    "h-full rounded-full transition-all duration-500",
+                    kpi.expenses > totalPlanned ? "bg-loss" : "bg-accent",
+                  )}
+                  style={{ width: `${Math.min(100, (kpi.expenses / totalPlanned) * 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Budget-Ausschöpfung */}
+        <div className="card flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-text-tertiary text-xs uppercase tracking-wide">Ausschöpfung</span>
+            <div className="w-8 h-8 rounded-lg bg-bg-surface2 flex items-center justify-center">
+              <Target className="w-4 h-4 text-text-tertiary" />
+            </div>
+          </div>
+          {utilisation !== null ? (
+            <>
+              <p className={clsx(
+                "text-2xl font-mono font-semibold",
+                utilisation > 100 ? "text-loss" : utilisation > 80 ? "text-warning" : "text-gain",
+              )}>
+                {utilisation}%
+              </p>
+              <p className="text-text-tertiary text-xs">
+                {utilisation > 100
+                  ? `${utilisation - 100}% über Budget`
+                  : utilisation > 80
+                    ? "Nahe am Limit"
+                    : "Im grünen Bereich"}
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-2xl font-mono font-semibold text-text-disabled">—</p>
+              <p className="text-text-tertiary text-xs">
+                Kein Soll-Budget definiert
+              </p>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* ── Supercategory bars ─────────────────────────────── */}
+      <div className="card !p-0 overflow-hidden">
+        <div className="px-4 pt-4 pb-2 border-b border-border">
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-text-primary font-semibold text-sm">Ausgaben-Kategorien</h2>
+            <span className="text-text-tertiary text-xs">{range.label}</span>
+          </div>
+          {totalPlanned > 0 && (
+            <div className="flex items-center gap-4 mt-2 text-xs text-text-tertiary">
+              <span className="flex items-center gap-1.5">
+                <span className="w-3 h-1.5 rounded-full bg-accent/60 inline-block" />
+                Ist (Historisch)
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-3 h-1.5 rounded-full bg-white/20 inline-block" />
+                Soll (Empirisch)
+              </span>
+            </div>
+          )}
+        </div>
+
+        {mainRows.length === 0 && (
+          <p className="text-text-tertiary text-sm text-center py-10">
+            Keine Daten für den gewählten Zeitraum.
+          </p>
+        )}
+
+        <div className="divide-y divide-border/40">
+          {mainRows.map((row) => (
+            <SuperCategoryBar
+              key={row.sc.id}
+              superCategory={row.sc}
+              actual={row.actual > 0 ? row.actual : undefined}
+              planned={row.planned > 0 ? row.planned : undefined}
+              subItems={row.subItems}
+              onClick={() => openDrillDown(row)}
+            />
+          ))}
+
+          {/* Sonstiges (collapsed by default) */}
+          {sonstigesRow && (
+            <>
+              <button
+                type="button"
+                className="w-full flex items-center justify-between px-4 py-2.5 text-text-tertiary hover:text-text-primary text-xs transition-colors"
+                onClick={() => setShowSonstiges((v) => !v)}
+              >
+                <span className="flex items-center gap-1.5">
+                  {showSonstiges ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                  Sonstiges
+                  {sonstigesRow.actual > 0 && ` · ${formatCHF(sonstigesRow.actual)}`}
+                </span>
+              </button>
+              {showSonstiges && (
+                <SuperCategoryBar
+                  superCategory={sonstigesRow.sc}
+                  actual={sonstigesRow.actual > 0 ? sonstigesRow.actual : undefined}
+                  planned={sonstigesRow.planned > 0 ? sonstigesRow.planned : undefined}
+                  subItems={sonstigesRow.subItems}
+                  onClick={() => openDrillDown(sonstigesRow)}
+                />
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* ── Peer comparison (collapsed) ────────────────────── */}
+      {capabilities?.peer_data_available && (
+        <div className="card !p-0 overflow-hidden">
           <button
             type="button"
-            onClick={() => setPeerOpportunitiesOpen((o) => !o)}
-            className="flex w-full items-center gap-2 text-left rounded-md -mx-1 px-1 py-1.5 hover:bg-orange-950/25 transition-colors"
-            aria-expanded={peerOpportunitiesOpen}
-            aria-controls="peer-opportunities-panel"
-            id="peer-opportunities-toggle"
+            className="w-full flex items-center justify-between px-4 py-3 text-sm hover:bg-bg-surface2 transition-colors"
+            onClick={() => setShowPeer((v) => !v)}
           >
-            <Lightbulb className="w-4 h-4 text-orange-400 shrink-0" aria-hidden />
-            <h2 className="text-text-primary font-semibold text-sm">Sparpotenzial vs. Peer-Group</h2>
-            <span className="text-xs text-text-tertiary bg-bg-surface2 px-2 py-0.5 rounded-full shrink-0">
-              {peerData.opportunities.length} Aktionspunkt{peerData.opportunities.length !== 1 ? "e" : ""}
+            <span className="flex items-center gap-2 text-text-secondary font-medium">
+              <Lightbulb className="w-4 h-4 text-warning" />
+              Peer-Vergleich (Schweizer Durchschnitt)
             </span>
-            <ChevronDown
-              className={clsx(
-                "w-4 h-4 text-text-tertiary shrink-0 ml-auto transition-transform",
-                peerOpportunitiesOpen && "rotate-180"
-              )}
-              aria-hidden
-            />
+            {showPeer ? <ChevronUp className="w-4 h-4 text-text-tertiary" /> : <ChevronDown className="w-4 h-4 text-text-tertiary" />}
           </button>
-          {peerOpportunitiesOpen && (
-            <div id="peer-opportunities-panel" role="region" aria-labelledby="peer-opportunities-toggle" className="mt-4">
-              <div className="space-y-3">
-                {peerData.opportunities.map((opp: SavingsOpportunity) => (
-                  <div key={opp.peer_key} className="flex items-start gap-3 p-3 rounded-lg bg-bg-surface2/60 border border-border/30">
-                    <AlertTriangle className="w-4 h-4 text-orange-400 mt-0.5 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2 mb-1">
-                        <span className="text-text-primary text-sm font-medium">{displayCat(opp.category)}</span>
-                        <span className="text-orange-400 text-xs font-mono shrink-0">
-                          +{opp.excess_pct}% über Ø
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-4 mb-1.5">
-                        <span className="text-xs text-text-tertiary">
-                          Du: <span className="text-text-secondary font-mono">{formatCHF(opp.actual)}/M</span>
-                        </span>
-                        <span className="text-xs text-text-tertiary">
-                          Peer Ø: <span className="text-orange-400/80 font-mono">{formatCHF(opp.peer_benchmark)}/M</span>
-                        </span>
-                        <span className="text-xs text-gain font-mono ml-auto">
-                          → spare {formatCHF(opp.monthly_saving)}/M
-                        </span>
-                      </div>
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-text-tertiary w-8">Du</span>
-                          <div className="flex-1 h-1.5 bg-bg-surface2 rounded-full overflow-hidden">
-                            <div className="h-full bg-orange-500/70 rounded-full" style={{ width: "100%" }} />
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-text-tertiary w-8">Ø</span>
-                          <div className="flex-1 h-1.5 bg-bg-surface2 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-accent/60 rounded-full"
-                              style={{ width: `${Math.round((opp.peer_benchmark / opp.actual) * 100)}%` }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+
+          {showPeer && peerData && (
+            <div className="border-t border-border px-4 py-4 space-y-4">
               {peerData.peer_info && (
-                <p className="text-xs text-text-tertiary mt-3 pt-3 border-t border-border/20">
-                  Vergleichsgruppe: {peerData.peer_info.age_range} Jahre · {peerData.peer_info.household_type} · {peerData.peer_info.peer_count.toLocaleString("de-CH")} Personen · Sparquote Ø {peerData.peer_info.savings_rate_pct}%
-                </p>
+                <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-text-tertiary border-b border-border pb-3">
+                  <span>Altersgruppe: <strong className="text-text-secondary">{peerData.peer_info.age_range}</strong></span>
+                  <span>Haushalt: <strong className="text-text-secondary">{peerData.peer_info.household_type}</strong></span>
+                  <span>Medianeinkommen: <strong className="text-text-secondary">{formatCHF(peerData.peer_info.median_income)}/Monat</strong></span>
+                  <span>Sparquote Peers: <strong className="text-text-secondary">{peerData.peer_info.savings_rate_pct}%</strong></span>
+                </div>
+              )}
+              <div className="space-y-3">
+                {peerData.categories
+                  .filter((c) => c.peer_benchmark != null && (c.actual ?? 0) > 0)
+                  .sort((a, b) => (b.actual ?? 0) - (a.actual ?? 0))
+                  .slice(0, 8)
+                  .map((cat) => {
+                    const sc = resolveSuperCategory(cat.category);
+                    const peerMax = Math.max(cat.actual ?? 0, cat.peer_benchmark ?? 0, 1);
+                    const actPct  = Math.min(100, ((cat.actual  ?? 0) / peerMax) * 100);
+                    const peerPct = Math.min(100, ((cat.peer_benchmark ?? 0) / peerMax) * 100);
+                    const isOver  = (cat.actual ?? 0) > (cat.peer_benchmark ?? 0);
+                    return (
+                      <div key={cat.category}>
+                        <div className="flex items-center justify-between mb-1 text-xs">
+                          <span className="text-text-secondary flex items-center gap-1">
+                            <span>{sc.emoji}</span>{cat.category}
+                          </span>
+                          <div className="flex items-center gap-2 font-mono">
+                            <span className={isOver ? "text-loss" : "text-text-primary"}>
+                              {formatCHF(cat.actual ?? 0)}
+                            </span>
+                            <span className="text-text-disabled">/</span>
+                            <span className="text-text-tertiary">Ø {formatCHF(cat.peer_benchmark ?? 0)}</span>
+                          </div>
+                        </div>
+                        <div className="relative h-1.5 bg-bg-surface2 rounded-full overflow-hidden">
+                          {/* Peer benchmark reference line */}
+                          <div
+                            className="absolute top-0 bottom-0 left-0 rounded-full opacity-30"
+                            style={{ width: `${peerPct}%`, backgroundColor: sc.color }}
+                          />
+                          {/* Actual */}
+                          <div
+                            className="absolute top-0 bottom-0 left-0 rounded-full opacity-80"
+                            style={{
+                              width: `${actPct}%`,
+                              backgroundColor: isOver ? "#f87171" : sc.color,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+
+              {/* Savings opportunities */}
+              {peerData.opportunities && peerData.opportunities.length > 0 && (
+                <div className="border-t border-border pt-3">
+                  <p className="text-text-tertiary text-xs font-semibold uppercase tracking-wide mb-2">
+                    Einspar-Potenzial
+                  </p>
+                  <div className="space-y-2">
+                    {peerData.opportunities.slice(0, 3).map((opp) => (
+                      <div
+                        key={opp.category}
+                        className="flex items-start gap-2 bg-warning/5 border border-warning/20 rounded-lg px-3 py-2"
+                      >
+                        <Lightbulb className="w-3.5 h-3.5 text-warning shrink-0 mt-0.5" />
+                        <p className="text-text-secondary text-xs">{opp.action}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           )}
         </div>
       )}
 
-      {/* Category budgets — unified mode-aware card */}
-      <div className="card">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-text-primary font-semibold text-sm">
-            {analysisMode === "past"
-              ? (isFuturePeriod ? "Erwartete Ausgaben nach Kategorie" : "Budgets nach Kategorie")
-              : analysisMode === "wizard"
-                ? "Budgets nach Kategorie — Empirisch"
-                : "Budgets nach Kategorie — Kombiniert"}
-          </h2>
-          <div className="flex items-center gap-3">
-            {showPeerComparison && peerData?.peer_info && (
-              <div className="flex items-center gap-3 text-xs text-text-tertiary">
-                {analysisMode !== "past" && (
-                  <span className="flex items-center gap-1">
-                    <span className="inline-block w-3 h-1.5 rounded-full bg-violet-500/70" />
-                    Empirisch
-                  </span>
-                )}
-                <span className="flex items-center gap-1">
-                  <span className="inline-block w-3 h-1.5 rounded-full bg-accent" />
-                  {analysisMode === "past" ? "Du" : "Ist"}
-                </span>
-                {analysisMode === "combined" && (
-                  <span className="flex items-center gap-1">
-                    <span className="inline-block w-3 h-1.5 rounded-full bg-violet-500/50" />
-                    Kombiniert
-                  </span>
-                )}
-                <span className="flex items-center gap-1">
-                  <span className="inline-block w-3 h-1.5 rounded-full bg-orange-500/70" />
-                  Peer Ø ({peerData.peer_info.age_range} J. · {peerData.peer_info.household_type})
-                </span>
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={() => analysisMode === "wizard" ? setShowWizardEditor(true) : setShowEditor(true)}
-              className="flex items-center justify-center p-2 rounded-lg text-text-secondary border border-border/50 hover:bg-bg-surface2 hover:text-text-primary transition-colors"
-              title={analysisMode === "wizard" ? "Empirische Budgets bearbeiten" : "Transaktionen bearbeiten"}
-              aria-label={analysisMode === "wizard" ? "Empirische Budgets bearbeiten" : "Transaktionen bearbeiten"}
-            >
-              <Pencil className="w-3.5 h-3.5" aria-hidden />
-            </button>
-          </div>
-        </div>
-
-        {analysisMode === "past" ? (
-          /* ── Historisch: freq-filtered transaction bars ──────────── */
-          <div className="space-y-4">
-            {(() => {
-              const cats = isFuturePeriod ? allCategories : historischCategories;
-              const maxSpent = cats[0]?.total ?? 1;
-              return cats.map((cat: { category: string; total: number; isProjected?: boolean; frequency?: string; confidence?: number }) => {
-                const spent = cat.total;
-                const inlinePeer = peerBenchmarkByCat.get(cat.category) ?? null;
-                const showPeerBar = showPeerComparison && inlinePeer != null;
-                const compMax = Math.max(spent, showPeerBar ? inlinePeer : 0, maxSpent, 1);
-                return (
-                  <div key={cat.category}>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2">
-                        <span className="text-text-secondary text-sm">{displayCat(cat.category) || "Sonstige"}</span>
-                        {cat.isProjected && (
-                          <span className="inline-flex items-center gap-1 text-xs text-accent bg-accent/10 px-1.5 py-0.5 rounded">
-                            <Sparkles className="w-3 h-3" />
-                            {cat.frequency}
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-sm font-mono text-text-primary">{formatCHF(spent)}</span>
-                    </div>
-                    {showPeerBar ? (
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-text-tertiary w-14 shrink-0 text-right">Du</span>
-                          <div className="flex-1 h-2 bg-bg-surface2 rounded-full overflow-hidden">
-                            <div className="h-full bg-accent rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (spent / compMax) * 100)}%` }} />
-                          </div>
-                          <span className="text-xs font-mono text-text-primary w-20 shrink-0">{formatCHF(spent)}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-text-tertiary w-14 shrink-0 text-right">Peer Ø</span>
-                          <div className="flex-1 h-2 bg-bg-surface2 rounded-full overflow-hidden">
-                            <div className="h-full bg-orange-500/70 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (inlinePeer / compMax) * 100)}%` }} />
-                          </div>
-                          <span className="text-xs font-mono text-orange-400 w-20 shrink-0">{formatCHF(inlinePeer)}</span>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="h-2 bg-bg-surface2 rounded-full overflow-hidden">
-                        <div
-                          className={clsx("h-full rounded-full transition-all duration-500", cat.isProjected ? "bg-accent/60" : "bg-accent")}
-                          style={{ width: `${Math.min(100, (spent / compMax) * 100)}%` }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                );
-              });
-            })()}
-            {(isFuturePeriod ? allCategories : historischCategories).length === 0 && (
-              <p className="text-text-tertiary text-sm text-center py-8">
-                {isFuturePeriod ? "Keine wiederkehrenden Ausgaben erkannt." : "Keine Ausgaben in diesem Zeitraum"}
-              </p>
-            )}
-          </div>
-        ) : isMultiLoading ? (
-          <p className="text-text-tertiary text-sm text-center py-8">Analyse wird berechnet…</p>
-        ) : (
-          /* ── Empirisch / Kombiniert: unified planned + actual rows ── */
-          <div className="space-y-4">
-            {unifiedRows.map((row) => {
-              const { category, planned, blended, actual } = row;
-              const peerEx = showPeerComparison
-                ? peerExtrasForRow({ category, peer_key: row.peer_key ?? undefined, actual: actual ?? undefined } as CategoryBreakdown)
-                : null;
-              const peerVal = peerEx?.benchmark ?? null;
-              const compMax = Math.max(planned ?? 0, actual ?? 0, blended ?? 0, peerVal ?? 0, 1);
-              return (
-                <div key={category}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-text-secondary text-sm">{displayCat(category)}</span>
-                    <div className="flex items-center gap-3 text-xs font-mono">
-                      {planned != null && <span className="text-violet-400">{formatCHF(planned)}</span>}
-                      {actual != null && <span className="text-text-tertiary">Ist: {formatCHF(actual)}</span>}
-                      {blended != null && analysisMode === "combined" && (
-                        <span className={clsx(
-                          actual != null && planned != null ? "text-violet-400"
-                            : actual != null ? "text-blue-400" : "text-green-400"
-                        )}>∅ {formatCHF(blended)}</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    {planned != null && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-text-tertiary w-14 shrink-0 text-right">Empirisch</span>
-                        <div className="flex-1 h-2 bg-bg-surface2 rounded-full overflow-hidden">
-                          <div className="h-full bg-violet-500/70 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (planned / compMax) * 100)}%` }} />
-                        </div>
-                        <span className="text-xs font-mono text-violet-400 w-20 shrink-0">{formatCHF(planned)}</span>
-                      </div>
-                    )}
-                    {actual != null && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-text-tertiary w-14 shrink-0 text-right">Ist</span>
-                        <div className="flex-1 h-2 bg-bg-surface2 rounded-full overflow-hidden">
-                          <div className="h-full bg-accent rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (actual / compMax) * 100)}%` }} />
-                        </div>
-                        <span className="text-xs font-mono text-text-primary w-20 shrink-0">{formatCHF(actual)}</span>
-                      </div>
-                    )}
-                    {blended != null && analysisMode === "combined" && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-text-tertiary w-14 shrink-0 text-right">Kombiniert</span>
-                        <div className="flex-1 h-2 bg-bg-surface2 rounded-full overflow-hidden">
-                          <div
-                            className={clsx(
-                              "h-full rounded-full transition-all duration-500",
-                              actual != null && planned != null ? "bg-violet-500/50"
-                                : actual != null ? "bg-blue-500/70" : "bg-green-500/70"
-                            )}
-                            style={{ width: `${Math.min(100, (blended / compMax) * 100)}%` }}
-                          />
-                        </div>
-                        <span className={clsx(
-                          "text-xs font-mono w-20 shrink-0",
-                          actual != null && planned != null ? "text-violet-400"
-                            : actual != null ? "text-blue-400" : "text-green-400"
-                        )}>{formatCHF(blended)}</span>
-                      </div>
-                    )}
-                    {peerVal != null && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-text-tertiary w-14 shrink-0 text-right">Peer Ø</span>
-                        <div className="flex-1 h-2 bg-bg-surface2 rounded-full overflow-hidden">
-                          <div className="h-full bg-orange-500/70 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (peerVal / compMax) * 100)}%` }} />
-                        </div>
-                        <span className="text-xs font-mono text-orange-400 w-20 shrink-0">{formatCHF(peerVal)}</span>
-                      </div>
-                    )}
-                  </div>
-                  {planned != null && actual != null && (
-                    <p className="text-xs mt-0.5 text-right">
-                      {(() => {
-                        const delta = actual - planned;
-                        if (Math.abs(delta) < 0.5) return <span className="text-text-tertiary">im Rahmen der Planung</span>;
-                        return delta > 0
-                          ? <span className="text-loss">+{formatCHF(delta)} über Planung</span>
-                          : <span className="text-gain">{formatCHF(Math.abs(delta))} unter Planung</span>;
-                      })()}
-                    </p>
-                  )}
-                </div>
-              );
-            })}
-            {unifiedRows.length === 0 && (
-              <p className="text-text-tertiary text-sm text-center py-8">
-                {analysisMode === "wizard"
-                  ? "Keine Planungsdaten aus empirischen Angaben. Bitte unter «Empirische Angaben» abschliessen."
-                  : "Keine Daten für diesen Zeitraum verfügbar."}
-              </p>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Peer detail table (Vergangenheit + Peer einblenden) */}
-      {analysisMode === "past" &&
-        showPeerComparison &&
-        peerData &&
-        peerData.categories.length > 0 && (
-          <div className="card">
-            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-              <h2 className="text-text-primary font-semibold text-sm">
-                Peer-Vergleich: Deine Ausgaben vs. Benchmarks
-              </h2>
-              {peerData.peer_info && (
-                <span className="text-xs text-text-tertiary bg-bg-surface2 px-2 py-1 rounded">
-                  Vergleichsgruppe: {peerData.peer_info.age_range} Jahre ·{" "}
-                  {peerData.peer_info.household_type} ·{" "}
-                  {peerData.peer_info.peer_count.toLocaleString("de-CH")} Personen
-                </span>
-              )}
-            </div>
-            <div className="grid grid-cols-3 gap-3 mb-4">
-              <div className="bg-bg-surface2 rounded-lg p-3">
-                <p className="text-text-tertiary text-xs mb-1">Einnahmen</p>
-                <p className="text-gain font-mono font-semibold">{formatCHF(peerData.income)}</p>
-              </div>
-              <div className="bg-bg-surface2 rounded-lg p-3">
-                <p className="text-text-tertiary text-xs mb-1">Ausgaben</p>
-                <p className="text-loss font-mono font-semibold">{formatCHF(peerData.total_expenses)}</p>
-              </div>
-              <div className="bg-bg-surface2 rounded-lg p-3">
-                <p className="text-text-tertiary text-xs mb-1">Sparquote</p>
-                <p
-                  className={clsx(
-                    "font-mono font-semibold",
-                    peerData.savings_rate >= 0 ? "text-gain" : "text-loss"
-                  )}
-                >
-                  {peerData.savings_rate.toFixed(1)} %
-                </p>
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border/50 text-text-tertiary text-xs">
-                    <th className="text-left py-2 pr-3">Kategorie</th>
-                    <th className="text-right py-2 px-3">Deine Ausgaben</th>
-                    <th className="text-right py-2 px-3">Benchmark</th>
-                    <th className="text-right py-2 px-3">Delta</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/30">
-                  {peerData.categories.map((cat) => (
-                    <tr key={cat.category} className="hover:bg-bg-surface2/50">
-                      <td className="py-2 pr-3 text-text-secondary font-medium">{displayCat(cat.category)}</td>
-                      <td className="text-right py-2 px-3 font-mono text-text-primary">
-                        {cat.actual != null ? formatCHF(cat.actual) : "—"}
-                      </td>
-                      <td className="text-right py-2 px-3 font-mono text-text-tertiary">
-                        {cat.peer_benchmark != null ? formatCHF(cat.peer_benchmark) : "—"}
-                      </td>
-                      <td className="text-right py-2 px-3 font-mono">
-                        {cat.delta_vs_peer != null ? (
-                          <span
-                            className={clsx(
-                              "inline-flex items-center gap-1",
-                              cat.delta_vs_peer > 0 ? "text-loss" : "text-gain"
-                            )}
-                          >
-                            {cat.delta_vs_peer > 0 ? (
-                              <TrendingUp className="w-3 h-3" />
-                            ) : cat.delta_vs_peer < 0 ? (
-                              <TrendingDown className="w-3 h-3" />
-                            ) : (
-                              <Minus className="w-3 h-3" />
-                            )}
-                            {formatCHF(Math.abs(cat.delta_vs_peer))}
-                          </span>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {peerData.peer_info && (
-              <div className="mt-4 border-t border-border/30 pt-3 text-xs text-text-tertiary flex flex-wrap gap-4">
-                <span>
-                  Median-Einkommen Peer-Gruppe:{" "}
-                  <span className="text-text-secondary font-mono">
-                    {formatCHF(peerData.peer_info.median_income)}
-                  </span>
-                </span>
-                <span>
-                  Sparquote Peer-Gruppe:{" "}
-                  <span className="text-text-secondary">{peerData.peer_info.savings_rate_pct} %</span>
-                </span>
-                <span className="ml-auto text-slate-600">
-                  Grün = unter Durchschnitt (gut) · Rot = über Durchschnitt
-                </span>
-              </div>
-            )}
-          </div>
-        )}
-
-      {showEditor && (
-        <TransactionSidebarEditor
-          transactions={periodTransactions}
-          periodLabel={range.label}
-          onClose={() => setShowEditor(false)}
+      {/* ── Drill-down panel ───────────────────────────────── */}
+      {drillDown && (
+        <CategoryDrillDown
+          superCategory={drillDown.sc}
+          actual={drillDown.actual > 0 ? drillDown.actual : undefined}
+          planned={drillDown.planned > 0 ? drillDown.planned : undefined}
+          months={months}
+          subItems={drillDown.subItems}
+          transactions={drillDown.transactions}
+          onClose={closeDrillDown}
+          onEditWizard={capabilities?.wizard_available ? () => {
+            closeDrillDown();
+            setShowWizardEditor(true);
+          } : undefined}
+          onEditTransactions={() => {
+            closeDrillDown();
+            setShowTxnEditor(true);
+          }}
         />
       )}
 
-      {showWizardEditor && analysisMode === "wizard" && (
+      {/* ── Wizard budget sidebar ──────────────────────────── */}
+      {showWizardEditor && (
         <WizardBudgetSidebar
           periodLabel={range.label}
-          months={monthsInPeriod}
+          months={months}
           onClose={() => setShowWizardEditor(false)}
+        />
+      )}
+
+      {/* ── Transaction sidebar editor ─────────────────────── */}
+      {showTxnEditor && (
+        <TransactionSidebarEditor
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          transactions={filteredTxns as any[]}
+          periodLabel={range.label}
+          onClose={() => setShowTxnEditor(false)}
         />
       )}
     </div>

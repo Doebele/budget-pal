@@ -169,25 +169,55 @@ export const nivoTheme = {
 };
 
 // ── Category colors ───────────────────────────────────────────
+// NOTE: canonical colours now live in src/lib/categories.ts (getCategoryColor).
+// This map is kept for legacy compatibility but defers to SUPER_CATEGORIES.
 
 export const categoryColors: Record<string, string> = {
-  Groceries: "#4ade80",
-  "Food & Drink": "#fb923c",
+  // ── Wohnen (amber) ──────────────────────────────────────────
+  Housing: "#f0b429",
+  Wohnen: "#f0b429",
+  Utilities: "#f0b429",
+  Nebenkosten: "#f0b429",
+  // ── Essen & Trinken (lime) ───────────────────────────────────
+  Groceries: "#84cc16",
+  "Food & Drink": "#84cc16",
+  Lebensmittel: "#84cc16",
+  "Restaurant & Takeaway": "#84cc16",
+  // ── Mobilität (sky) ─────────────────────────────────────────
   Transport: "#38bdf8",
-  Travel: "#60a5fa",
-  Utilities: "#fbbf24",
-  Health: "#f472b6",
+  Travel: "#38bdf8",
+  Reisen: "#38bdf8",
+  "ÖV-Abonnements": "#38bdf8",
+  // ── Versicherungen & Gesundheit (violet) ─────────────────────
   Insurance: "#a78bfa",
-  Finance: "#3b82f6",
-  Housing: "#34d399",
-  Shopping: "#f87171",
-  Entertainment: "#c084fc",
-  Education: "#67e8f9",
+  Health: "#a78bfa",
+  Versicherungen: "#a78bfa",
+  Krankenkasse: "#a78bfa",
+  Gesundheit: "#a78bfa",
+  Fitness: "#a78bfa",
+  // ── Freizeit & Unterhaltung (orange) ─────────────────────────
+  Entertainment: "#fb923c",
+  Unterhaltung: "#fb923c",
+  "Freizeit & Unterhaltung": "#fb923c",
+  // ── Abonnements & Kommunikation (cyan) ───────────────────────
+  Abonnements: "#22d3ee",
+  Kommunikation: "#22d3ee",
+  Streaming: "#22d3ee",
+  // ── Shopping & Kleidung (pink) ───────────────────────────────
+  Shopping: "#ec4899",
+  Kleidung: "#ec4899",
+  // ── Bildung (indigo) ─────────────────────────────────────────
+  Education: "#6366f1",
+  Bildung: "#6366f1",
+  // ── Einnahmen / Sparen (emerald) ─────────────────────────────
+  Salary: "#10b981",
+  Sparen: "#10b981",
+  Investment: "#10b981",
+  // ── Sonstiges (slate) ────────────────────────────────────────
+  Finance: "#94a3b8",
   Services: "#94a3b8",
-  Taxes: "#f59e0b",
-  Salary: "#4ade80",
-  Investment: "#22d3ee",
-  Other: "#64748b",
+  Taxes: "#94a3b8",
+  Other: "#94a3b8",
 };
 
 // ── Formatters ────────────────────────────────────────────────
