@@ -7,12 +7,13 @@ import {
   isCurrentPeriod,
 } from "@/lib/granularity";
 
+/** Left-to-right: YTD → Jahr → Halbjahr → Quartal → Monat */
 const TABS: { value: TimeGranularity; label: string; title: string }[] = [
-  { value: "monthly",    label: "M",   title: "Monatlich" },
-  { value: "quarterly",  label: "Q",   title: "Vierteljährlich" },
-  { value: "halfyearly", label: "H",   title: "Halbjährlich" },
-  { value: "yearly",     label: "J",   title: "Jährlich" },
   { value: "ytd",        label: "YTD", title: "Jahr bis heute" },
+  { value: "yearly",     label: "J",   title: "Jährlich" },
+  { value: "halfyearly", label: "H",   title: "Halbjährlich" },
+  { value: "quarterly",  label: "Q",   title: "Vierteljährlich" },
+  { value: "monthly",    label: "M",   title: "Monatlich" },
 ];
 
 interface Props {

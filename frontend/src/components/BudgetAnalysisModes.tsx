@@ -19,7 +19,7 @@ const MODES: ModeOption[] = [
   {
     value: "wizard",
     label: "Empirisch",
-    description: "Basierend auf Setup-Wizard-Eingaben",
+    description: "Basierend auf empirischen Angaben",
     icon: <FlaskConical className="w-4 h-4" />,
   },
   {
@@ -52,7 +52,7 @@ export default function BudgetAnalysisModes({
           <button
             key={opt.value}
             onClick={() => !unavailable && onChange(opt.value)}
-            title={unavailable ? "Wizard-Daten fehlen — Onboarding zuerst abschliessen" : opt.description}
+            title={unavailable ? "Empirische Angaben fehlen — bitte zuerst unter «Empirische Angaben» erfassen" : opt.description}
             className={clsx(
               "flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-all",
               active

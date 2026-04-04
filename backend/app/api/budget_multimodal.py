@@ -27,6 +27,7 @@ from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.models import (
     Account, Budget, PeerGroupBenchmark, Scenario, Transaction, User,
+    WizardCategoryMapping,
 )
 
 logger = logging.getLogger(__name__)
@@ -54,6 +55,26 @@ WIZARD_TO_PEER: dict[str, str] = {
     "auto-amortisation": "transport",
     "sbb halbtax": "transport",
     "sbb ga 2. klasse": "transport",
+}
+
+# Default mapping: wizard budget label (lower) → transaction category name
+DEFAULT_WIZARD_TO_TXN: dict[str, str] = {
+    "miete": "Wohnen",
+    "hypothek": "Wohnen",
+    "hypothek & amortisation": "Wohnen",
+    "nebenkosten": "Nebenkosten",
+    "krankenkasse": "Versicherungen",
+    "zusatzversicherung": "Versicherungen",
+    "hausrat & haftpflicht": "Versicherungen",
+    "autoversicherung": "Versicherungen",
+    "lebensmittel": "Lebensmittel",
+    "freizeit & restaurant": "Restaurant & Takeaway",
+    "abonnements": "Abonnements",
+    "benzin / strom (auto)": "Transport",
+    "parkplatz": "Transport",
+    "auto-amortisation": "Transport",
+    "sbb halbtax": "Öv-Abonnements",
+    "sbb ga 2. klasse": "Öv-Abonnements",
 }
 
 # Maps transaction category → peer-group column key
@@ -305,6 +326,13 @@ async def multi_analysis(
     wizard_available = wizard_params is not None and len(wizard_budgets) > 0
     peer_data_available = peer_benchmark is not None
 
+    # ── Period length (used in wizard/combined scaling) ───────
+    months = max(
+        1,
+        (period_end.year - period_start.year) * 12
+        + (period_end.month - period_start.month) + 1,
+    )
+
     # ── Build category breakdown ──────────────────────────────
     categories: list[CategoryBreakdown] = []
     data_sources: list[str] = []
@@ -330,16 +358,30 @@ async def multi_analysis(
         for b in wizard_budgets:
             label = b.notes or "Sonstiges"
             wizard_totals[label] = wizard_totals.get(label, 0.0) + b.amount
-        for cat, planned in sorted(wizard_totals.items(), key=lambda x: -x[1]):
-            actual = actual_expenses.get(cat)
+
+        # Load category mappings (DB overrides + defaults)
+        mapping_result = await db.execute(
+            select(WizardCategoryMapping).where(WizardCategoryMapping.user_id == current_user.id)
+        )
+        user_mappings = {m.wizard_label.lower(): m.transaction_category for m in mapping_result.scalars()}
+
+        def resolve_txn_cat(wizard_label: str) -> Optional[str]:
+            lower = wizard_label.lower()
+            return user_mappings.get(lower) or DEFAULT_WIZARD_TO_TXN.get(lower)
+
+        # Scale monthly wizard amounts to the period for direct comparison with actuals
+        monthly_wizard_income = (wizard_params or {}).get("monthly_income", actual_income)
+        for cat, monthly_amount in sorted(wizard_totals.items(), key=lambda x: -x[1]):
+            txn_cat = resolve_txn_cat(cat)
+            actual_val = actual_expenses.get(txn_cat) if txn_cat else actual_expenses.get(cat)
             categories.append(CategoryBreakdown(
                 category=cat,
                 peer_key=WIZARD_TO_PEER.get(cat.lower()),
-                planned=round(planned, 2),
-                actual=round(actual, 2) if actual is not None else None,
+                planned=round(monthly_amount * months, 2),   # period total
+                actual=round(actual_val, 2) if actual_val is not None else None,
             ))
-        income = (wizard_params or {}).get("monthly_income", actual_income)
-        total_expenses = sum(wizard_totals.values())
+        income = monthly_wizard_income * months   # period total
+        total_expenses = sum(wizard_totals.values()) * months  # period total
         if actual_expenses:
             data_sources.append("transactions")
 
@@ -419,11 +461,8 @@ async def multi_analysis(
         total_expenses = sum(actual_expenses.values())
 
     # ── Top-level metrics ─────────────────────────────────────
-    months = max(
-        1,
-        (period_end.year - period_start.year) * 12
-        + (period_end.month - period_start.month) + 1,
-    )
+    # All modes now return period totals for income/total_expenses.
+    # Savings rate is computed from monthly figures for comparability.
     monthly_income = income / months if months > 1 else income
     monthly_expenses = total_expenses / months if months > 1 else total_expenses
     savings_rate = (
@@ -484,9 +523,9 @@ async def multi_analysis(
         mode=mode,
         period_start=period_start.isoformat(),
         period_end=period_end.isoformat(),
-        income=round(monthly_income, 2),
-        total_expenses=round(monthly_expenses, 2),
-        savings_rate=savings_rate,
+        income=round(income, 2),           # period total
+        total_expenses=round(total_expenses, 2),  # period total
+        savings_rate=savings_rate,          # monthly rate
         categories=categories,
         peer_info=peer_info,
         wizard_available=wizard_available,

@@ -660,18 +660,20 @@ function Step3({
   const userNetto = computeNettoEinkommen(data);
 
   function handleAccept() {
+    const applied = data.peerGroupDefaults ?? defaults;
     update({
-      peerGroupDefaults: defaults,
+      peerGroupDefaults: applied,
       peerGroupAccepted: true,
-      monthlyRent: defaults.housing,
-      groceries: defaults.groceries,
-      freizeit: defaults.dining_out + defaults.entertainment,
+      monthlyRent: applied.housing,
+      groceries: applied.groceries,
+      freizeit: applied.dining_out + applied.entertainment,
     });
   }
 
   function handleAdjust(key: keyof PeerGroupDefaults, value: number) {
+    const base = data.peerGroupDefaults ?? defaults;
     update({
-      peerGroupDefaults: { ...defaults, [key]: value },
+      peerGroupDefaults: { ...base, [key]: value },
     });
   }
 
@@ -1469,15 +1471,7 @@ function Step8({ data, update }: { data: WizardData; update: (p: Partial<WizardD
 
 // ── Review Screen ──────────────────────────────────────────────
 
-function ReviewScreen({
-  data,
-  onSubmit,
-  isSubmitting,
-}: {
-  data: WizardData;
-  onSubmit: () => void;
-  isSubmitting: boolean;
-}) {
+function ReviewScreen({ data }: { data: WizardData }) {
   const netto = computeNettoEinkommen(data);
   const age = new Date().getFullYear() - data.geburtsjahr;
   const yearsToRetirement = Math.max(data.zielRentenalter - age, 0);
@@ -1514,7 +1508,8 @@ function ReviewScreen({
           {data.vorname ? `Fast fertig, ${data.vorname}!` : "Zusammenfassung"}
         </h2>
         <p className="text-text-secondary text-sm max-w-sm mx-auto">
-          Überprüfe deine Angaben und erstelle deinen persönlichen Finanzplan.
+          Überprüfe deine Angaben. Unten rechts kannst du den Finanzplan erstellen — dein Fortschritt
+          bleibt bei jedem Schritt gespeichert.
         </p>
       </div>
 
@@ -1556,25 +1551,6 @@ function ReviewScreen({
         </div>
       </div>
 
-      <button
-        type="button"
-        className="btn-primary w-full py-4 text-base font-semibold flex items-center justify-center gap-2"
-        onClick={onSubmit}
-        disabled={isSubmitting}
-      >
-        {isSubmitting ? (
-          <>
-            <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-            Finanzplan wird erstellt…
-          </>
-        ) : (
-          <>
-            <ArrowRight className="w-5 h-5" />
-            Finanzplan erstellen
-          </>
-        )}
-      </button>
-
       <p className="text-text-tertiary text-xs text-center leading-relaxed px-4">
         Deine Daten werden verschlüsselt gespeichert und nur zur Berechnung deines persönlichen
         Finanzplans verwendet. BudgetPal gibt keine Daten an Dritte weiter.
@@ -1595,6 +1571,15 @@ function loadDraft(): WizardData {
     if (saved) return { ...DEFAULT_WIZARD_DATA, ...JSON.parse(saved) };
   } catch {}
   return DEFAULT_WIZARD_DATA;
+}
+
+/** Persist full wizard state (called on every „Weiter“ / before submit). */
+function persistWizardDraft(data: WizardData) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch (e) {
+    console.warn("Wizard draft could not be saved:", e);
+  }
 }
 
 export default function Wizard() {
@@ -1642,6 +1627,7 @@ export default function Wizard() {
 
   async function goNext() {
     if (!canGoNext()) return;
+    persistWizardDraft(wizardData);
     setDirection("forward");
     setAnimating(true);
     await new Promise((r) => setTimeout(r, 180));
@@ -1654,6 +1640,7 @@ export default function Wizard() {
   }
 
   async function goBack() {
+    persistWizardDraft(wizardData);
     setDirection("back");
     setAnimating(true);
     await new Promise((r) => setTimeout(r, 180));
@@ -1666,6 +1653,7 @@ export default function Wizard() {
   }
 
   async function handleSubmit() {
+    persistWizardDraft(wizardData);
     setIsSubmitting(true);
     try {
       const subscriptionTotal = COMMON_SUBSCRIPTIONS
@@ -1708,12 +1696,14 @@ export default function Wizard() {
             <span className="font-display font-semibold text-text-primary text-sm">
               Budget<span className="text-accent">Pal</span>
             </span>
-            {!isReview && (
-              <span className="ml-auto text-text-tertiary text-xs">Setup-Assistent</span>
-            )}
+            <span className="ml-auto text-text-tertiary text-xs">Empirische Angaben</span>
           </div>
 
-          {!isReview && (
+          {isReview ? (
+            <p className="text-text-tertiary text-xs text-center md:text-left">
+              Zusammenfassung — alle Schritte ausgefüllt
+            </p>
+          ) : (
             <StepIndicator currentStep={currentStep} totalSteps={TOTAL_STEPS} />
           )}
 
@@ -1732,7 +1722,7 @@ export default function Wizard() {
       </header>
 
       {/* ── Content ────────────────────────────── */}
-      <main className="flex-1 px-4 py-8">
+      <main className="flex-1 px-4 py-8 pb-28">
         <div className="max-w-2xl mx-auto">
           <div
             className={clsx(
@@ -1745,11 +1735,7 @@ export default function Wizard() {
             )}
           >
             {isReview ? (
-              <ReviewScreen
-                data={wizardData}
-                onSubmit={handleSubmit}
-                isSubmitting={isSubmitting}
-              />
+              <ReviewScreen data={wizardData} />
             ) : (
               stepComponents[currentStep]
             )}
@@ -1757,71 +1743,76 @@ export default function Wizard() {
         </div>
       </main>
 
-      {/* ── Navigation ─────────────────────────── */}
-      {!isReview && (
-        <nav className="sticky bottom-0 bg-bg/95 backdrop-blur border-t border-border/50 px-4 py-3">
-          <div className="max-w-2xl mx-auto flex items-center gap-3">
-            {currentStep > 1 ? (
-              <button
-                type="button"
-                className="btn-secondary flex items-center gap-1.5"
-                onClick={goBack}
-                disabled={animating}
-              >
-                <ChevronLeft className="w-4 h-4" />
-                Zurück
-              </button>
-            ) : (
-              <div />
-            )}
+      {/* ── Navigation (always visible) ────────── */}
+      <nav className="sticky bottom-0 z-10 bg-bg/95 backdrop-blur border-t border-border/50 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="max-w-2xl mx-auto flex items-center gap-3">
+          {(isReview || currentStep > 1) && (
+            <button
+              type="button"
+              className="btn-secondary flex items-center gap-1.5 shrink-0"
+              onClick={goBack}
+              disabled={animating || isSubmitting}
+            >
+              <ChevronLeft className="w-4 h-4" />
+              {isReview ? "Zurück zu den Zielen" : "Zurück"}
+            </button>
+          )}
+          {!(isReview || currentStep > 1) && <div />}
 
-            <div className="flex-1" />
+          <div className="flex-1 min-w-0" />
 
-            {/* Optional skip for steps 3, 6, 7 */}
-            {(currentStep === 3 || currentStep === 6 || currentStep === 7) && (
-              <button
-                type="button"
-                className="btn-ghost text-sm"
-                onClick={goNext}
-                disabled={animating}
-              >
-                Überspringen
-              </button>
-            )}
+          {!isReview && (currentStep === 3 || currentStep === 6 || currentStep === 7) && (
+            <button
+              type="button"
+              className="btn-ghost text-sm shrink-0"
+              onClick={goNext}
+              disabled={animating}
+            >
+              Überspringen
+            </button>
+          )}
 
+          {!isReview ? (
             <button
               type="button"
               className={clsx(
-                "btn-primary flex items-center gap-1.5",
+                "btn-primary flex items-center gap-1.5 shrink-0",
                 !canGoNext() && "opacity-50 cursor-not-allowed"
               )}
               onClick={goNext}
               disabled={animating || !canGoNext()}
             >
               {currentStep === TOTAL_STEPS ? (
-                <>Weiter zur Übersicht <ArrowRight className="w-4 h-4" /></>
+                <>
+                  Weiter zur Übersicht <ArrowRight className="w-4 h-4" />
+                </>
               ) : (
-                <>Weiter <ChevronRight className="w-4 h-4" /></>
+                <>
+                  Weiter <ChevronRight className="w-4 h-4" />
+                </>
               )}
             </button>
-          </div>
-        </nav>
-      )}
-
-      {isReview && !isSubmitting && (
-        <nav className="sticky bottom-0 bg-bg/95 backdrop-blur border-t border-border/50 px-4 py-3">
-          <div className="max-w-2xl mx-auto">
+          ) : (
             <button
               type="button"
-              className="btn-ghost flex items-center gap-1.5 text-sm"
-              onClick={goBack}
+              className="btn-primary flex items-center gap-1.5 shrink-0"
+              onClick={handleSubmit}
+              disabled={isSubmitting}
             >
-              <ChevronLeft className="w-4 h-4" />
-              Zurück zu den Zielen
+              {isSubmitting ? (
+                <>
+                  <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                  Wird erstellt…
+                </>
+              ) : (
+                <>
+                  Finanzplan erstellen <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </button>
-          </div>
-        </nav>
-      )}
+          )}
+        </div>
+      </nav>
 
       {/* Slider thumb styling */}
       <style>{`

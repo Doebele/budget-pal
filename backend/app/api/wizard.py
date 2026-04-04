@@ -15,11 +15,14 @@ POST /wizard/complete
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone, date
-from typing import List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic.alias_generators import to_camel
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -35,6 +38,7 @@ from app.models.models import (
     PensionPillar,
     Scenario,
     User,
+    UserWizardConfig,
 )
 
 router = APIRouter()
@@ -63,7 +67,16 @@ class Pillar3aAccountPayload(BaseModel):
 
 
 class WizardCompletePayload(BaseModel):
-    """Full wizard data — mirrors the WizardData TypeScript interface."""
+    """Full wizard data — mirrors the WizardData TypeScript interface.
+
+    The frontend sends camelCase (e.g. housingMode, monthlyRent). We accept both
+    camelCase (via alias_generator) and snake_case (populate_by_name=True).
+    """
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,  # also accept snake_case directly
+    )
 
     # ── Step 1: Demographics
     vorname: str = ""
@@ -86,6 +99,9 @@ class WizardCompletePayload(BaseModel):
     ahv_rente: float = 0.0
     ahv_rente_enabled: bool = False
     estimated_netto_monthly: float = 0.0
+
+    # ── Step 3: Peer group (optional; user-adjusted BFS defaults)
+    peer_group_defaults: Optional[Dict[str, Any]] = None
 
     # ── Step 4: Housing
     housing_mode: Literal["miete", "hypothek"] = "miete"
@@ -271,10 +287,10 @@ async def wizard_peer_defaults(profile: PeerGroupProfileIn):
     "/complete",
     response_model=WizardSummary,
     status_code=status.HTTP_201_CREATED,
-    summary="Complete onboarding wizard",
+    summary="Empirische Angaben abschliessen (Onboarding)",
     description=(
-        "Accepts the full 8-step wizard payload and bootstraps the user's financial "
-        "profile: accounts, budgets, pension data, assets, and initial scenario."
+        "Akzeptiert die vollständigen Daten aus «Empirischen Angaben» und legt Konten, "
+        "Budgets, Vorsorge, Vermögen und ein Basisszenario an."
     ),
 )
 async def wizard_complete(
@@ -400,7 +416,7 @@ async def wizard_complete(
         annual_contribution=payload.bvg_jahresbeitrag,
         expected_return_rate=0.015,  # BVG Mindestzins
         retirement_age=payload.bvg_rentenalter,
-        notes=f"BVG Guthaben per Wizard-Onboarding | Rentenalter: {payload.bvg_rentenalter}",
+        notes=f"BVG Guthaben aus empirischen Angaben | Rentenalter: {payload.bvg_rentenalter}",
         as_of_date=_now(),
     )
     db.add(bvg)
@@ -417,7 +433,7 @@ async def wizard_complete(
             annual_contribution=acc_3a.annual_contribution,
             expected_return_rate=expected_return,
             retirement_age=payload.ziel_rentenalter,
-            notes=f"Strategie: {acc_3a.strategy} | Wizard-Import",
+            notes=f"Strategie: {acc_3a.strategy} | Import aus empirischen Angaben",
             as_of_date=_now(),
         )
         db.add(p3a)
@@ -433,7 +449,7 @@ async def wizard_complete(
             current_value=payload.stocks_value,
             currency="CHF",
             expected_return_rate=0.07,
-            notes="Wizard-Import",
+            notes="Import aus empirischen Angaben",
             as_of_date=_now(),
         ))
         assets_created += 1
@@ -463,7 +479,7 @@ async def wizard_complete(
             current_value=payload.crypto_value,
             currency="CHF",
             expected_return_rate=0.0,
-            notes="Wizard-Import — Marktwert zum Zeitpunkt des Onboardings",
+            notes="Import aus empirischen Angaben — Marktwert zum Zeitpunkt der Erfassung",
             as_of_date=_now(),
         ))
         assets_created += 1
@@ -475,7 +491,7 @@ async def wizard_complete(
             name="Sonstige Anlagen",
             current_value=payload.other_assets_value,
             currency="CHF",
-            notes="Wizard-Import",
+            notes="Import aus empirischen Angaben",
             as_of_date=_now(),
         ))
         assets_created += 1
@@ -514,10 +530,10 @@ async def wizard_complete(
 
     scenario = Scenario(
         user_id=current_user.id,
-        name="Finanzplan (Wizard-Onboarding)",
+        name="Finanzplan (empirische Angaben)",
         description=(
-            f"Automatisch erstelltes Basisszenario basierend auf Wizard-Daten "
-            f"von {_now().strftime('%d.%m.%Y')}. "
+            f"Automatisch erstelltes Basisszenario basierend auf empirischen Angaben "
+            f"vom {_now().strftime('%d.%m.%Y')}. "
             f"Kanton: {payload.kanton} | Haushalt: {payload.haushalt} | "
             f"Rentenalter: {payload.ziel_rentenalter}"
         ),
@@ -525,6 +541,23 @@ async def wizard_complete(
     )
     db.add(scenario)
     scenarios_created += 1
+
+    # ── 8b. Persist peer-group defaults snapshot (user-edited values) ──
+    if payload.peer_group_defaults is not None:
+        cfg_result = await db.execute(
+            select(UserWizardConfig).where(UserWizardConfig.user_id == current_user.id)
+        )
+        wizard_cfg = cfg_result.scalar_one_or_none()
+        blob = json.dumps(payload.peer_group_defaults, ensure_ascii=False)
+        if wizard_cfg:
+            wizard_cfg.peer_group_defaults_json = blob
+        else:
+            db.add(
+                UserWizardConfig(
+                    user_id=current_user.id,
+                    peer_group_defaults_json=blob,
+                )
+            )
 
     # ── 9. Commit ─────────────────────────────────────────────
     await db.commit()

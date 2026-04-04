@@ -76,6 +76,8 @@ class ArchivedTransactionResponse(BaseModel):
     currency: str
     category: Optional[str]
     deleted_at: Optional[datetime]
+    is_recurring: bool = False
+    periodicity: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -162,6 +164,27 @@ PERIODICITY_MONTHLY_FACTOR = {
     "yearly": 1.0 / 12,    # 1 time per year
 }
 
+_PERIODICITY_LIST_FILTER = frozenset({"weekly", "monthly", "quarterly", "halfyearly", "yearly"})
+
+
+def _apply_recurrence_list_filters(
+    filters: list,
+    *,
+    is_recurring: Optional[bool],
+    periodicity: Optional[str],
+) -> None:
+    """periodicity implies is_recurring=True and exact periodicity match."""
+    if periodicity:
+        if periodicity not in _PERIODICITY_LIST_FILTER:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Invalid periodicity filter (allowed: {', '.join(sorted(_PERIODICITY_LIST_FILTER))}).",
+            )
+        filters.append(Transaction.is_recurring.is_(True))
+        filters.append(Transaction.periodicity == periodicity)
+    elif is_recurring is not None:
+        filters.append(Transaction.is_recurring == is_recurring)
+
 async def get_user_transaction(
     transaction_id: int,
     current_user: User,
@@ -224,6 +247,8 @@ def _to_archived_response(t: Transaction) -> ArchivedTransactionResponse:
         currency=t.currency,
         category=t.category,
         deleted_at=t.deleted_at,
+        is_recurring=bool(t.is_recurring),
+        periodicity=t.periodicity,
     )
 
 
@@ -232,6 +257,13 @@ def _to_archived_response(t: Transaction) -> ArchivedTransactionResponse:
 @router.get("/archived", response_model=List[ArchivedTransactionResponse])
 async def list_archived_transactions(
     account_id: Optional[int] = Query(None),
+    is_recurring: Optional[bool] = Query(
+        None, description="If true, only recurring; if false, only non-recurring"
+    ),
+    periodicity: Optional[str] = Query(
+        None,
+        description="monthly|quarterly|halfyearly|yearly — implies is_recurring",
+    ),
     limit: int = Query(200, le=500),
     offset: int = Query(0),
     current_user: User = Depends(get_current_user),
@@ -244,6 +276,9 @@ async def list_archived_transactions(
     ]
     if account_id is not None:
         filters.append(Transaction.account_id == account_id)
+    _apply_recurrence_list_filters(
+        filters, is_recurring=is_recurring, periodicity=periodicity
+    )
 
     result = await db.execute(
         select(Transaction)
@@ -332,6 +367,13 @@ async def list_transactions(
     min_amount: Optional[float] = Query(None),
     max_amount: Optional[float] = Query(None),
     is_transfer: Optional[bool] = Query(None),
+    is_recurring: Optional[bool] = Query(
+        None, description="If true, only recurring; if false, only non-recurring"
+    ),
+    periodicity: Optional[str] = Query(
+        None,
+        description="monthly|quarterly|halfyearly|yearly — recurring with this rhythm",
+    ),
     limit: int = Query(100, le=1000),
     offset: int = Query(0),
     current_user: User = Depends(get_current_user),
@@ -366,6 +408,9 @@ async def list_transactions(
         filters.append(Transaction.amount <= max_amount)
     if is_transfer is not None:
         filters.append(Transaction.is_transfer == is_transfer)
+    _apply_recurrence_list_filters(
+        filters, is_recurring=is_recurring, periodicity=periodicity
+    )
 
     query = (
         select(Transaction)

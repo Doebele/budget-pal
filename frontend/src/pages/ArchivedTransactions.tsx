@@ -3,6 +3,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { transactionsApi, accountsApi } from "@/lib/api";
 import { DeletedTransactionsView, type DeletedTransactionRow } from "@/components/transactions/DeletedTransactionsView";
 import { AlertTriangle, X } from "lucide-react";
+import {
+  RECURRENCE_FILTER_OPTIONS,
+  recurrenceFilterToApiParams,
+  type RecurrenceFilterValue,
+} from "@/lib/recurrenceFilter";
 
 interface ArchivedApiRow {
   id: number;
@@ -14,11 +19,14 @@ interface ArchivedApiRow {
   currency: string;
   category?: string | null;
   deleted_at: string | null;
+  is_recurring?: boolean;
+  periodicity?: string | null;
 }
 
 export default function ArchivedTransactions() {
   const queryClient = useQueryClient();
   const [accountFilter, setAccountFilter] = useState<string>("");
+  const [recurrenceFilter, setRecurrenceFilter] = useState<RecurrenceFilterValue>("");
   const [purgeId, setPurgeId] = useState<number | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
 
@@ -28,11 +36,12 @@ export default function ArchivedTransactions() {
   });
 
   const { data: raw, isLoading } = useQuery({
-    queryKey: ["transactions-archived", accountFilter],
+    queryKey: ["transactions-archived", accountFilter, recurrenceFilter],
     queryFn: () =>
       transactionsApi
         .listArchived({
           account_id: accountFilter ? Number(accountFilter) : undefined,
+          ...recurrenceFilterToApiParams(recurrenceFilter),
         })
         .then((r) => r.data as ArchivedApiRow[]),
   });
@@ -48,6 +57,8 @@ export default function ArchivedTransactions() {
         amount: t.amount,
         category: t.category,
         deletedAt: t.deleted_at,
+        is_recurring: t.is_recurring,
+        periodicity: t.periodicity,
       })),
     [raw]
   );
@@ -81,20 +92,39 @@ export default function ArchivedTransactions() {
           <h1 className="text-2xl font-display text-text-primary">Archiv</h1>
           <p className="text-text-tertiary text-sm mt-0.5">Wiederherstellung weich gelöschter Transaktionen</p>
         </div>
-        <div className="flex flex-col gap-1">
-          <label className="label text-xs text-text-tertiary">Konto filtern</label>
-          <select
-            className="input w-full sm:w-64"
-            value={accountFilter}
-            onChange={(e) => setAccountFilter(e.target.value)}
-          >
-            <option value="">Alle Konten</option>
-            {(accounts || []).map((a: { id: number; name: string }) => (
-              <option key={a.id} value={String(a.id)}>
-                {a.name}
-              </option>
-            ))}
-          </select>
+        <div className="flex flex-col sm:flex-row gap-4 sm:items-end">
+          <div className="flex flex-col gap-1">
+            <label className="label text-xs text-text-tertiary">Konto filtern</label>
+            <select
+              className="input w-full sm:w-64"
+              value={accountFilter}
+              onChange={(e) => setAccountFilter(e.target.value)}
+            >
+              <option value="">Alle Konten</option>
+              {(accounts || []).map((a: { id: number; name: string }) => (
+                <option key={a.id} value={String(a.id)}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="label text-xs text-text-tertiary">Wiederkehrend</label>
+            <select
+              className="input w-full sm:w-64"
+              value={recurrenceFilter}
+              onChange={(e) =>
+                setRecurrenceFilter(e.target.value as RecurrenceFilterValue)
+              }
+              aria-label="Archiv nach Rhythmus filtern"
+            >
+              {RECURRENCE_FILTER_OPTIONS.map(({ value, label }) => (
+                <option key={value || "all"} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 

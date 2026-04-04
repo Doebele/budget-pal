@@ -11,6 +11,11 @@ import { Link } from "react-router-dom";
 import { clsx } from "clsx";
 import { getBankByName } from "@/data/banks-with-logos";
 import { TransactionOverviewHeader } from "@/components/transactions/TransactionOverviewHeader";
+import {
+  RECURRENCE_FILTER_OPTIONS,
+  recurrenceFilterToApiParams,
+  type RecurrenceFilterValue,
+} from "@/lib/recurrenceFilter";
 
 type RecurrenceType = "weekly" | "monthly" | "quarterly" | "halfyearly" | "yearly";
 
@@ -53,9 +58,10 @@ interface BudgetAnalysis {
 export default function Transactions() {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [recurrenceFilter, setRecurrenceFilter] = useState<RecurrenceFilterValue>("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editCategory, setEditCategory] = useState("");
-  const [granularity, setGranularity] = useState<TimeGranularity>("monthly");
+  const [granularity, setGranularity] = useState<TimeGranularity>("ytd");
   const [anchor, setAnchor] = useState<Date>(new Date());
   const queryClient = useQueryClient();
   const [viewMode, setViewMode] = useState("all");
@@ -89,12 +95,21 @@ export default function Transactions() {
   const periodEnd   = format(range.to,   "yyyy-MM-dd");
 
   const { data: transactions, isLoading } = useQuery({
-    queryKey: ["transactions", search, categoryFilter, granularity, anchor.toISOString(), viewMode],
+    queryKey: [
+      "transactions",
+      search,
+      categoryFilter,
+      recurrenceFilter,
+      granularity,
+      anchor.toISOString(),
+      viewMode,
+    ],
     queryFn: () =>
       transactionsApi
         .list({
           q: search || undefined,
           category: categoryFilter || undefined,
+          ...recurrenceFilterToApiParams(recurrenceFilter),
           account_id: viewMode === "all" ? undefined : Number(viewMode),
           start: periodStart,
           end: periodEnd,
@@ -172,7 +187,7 @@ export default function Transactions() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-display text-text-primary">Transaktionen</h1>
+          <h1 className="text-2xl font-display text-text-primary">Reale Angaben</h1>
           <p className="text-text-tertiary text-sm mt-0.5">
             {range.label} · {transactions?.length || 0} Einträge
           </p>
@@ -493,6 +508,20 @@ export default function Transactions() {
           <option value="">Alle Kategorien</option>
           {categories.map((cat) => (
             <option key={cat} value={cat}>{cat}</option>
+          ))}
+        </select>
+        <select
+          className="input w-auto min-w-[12rem]"
+          value={recurrenceFilter}
+          onChange={(e) =>
+            setRecurrenceFilter(e.target.value as RecurrenceFilterValue)
+          }
+          aria-label="Nach Wiederkehrend / Rhythmus filtern"
+        >
+          {RECURRENCE_FILTER_OPTIONS.map(({ value, label }) => (
+            <option key={value || "all"} value={value}>
+              {label}
+            </option>
           ))}
         </select>
       </div>

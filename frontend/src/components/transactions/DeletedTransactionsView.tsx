@@ -1,7 +1,7 @@
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { Archive, RotateCcw, Trash2 } from "lucide-react";
-import { formatCHF } from "@/lib/theme";
+import { formatCHF, PERIODICITY_LABELS } from "@/lib/theme";
 import { clsx } from "clsx";
 
 export interface DeletedTransactionRow {
@@ -13,6 +13,8 @@ export interface DeletedTransactionRow {
   deletedAt: string | null;
   accountId: number;
   accountName: string;
+  is_recurring?: boolean;
+  periodicity?: string | null;
 }
 
 interface DeletedTransactionsViewProps {
@@ -51,6 +53,7 @@ export function DeletedTransactionsView({
                 <th className="text-left px-4 py-3 font-medium">Konto</th>
                 <th className="text-left px-4 py-3 font-medium">Beschreibung</th>
                 <th className="text-left px-4 py-3 font-medium">Kategorie</th>
+                <th className="text-left px-4 py-3 font-medium">Rhythmus</th>
                 <th className="text-right px-4 py-3 font-medium">Betrag</th>
                 <th className="text-left px-4 py-3 font-medium">Gelöscht am</th>
                 <th className="text-right px-4 py-3 font-medium">Aktionen</th>
@@ -70,6 +73,13 @@ export function DeletedTransactionsView({
                   </td>
                   <td className="px-4 py-3 text-text-tertiary text-xs">
                     {txn.category || "—"}
+                  </td>
+                  <td className="px-4 py-3 text-text-tertiary text-xs whitespace-nowrap">
+                    {txn.is_recurring && txn.periodicity
+                      ? (PERIODICITY_LABELS[txn.periodicity] ?? txn.periodicity)
+                      : txn.is_recurring
+                        ? "Wiederkehrend"
+                        : "Einmalig"}
                   </td>
                   <td
                     className={clsx(

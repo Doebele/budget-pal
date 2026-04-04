@@ -1,10 +1,13 @@
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { ArrowUpRight, ArrowDownRight, Wallet, TrendingUp, Upload, ArrowRight, BarChart3, Target, FileUp } from "lucide-react";
+import { ArrowUpRight, ArrowDownRight, Wallet, TrendingUp, Upload, ArrowRight, BarChart3, Target, FileUp, Wand2 } from "lucide-react";
 import { transactionsApi, accountsApi } from "@/lib/api";
-import { formatCHF, colors } from "@/lib/theme";
-import { format, startOfMonth, endOfMonth } from "date-fns";
+import { formatCHF } from "@/lib/theme";
+import { format } from "date-fns";
 import SankeyChart from "@/components/charts/SankeyChart";
+import GranularityNavigator from "@/components/GranularityNavigator";
+import { computeDateRange, TimeGranularity } from "@/lib/granularity";
 import { clsx } from "clsx";
 
 // ── Stat card ─────────────────────────────────────────────────
@@ -13,12 +16,14 @@ function StatCard({
   label,
   value,
   delta,
+  periodHint,
   icon: Icon,
   colorClass = "text-text-primary",
 }: {
   label: string;
   value: string;
   delta?: number;
+  periodHint?: string;
   icon: React.ElementType;
   colorClass?: string;
 }) {
@@ -30,6 +35,11 @@ function StatCard({
           <Icon className="w-4 h-4 text-text-tertiary" />
         </div>
       </div>
+      {periodHint && (
+        <p className="text-text-tertiary text-xs -mt-2 truncate" title={periodHint}>
+          {periodHint}
+        </p>
+      )}
       <div>
         <p className={clsx("text-2xl font-mono font-semibold", colorClass)}>{value}</p>
         {delta !== undefined && (
@@ -46,13 +56,17 @@ function StatCard({
 // ── Main Dashboard ────────────────────────────────────────────
 
 export default function Dashboard() {
-  const now = new Date();
-  const monthStart = format(startOfMonth(now), "yyyy-MM-dd");
-  const monthEnd = format(endOfMonth(now), "yyyy-MM-dd");
+  const [granularity, setGranularity] = useState<TimeGranularity>("ytd");
+  const [anchor, setAnchor] = useState<Date>(() => new Date());
+
+  const range = useMemo(() => computeDateRange(granularity, anchor), [granularity, anchor]);
+  const periodStart = format(range.from, "yyyy-MM-dd");
+  const periodEnd = format(range.to, "yyyy-MM-dd");
 
   const { data: stats } = useQuery({
-    queryKey: ["transaction-stats", monthStart, monthEnd],
-    queryFn: () => transactionsApi.stats({ start: monthStart, end: monthEnd }).then((r) => r.data),
+    queryKey: ["transaction-stats", granularity, anchor.toISOString(), periodStart, periodEnd],
+    queryFn: () =>
+      transactionsApi.stats({ start: periodStart, end: periodEnd }).then((r) => r.data),
   });
 
   const { data: accounts } = useQuery({
@@ -65,33 +79,37 @@ export default function Dashboard() {
     queryFn: () => transactionsApi.list({ limit: 8 }).then((r) => r.data),
   });
 
-  const { data: monthlySummary } = useQuery({
-    queryKey: ["monthly-summary", now.getFullYear()],
-    queryFn: () => transactionsApi.monthlySummary({ year: now.getFullYear() }).then((r) => r.data),
-  });
-
   const totalBalance = (accounts || []).reduce((sum: number, a: { balance: number }) => sum + a.balance, 0);
 
-  // Build Sankey data from monthly stats
-  const sankeyData = buildSankeyData(stats, monthlySummary?.[monthlySummary?.length - 1]);
+  const sankeyData = buildSankeyData(stats);
 
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-2xl font-display text-text-primary">Dashboard</h1>
-          <p className="text-text-tertiary text-sm mt-0.5">{format(now, "MMMM yyyy")}</p>
+          <p className="text-text-tertiary text-sm mt-0.5">{range.label}</p>
         </div>
-        <div className="flex gap-2">
-          <Link to="/import" className="btn-secondary flex items-center gap-2">
-            <Upload className="w-4 h-4" />
-            Import
-          </Link>
-          <Link to="/projections" className="btn-primary flex items-center gap-2">
-            <TrendingUp className="w-4 h-4" />
-            Prognosen
-          </Link>
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center lg:justify-end">
+          <GranularityNavigator
+            granularity={granularity}
+            anchor={anchor}
+            onChange={(g, a) => {
+              setGranularity(g);
+              setAnchor(a);
+            }}
+          />
+          <div className="flex gap-2 flex-wrap">
+            <Link to="/import" className="btn-secondary flex items-center gap-2">
+              <Upload className="w-4 h-4" />
+              Import
+            </Link>
+            <Link to="/projections" className="btn-primary flex items-center gap-2">
+              <TrendingUp className="w-4 h-4" />
+              Prognosen
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -104,19 +122,22 @@ export default function Dashboard() {
           colorClass="text-text-primary"
         />
         <StatCard
-          label="Einnahmen (Monat)"
+          label="Einnahmen"
+          periodHint={range.label}
           value={formatCHF(stats?.total_income || 0)}
           icon={ArrowUpRight}
           colorClass="text-gain"
         />
         <StatCard
-          label="Ausgaben (Monat)"
+          label="Ausgaben"
+          periodHint={range.label}
           value={formatCHF(stats?.total_expenses || 0)}
           icon={ArrowDownRight}
           colorClass="text-loss"
         />
         <StatCard
-          label="Netto (Monat)"
+          label="Netto"
+          periodHint={range.label}
           value={formatCHF((stats?.total_income || 0) - (stats?.total_expenses || 0))}
           icon={TrendingUp}
           colorClass={(stats?.net || 0) >= 0 ? "text-gain" : "text-loss"}
@@ -127,14 +148,15 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         {/* Sankey cash flow */}
         <div className="xl:col-span-2 card">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-text-primary font-semibold text-sm">Cashflow — {format(now, "MMMM")}</h2>
+          <div className="mb-4">
+            <h2 className="text-text-primary font-semibold text-sm">Cashflow</h2>
+            <p className="text-text-tertiary text-xs mt-0.5">{range.label}</p>
           </div>
           {sankeyData.nodes.length > 2 ? (
             <SankeyChart data={sankeyData} height={280} />
           ) : (
-            <div className="h-64 flex items-center justify-center text-text-tertiary text-sm">
-              Noch keine Transaktionen in diesem Monat
+            <div className="h-64 flex items-center justify-center text-text-tertiary text-sm text-center px-4">
+              Noch keine Transaktionen im gewählten Zeitraum ({range.label})
             </div>
           )}
         </div>
@@ -186,7 +208,10 @@ export default function Dashboard() {
       {/* Top categories */}
       {stats?.top_categories && stats.top_categories.length > 0 && (
         <div className="card">
-          <h2 className="text-text-primary font-semibold text-sm mb-4">Top Ausgaben-Kategorien</h2>
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between mb-4">
+            <h2 className="text-text-primary font-semibold text-sm">Top Ausgaben-Kategorien</h2>
+            <span className="text-text-tertiary text-xs">{range.label}</span>
+          </div>
           <div className="space-y-3">
             {stats.top_categories.slice(0, 6).map((cat: { category: string; total: number }) => {
               const pct = stats.total_expenses > 0 ? (cat.total / stats.total_expenses) * 100 : 0;
@@ -210,10 +235,11 @@ export default function Dashboard() {
       )}
 
       {/* Quick nav */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         {[
-          { to: "/transactions", label: "Transaktionen", desc: "Alle ansehen & filtern", Icon: BarChart3 },
-          { to: "/budget", label: "Budget", desc: "Ziele verwalten", Icon: Target },
+          { to: "/transactions", label: "Reale Angaben", desc: "Alle ansehen & filtern", Icon: BarChart3 },
+          { to: "/wizard", label: "Empirische Angaben", desc: "Profil & Planungsdaten", Icon: Wand2 },
+          { to: "/budget", label: "Budgetanalyse", desc: "Ziele verwalten", Icon: Target },
           { to: "/projections", label: "Prognosen", desc: "Monte Carlo & Rente", Icon: TrendingUp },
           { to: "/import", label: "Import", desc: "CSV / PDF hochladen", Icon: FileUp },
         ].map(({ to, label, desc, Icon }) => (
@@ -248,7 +274,7 @@ function buildSankeyData(stats: {
   total_income?: number;
   total_expenses?: number;
   top_categories?: Array<{ category: string; total: number }>;
-} | undefined, _month: unknown) {
+} | undefined) {
   if (!stats || !stats.total_income) {
     return { nodes: [], links: [] };
   }

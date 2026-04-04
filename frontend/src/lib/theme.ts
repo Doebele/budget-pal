@@ -222,9 +222,10 @@ export function formatPercent(value: number): string {
 
 // ── Periodicity / Frequency ───────────────────────────────────
 
-export type Periodicity = "monthly" | "quarterly" | "halfyearly" | "yearly";
+export type Periodicity = "weekly" | "monthly" | "quarterly" | "halfyearly" | "yearly";
 
 export const PERIODICITY_LABELS: Record<string, string> = {
+  weekly: "Wöchentlich",
   monthly: "Monatlich",
   quarterly: "Vierteljährlich",
   halfyearly: "Halbjährlich",
@@ -237,6 +238,7 @@ export const PERIODICITY_LABELS: Record<string, string> = {
  */
 export function getFrequencyStyle(periodicity: string | null | undefined): string {
   switch (periodicity) {
+    case "weekly":     return "bg-cyan-900/20 border-cyan-800 text-cyan-300";
     case "monthly":    return "bg-blue-900/20 border-blue-800 text-blue-300";
     case "quarterly":  return "bg-orange-900/20 border-orange-800 text-orange-300";
     case "halfyearly": return "bg-violet-900/20 border-violet-800 text-violet-300";
@@ -248,6 +250,7 @@ export function getFrequencyStyle(periodicity: string | null | undefined): strin
 /** Tailwind badge classes (no border) for inline status chips. */
 export function getFrequencyBadgeStyle(periodicity: string | null | undefined): string {
   switch (periodicity) {
+    case "weekly":     return "bg-cyan-900/50 text-cyan-300";
     case "monthly":    return "bg-blue-900/50 text-blue-300";
     case "quarterly":  return "bg-orange-900/50 text-orange-300";
     case "halfyearly": return "bg-violet-900/50 text-violet-300";

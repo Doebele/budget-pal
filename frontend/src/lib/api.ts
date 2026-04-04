@@ -194,4 +194,12 @@ export const forecastingApi = {
   deleteScenario: (id: number) => api.delete(`/forecasting/scenarios/${id}`),
 };
 
+// Settings (category mappings)
+export const settingsApi = {
+  getCategoryMappings: () => api.get("/settings/category-mappings"),
+  putCategoryMappings: (mappings: Array<{ wizard_label: string; transaction_category: string }>) =>
+    api.put("/settings/category-mappings", { mappings }),
+  resetCategoryMappings: () => api.delete("/settings/category-mappings"),
+};
+
 export default api;

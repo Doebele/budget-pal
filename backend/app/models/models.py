@@ -454,10 +454,27 @@ class UserWizardConfig(Base):
     peer_group_age_range_start: Mapped[int] = mapped_column(Integer, default=25)
     peer_group_age_range_end: Mapped[int] = mapped_column(Integer, default=35)
     use_peer_group_defaults: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Full PeerGroupDefaults object from «Empirische Angaben» (user-adjusted), JSON text
+    peer_group_defaults_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+# ── WizardCategoryMapping ─────────────────────────────────────
+
+class WizardCategoryMapping(Base):
+    """User-defined mapping from wizard budget labels to transaction categories."""
+
+    __tablename__ = "wizard_category_mappings"
+    __table_args__ = (UniqueConstraint("user_id", "wizard_label"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    wizard_label: Mapped[str] = mapped_column(String(200), nullable=False)
+    transaction_category: Mapped[str] = mapped_column(String(200), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 # ── PeerGroupBenchmark ────────────────────────────────────────

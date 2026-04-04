@@ -1,7 +1,7 @@
 /**
- * Reusable Sankey chart using @nivo/sankey.
- * Dark themed using nivoTheme constants.
+ * Cashflow-Sankey mit @nivo/sankey (MIT).
  */
+import { useMemo } from "react";
 import { ResponsiveSankey } from "@nivo/sankey";
 import { nivoTheme, colors } from "@/lib/theme";
 
@@ -39,11 +39,29 @@ const NODE_COLORS = [
 
 function formatChf(v: number): string {
   if (Math.abs(v) >= 1000) return `CHF ${(v / 1000).toFixed(1)}k`;
-  return `CHF ${v.toFixed(0)}`;
+  return `CHF ${Math.round(v).toLocaleString("de-CH")}`;
 }
 
 export default function SankeyChart({ data, height = 300 }: SankeyChartProps) {
-  if (!data.nodes.length || !data.links.length) {
+  const validLinks = useMemo(
+    () => data.links.filter((l) => l.value > 0),
+    [data.links]
+  );
+
+  const chartData = useMemo(
+    () => ({ nodes: data.nodes, links: validLinks }),
+    [data.nodes, validLinks]
+  );
+
+  const nodeColorMap = useMemo(() => {
+    const m: Record<string, string> = {};
+    data.nodes.forEach((node, i) => {
+      m[node.id] = NODE_COLORS[i % NODE_COLORS.length];
+    });
+    return m;
+  }, [data.nodes]);
+
+  if (!data.nodes.length || !validLinks.length) {
     return (
       <div
         style={{ height }}
@@ -54,16 +72,10 @@ export default function SankeyChart({ data, height = 300 }: SankeyChartProps) {
     );
   }
 
-  // Build color map for nodes
-  const nodeColorMap: Record<string, string> = {};
-  data.nodes.forEach((node, i) => {
-    nodeColorMap[node.id] = NODE_COLORS[i % NODE_COLORS.length];
-  });
-
   return (
-    <div style={{ height }}>
+    <div style={{ height }} className="w-full min-h-[200px]">
       <ResponsiveSankey
-        data={data}
+        data={chartData}
         margin={{ top: 8, right: 120, bottom: 8, left: 120 }}
         align="justify"
         colors={(node: { id: string }) => nodeColorMap[node.id] || colors.accent}
@@ -76,12 +88,12 @@ export default function SankeyChart({ data, height = 300 }: SankeyChartProps) {
         linkOpacity={0.25}
         linkHoverOpacity={0.5}
         linkContract={2}
-        enableLinkGradient={true}
+        enableLinkGradient
         labelPosition="outside"
         labelOrientation="horizontal"
         labelPadding={16}
         labelTextColor={colors.textSecondary}
-        valueFormat={(v) => formatChf(v)}
+        valueFormat={(v) => formatChf(Number(v))}
         theme={{
           ...nivoTheme,
           labels: {
@@ -92,7 +104,7 @@ export default function SankeyChart({ data, height = 300 }: SankeyChartProps) {
             },
           },
         }}
-        tooltip={({ node }: { node: { id: string; value: number; color: string } }) => (
+        nodeTooltip={({ node }) => (
           <div
             style={{
               background: colors.bgElevated,
@@ -106,6 +118,24 @@ export default function SankeyChart({ data, height = 300 }: SankeyChartProps) {
             <strong>{node.id}</strong>
             <br />
             {formatChf(node.value)}
+          </div>
+        )}
+        linkTooltip={({ link }) => (
+          <div
+            style={{
+              background: colors.bgElevated,
+              border: `1px solid ${colors.border}`,
+              borderRadius: 6,
+              padding: "8px 12px",
+              color: colors.textPrimary,
+              fontSize: 12,
+            }}
+          >
+            <strong>
+              {link.source.id} → {link.target.id}
+            </strong>
+            <br />
+            {formatChf(link.value)}
           </div>
         )}
       />

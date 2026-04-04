@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal, init_db
 from app.api import auth, transactions, imports, projections, accounts, categories, budgets, pension, assets, wizard, currency, forecasting, budget_multimodal
+from app.api import settings as settings_api
 from app.services.currency_service import currency_service
 
 logging.basicConfig(
@@ -31,6 +32,39 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Database init failed: {e}")
         raise
+
+    # Ensure new tables added after initial migrations exist
+    try:
+        from app.core.database import engine
+        from sqlalchemy import text
+        async with engine.begin() as conn:
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS wizard_category_mappings (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    wizard_label VARCHAR(200) NOT NULL,
+                    transaction_category VARCHAR(200) NOT NULL,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    UNIQUE (user_id, wizard_label)
+                )
+            """))
+        logger.info("wizard_category_mappings table ensured.")
+    except Exception as e:
+        logger.warning("wizard_category_mappings table creation skipped: %s", e)
+
+    try:
+        from app.core.database import engine
+        from sqlalchemy import text
+        async with engine.begin() as conn:
+            await conn.execute(
+                text(
+                    "ALTER TABLE user_wizard_config "
+                    "ADD COLUMN IF NOT EXISTS peer_group_defaults_json TEXT"
+                )
+            )
+        logger.info("user_wizard_config.peer_group_defaults_json column ensured.")
+    except Exception as e:
+        logger.warning("peer_group_defaults_json column migration skipped: %s", e)
 
     try:
         from app.services.peer_group_seed import seed_peer_group_system_categories
@@ -93,6 +127,7 @@ app.include_router(wizard.router, prefix="/api/wizard", tags=["wizard"])
 app.include_router(currency.router, prefix="/api/currency", tags=["currency"])
 app.include_router(forecasting.router, prefix="/api/forecasting", tags=["forecasting"])
 app.include_router(budget_multimodal.router, prefix="/api/budget", tags=["budget"])
+app.include_router(settings_api.router, prefix="/api/settings", tags=["settings"])
 
 
 # ── Health Check ──────────────────────────────────────────────

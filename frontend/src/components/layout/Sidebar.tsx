@@ -23,9 +23,10 @@ import { clsx } from "clsx";
 
 const NAV_ITEMS = [
   { path: "/", icon: LayoutDashboard, label: "Dashboard" },
-  { path: "/transactions", icon: ArrowLeftRight, label: "Transaktionen" },
+  { path: "/transactions", icon: ArrowLeftRight, label: "Reale Angaben" },
+  { path: "/wizard", icon: Wand2, label: "Empirische Angaben", highlight: true },
   { path: "/transactions/archived", icon: Archive, label: "Archiv" },
-  { path: "/budget", icon: PiggyBank, label: "Budget" },
+  { path: "/budget", icon: PiggyBank, label: "Budgetanalyse" },
   { path: "/forecast", icon: Brain, label: "Budgetprognose" },
   { path: "/projections", icon: TrendingUp, label: "Rentenprognose" },
   { path: "/import", icon: Upload, label: "Import" },
@@ -33,7 +34,6 @@ const NAV_ITEMS = [
 ] as const;
 
 const BOTTOM_ITEMS = [
-  { path: "/wizard", icon: Wand2, label: "Setup-Wizard", highlight: true },
   { path: "/settings", icon: Settings, label: "Einstellungen", highlight: false },
 ] as const;
 
@@ -66,22 +66,28 @@ export default function Sidebar() {
 
       {/* Main nav */}
       <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto scrollbar-hide">
-        {NAV_ITEMS.map(({ path, icon: Icon, label }) => (
-          <NavLink
-            key={path}
-            to={path}
-            onClick={() => setMobileOpen(false)}
-            className={clsx(
-              "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-all duration-150",
-              isActive(path)
-                ? "bg-accent/15 text-accent"
-                : "text-text-secondary hover:text-text-primary hover:bg-bg-surface2"
-            )}
-          >
-            <Icon className="w-4 h-4 flex-shrink-0" />
-            {!collapsed && <span>{label}</span>}
-          </NavLink>
-        ))}
+        {NAV_ITEMS.map((item) => {
+          const { path, icon: Icon, label } = item;
+          const highlight = "highlight" in item && item.highlight;
+          return (
+            <NavLink
+              key={path}
+              to={path}
+              onClick={() => setMobileOpen(false)}
+              className={clsx(
+                "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-all duration-150",
+                isActive(path)
+                  ? "bg-accent/15 text-accent"
+                  : highlight
+                    ? "text-accent/80 hover:text-accent hover:bg-accent/10"
+                    : "text-text-secondary hover:text-text-primary hover:bg-bg-surface2"
+              )}
+            >
+              <Icon className="w-4 h-4 flex-shrink-0" />
+              {!collapsed && <span>{label}</span>}
+            </NavLink>
+          );
+        })}
       </nav>
 
       {/* Bottom nav */}

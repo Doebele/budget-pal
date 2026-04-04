@@ -1,4 +1,8 @@
-export type AnalysisMode = "past" | "wizard" | "combined" | "peer";
+/** Modes selectable in the Budget UI (peer is toggled separately). */
+export type BudgetAnalysisMode = "past" | "wizard" | "combined";
+
+/** API may return `peer` for dedicated peer breakdown queries. */
+export type MultiAnalysisApiMode = BudgetAnalysisMode | "peer";
 
 export interface CategoryBreakdown {
   category: string;
@@ -33,7 +37,7 @@ export interface SavingsOpportunity {
 }
 
 export interface MultiAnalysisResult {
-  mode: AnalysisMode;
+  mode: MultiAnalysisApiMode;
   period_start: string | null;
   period_end: string | null;
   income: number;

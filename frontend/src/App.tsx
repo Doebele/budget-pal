@@ -159,14 +159,13 @@ export default function App() {
           }
         />
 
-        {/* Wizard — full-page, no sidebar */}
         <Route
           path="/wizard"
           element={
             <ProtectedRoute>
-              <Suspense fallback={<LoadingScreen />}>
+              <AppShell>
                 <Wizard />
-              </Suspense>
+              </AppShell>
             </ProtectedRoute>
           }
         />
