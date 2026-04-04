@@ -37,10 +37,9 @@ function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen bg-bg overflow-hidden">
       <Sidebar />
-      <div className="min-h-full p-6">
+      <main className="flex-1 overflow-y-auto p-6">
         <Suspense fallback={<LoadingScreen />}>{children}</Suspense>
-      </div>
-      <main className="flex-1 overflow-y-auto"></main>
+      </main>
     </div>
   );
 }
