@@ -259,10 +259,10 @@ export default function Dashboard() {
                 <div key={txn.id} className="flex items-center justify-between py-1.5">
                   <div className="flex items-center gap-3 min-w-0">
                     <div
-                      className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-xs"
-                      style={{ backgroundColor: sc.color + "22", color: sc.color }}
+                      className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+                      style={{ backgroundColor: sc.color + "22" }}
                     >
-                      {sc.emoji}
+                      <sc.icon className="w-3.5 h-3.5" style={{ color: sc.color }} />
                     </div>
                     <div className="min-w-0">
                       <p className="text-text-primary text-xs font-medium truncate">
@@ -301,7 +301,12 @@ export default function Dashboard() {
                 <div key={cat.category}>
                   <div className="flex items-center justify-between mb-1">
                     <span className="flex items-center gap-1.5 text-text-secondary text-xs">
-                      <span>{sc.emoji}</span>
+                      <span
+                        className="w-4 h-4 rounded flex items-center justify-center shrink-0"
+                        style={{ backgroundColor: sc.color + "22" }}
+                      >
+                        <sc.icon className="w-2.5 h-2.5" style={{ color: sc.color }} />
+                      </span>
                       {cat.category || "Sonstige"}
                     </span>
                     <span className="text-text-primary text-xs font-mono">{formatCHF(cat.total)}</span>

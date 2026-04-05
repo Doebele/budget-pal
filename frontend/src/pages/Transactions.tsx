@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { transactionsApi, accountsApi } from "@/lib/api";
-import { formatCHF, categoryColors, getFrequencyStyle, getFrequencyBadgeStyle, PERIODICITY_LABELS } from "@/lib/theme";
+import { formatCHF, getFrequencyStyle, getFrequencyBadgeStyle, PERIODICITY_LABELS } from "@/lib/theme";
+import { resolveSuperCategory } from "@/lib/categories";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { Search, Upload, ChevronDown, Check, X, LayoutGrid, Building2, Repeat, Wallet, TrendingUp, PieChart } from "lucide-react";
@@ -592,16 +593,22 @@ export default function Transactions() {
                           onClick={() => handleCategoryEdit(txn)}
                           className="flex items-center gap-1.5 group"
                         >
-                          <span
-                            className="badge text-xs"
-                            style={{
-                              backgroundColor: `${categoryColors[txn.category || ""] || "#64748b"}22`,
-                              color: categoryColors[txn.category || ""] || "#94a3b8",
-                              border: `1px solid ${categoryColors[txn.category || ""] || "#64748b"}44`,
-                            }}
-                          >
-                            {txn.category || "Unkategorisiert"}
-                          </span>
+                          {(() => {
+                            const sc = resolveSuperCategory(txn.category || "");
+                            return (
+                              <span
+                                className="badge text-xs flex items-center gap-1"
+                                style={{
+                                  backgroundColor: sc.color + "22",
+                                  color: sc.color,
+                                  border: `1px solid ${sc.color}44`,
+                                }}
+                              >
+                                <sc.icon className="w-3 h-3 shrink-0" />
+                                {txn.category || "Unkategorisiert"}
+                              </span>
+                            );
+                          })()}
                           {!txn.user_verified && txn.confidence_score !== undefined && (
                             <span className="text-warning text-xs opacity-70">
                               {Math.round((txn.confidence_score || 0) * 100)}%
