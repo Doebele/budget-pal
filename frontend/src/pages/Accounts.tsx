@@ -351,12 +351,17 @@ export default function Accounts() {
   const deleteMutation = useMutation({
     mutationFn: (id: number) => accountsApi.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["accounts"] });
+      // Always reset the edit form — the account no longer exists.
+      // Do this before invalidateQueries so the form closes immediately
+      // rather than waiting for the refetch to complete.
+      resetForm();
       setShowDeleteModal(false);
       setAccountToDelete(null);
-      if (editingAccountId === accountToDelete?.id) {
-        resetForm();
-      }
+      queryClient.invalidateQueries({ queryKey: ["accounts"], refetchType: "all" });
+    },
+    onError: (error) => {
+      console.error("[Accounts] Delete error:", error);
+      alert(`Fehler beim Löschen: ${error instanceof Error ? error.message : "Unbekannter Fehler"}`);
     },
   });
 
