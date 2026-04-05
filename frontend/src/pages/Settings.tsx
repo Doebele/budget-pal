@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { clsx } from "clsx";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { authApi, settingsApi } from "@/lib/api";
@@ -25,6 +26,16 @@ export default function Settings() {
   const [retirementAge, setRetirementAge] = useState(user?.retirement_age || 65);
   const [saved, setSaved] = useState(false);
   const [expandedSc, setExpandedSc] = useState<string | null>(null);
+  const [budgetDefaultView, setBudgetDefaultView] = useState<"bar" | "gauge">(() => {
+    try {
+      return (localStorage.getItem("budgetpal_budget_default_view") as "bar" | "gauge") || "gauge";
+    } catch { return "gauge"; }
+  });
+
+  function handleBudgetDefaultView(v: "bar" | "gauge") {
+    setBudgetDefaultView(v);
+    try { localStorage.setItem("budgetpal_budget_default_view", v); } catch {}
+  }
 
   // Category mapping state
   const [mappingDrafts, setMappingDrafts] = useState<Record<string, string>>({});
@@ -351,6 +362,45 @@ export default function Settings() {
       </div>
 
       {/* Info */}
+      {/* Darstellung / Display preferences */}
+      <div className="card">
+        <h2 className="text-text-primary font-semibold text-sm mb-4">Darstellung</h2>
+        <div className="space-y-4">
+          <div>
+            <label className="label mb-2 block">Standard-Ansicht Budgetanalyse</label>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleBudgetDefaultView("bar")}
+                className={clsx(
+                  "flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-medium transition-colors",
+                  budgetDefaultView === "bar"
+                    ? "bg-accent/15 border-accent/40 text-accent"
+                    : "border-border text-text-tertiary hover:text-text-secondary",
+                )}
+              >
+                Balkenansicht
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBudgetDefaultView("gauge")}
+                className={clsx(
+                  "flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-medium transition-colors",
+                  budgetDefaultView === "gauge"
+                    ? "bg-accent/15 border-accent/40 text-accent"
+                    : "border-border text-text-tertiary hover:text-text-secondary",
+                )}
+              >
+                Gauge-Ansicht
+              </button>
+            </div>
+            <p className="text-text-disabled text-xs mt-1.5">
+              Wird beim Öffnen der Budgetanalyse als Standard verwendet.
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="card">
         <h2 className="text-text-primary font-semibold text-sm mb-4">About</h2>
         <div className="space-y-3 text-sm text-text-secondary">

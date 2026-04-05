@@ -19,7 +19,7 @@ import { format } from "date-fns";
 import { clsx } from "clsx";
 import {
   TrendingDown, TrendingUp, ChevronDown, ChevronUp,
-  Lightbulb, Target, Wallet, BarChart3, Gauge,
+  Lightbulb, Target, Wallet, BarChart3, Gauge, Eye, EyeOff, ArrowDownUp,
 } from "lucide-react";
 
 const CategoryGaugeChart = lazy(
@@ -92,7 +92,41 @@ export default function Budget() {
   const [showTxnEditor, setShowTxnEditor] = useState(false);
   const [txnEditorRows, setTxnEditorRows] = useState<DrillDownTransaction[]>([]);
   const [showSonstiges, setShowSonstiges] = useState(false);
-  const [gaugeView, setGaugeView] = useState(false);
+  const [gaugeView, setGaugeView] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("budgetpal_budget_default_view") !== "bar";
+    } catch { return true; }
+  });
+  const [sortOrder, setSortOrder] = useState<"default" | "amount">(() => {
+    try {
+      return (localStorage.getItem("budgetpal_budget_sort_order") as "default" | "amount") || "default";
+    } catch { return "default"; }
+  });
+  const [hiddenScIds, setHiddenScIds] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem("budgetpal_budget_hidden_cats");
+      return saved ? new Set<string>(JSON.parse(saved)) : new Set<string>();
+    } catch { return new Set<string>(); }
+  });
+
+  function toggleHideCategory(scId: string) {
+    setHiddenScIds((prev) => {
+      const next = new Set(prev);
+      next.has(scId) ? next.delete(scId) : next.add(scId);
+      try { localStorage.setItem("budgetpal_budget_hidden_cats", JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  }
+
+  function handleSetGaugeView(v: boolean) {
+    setGaugeView(v);
+    try { localStorage.setItem("budgetpal_budget_default_view", v ? "gauge" : "bar"); } catch {}
+  }
+
+  function handleSetSortOrder(v: "default" | "amount") {
+    setSortOrder(v);
+    try { localStorage.setItem("budgetpal_budget_sort_order", v); } catch {}
+  }
 
   function toggleFreq(key: string) {
     setSelectedFreqs((prev) => {
@@ -247,20 +281,15 @@ export default function Budget() {
     return m;
   }, [periodTransactions]);
 
-  // ── Unified SuperRow list ─────────────────────────────────────
+  // ── Unified SuperRow list (all SUPER_CATEGORIES) ──────────────
   const superRows = useMemo((): SuperRow[] => {
-    const allScIds = new Set([
-      ...actualBySuperCat.keys(),
-      ...plannedBySuperCat.keys(),
-    ]);
-
     const rows: SuperRow[] = [];
-    for (const scId of allScIds) {
-      const sc = SUPER_CATEGORIES.find((s) => s.id === scId);
-      if (!sc || sc.id === "sparen") continue;
 
-      const actEntry  = actualBySuperCat.get(scId);
-      const planEntry = plannedBySuperCat.get(scId);
+    for (const sc of SUPER_CATEGORIES) {
+      if (sc.id === "sparen") continue; // income side — never shown as expense
+
+      const actEntry  = actualBySuperCat.get(sc.id);
+      const planEntry = plannedBySuperCat.get(sc.id);
       const actual    = actEntry?.total  ?? 0;
       const planned   = planEntry?.total ?? 0;
 
@@ -287,17 +316,26 @@ export default function Budget() {
         actual,
         planned,
         subItems,
-        transactions: txnsBySuperCat.get(scId) ?? [],
+        transactions: txnsBySuperCat.get(sc.id) ?? [],
       });
     }
 
-    return rows.sort((a, b) => (b.actual || b.planned) - (a.actual || a.planned));
-  }, [actualBySuperCat, plannedBySuperCat, txnsBySuperCat]);
+    // Apply sort order
+    if (sortOrder === "amount") {
+      rows.sort((a, b) => (b.actual || b.planned) - (a.actual || a.planned));
+    }
+    // "default" keeps SUPER_CATEGORIES insertion order
+
+    return rows;
+  }, [actualBySuperCat, plannedBySuperCat, txnsBySuperCat, sortOrder]);
 
   const mainRows     = superRows.filter((r) => r.sc.id !== "sonstiges");
   const sonstigesRow = superRows.find((r) => r.sc.id === "sonstiges");
 
-  // ── Gauge rows: superRows + peer values ───────────────────────
+  // Visible (non-hidden) rows for each view
+  const visibleMainRows = mainRows.filter((r) => !hiddenScIds.has(r.sc.id));
+
+  // ── Gauge rows: all mainRows + peer values ────────────────────
   const gaugeRows = useMemo(
     () =>
       mainRows.map((r) => ({
@@ -305,8 +343,9 @@ export default function Budget() {
         actual:  r.actual,
         planned: r.planned,
         peer:    peerBySuperCat.get(r.sc.id),
+        hidden:  hiddenScIds.has(r.sc.id),
       })),
-    [mainRows, peerBySuperCat],
+    [mainRows, peerBySuperCat, hiddenScIds],
   );
 
   const hasPeerGauge =
@@ -319,7 +358,7 @@ export default function Budget() {
   const openDrillDown  = useCallback((row: SuperRow) => setDrillDown(row), []);
   const closeDrillDown = useCallback(() => setDrillDown(null), []);
 
-  const hasSomeData = mainRows.length > 0 || (sonstigesRow != null);
+  const hasSomeData = superRows.some((r) => r.actual > 0 || r.planned > 0) || (sonstigesRow != null && (sonstigesRow.actual > 0 || sonstigesRow.planned > 0));
 
   // ── Render ────────────────────────────────────────────────────
   return (
@@ -470,12 +509,28 @@ export default function Budget() {
             <div className="flex items-center gap-2">
               <span className="text-text-tertiary text-xs hidden sm:inline">{range.label}</span>
 
+              {/* Sort order toggle */}
+              <button
+                type="button"
+                title={sortOrder === "default" ? "Sortierung: Standard → nach Betrag" : "Sortierung: nach Betrag → Standard"}
+                onClick={() => handleSetSortOrder(sortOrder === "default" ? "amount" : "default")}
+                className={clsx(
+                  "flex items-center gap-1 px-2 py-1.5 rounded-lg border text-xs transition-colors",
+                  sortOrder === "amount"
+                    ? "bg-accent/15 border-accent/40 text-accent"
+                    : "border-border text-text-tertiary hover:text-text-secondary",
+                )}
+              >
+                <ArrowDownUp className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{sortOrder === "amount" ? "Betrag" : "Standard"}</span>
+              </button>
+
               {/* View toggle: Balken / Gauge */}
               <div className="flex items-center rounded-lg border border-border overflow-hidden">
                 <button
                   type="button"
                   title="Balkenansicht"
-                  onClick={() => setGaugeView(false)}
+                  onClick={() => handleSetGaugeView(false)}
                   className={clsx(
                     "px-2 py-1.5 transition-colors",
                     !gaugeView
@@ -488,7 +543,7 @@ export default function Budget() {
                 <button
                   type="button"
                   title="Gauge-Ansicht"
-                  onClick={() => setGaugeView(true)}
+                  onClick={() => handleSetGaugeView(true)}
                   className={clsx(
                     "px-2 py-1.5 border-l border-border transition-colors",
                     gaugeView
@@ -517,6 +572,46 @@ export default function Budget() {
           )}
         </div>
 
+        {/* Category visibility filter chips */}
+        <div className="flex flex-wrap gap-1.5 px-4 py-2 border-b border-border/40 bg-bg-surface/30">
+          {SUPER_CATEGORIES.filter((sc) => sc.id !== "sparen").map((sc) => {
+            const isHidden = hiddenScIds.has(sc.id);
+            return (
+              <button
+                key={sc.id}
+                type="button"
+                title={isHidden ? `${sc.label} einblenden` : `${sc.label} ausblenden`}
+                onClick={() => toggleHideCategory(sc.id)}
+                className={clsx(
+                  "flex items-center gap-1 px-2 py-1 rounded-lg border text-xs transition-all",
+                  isHidden
+                    ? "border-border bg-bg-surface2 text-text-disabled opacity-50"
+                    : "border-border/60 bg-bg-elevated text-text-secondary",
+                )}
+                style={!isHidden ? { borderColor: sc.color + "50", backgroundColor: sc.color + "12" } : undefined}
+              >
+                {isHidden
+                  ? <EyeOff className="w-3 h-3 shrink-0" />
+                  : <sc.icon className="w-3 h-3 shrink-0" style={{ color: sc.color }} />}
+                <span className="hidden sm:inline truncate max-w-[80px]">{sc.label}</span>
+              </button>
+            );
+          })}
+          {hiddenScIds.size > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setHiddenScIds(new Set());
+                try { localStorage.removeItem("budgetpal_budget_hidden_cats"); } catch {}
+              }}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg border border-border/40 text-xs text-text-tertiary hover:text-text-secondary transition-colors"
+            >
+              <Eye className="w-3 h-3" />
+              <span className="hidden sm:inline">Alle einblenden</span>
+            </button>
+          )}
+        </div>
+
         {!hasSomeData && (
           <p className="text-text-tertiary text-sm text-center py-10">
             Keine Daten für den gewählten Zeitraum.{" "}
@@ -539,14 +634,14 @@ export default function Budget() {
               </div>
             }
           >
-            <CategoryGaugeChart rows={gaugeRows} hasPeer={hasPeerGauge} />
+            <CategoryGaugeChart rows={gaugeRows} hasPeer={hasPeerGauge} onToggleHide={toggleHideCategory} />
           </Suspense>
         )}
 
         {/* ── Bar view ── */}
         {!gaugeView && (
           <div className="divide-y divide-border/40">
-            {mainRows.map((row) => (
+            {visibleMainRows.map((row) => (
               <SuperCategoryBar
                 key={row.sc.id}
                 superCategory={row.sc}

@@ -14,6 +14,7 @@ import ReactECharts from "echarts-for-react";
 import { useMemo } from "react";
 import { colors, formatCHF } from "@/lib/theme";
 import type { SuperCategory } from "@/lib/categories";
+import { EyeOff } from "lucide-react";
 
 // ── Public types ───────────────────────────────────────────────
 export interface GaugeRow {
@@ -21,12 +22,15 @@ export interface GaugeRow {
   actual: number;   // historical (real transactions)
   planned: number;  // empirical (wizard budgets)
   peer?: number;    // peer benchmark (per period)
+  hidden?: boolean; // currently hidden via filter
 }
 
 interface CategoryGaugeChartProps {
   rows: GaugeRow[];
   /** true when peer data has been loaded and at least one row has a peer value */
   hasPeer: boolean;
+  /** Called when user clicks the eye icon on a gauge card */
+  onToggleHide: (scId: string) => void;
 }
 
 // ── Constants ──────────────────────────────────────────────────
@@ -173,13 +177,17 @@ function makeOption(row: GaugeRow, hasPeer: boolean): any {
 }
 
 // ── Component ──────────────────────────────────────────────────
-export default function CategoryGaugeChart({ rows, hasPeer }: CategoryGaugeChartProps) {
+export default function CategoryGaugeChart({ rows, hasPeer, onToggleHide }: CategoryGaugeChartProps) {
   const visibleRows = useMemo(
-    () => rows.filter((r) => r.actual > 0 || r.planned > 0),
+    () => rows.filter((r) => !r.hidden),
+    [rows],
+  );
+  const hiddenRows = useMemo(
+    () => rows.filter((r) => r.hidden),
     [rows],
   );
 
-  if (visibleRows.length === 0) {
+  if (visibleRows.length === 0 && hiddenRows.length === 0) {
     return (
       <div className="py-10 text-center text-text-tertiary text-sm">
         Keine Daten verfügbar
@@ -208,49 +216,65 @@ export default function CategoryGaugeChart({ rows, hasPeer }: CategoryGaugeChart
       </div>
 
       {/* Gauge grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
-        {visibleRows.map((row) => {
-          const option = makeOption(row, hasPeer);
-          const isOver = hasPeer && (row.peer ?? 0) > 0 && row.actual > (row.peer ?? 0);
+      {visibleRows.length > 0 ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
+          {visibleRows.map((row) => {
+            const option = makeOption(row, hasPeer);
+            const isOver = hasPeer && (row.peer ?? 0) > 0 && row.actual > (row.peer ?? 0);
 
-          return (
-            <div
-              key={row.sc.id}
-              className="flex flex-col items-center rounded-xl bg-bg-surface2 border border-border/40 pt-2 pb-3 px-2"
-            >
-              {/* ECharts ring gauge */}
-              <ReactECharts
-                option={option}
-                style={{ width: "100%", height: 150 }}
-                opts={{ renderer: "svg" }}
-              />
-
-              {/* Category label */}
-              <div className="flex items-center gap-1.5 mt-1">
-                <span
-                  className="w-5 h-5 rounded-md flex items-center justify-center shrink-0"
-                  style={{ backgroundColor: row.sc.color + "22" }}
+            return (
+              <div
+                key={row.sc.id}
+                className="relative flex flex-col items-center rounded-xl bg-bg-surface2 border border-border/40 pt-2 pb-3 px-2"
+              >
+                {/* Eye/hide button */}
+                <button
+                  type="button"
+                  title={`${row.sc.label} ausblenden`}
+                  onClick={() => onToggleHide(row.sc.id)}
+                  className="absolute top-1.5 right-1.5 p-1 rounded-md text-text-disabled hover:text-text-tertiary hover:bg-bg-elevated transition-colors"
                 >
-                  <row.sc.icon className="w-3 h-3" style={{ color: row.sc.color }} />
-                </span>
-                <span className="text-xs font-medium text-text-secondary truncate max-w-[90px]">
-                  {row.sc.label}
-                </span>
+                  <EyeOff className="w-3 h-3" />
+                </button>
+
+                {/* ECharts ring gauge */}
+                <ReactECharts
+                  option={option}
+                  style={{ width: "100%", height: 150 }}
+                  opts={{ renderer: "svg" }}
+                />
+
+                {/* Category label */}
+                <div className="flex items-center gap-1.5 mt-1">
+                  <span
+                    className="w-5 h-5 rounded-md flex items-center justify-center shrink-0"
+                    style={{ backgroundColor: row.sc.color + "22" }}
+                  >
+                    <row.sc.icon className="w-3 h-3" style={{ color: row.sc.color }} />
+                  </span>
+                  <span className="text-xs font-medium text-text-secondary truncate max-w-[90px]">
+                    {row.sc.label}
+                  </span>
+                </div>
+
+                {/* Peer comparison hint */}
+                {hasPeer && (row.peer ?? 0) > 0 && (
+                  <p
+                    className="text-[10px] mt-0.5 font-mono"
+                    style={{ color: isOver ? "#f87171" : colors.textTertiary }}
+                  >
+                    {pctLabel(row.actual, row.peer!)}
+                  </p>
+                )}
               </div>
-
-              {/* Peer comparison hint */}
-              {hasPeer && (row.peer ?? 0) > 0 && (
-                <p
-                  className="text-[10px] mt-0.5 font-mono"
-                  style={{ color: isOver ? "#f87171" : colors.textTertiary }}
-                >
-                  {pctLabel(row.actual, row.peer!)}
-                </p>
-              )}
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="text-center text-text-tertiary text-sm py-6">
+          Alle Kategorien ausgeblendet — nutze die Filter-Chips oben um Kategorien einzublenden.
+        </p>
+      )}
     </div>
   );
 }
