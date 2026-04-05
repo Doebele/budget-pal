@@ -13,14 +13,18 @@
  *   4. SuperCategory bars (Ist = stats, Soll = wizard × months)
  *   5. Peer-comparison section (collapsed by default)
  */
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, lazy, Suspense } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { clsx } from "clsx";
 import {
   TrendingDown, TrendingUp, ChevronDown, ChevronUp,
-  Lightbulb, Target, Wallet,
+  Lightbulb, Target, Wallet, BarChart3, Gauge,
 } from "lucide-react";
+
+const CategoryGaugeChart = lazy(
+  () => import("@/components/charts/CategoryGaugeChart"),
+);
 
 import { budgetsApi, transactionsApi, budgetApi } from "@/lib/api";
 import { formatCHF } from "@/lib/theme";
@@ -88,6 +92,7 @@ export default function Budget() {
   const [showTxnEditor, setShowTxnEditor] = useState(false);
   const [txnEditorRows, setTxnEditorRows] = useState<DrillDownTransaction[]>([]);
   const [showSonstiges, setShowSonstiges] = useState(false);
+  const [gaugeView, setGaugeView] = useState(false);
 
   function toggleFreq(key: string) {
     setSelectedFreqs((prev) => {
@@ -141,7 +146,7 @@ export default function Budget() {
       budgetApi
         .multiAnalysis({ mode: "peer", start: periodStart, end: periodEnd })
         .then((r) => r.data),
-    enabled: showPeer && capabilities?.peer_data_available === true,
+    enabled: (showPeer || gaugeView) && capabilities?.peer_data_available === true,
     staleTime: 60_000,
   });
 
@@ -205,6 +210,19 @@ export default function Budget() {
     () => [...plannedBySuperCat.values()].reduce((s, e) => s + e.total, 0),
     [plannedBySuperCat],
   );
+
+  // ── Peer benchmark aggregated to supercategory level ──────────
+  const peerBySuperCat = useMemo((): Map<string, number> => {
+    if (!peerData) return new Map();
+    const m = new Map<string, number>();
+    for (const cat of (peerData.categories ?? [])) {
+      if (!cat.peer_benchmark || cat.peer_benchmark <= 0) continue;
+      const sc = resolveSuperCategory(cat.category, false);
+      if (sc.id === "sparen") continue;
+      m.set(sc.id, (m.get(sc.id) ?? 0) + cat.peer_benchmark);
+    }
+    return m;
+  }, [peerData]);
 
   // ── Transactions per supercategory for drill-down ─────────────
   const txnsBySuperCat = useMemo((): Map<string, DrillDownTransaction[]> => {
@@ -278,6 +296,21 @@ export default function Budget() {
 
   const mainRows     = superRows.filter((r) => r.sc.id !== "sonstiges");
   const sonstigesRow = superRows.find((r) => r.sc.id === "sonstiges");
+
+  // ── Gauge rows: superRows + peer values ───────────────────────
+  const gaugeRows = useMemo(
+    () =>
+      mainRows.map((r) => ({
+        sc:      r.sc,
+        actual:  r.actual,
+        planned: r.planned,
+        peer:    peerBySuperCat.get(r.sc.id),
+      })),
+    [mainRows, peerBySuperCat],
+  );
+
+  const hasPeerGauge =
+    capabilities?.peer_data_available === true && peerBySuperCat.size > 0;
 
   const utilisation = totalPlanned > 0
     ? Math.min(200, Math.round((kpi.expenses / totalPlanned) * 100))
@@ -426,14 +459,51 @@ export default function Budget() {
         </div>
       </div>
 
-      {/* ── Supercategory bars ──────────────────── */}
+      {/* ── Ausgaben-Kategorien (bar / gauge toggle) ── */}
       <div className="card !p-0 overflow-hidden">
+
+        {/* Card header */}
         <div className="px-4 pt-4 pb-2 border-b border-border">
-          <div className="flex items-baseline justify-between">
+          <div className="flex items-center justify-between gap-2">
             <h2 className="text-text-primary font-semibold text-sm">Ausgaben-Kategorien</h2>
-            <span className="text-text-tertiary text-xs">{range.label}</span>
+
+            <div className="flex items-center gap-2">
+              <span className="text-text-tertiary text-xs hidden sm:inline">{range.label}</span>
+
+              {/* View toggle: Balken / Gauge */}
+              <div className="flex items-center rounded-lg border border-border overflow-hidden">
+                <button
+                  type="button"
+                  title="Balkenansicht"
+                  onClick={() => setGaugeView(false)}
+                  className={clsx(
+                    "px-2 py-1.5 transition-colors",
+                    !gaugeView
+                      ? "bg-accent/20 text-accent"
+                      : "text-text-tertiary hover:text-text-secondary",
+                  )}
+                >
+                  <BarChart3 className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  title="Gauge-Ansicht"
+                  onClick={() => setGaugeView(true)}
+                  className={clsx(
+                    "px-2 py-1.5 border-l border-border transition-colors",
+                    gaugeView
+                      ? "bg-accent/20 text-accent"
+                      : "text-text-tertiary hover:text-text-secondary",
+                  )}
+                >
+                  <Gauge className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
           </div>
-          {totalPlanned > 0 && (
+
+          {/* Bar-view legend */}
+          {!gaugeView && totalPlanned > 0 && (
             <div className="flex items-center gap-4 mt-2 text-xs text-text-tertiary">
               <span className="flex items-center gap-1.5">
                 <span className="w-3 h-1.5 rounded-full bg-accent/60 inline-block" />
@@ -460,43 +530,59 @@ export default function Budget() {
           </p>
         )}
 
-        <div className="divide-y divide-border/40">
-          {mainRows.map((row) => (
-            <SuperCategoryBar
-              key={row.sc.id}
-              superCategory={row.sc}
-              actual={row.actual  > 0 ? row.actual  : undefined}
-              planned={row.planned > 0 ? row.planned : undefined}
-              subItems={row.subItems}
-              onClick={() => openDrillDown(row)}
-            />
-          ))}
+        {/* ── Gauge view ── */}
+        {gaugeView && hasSomeData && (
+          <Suspense
+            fallback={
+              <div className="py-10 flex items-center justify-center text-text-tertiary text-sm">
+                Lade Gauge…
+              </div>
+            }
+          >
+            <CategoryGaugeChart rows={gaugeRows} hasPeer={hasPeerGauge} />
+          </Suspense>
+        )}
 
-          {sonstigesRow && (
-            <>
-              <button
-                type="button"
-                className="w-full flex items-center justify-between px-4 py-2.5 text-text-tertiary hover:text-text-primary text-xs transition-colors"
-                onClick={() => setShowSonstiges((v) => !v)}
-              >
-                <span className="flex items-center gap-1.5">
-                  {showSonstiges ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                  💸 Sonstiges
-                  {sonstigesRow.actual > 0 && ` · ${formatCHF(sonstigesRow.actual)}`}
-                </span>
-              </button>
-              {showSonstiges && (
-                <SuperCategoryBar
-                  superCategory={sonstigesRow.sc}
-                  actual={sonstigesRow.actual  > 0 ? sonstigesRow.actual  : undefined}
-                  planned={sonstigesRow.planned > 0 ? sonstigesRow.planned : undefined}
-                  subItems={sonstigesRow.subItems}
-                  onClick={() => openDrillDown(sonstigesRow)}
-                />
-              )}
-            </>
-          )}
-        </div>
+        {/* ── Bar view ── */}
+        {!gaugeView && (
+          <div className="divide-y divide-border/40">
+            {mainRows.map((row) => (
+              <SuperCategoryBar
+                key={row.sc.id}
+                superCategory={row.sc}
+                actual={row.actual  > 0 ? row.actual  : undefined}
+                planned={row.planned > 0 ? row.planned : undefined}
+                subItems={row.subItems}
+                onClick={() => openDrillDown(row)}
+              />
+            ))}
+
+            {sonstigesRow && (
+              <>
+                <button
+                  type="button"
+                  className="w-full flex items-center justify-between px-4 py-2.5 text-text-tertiary hover:text-text-primary text-xs transition-colors"
+                  onClick={() => setShowSonstiges((v) => !v)}
+                >
+                  <span className="flex items-center gap-1.5">
+                    {showSonstiges ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                    💸 Sonstiges
+                    {sonstigesRow.actual > 0 && ` · ${formatCHF(sonstigesRow.actual)}`}
+                  </span>
+                </button>
+                {showSonstiges && (
+                  <SuperCategoryBar
+                    superCategory={sonstigesRow.sc}
+                    actual={sonstigesRow.actual  > 0 ? sonstigesRow.actual  : undefined}
+                    planned={sonstigesRow.planned > 0 ? sonstigesRow.planned : undefined}
+                    subItems={sonstigesRow.subItems}
+                    onClick={() => openDrillDown(sonstigesRow)}
+                  />
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Peer comparison (collapsed) ─────────── */}
@@ -540,8 +626,14 @@ export default function Budget() {
                     return (
                       <div key={cat.category}>
                         <div className="flex items-center justify-between mb-1 text-xs">
-                          <span className="text-text-secondary flex items-center gap-1">
-                            <span>{sc.emoji}</span>{cat.category}
+                          <span className="text-text-secondary flex items-center gap-1.5">
+                            <span
+                              className="w-4 h-4 rounded flex items-center justify-center shrink-0"
+                              style={{ backgroundColor: sc.color + "22" }}
+                            >
+                              <sc.icon className="w-2.5 h-2.5" style={{ color: sc.color }} />
+                            </span>
+                            {cat.category}
                           </span>
                           <div className="flex items-center gap-2 font-mono">
                             <span className={isOver ? "text-loss" : "text-text-primary"}>
