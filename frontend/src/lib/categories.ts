@@ -17,6 +17,7 @@ import {
   Smartphone,
   ShoppingBag,
   GraduationCap,
+  Landmark,
   PiggyBank,
   Layers,
 } from "lucide-react";
@@ -132,6 +133,26 @@ export const SUPER_CATEGORIES: SuperCategory[] = [
     color: "#6366f1",
     txnCategories: ["education"],
     wizardLabels: [],
+  },
+  {
+    id: "steuern",
+    label: "Steuern & Abgaben",
+    icon: Landmark,
+    emoji: "🏛️",
+    color: "#f43f5e",
+    txnCategories: [
+      "finance", "taxes", "services", "gebühren",
+      "fees", "steuern", "abgaben",
+    ],
+    wizardLabels: [
+      // Direkte Steuern (Kanton + Gemeinde + Bund)
+      "direkte steuern",
+      // Serafe (ehemals Billag): ~CHF 335/Jahr
+      "serafe",
+      // Sonstige Gebühren
+      "gebühren",
+      "kirchensteuern",
+    ],
   },
   {
     id: "sparen",

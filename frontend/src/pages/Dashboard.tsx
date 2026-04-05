@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, lazy, Suspense } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import {
@@ -8,8 +8,9 @@ import {
 import { transactionsApi, accountsApi, budgetsApi } from "@/lib/api";
 import { formatCHF } from "@/lib/theme";
 import { format } from "date-fns";
-import SankeyChart from "@/components/charts/SankeyChart";
 import type { SankeyLink } from "@/components/charts/SankeyChart";
+
+const SankeyChart = lazy(() => import("@/components/charts/SankeyChart"));
 import GranularityNavigator from "@/components/GranularityNavigator";
 import { computeDateRange, TimeGranularity } from "@/lib/granularity";
 import { clsx } from "clsx";
@@ -214,7 +215,16 @@ export default function Dashboard() {
           </div>
 
           {sankeyData.links.length > 0 ? (
-            <SankeyChart data={sankeyData} height={360} />
+            <Suspense
+              fallback={
+                <div
+                  style={{ height: 360 }}
+                  className="animate-pulse rounded-xl bg-bg-surface2"
+                />
+              }
+            >
+              <SankeyChart data={sankeyData} height={360} />
+            </Suspense>
           ) : (
             <div className="h-64 flex items-center justify-center text-text-tertiary text-sm text-center px-4">
               {sankeySource === "empirisch" && wizardLoading
