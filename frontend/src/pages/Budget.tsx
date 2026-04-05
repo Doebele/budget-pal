@@ -246,6 +246,9 @@ export default function Budget() {
   );
 
   // ── Peer benchmark aggregated to supercategory level ──────────
+  // NOTE: peer_benchmark from the API is always a MONTHLY value (same as
+  // wizard monthly_amount). Must be multiplied by months to match actual
+  // spending which covers the full selected period.
   const peerBySuperCat = useMemo((): Map<string, number> => {
     if (!peerData) return new Map();
     const m = new Map<string, number>();
@@ -253,10 +256,11 @@ export default function Budget() {
       if (!cat.peer_benchmark || cat.peer_benchmark <= 0) continue;
       const sc = resolveSuperCategory(cat.category, false);
       if (sc.id === "sparen") continue;
-      m.set(sc.id, (m.get(sc.id) ?? 0) + cat.peer_benchmark);
+      // Scale monthly benchmark → selected period
+      m.set(sc.id, (m.get(sc.id) ?? 0) + cat.peer_benchmark * months);
     }
     return m;
-  }, [peerData]);
+  }, [peerData, months]);
 
   // ── Transactions per supercategory for drill-down ─────────────
   const txnsBySuperCat = useMemo((): Map<string, DrillDownTransaction[]> => {
@@ -714,10 +718,11 @@ export default function Budget() {
                   .slice(0, 8)
                   .map((cat) => {
                     const sc = resolveSuperCategory(cat.category);
-                    const peerMax = Math.max(cat.actual ?? 0, cat.peer_benchmark ?? 0, 1);
-                    const actPct  = Math.min(100, ((cat.actual         ?? 0) / peerMax) * 100);
-                    const peerPct = Math.min(100, ((cat.peer_benchmark ?? 0) / peerMax) * 100);
-                    const isOver  = (cat.actual ?? 0) > (cat.peer_benchmark ?? 0);
+                    const peerPeriod = (cat.peer_benchmark ?? 0) * months; // monthly → period
+                    const peerMax = Math.max(cat.actual ?? 0, peerPeriod, 1);
+                    const actPct  = Math.min(100, ((cat.actual ?? 0) / peerMax) * 100);
+                    const peerPct = Math.min(100, (peerPeriod         / peerMax) * 100);
+                    const isOver  = (cat.actual ?? 0) > peerPeriod;
                     return (
                       <div key={cat.category}>
                         <div className="flex items-center justify-between mb-1 text-xs">
@@ -735,7 +740,7 @@ export default function Budget() {
                               {formatCHF(cat.actual ?? 0)}
                             </span>
                             <span className="text-text-disabled">/</span>
-                            <span className="text-text-tertiary">Ø {formatCHF(cat.peer_benchmark ?? 0)}</span>
+                            <span className="text-text-tertiary">Ø {formatCHF(peerPeriod)}</span>
                           </div>
                         </div>
                         <div className="relative h-1.5 bg-bg-surface2 rounded-full overflow-hidden">

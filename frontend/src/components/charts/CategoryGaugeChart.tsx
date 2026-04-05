@@ -77,7 +77,15 @@ function makeOption(row: GaugeRow, hasPeer: boolean): any {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const series: any[] = [];
 
-  // OUTER RING — Historisch (actual)
+  // ── Center label offsets (3-line stack) ────────────────────────
+  // Actual: large, top of center
+  // Peer + Planned: small, below
+  const hasSecondary = hasPeerVal || planned > 0;
+  const actualOffset  = hasSecondary ? "-12%" : "8%";
+  const peerOffset    = planned > 0 ? "14%"  : "28%";
+  const plannedOffset = "28%";
+
+  // OUTER RING — Historisch (actual) — shows main CHF value
   series.push({
     name: "Historisch",
     type: "gauge",
@@ -92,8 +100,8 @@ function makeOption(row: GaugeRow, hasPeer: boolean): any {
     pointer: { show: false },
     detail: {
       show: true,
-      offsetCenter: [0, "8%"],
-      fontSize: 12,
+      offsetCenter: [0, actualOffset],
+      fontSize: 14,
       fontWeight: 700,
       fontFamily: "Syne, system-ui, sans-serif",
       color: isOverPeer ? "#f87171" : isOverPlan ? "#fbbf24" : colors.textSecondary,
@@ -103,7 +111,7 @@ function makeOption(row: GaugeRow, hasPeer: boolean): any {
     data: [{ value: actualClamped, itemStyle: { color: actualColor } }],
   });
 
-  // MIDDLE RING — Peer-Benchmark (always ≈ 50%)
+  // MIDDLE RING — Peer-Benchmark (always ≈ 50%) — shows Ø value small
   if (hasPeerVal) {
     series.push({
       name: "Peer-Ø",
@@ -117,13 +125,21 @@ function makeOption(row: GaugeRow, hasPeer: boolean): any {
       axisTick: { show: false },
       axisLabel: { show: false },
       pointer: { show: false },
-      detail: { show: false },
+      detail: {
+        show: true,
+        offsetCenter: [0, peerOffset],
+        fontSize: 9,
+        fontWeight: 400,
+        fontFamily: "Syne, system-ui, sans-serif",
+        color: "#64748b",
+        formatter: () => `Ø ${fmtCompact(peer!)}`,
+      },
       title: { show: false },
       data: [{ value: peerClamped, itemStyle: { color: "#64748b" } }],
     });
   }
 
-  // INNER RING — Empirisch (planned)
+  // INNER RING — Empirisch (planned) — shows Soll value small
   if (planned > 0) {
     series.push({
       name: "Empirisch",
@@ -137,7 +153,15 @@ function makeOption(row: GaugeRow, hasPeer: boolean): any {
       axisTick: { show: false },
       axisLabel: { show: false },
       pointer: { show: false },
-      detail: { show: false },
+      detail: {
+        show: true,
+        offsetCenter: [0, plannedOffset],
+        fontSize: 9,
+        fontWeight: 400,
+        fontFamily: "Syne, system-ui, sans-serif",
+        color: sc.color + "bb",
+        formatter: () => `≈ ${fmtCompact(planned)}`,
+      },
       title: { show: false },
       data: [{ value: plannedClamped, itemStyle: { color: plannedColor } }],
     });
