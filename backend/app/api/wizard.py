@@ -128,6 +128,12 @@ class WizardCompletePayload(BaseModel):
     selected_subscriptions: List[str] = Field(default_factory=list)
     subscription_total: float = 0.0
     freizeit: float = 250.0
+    # BFS HABE empirical defaults (can be adjusted in wizard)
+    kleidung: float = 120.0          # CHF 120/Mo — BFS HABE 2021 avg clothing+shoes
+    unterhaltung: float = 200.0      # CHF 200/Mo — BFS HABE 2021 recreation & culture
+    direkte_steuern: float = 700.0   # CHF 700/Mo — BFS HABE 2021 avg direct taxes
+    serafe: float = 27.92            # CHF 335/Jahr ÷ 12 — Serafe (ehem. Billag)
+    weiterbildung: float = 30.0      # CHF 30/Mo  — BFS HABE 2021 education/training
 
     # ── Step 6: Assets
     bank_balance: float = 0.0
@@ -217,6 +223,11 @@ def _compute_monthly_expenses(p: WizardCompletePayload) -> float:
         + (p.autoversicherung if p.has_auto_insurance else 0.0)
         + p.subscription_total
         + p.freizeit
+        + p.kleidung
+        + p.unterhaltung
+        + p.direkte_steuern
+        + p.serafe
+        + p.weiterbildung
     )
 
 
@@ -399,6 +410,13 @@ async def wizard_complete(
     # Daily life
     add_budget(payload.groceries, "Lebensmittel")
     add_budget(payload.freizeit, "Freizeit & Restaurant")
+
+    # BFS-based empirical defaults (Shopping, Unterhaltung, Steuern, Weiterbildung)
+    add_budget(payload.kleidung,        "Kleidung")
+    add_budget(payload.unterhaltung,    "Freizeit & Unterhaltung")
+    add_budget(payload.direkte_steuern, "Direkte Steuern")
+    add_budget(payload.serafe,          "Serafe")
+    add_budget(payload.weiterbildung,   "Weiterbildung & Kurse")
 
     # Subscriptions — save one budget entry per selected service
     # SBB entries are already handled via has_sbb_halbtax / has_sbb_ga above

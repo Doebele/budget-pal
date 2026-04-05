@@ -79,10 +79,10 @@ function makeOption(row: GaugeRow, hasPeer: boolean): any {
 
   // ── Center label offsets (3-line stack) ────────────────────────
   // Actual: large, top of center
-  // Peer + Planned: small, below
+  // Peer + Planned: small, below — with generous spacing
   const hasSecondary = hasPeerVal || planned > 0;
-  const actualOffset  = hasSecondary ? "-12%" : "8%";
-  const peerOffset    = planned > 0 ? "14%"  : "28%";
+  const actualOffset  = hasSecondary ? "-16%" : "8%";
+  const peerOffset    = planned > 0 ? "10%"  : "24%";
   const plannedOffset = "28%";
 
   // OUTER RING — Historisch (actual) — shows main CHF value
@@ -103,7 +103,7 @@ function makeOption(row: GaugeRow, hasPeer: boolean): any {
       offsetCenter: [0, actualOffset],
       fontSize: 14,
       fontWeight: 700,
-      fontFamily: "Syne, system-ui, sans-serif",
+      fontFamily: "JetBrains Mono, Fira Code, monospace",
       color: isOverPeer ? "#f87171" : isOverPlan ? "#fbbf24" : colors.textSecondary,
       formatter: () => `CHF ${fmtCompact(actual)}`,
     },
@@ -130,7 +130,7 @@ function makeOption(row: GaugeRow, hasPeer: boolean): any {
         offsetCenter: [0, peerOffset],
         fontSize: 9,
         fontWeight: 400,
-        fontFamily: "Syne, system-ui, sans-serif",
+        fontFamily: "JetBrains Mono, Fira Code, monospace",
         color: "#64748b",
         formatter: () => `Ø ${fmtCompact(peer!)}`,
       },
@@ -158,7 +158,7 @@ function makeOption(row: GaugeRow, hasPeer: boolean): any {
         offsetCenter: [0, plannedOffset],
         fontSize: 9,
         fontWeight: 400,
-        fontFamily: "Syne, system-ui, sans-serif",
+        fontFamily: "JetBrains Mono, Fira Code, monospace",
         color: sc.color + "bb",
         formatter: () => `≈ ${fmtCompact(planned)}`,
       },

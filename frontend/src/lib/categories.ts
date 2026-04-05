@@ -90,7 +90,7 @@ export const SUPER_CATEGORIES: SuperCategory[] = [
     emoji: "🎬",
     color: "#fb923c",
     txnCategories: ["entertainment", "unterhaltung", "freizeit & unterhaltung"],
-    wizardLabels: [],
+    wizardLabels: ["freizeit & unterhaltung", "sport & fitness", "kultur & events"],
   },
   {
     id: "abos",
@@ -123,7 +123,7 @@ export const SUPER_CATEGORIES: SuperCategory[] = [
     emoji: "👔",
     color: "#ec4899",
     txnCategories: ["shopping", "kleidung"],
-    wizardLabels: ["kleidung"],
+    wizardLabels: ["kleidung", "shopping & kleidung", "bekleidung & schuhe"],
   },
   {
     id: "bildung",
@@ -132,7 +132,7 @@ export const SUPER_CATEGORIES: SuperCategory[] = [
     emoji: "📚",
     color: "#6366f1",
     txnCategories: ["education"],
-    wizardLabels: [],
+    wizardLabels: ["weiterbildung & kurse", "bücher & medien", "bildung & weiterbildung"],
   },
   {
     id: "steuern",
