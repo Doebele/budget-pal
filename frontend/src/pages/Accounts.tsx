@@ -318,6 +318,13 @@ export default function Accounts() {
   const [massDeletePreview, setMassDeletePreview] = useState<BulkDeletePreview | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
+  // Non-blocking notification (replaces alert())
+  const [notification, setNotification] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const showNotification = (message: string, type: "success" | "error" = "success") => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 4000);
+  };
+
   const [form, setForm] = useState({
     name: "",
     bank: "",
@@ -377,15 +384,19 @@ export default function Accounts() {
       queryClient.invalidateQueries({ queryKey: ["transactions"], refetchType: "all" });
       queryClient.invalidateQueries({ queryKey: ["budget-analysis"], refetchType: "all" });
       queryClient.invalidateQueries({ queryKey: ["import-history"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["accounts"], refetchType: "all" });
 
-      alert(`Transaktionen wurden erfolgreich gelöscht. (${data.deleted_count ?? 0} Einträge)`);
+      showNotification(`${data.deleted_count ?? 0} Transaktionen erfolgreich gelöscht.`);
     },
     onError: (error) => {
       console.error("[Accounts] Mass delete error:", error);
-      alert(`Fehler beim Löschen: ${error instanceof Error ? error.message : "Unbekannter Fehler"}`);
       setShowMassDeleteModal(false);
       setAccountForMassDelete(null);
       setMassDeletePreview(null);
+      showNotification(
+        `Fehler beim Löschen: ${error instanceof Error ? error.message : "Unbekannter Fehler"}`,
+        "error"
+      );
     },
   });
 
@@ -489,6 +500,23 @@ export default function Accounts() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Non-blocking notification toast */}
+      {notification && (
+        <div
+          className={clsx(
+            "fixed top-4 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-sm font-medium transition-all",
+            notification.type === "success"
+              ? "bg-emerald-900/90 border border-emerald-500/40 text-emerald-200"
+              : "bg-red-900/90 border border-red-500/40 text-red-200"
+          )}
+        >
+          <span>{notification.message}</span>
+          <button onClick={() => setNotification(null)} className="ml-2 opacity-60 hover:opacity-100">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-display text-text-primary">Konten</h1>
