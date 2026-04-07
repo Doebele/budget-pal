@@ -108,6 +108,8 @@ export const SUPER_CATEGORIES: SuperCategory[] = [
     wizardLabels: [
       // aggregate fallback (old wizard runs)
       "abonnements",
+      // Serafe (ehemals Billag) — Pflichtabonnement, kein Steuerposten
+      "serafe",
       // individual subscription services (new wizard runs)
       "netflix", "spotify", "disney+", "nzz digital", "blick+",
       "srf play (optional)", "icloud 200gb", "google one", "microsoft 365",
@@ -147,8 +149,6 @@ export const SUPER_CATEGORIES: SuperCategory[] = [
     wizardLabels: [
       // Direkte Steuern (Kanton + Gemeinde + Bund)
       "direkte steuern",
-      // Serafe (ehemals Billag): ~CHF 335/Jahr
-      "serafe",
       // Sonstige Gebühren
       "gebühren",
       "kirchensteuern",
