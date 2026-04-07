@@ -17,6 +17,7 @@ import {
   Wand2,
   Archive,
   Brain,
+  FileBarChart2,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { clsx } from "clsx";
@@ -24,7 +25,8 @@ import { clsx } from "clsx";
 const NAV_ITEMS = [
   { path: "/", icon: LayoutDashboard, label: "Dashboard" },
   { path: "/transactions", icon: ArrowLeftRight, label: "Reale Angaben" },
-  { path: "/wizard", icon: Wand2, label: "Empirische Angaben", highlight: true },
+  { path: "/wizard", icon: Wand2, label: "Empirische Angaben" },
+  { path: "/finanzplan", icon: FileBarChart2, label: "Finanzplan" },
   { path: "/transactions/archived", icon: Archive, label: "Archiv" },
   { path: "/budget", icon: PiggyBank, label: "Budgetanalyse" },
   { path: "/forecast", icon: Brain, label: "Budgetprognose" },

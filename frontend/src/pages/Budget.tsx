@@ -26,7 +26,7 @@ const CategoryGaugeChart = lazy(
   () => import("@/components/charts/CategoryGaugeChart"),
 );
 
-import { budgetsApi, transactionsApi, budgetApi } from "@/lib/api";
+import { api, budgetsApi, transactionsApi, budgetApi } from "@/lib/api";
 import { formatCHF } from "@/lib/theme";
 import GranularityNavigator from "@/components/GranularityNavigator";
 import WizardBudgetSidebar from "@/components/WizardBudgetSidebar";
@@ -43,6 +43,39 @@ import {
 } from "@/lib/categories";
 import { deduplicateWizardBatch } from "@/lib/wizardUtils";
 import type { MultiAnalysisResult } from "@/types/budgetAnalysis";
+
+// ── Wizard peer-config types + SC→key mapping ─────────────────
+interface PeerConfig {
+  housing?: number;
+  groceries?: number;
+  dining_out?: number;
+  transport?: number;
+  travel?: number;
+  health_insurance?: number;
+  other_insurance?: number;
+  entertainment?: number;
+  communication?: number;
+  subscriptions?: number;
+  clothing?: number;
+  education?: number;
+  direct_taxes?: number;
+  pillar_3a_monthly?: number;
+  [key: string]: number | undefined;
+}
+
+// Maps supercategory IDs → wizard peer-config keys that belong to it
+const PEER_KEYS_BY_SC: Record<string, (keyof PeerConfig)[]> = {
+  wohnen:        ["housing"],
+  essen:         ["groceries", "dining_out"],
+  mobilitaet:    ["transport", "travel"],
+  versicherungen:["health_insurance", "other_insurance"],
+  freizeit:      ["entertainment"],
+  abos:          ["communication", "subscriptions"],
+  shopping:      ["clothing"],
+  bildung:       ["education"],
+  steuern:       ["direct_taxes"],
+  sparen:        ["pillar_3a_monthly"],
+};
 
 // ── Frequency filter ──────────────────────────────────────────
 const FREQ_OPTIONS = [
@@ -184,6 +217,14 @@ export default function Budget() {
     staleTime: 60_000,
   });
 
+  // Wizard peer-config (stored BFS defaults — fallback for categories without txn peer data)
+  const { data: wizardPeerConfig } = useQuery<PeerConfig | null>({
+    queryKey: ["wizard-peer-config"],
+    queryFn: () => api.get("/wizard/peer-config").then((r) => r.data),
+    staleTime: 300_000,
+    enabled: showPeer || gaugeView,
+  });
+
   // ── KPI from stats ───────────────────────────────────────────
   const kpi = useMemo(() => ({
     income:   stats?.total_income   ?? 0,
@@ -249,18 +290,36 @@ export default function Budget() {
   // NOTE: peer_benchmark from the API is always a MONTHLY value (same as
   // wizard monthly_amount). Must be multiplied by months to match actual
   // spending which covers the full selected period.
+  // For categories with no txn peer data (e.g. Freizeit, Shopping, Bildung,
+  // Steuern) we supplement from the stored wizard peer-config.
   const peerBySuperCat = useMemo((): Map<string, number> => {
-    if (!peerData) return new Map();
     const m = new Map<string, number>();
-    for (const cat of (peerData.categories ?? [])) {
-      if (!cat.peer_benchmark || cat.peer_benchmark <= 0) continue;
-      const sc = resolveSuperCategory(cat.category, false);
-      if (sc.id === "sparen") continue;
-      // Scale monthly benchmark → selected period
-      m.set(sc.id, (m.get(sc.id) ?? 0) + cat.peer_benchmark * months);
+
+    // 1. Populate from API peer data (categories that have real transactions)
+    if (peerData) {
+      for (const cat of (peerData.categories ?? [])) {
+        if (!cat.peer_benchmark || cat.peer_benchmark <= 0) continue;
+        const sc = resolveSuperCategory(cat.category, false);
+        if (sc.id === "sparen") continue;
+        m.set(sc.id, (m.get(sc.id) ?? 0) + cat.peer_benchmark * months);
+      }
     }
+
+    // 2. Supplement from wizard peer-config for supercategories still missing
+    if (wizardPeerConfig) {
+      for (const [scId, keys] of Object.entries(PEER_KEYS_BY_SC)) {
+        if (m.has(scId)) continue; // already have API data — don't override
+        let sum = 0;
+        for (const key of keys) {
+          const monthly = wizardPeerConfig[key];
+          if (monthly && monthly > 0) sum += monthly;
+        }
+        if (sum > 0) m.set(scId, sum * months);
+      }
+    }
+
     return m;
-  }, [peerData, months]);
+  }, [peerData, wizardPeerConfig, months]);
 
   // ── Transactions per supercategory for drill-down ─────────────
   const txnsBySuperCat = useMemo((): Map<string, DrillDownTransaction[]> => {
@@ -353,7 +412,8 @@ export default function Budget() {
   );
 
   const hasPeerGauge =
-    capabilities?.peer_data_available === true && peerBySuperCat.size > 0;
+    peerBySuperCat.size > 0 &&
+    (capabilities?.peer_data_available === true || wizardPeerConfig != null);
 
   const utilisation = totalPlanned > 0
     ? Math.min(200, Math.round((kpi.expenses / totalPlanned) * 100))

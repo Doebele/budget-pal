@@ -1587,6 +1587,7 @@ export default function Wizard() {
   const [currentStep, setCurrentStep] = useState(1);
   const [wizardData, setWizardData] = useState<WizardData>(loadDraft);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [animating, setAnimating] = useState(false);
   const [direction, setDirection] = useState<"forward" | "back">("forward");
   const [isReview, setIsReview] = useState(false);
@@ -1655,6 +1656,7 @@ export default function Wizard() {
   async function handleSubmit() {
     persistWizardDraft(wizardData);
     setIsSubmitting(true);
+    setSubmitError(null);
     try {
       const subscriptionTotal = COMMON_SUBSCRIPTIONS
         .filter((s) => wizardData.selectedSubscriptions.includes(s.name))
@@ -1666,9 +1668,10 @@ export default function Wizard() {
         subscription_total: subscriptionTotal,
       });
       localStorage.removeItem(STORAGE_KEY);
-      navigate("/");
+      navigate("/finanzplan");
     } catch (err) {
       console.error("Wizard submit failed:", err);
+      setSubmitError("Der Finanzplan konnte nicht erstellt werden. Bitte versuche es erneut.");
       setIsSubmitting(false);
     }
   }
@@ -1745,6 +1748,12 @@ export default function Wizard() {
 
       {/* ── Navigation (always visible) ────────── */}
       <nav className="sticky bottom-0 z-10 bg-bg/95 backdrop-blur border-t border-border/50 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        {submitError && (
+          <div className="max-w-2xl mx-auto mb-2 flex items-center gap-2 rounded-lg border border-loss/40 bg-loss/10 px-3 py-2 text-xs text-loss">
+            <span className="flex-1">{submitError}</span>
+            <button type="button" onClick={() => setSubmitError(null)} className="shrink-0 hover:opacity-70">✕</button>
+          </div>
+        )}
         <div className="max-w-2xl mx-auto flex items-center gap-3">
           {(isReview || currentStep > 1) && (
             <button

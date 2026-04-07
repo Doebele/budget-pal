@@ -256,6 +256,11 @@ def get_peer_group_defaults(profile: PeerGroupProfile) -> Dict[str, Any]:
     subscriptions_base = 100 if profile.household_type == "single" else 130
     subscriptions = round10(subscriptions_base)
 
+    # Direct taxes (Kanton, Gemeinde, Bund) — estimated from income median + effective rate
+    # Rates based on BFS Steuerstatistik averages for Swiss households
+    tax_rates: Dict[IncomeLevel, float] = {"low": 0.08, "medium": 0.14, "high": 0.22}
+    direct_taxes = round50(income_median * 1.25 * tax_rates[profile.income_level] * cm * (hm ** 0.4))
+
     pillar3a_annual_max = 35_280 if profile.employment_status == "self-employed" else 7_056
     if profile.income_level == "high":
         pillar3a_usage_rate = 0.95
@@ -295,6 +300,7 @@ def get_peer_group_defaults(profile: PeerGroupProfile) -> Dict[str, Any]:
         "travel": travel,
         "education": education,
         "subscriptions": subscriptions,
+        "direct_taxes": direct_taxes,
         "savings_rate": savings_rate,
         "pillar_3a_monthly": pillar_3a_monthly,
         "peerLabel": peer_label,

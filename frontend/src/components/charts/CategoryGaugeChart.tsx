@@ -102,10 +102,10 @@ function makeOption(row: GaugeRow, hasPeer: boolean): any {
     detail: {
       show: true,
       offsetCenter: [0, actualOffset],
-      fontSize: 15,
+      fontSize: 14,
       fontWeight: 700,
       fontFamily: "JetBrains Mono, Fira Code, monospace",
-      color: isOverPeer ? "#f87171" : isOverPlan ? "#fbbf24" : colors.textSecondary,
+      color: isOverPeer ? "#f87171" : isOverPlan ? "#fbbf24" : sc.color,
       formatter: () => `CHF ${fmtCompact(actual)}`,
     },
     title: { show: false },
@@ -129,7 +129,7 @@ function makeOption(row: GaugeRow, hasPeer: boolean): any {
       detail: {
         show: true,
         offsetCenter: [0, peerOffset],
-        fontSize: 10,
+        fontSize: 11,
         fontWeight: 400,
         fontFamily: "JetBrains Mono, Fira Code, monospace",
         color: "#64748b",
@@ -157,7 +157,7 @@ function makeOption(row: GaugeRow, hasPeer: boolean): any {
       detail: {
         show: true,
         offsetCenter: [0, plannedOffset],
-        fontSize: 10,
+        fontSize: 11,
         fontWeight: 400,
         fontFamily: "JetBrains Mono, Fira Code, monospace",
         color: sc.color + "bb",

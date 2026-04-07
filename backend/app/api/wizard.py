@@ -259,7 +259,27 @@ def _build_scenario_params(p: WizardCompletePayload) -> dict:
     }
 
 
-# ── Peer group endpoints (no auth — static / derived reference data) ──
+# ── Peer group endpoints ───────────────────────────────────────
+
+
+@router.get(
+    "/peer-config",
+    summary="Gespeicherte Peer-Gruppe Defaults des eingeloggten Nutzers",
+)
+async def get_peer_config(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Returns the peer_group_defaults snapshot saved during the last wizard run.
+    Returns null if no wizard has been completed yet.
+    """
+    cfg_result = await db.execute(
+        select(UserWizardConfig).where(UserWizardConfig.user_id == current_user.id)
+    )
+    wizard_cfg = cfg_result.scalar_one_or_none()
+    if not wizard_cfg or not wizard_cfg.peer_group_defaults_json:
+        return None
+    return json.loads(wizard_cfg.peer_group_defaults_json)
 
 
 @router.get(
@@ -601,22 +621,64 @@ async def wizard_complete(
     db.add(scenario)
     scenarios_created += 1
 
-    # ── 8b. Persist peer-group defaults snapshot (user-edited values) ──
-    if payload.peer_group_defaults is not None:
-        cfg_result = await db.execute(
-            select(UserWizardConfig).where(UserWizardConfig.user_id == current_user.id)
+    # ── 8b. Persist peer-group defaults snapshot ──────────────────
+    # If the frontend sent user-adjusted values, use those.
+    # Otherwise compute from payload demographics so the /peer-config
+    # endpoint always returns something useful after wizard completion.
+    from app.services.peer_group import PeerGroupProfile as _PGP, get_peer_group_defaults as _pgd
+
+    _age = datetime.now().year - payload.geburtsjahr
+    _age_group: str
+    if _age < 35:
+        _age_group = "25-34"
+    elif _age < 45:
+        _age_group = "35-44"
+    elif _age < 55:
+        _age_group = "45-54"
+    elif _age < 65:
+        _age_group = "55-64"
+    else:
+        _age_group = "65+"
+
+    _annual_brutto = (
+        (payload.lohn if payload.lohn_enabled else 0.0)
+        + (payload.selbstaendig if payload.selbstaendig_enabled else 0.0)
+    ) * 12
+    _income_level: str
+    if _annual_brutto < 80_000:
+        _income_level = "low"
+    elif _annual_brutto < 150_000:
+        _income_level = "medium"
+    else:
+        _income_level = "high"
+
+    _computed_defaults = _pgd(
+        _PGP(
+            age_group=_age_group,  # type: ignore[arg-type]
+            canton=payload.kanton,
+            household_type=payload.haushalt,  # type: ignore[arg-type]
+            employment_status=payload.beschaeftigung,  # type: ignore[arg-type]
+            income_level=_income_level,  # type: ignore[arg-type]
         )
-        wizard_cfg = cfg_result.scalar_one_or_none()
-        blob = json.dumps(payload.peer_group_defaults, ensure_ascii=False)
-        if wizard_cfg:
-            wizard_cfg.peer_group_defaults_json = blob
-        else:
-            db.add(
-                UserWizardConfig(
-                    user_id=current_user.id,
-                    peer_group_defaults_json=blob,
-                )
+    )
+
+    # Prefer frontend-sent (user-adjusted) values; fall back to computed.
+    defaults_to_store = payload.peer_group_defaults if payload.peer_group_defaults is not None else _computed_defaults
+
+    cfg_result = await db.execute(
+        select(UserWizardConfig).where(UserWizardConfig.user_id == current_user.id)
+    )
+    wizard_cfg = cfg_result.scalar_one_or_none()
+    blob = json.dumps(defaults_to_store, ensure_ascii=False)
+    if wizard_cfg:
+        wizard_cfg.peer_group_defaults_json = blob
+    else:
+        db.add(
+            UserWizardConfig(
+                user_id=current_user.id,
+                peer_group_defaults_json=blob,
             )
+        )
 
     # ── 9. Commit ─────────────────────────────────────────────
     await db.commit()

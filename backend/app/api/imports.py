@@ -747,20 +747,47 @@ async def preview_pdf_import(
 
     try:
         import pdfplumber
+        from app.services.import_parsers.comdirect_pdf import (
+            is_comdirect_pdf,
+            parse_comdirect_pdf_tables,
+            parse_comdirect_pdf_text,
+        )
+
         with pdfplumber.open(tmp_path) as pdf:
-            # 1st choice: structured table extraction (avoids Saldo-vs-Betrag ambiguity)
-            raw_transactions = _parse_ubs_pdf_tables(pdf)
-            if not raw_transactions:
-                # 2nd choice: text extraction + fixed two-date regex parser
-                full_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
-                if len(full_text.strip()) < 100:
-                    full_text = await _ocr_pdf_to_text(tmp_path)
+            full_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+
+            # Auto-detect comdirect vs UBS when bank not specified
+            _is_comdirect = (bank or "").lower() == "comdirect" or (
+                not bank and is_comdirect_pdf(full_text)
+            )
+
+            if _is_comdirect:
+                detected_bank = "comdirect"
+                # 1st choice: pdfplumber table extraction (precise column mapping)
+                raw_transactions = parse_comdirect_pdf_tables(pdf)
+                if not raw_transactions:
+                    # 2nd choice: text-based regex extraction
+                    if len(full_text.strip()) < 100:
+                        full_text = await _ocr_pdf_to_text(tmp_path)
+                    raw_transactions = parse_comdirect_pdf_text(full_text)
+                    logger.info(
+                        "comdirect PDF: text fallback yielded %d rows.", len(raw_transactions)
+                    )
+                else:
+                    logger.info(
+                        "comdirect PDF: table extraction yielded %d rows.", len(raw_transactions)
+                    )
+            else:
                 detected_bank = bank or "ubs"
-                raw_transactions = _parse_pdf_text(full_text, detected_bank)
+                # 1st choice: structured UBS table extraction
+                raw_transactions = _parse_ubs_pdf_tables(pdf)
+                if not raw_transactions:
+                    # 2nd choice: text extraction + two-date regex parser
+                    if len(full_text.strip()) < 100:
+                        full_text = await _ocr_pdf_to_text(tmp_path)
+                    raw_transactions = _parse_pdf_text(full_text, detected_bank)
     finally:
         os.unlink(tmp_path)
-
-    detected_bank = bank or "ubs"
 
     rows: List[PdfPreviewTransaction] = []
     parsed_rows = 0

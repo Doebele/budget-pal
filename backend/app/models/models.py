@@ -450,10 +450,11 @@ class UserWizardConfig(Base):
     retirement_age_target: Mapped[int] = mapped_column(Integer, default=67)
     current_age: Mapped[int] = mapped_column(Integer, default=28)
     category_weights: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON
-    peer_group_comparison_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    # NOTE: DB columns were created as INTEGER (not BOOLEAN) — use Integer to match actual schema
+    peer_group_comparison_enabled: Mapped[int] = mapped_column(Integer, default=1)
     peer_group_age_range_start: Mapped[int] = mapped_column(Integer, default=25)
     peer_group_age_range_end: Mapped[int] = mapped_column(Integer, default=35)
-    use_peer_group_defaults: Mapped[bool] = mapped_column(Boolean, default=True)
+    use_peer_group_defaults: Mapped[int] = mapped_column(Integer, default=1)
     # Full PeerGroupDefaults object from «Empirische Angaben» (user-adjusted), JSON text
     peer_group_defaults_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

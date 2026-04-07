@@ -2,11 +2,59 @@ import { useState, useEffect } from "react";
 import { clsx } from "clsx";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
-import { authApi, settingsApi } from "@/lib/api";
-import { Save, ExternalLink, Wand2, RotateCcw, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { api, authApi, settingsApi } from "@/lib/api";
+import { Save, ExternalLink, Wand2, RotateCcw, AlertCircle, ChevronDown, ChevronUp, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 import { differenceInYears, parseISO } from "date-fns";
 import { SUPER_CATEGORIES } from "@/lib/categories";
+
+// ── Peer-Gruppe: Schlüssel je Superkategorie ───────────────────
+// Summe der aufgeführten PeerGroupDefaults-Felder ergibt den monatlichen
+// Peer-Ø-Betrag für diese Superkategorie.
+const PEER_KEYS_BY_SC: Record<string, (keyof PeerConfig)[]> = {
+  wohnen:          ["housing"],
+  essen:           ["groceries", "dining_out"],
+  mobilitaet:      ["transport", "travel"],
+  versicherungen:  ["health_insurance", "other_insurance"],
+  freizeit:        ["entertainment"],
+  abos:            ["communication", "subscriptions"],
+  shopping:        ["clothing"],
+  bildung:         ["education"],
+  steuern:         ["direct_taxes"],
+  sparen:          ["pillar_3a_monthly"],
+};
+
+interface PeerConfig {
+  housing: number;
+  groceries: number;
+  transport: number;
+  health_insurance: number;
+  other_insurance: number;
+  communication: number;
+  dining_out: number;
+  entertainment: number;
+  clothing: number;
+  travel: number;
+  education: number;
+  subscriptions: number;
+  direct_taxes: number;
+  savings_rate: number;
+  pillar_3a_monthly: number;
+  peerLabel: string;
+  sampleSize: string;
+  incomeMedian: number;
+  confidenceNote: string;
+}
+
+function peerTotal(config: PeerConfig, scId: string): number | null {
+  const keys = PEER_KEYS_BY_SC[scId];
+  if (!keys) return null;
+  return keys.reduce((sum, k) => sum + (config[k] as number), 0);
+}
+
+function fmtCHF(v: number): string {
+  return `CHF ${v.toLocaleString("de-CH", { maximumFractionDigits: 0 })}`;
+}
 
 function calcAge(birthdate: string): number | null {
   if (!birthdate) return null;
@@ -36,6 +84,13 @@ export default function Settings() {
     setBudgetDefaultView(v);
     try { localStorage.setItem("budgetpal_budget_default_view", v); } catch {}
   }
+
+  // Peer config (stored from last wizard run)
+  const { data: peerConfig } = useQuery<PeerConfig | null>({
+    queryKey: ["wizard-peer-config"],
+    queryFn: () => api.get("/wizard/peer-config").then((r) => r.data),
+    staleTime: 5 * 60_000,
+  });
 
   // Category mapping state
   const [mappingDrafts, setMappingDrafts] = useState<Record<string, string>>({});
@@ -281,12 +336,21 @@ export default function Settings() {
         <div className="mb-4">
           <h2 className="text-text-primary font-semibold text-sm">Superkategorie-Taxonomie</h2>
           <p className="text-text-tertiary text-xs mt-0.5">
-            Übersicht, welche Transaktionskategorien (Reale Angaben) und Wizard-Labels (Empirische Angaben) jeder Superkategorie zugeordnet sind.
+            Übersicht, welche Transaktionskategorien (Reale Angaben) und Wizard-Labels (Empirische Angaben) jeder Superkategorie zugeordnet sind — inkl. gespeichertem Peer-Ø.
           </p>
+          {peerConfig?.peerLabel && (
+            <div className="mt-2 flex items-center gap-1.5 text-xs text-text-tertiary">
+              <Users className="w-3 h-3 text-accent shrink-0" />
+              <span>Peer-Gruppe: <span className="text-text-secondary font-medium">{peerConfig.peerLabel}</span></span>
+              <span className="text-text-disabled">·</span>
+              <span>{peerConfig.sampleSize}</span>
+            </div>
+          )}
         </div>
         <div className="space-y-1">
           {SUPER_CATEGORIES.filter((sc) => sc.id !== "sonstiges").map((sc) => {
             const isOpen = expandedSc === sc.id;
+            const peer = peerConfig ? peerTotal(peerConfig, sc.id) : null;
             return (
               <div key={sc.id} className="rounded-lg border border-border/40 overflow-hidden">
                 <button
@@ -294,7 +358,7 @@ export default function Settings() {
                   onClick={() => setExpandedSc(isOpen ? null : sc.id)}
                   className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-bg-surface2 transition-colors"
                 >
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-2.5 flex-1 min-w-0">
                     <span
                       className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
                       style={{ backgroundColor: sc.color + "22" }}
@@ -307,51 +371,125 @@ export default function Settings() {
                       style={{ backgroundColor: sc.color }}
                     />
                   </div>
-                  {isOpen
-                    ? <ChevronUp className="w-3.5 h-3.5 text-text-tertiary shrink-0" />
-                    : <ChevronDown className="w-3.5 h-3.5 text-text-tertiary shrink-0" />}
+                  <div className="flex items-center gap-3 shrink-0">
+                    {peer != null && peer > 0 && (
+                      <span
+                        className="flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded-full"
+                        style={{ backgroundColor: sc.color + "18", color: sc.color }}
+                      >
+                        <Users className="w-2.5 h-2.5" />
+                        Ø {fmtCHF(peer)}/Mo
+                      </span>
+                    )}
+                    {isOpen
+                      ? <ChevronUp className="w-3.5 h-3.5 text-text-tertiary" />
+                      : <ChevronDown className="w-3.5 h-3.5 text-text-tertiary" />}
+                  </div>
                 </button>
                 {isOpen && (
-                  <div className="px-4 pb-3 pt-1 border-t border-border/30 grid grid-cols-2 gap-4 text-xs">
-                    <div>
-                      <p className="text-text-tertiary font-semibold uppercase tracking-wide mb-1.5">
-                        Transaktionskategorien (Reale Angaben)
-                      </p>
-                      {sc.txnCategories.length === 0 ? (
-                        <span className="text-text-disabled italic">Keine — fällt in Sonstiges</span>
-                      ) : (
-                        <div className="flex flex-wrap gap-1">
-                          {sc.txnCategories.map((c) => (
-                            <span
-                              key={c}
-                              className="px-1.5 py-0.5 rounded text-text-secondary"
-                              style={{ backgroundColor: sc.color + "18" }}
+                  <div className="px-4 pb-3 pt-2 border-t border-border/30 space-y-3 text-xs">
+                    {/* Peer-Gruppe Detail */}
+                    {peerConfig && peer != null && (
+                      <div>
+                        <p className="text-text-tertiary font-semibold uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                          <Users className="w-3 h-3" />
+                          Peer-Gruppe (BFS HABE 2021)
+                        </p>
+                        <div className="rounded-lg border border-border/30 overflow-hidden">
+                          {(PEER_KEYS_BY_SC[sc.id] ?? []).map((key) => {
+                            const val = peerConfig[key] as number;
+                            if (!val || val <= 0) return null;
+                            const LABEL: Record<string, string> = {
+                              housing: "Wohnen (Miete/Hypothek)",
+                              groceries: "Lebensmittel",
+                              dining_out: "Restaurant & Takeaway",
+                              transport: "Transport (ÖV + Auto)",
+                              travel: "Reisen / Urlaub",
+                              health_insurance: "Krankenkasse",
+                              other_insurance: "Andere Versicherungen",
+                              communication: "Kommunikation (Handy/Internet)",
+                              subscriptions: "Abonnements (Streaming etc.)",
+                              entertainment: "Freizeit & Unterhaltung",
+                              clothing: "Kleidung & Schuhe",
+                              education: "Weiterbildung",
+                              direct_taxes: "Direkte Steuern (Kt./Gmd./Bund)",
+                              pillar_3a_monthly: "Säule 3a (monatl.)",
+                            };
+                            return (
+                              <div
+                                key={key}
+                                className="flex items-center justify-between px-3 py-1.5 border-b border-border/20 last:border-0"
+                                style={{ backgroundColor: sc.color + "08" }}
+                              >
+                                <span className="text-text-secondary">{LABEL[key] ?? key}</span>
+                                <span className="font-mono text-text-primary font-medium">{fmtCHF(val)}</span>
+                              </div>
+                            );
+                          })}
+                          {(PEER_KEYS_BY_SC[sc.id] ?? []).length > 1 && (
+                            <div
+                              className="flex items-center justify-between px-3 py-1.5 font-semibold"
+                              style={{ backgroundColor: sc.color + "15" }}
                             >
-                              {c}
-                            </span>
-                          ))}
+                              <span style={{ color: sc.color }}>Gesamt Peer-Ø</span>
+                              <span className="font-mono" style={{ color: sc.color }}>{fmtCHF(peer)}/Mo</span>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-text-tertiary font-semibold uppercase tracking-wide mb-1.5">
-                        Empirische Labels (Wizard)
-                      </p>
-                      {sc.wizardLabels.length === 0 ? (
-                        <span className="text-text-disabled italic">Keine</span>
-                      ) : (
-                        <div className="flex flex-wrap gap-1">
-                          {sc.wizardLabels.map((l) => (
-                            <span
-                              key={l}
-                              className="px-1.5 py-0.5 rounded text-text-secondary"
-                              style={{ backgroundColor: sc.color + "18" }}
-                            >
-                              {l}
-                            </span>
-                          ))}
-                        </div>
-                      )}
+                      </div>
+                    )}
+                    {peerConfig && peer == null && (
+                      <div>
+                        <p className="text-text-tertiary font-semibold uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                          <Users className="w-3 h-3" />
+                          Peer-Gruppe (BFS HABE 2021)
+                        </p>
+                        <span className="text-text-disabled italic">Kein Peer-Ø für diese Kategorie verfügbar</span>
+                      </div>
+                    )}
+
+                    {/* Mapping columns */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-text-tertiary font-semibold uppercase tracking-wide mb-1.5">
+                          Transaktionskategorien (Reale Angaben)
+                        </p>
+                        {sc.txnCategories.length === 0 ? (
+                          <span className="text-text-disabled italic">Keine — fällt in Sonstiges</span>
+                        ) : (
+                          <div className="flex flex-wrap gap-1">
+                            {sc.txnCategories.map((c) => (
+                              <span
+                                key={c}
+                                className="px-1.5 py-0.5 rounded text-text-secondary"
+                                style={{ backgroundColor: sc.color + "18" }}
+                              >
+                                {c}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-text-tertiary font-semibold uppercase tracking-wide mb-1.5">
+                          Empirische Labels (Wizard)
+                        </p>
+                        {sc.wizardLabels.length === 0 ? (
+                          <span className="text-text-disabled italic">Keine</span>
+                        ) : (
+                          <div className="flex flex-wrap gap-1">
+                            {sc.wizardLabels.map((l) => (
+                              <span
+                                key={l}
+                                className="px-1.5 py-0.5 rounded text-text-secondary"
+                                style={{ backgroundColor: sc.color + "18" }}
+                              >
+                                {l}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}

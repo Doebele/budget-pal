@@ -5,10 +5,10 @@
  *  simple     – Pick a plan variant, optional price override + note
  *  individual – Enter own amount, frequency, currency, first-payment date
  */
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   X, Settings2, ChevronLeft, ExternalLink, Trash2,
-  Check, Users, Calendar, RefreshCw,
+  Check, Users, Calendar, RefreshCw, PencilLine,
 } from "lucide-react";
 import { clsx } from "clsx";
 import ProviderBrandIcon from "./ProviderBrandIcon";
@@ -58,6 +58,7 @@ export default function ProviderSidebar({
   const [viewMode, setViewMode] = useState<"simple" | "individual">(
     entry?.viewMode ?? "simple"
   );
+  const customInputRef = useRef<HTMLInputElement>(null);
 
   function switchMode(mode: "simple" | "individual") {
     setViewMode(mode);
@@ -129,7 +130,7 @@ export default function ProviderSidebar({
               <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Tarif / Plan</p>
               <div className="space-y-1.5">
                 {provider.variants.map(variant => {
-                  const isActive = entry?.variantId === variant.id;
+                  const isActive = entry?.variantId === variant.id && entry?.customPrice == null;
                   return (
                     <button
                       key={variant.id}
@@ -169,41 +170,77 @@ export default function ProviderSidebar({
                     </button>
                   );
                 })}
+
+                {/* Custom price — integrated as last radio option */}
+                {entry && (() => {
+                  const isCustomActive = entry.customPrice != null;
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!isCustomActive) {
+                          onUpdate({ customPrice: 0 });
+                          setTimeout(() => customInputRef.current?.focus(), 50);
+                        }
+                      }}
+                      className={clsx(
+                        "w-full flex items-start justify-between rounded-md px-3 py-2.5 text-left text-xs transition-all border",
+                        isCustomActive
+                          ? "border-accent/60 bg-accent/12 text-text-primary"
+                          : "border-border/50 hover:border-border text-text-secondary hover:bg-white/[0.03]"
+                      )}
+                    >
+                      <div className="flex items-start gap-2 flex-1 min-w-0">
+                        <div className={clsx(
+                          "w-3.5 h-3.5 rounded-full border mt-0.5 flex-shrink-0 flex items-center justify-center transition-all",
+                          isCustomActive ? "border-accent bg-accent" : "border-white/25"
+                        )}>
+                          {isCustomActive && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium flex items-center gap-1">
+                            <PencilLine className="w-3 h-3" />
+                            Eigener Preis
+                          </div>
+                          {isCustomActive && (
+                            <div className="flex items-center gap-1.5 mt-1.5" onClick={e => e.stopPropagation()}>
+                              <div className="relative">
+                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-text-tertiary text-xs pointer-events-none">CHF</span>
+                                <input
+                                  ref={customInputRef}
+                                  type="number"
+                                  className="input pl-9 text-sm w-28"
+                                  placeholder="0.00"
+                                  value={entry.customPrice === 0 ? "" : (entry.customPrice ?? "")}
+                                  onChange={e => onUpdate({ customPrice: e.target.value ? parseFloat(e.target.value) : 0 })}
+                                  min={0}
+                                  step={0.01}
+                                />
+                              </div>
+                              <span className="text-text-tertiary text-xs">/Mo</span>
+                              <button
+                                type="button"
+                                onClick={() => onUpdate({ customPrice: undefined })}
+                                className="text-text-tertiary hover:text-loss transition-colors ml-1"
+                                title="Zurücksetzen"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      {!isCustomActive && (
+                        <span className="font-mono flex-shrink-0 ml-2 mt-0.5 text-xs text-text-tertiary">—</span>
+                      )}
+                    </button>
+                  );
+                })()}
               </div>
               {!entry && (
                 <p className="text-text-tertiary text-[10px] mt-2 text-center">Wähle diesen Anbieter zuerst aus</p>
               )}
             </div>
-
-            {/* Custom price override */}
-            {entry && (
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">
-                  Eigener Preis <span className="normal-case font-normal">(optional)</span>
-                </p>
-                <div className="flex items-center gap-2">
-                  <div className="relative flex-1">
-                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary text-xs pointer-events-none">CHF</span>
-                    <input
-                      type="number"
-                      className="input pl-10 text-sm w-full"
-                      placeholder={String(provider.variants.find(v => v.id === entry.variantId)?.price ?? "")}
-                      value={entry.customPrice ?? ""}
-                      onChange={e => onUpdate({ customPrice: e.target.value ? parseFloat(e.target.value) : undefined })}
-                      min={0}
-                    />
-                  </div>
-                  <span className="text-text-tertiary text-xs">/Mo</span>
-                  {entry.customPrice != null && (
-                    <button type="button" onClick={() => onUpdate({ customPrice: undefined })}
-                      className="text-text-tertiary hover:text-loss transition-colors" title="Zurücksetzen">
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-                <p className="text-text-tertiary text-[10px] mt-1">Überschreibe den Planpreis mit deinem Betrag.</p>
-              </div>
-            )}
 
             {/* Note */}
             {entry && (
