@@ -1,11 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { accountsApi } from "@/lib/api";
-import { formatCHF, formatAmount } from "@/lib/theme";
-import { Plus, Edit2, Trash2, Search, Check, AlertTriangle, X, FileX } from "lucide-react";
+import { formatCHF } from "@/lib/theme";
+import { Plus, Edit2, Trash2, Search, Check, AlertTriangle } from "lucide-react";
 import { clsx } from "clsx";
-import { format } from "date-fns";
-import { de } from "date-fns/locale";
 import {
   BANKS_WITH_LOGOS,
   getBankCategoryLabel,
@@ -93,237 +91,12 @@ const formatCurrency = (amount: number, currency: string): string => {
   }).format(amount);
 };
 
-interface BulkDeletePreview {
-  transaction_count: number;
-  total_amount: number;
-  date_range: { from: string | null; to: string | null };
-  sample_transactions: Array<{
-    id: number;
-    date: string;
-    description: string;
-    amount: number;
-    category?: string;
-  }>;
-}
-
-// MassDeleteConfirmModal Component
-const MassDeleteConfirmModal = ({
-  isOpen,
-  onClose,
-  onConfirm,
-  accountName,
-  preview,
-  isLoading,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  onConfirm: (hardDelete: boolean) => void;
-  accountName: string;
-  preview: BulkDeletePreview | null;
-  isLoading: boolean;
-}) => {
-  const [confirmed, setConfirmed] = useState(false);
-  const [hardDelete, setHardDelete] = useState(false);
-
-  // Reset states when modal opens/closes
-  useEffect(() => {
-    if (!isOpen) {
-      setConfirmed(false);
-      setHardDelete(false);
-    }
-  }, [isOpen]);
-
-  if (!isOpen) return null;
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          onClose();
-        }
-      }}
-    >
-      <div
-        className="relative w-full max-w-lg bg-slate-900 rounded-lg border border-red-500/30 shadow-2xl mx-4 overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header with warning gradient */}
-        <div className="bg-gradient-to-r from-red-900/50 to-orange-900/50 p-6 border-b border-red-500/20">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0">
-              <AlertTriangle className="w-6 h-6 text-red-500" />
-            </div>
-            <div>
-              <h3 className="text-xl font-semibold text-white">
-                ⛔ Alle Transaktionen löschen?
-              </h3>
-              <p className="text-red-300 text-sm mt-1">
-                Diese Aktion ist unwiderruflich! Es werden keine Backups erstellt.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-6 space-y-4">
-          {/* Account info */}
-          <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
-            <p className="text-slate-400 text-sm">Betroffenes Konto:</p>
-            <p className="text-white font-medium text-lg">{accountName}</p>
-          </div>
-
-          {/* Preview of affected transactions */}
-          {preview && (
-            <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-white font-medium flex items-center gap-2">
-                  <FileX className="w-4 h-4 text-red-400" />
-                  {preview.transaction_count} Transaktionen werden gelöscht
-                </p>
-                <span className="text-xs text-slate-400">
-                  {preview.date_range.from && preview.date_range.to
-                    ? `${format(new Date(preview.date_range.from), "dd.MM.yyyy", { locale: de })} - ${format(new Date(preview.date_range.to), "dd.MM.yyyy", { locale: de })}`
-                    : "Keine Datumsangaben"}
-                </span>
-              </div>
-
-              {preview.sample_transactions.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-xs text-slate-500 uppercase tracking-wide">Vorschau der ersten Einträge:</p>
-                  <ul className="space-y-1.5">
-                    {preview.sample_transactions.map((txn) => (
-                      <li
-                        key={txn.id}
-                        className="flex items-center justify-between text-sm py-2 px-3 bg-slate-700/50 rounded"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <span className="text-slate-400 text-xs whitespace-nowrap">
-                            {format(new Date(txn.date), "dd.MM.", { locale: de })}
-                          </span>
-                          <span className="text-slate-300 truncate">{txn.description}</span>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className="text-xs text-slate-500">{txn.category || "Allgemein"}</span>
-                          <span className={clsx(
-                            "font-mono font-medium",
-                            txn.amount >= 0 ? "text-gain" : "text-loss"
-                          )}>
-                            {txn.amount >= 0 ? "+" : ""}{formatAmount(txn.amount)}
-                          </span>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                  {preview.transaction_count > 5 && (
-                    <p className="text-xs text-slate-500 text-center pt-2">
-                      ...und weitere {preview.transaction_count - 5} Einträge
-                    </p>
-                  )}
-                </div>
-              )}
-
-              <div className="mt-4 pt-3 border-t border-slate-700 flex justify-between items-center">
-                <span className="text-slate-400 text-sm">Gesamtbetrag:</span>
-                <span className="font-mono text-lg text-white">
-                  {formatAmount(preview.total_amount)}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* Hard delete option */}
-          <div className="bg-red-950/30 border border-red-500/20 rounded-lg p-4">
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={hardDelete}
-                onChange={(e) => setHardDelete(e.target.checked)}
-                className="mt-0.5 w-4 h-4 rounded border-red-500/50 bg-red-950/50 text-red-500 focus:ring-red-500/50"
-              />
-              <div>
-                <p className="text-red-300 font-medium text-sm">⚠️ Dauerhaft löschen (Hard Delete)</p>
-                <p className="text-red-400/70 text-xs mt-1">
-                  Standardmäßig werden Transaktionen archiviert (Soft Delete). Bei Hard Delete werden
-                  die Daten unwiderruflich aus der Datenbank entfernt.
-                </p>
-              </div>
-            </label>
-          </div>
-
-          {/* Confirmation checkbox */}
-          <label className="flex items-center gap-3 cursor-pointer p-3 bg-slate-800/50 rounded-lg">
-            <input
-              type="checkbox"
-              checked={confirmed}
-              onChange={(e) => setConfirmed(e.target.checked)}
-              className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-accent focus:ring-accent/50"
-            />
-            <span className="text-sm text-slate-300">
-              Ich verstehe, dass diese Aktion <span className="text-red-400 font-medium">nicht rückgängig</span> gemacht werden kann.
-            </span>
-          </label>
-
-          {/* Actions */}
-          <div className="flex gap-3 pt-2">
-            <button
-              onClick={onClose}
-              className="flex-1 px-4 py-2.5 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-800 transition-colors font-medium"
-              disabled={isLoading}
-            >
-              Abbrechen
-            </button>
-            <button
-              onClick={() => {
-                if (confirmed) {
-                  onConfirm(hardDelete);
-                }
-              }}
-              disabled={!confirmed || isLoading}
-              className={clsx(
-                "flex-1 px-4 py-2.5 rounded-lg font-medium transition-all flex items-center justify-center gap-2",
-                confirmed && !isLoading
-                  ? "bg-red-600 text-white hover:bg-red-500"
-                  : "bg-slate-700 text-slate-500 cursor-not-allowed"
-              )}
-            >
-              {isLoading ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Löschen...
-                </>
-              ) : (
-                <>
-                  <Trash2 className="w-4 h-4" />
-                  Ja, ich bin sicher – Löschen!
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 export default function Accounts() {
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [editingAccountId, setEditingAccountId] = useState<number | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [accountToDelete, setAccountToDelete] = useState<{ id: number; name: string } | null>(null);
-
-  // Mass delete modal state
-  const [showMassDeleteModal, setShowMassDeleteModal] = useState(false);
-  const [accountForMassDelete, setAccountForMassDelete] = useState<{ id: number; name: string } | null>(null);
-  const [massDeletePreview, setMassDeletePreview] = useState<BulkDeletePreview | null>(null);
-  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
-
-  // Non-blocking notification (replaces alert())
-  const [notification, setNotification] = useState<{ message: string; type: "success" | "error" } | null>(null);
-  const showNotification = (message: string, type: "success" | "error" = "success") => {
-    setNotification({ message, type });
-    setTimeout(() => setNotification(null), 4000);
-  };
 
   const [form, setForm] = useState({
     name: "",
@@ -371,63 +144,6 @@ export default function Accounts() {
       alert(`Fehler beim Löschen: ${error instanceof Error ? error.message : "Unbekannter Fehler"}`);
     },
   });
-
-  // Mass delete mutation
-  const massDeleteMutation = useMutation({
-    mutationFn: ({ accountId, hard }: { accountId: number; hard: boolean }) =>
-      accountsApi.deleteAllTransactions(accountId, hard).then((r) => r.data),
-    onSuccess: (data: { deleted_count: number }) => {
-      setShowMassDeleteModal(false);
-      setAccountForMassDelete(null);
-      setMassDeletePreview(null);
-
-      queryClient.invalidateQueries({ queryKey: ["transactions"], refetchType: "all" });
-      queryClient.invalidateQueries({ queryKey: ["budget-analysis"], refetchType: "all" });
-      queryClient.invalidateQueries({ queryKey: ["import-history"], refetchType: "all" });
-      queryClient.invalidateQueries({ queryKey: ["accounts"], refetchType: "all" });
-
-      showNotification(`${data.deleted_count ?? 0} Transaktionen erfolgreich gelöscht.`);
-    },
-    onError: (error) => {
-      console.error("[Accounts] Mass delete error:", error);
-      setShowMassDeleteModal(false);
-      setAccountForMassDelete(null);
-      setMassDeletePreview(null);
-      showNotification(
-        `Fehler beim Löschen: ${error instanceof Error ? error.message : "Unbekannter Fehler"}`,
-        "error"
-      );
-    },
-  });
-
-  // Open mass delete modal and load preview
-  const handleMassDeleteClick = async (account: { id: number; name: string }) => {
-    setAccountForMassDelete(account);
-    setShowMassDeleteModal(true);
-    setIsLoadingPreview(true);
-    try {
-      const response = await accountsApi.previewTransactionsForDeletion(account.id);
-      setMassDeletePreview(response.data as BulkDeletePreview);
-    } catch (error) {
-      console.error("[Accounts] Failed to load preview:", error);
-    } finally {
-      setIsLoadingPreview(false);
-    }
-  };
-
-  // Confirm mass delete
-  const handleMassDeleteConfirm = (hardDelete: boolean) => {
-    if (accountForMassDelete) {
-      massDeleteMutation.mutate({ accountId: accountForMassDelete.id, hard: hardDelete });
-    }
-  };
-
-  // Close mass delete modal
-  const handleMassDeleteClose = () => {
-    setShowMassDeleteModal(false);
-    setAccountForMassDelete(null);
-    setMassDeletePreview(null);
-  };
 
   const resetForm = () => {
     setEditingAccountId(null);
@@ -500,23 +216,6 @@ export default function Accounts() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Non-blocking notification toast */}
-      {notification && (
-        <div
-          className={clsx(
-            "fixed top-4 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-sm font-medium transition-all",
-            notification.type === "success"
-              ? "bg-emerald-900/90 border border-emerald-500/40 text-emerald-200"
-              : "bg-red-900/90 border border-red-500/40 text-red-200"
-          )}
-        >
-          <span>{notification.message}</span>
-          <button onClick={() => setNotification(null)} className="ml-2 opacity-60 hover:opacity-100">
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      )}
-
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-display text-text-primary">Konten</h1>
@@ -877,13 +576,6 @@ export default function Accounts() {
                   >
                     <Edit2 className="w-4 h-4" />
                   </button>
-                  <button
-                    onClick={() => handleMassDeleteClick(account)}
-                    className="p-1.5 rounded-md text-text-tertiary hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                    title="Alle Transaktionen löschen"
-                  >
-                    <FileX className="w-4 h-4" />
-                  </button>
                 </div>
               </div>
               {/* Balance Display: Primary (CHF) + Secondary (Original Currency) */}
@@ -912,15 +604,6 @@ export default function Accounts() {
         )}
       </div>
 
-      {/* Mass Delete Confirmation Modal */}
-      <MassDeleteConfirmModal
-        isOpen={showMassDeleteModal}
-        onClose={handleMassDeleteClose}
-        onConfirm={handleMassDeleteConfirm}
-        accountName={accountForMassDelete?.name || ""}
-        preview={massDeletePreview}
-        isLoading={isLoadingPreview || massDeleteMutation.isPending}
-      />
     </div>
   );
 }

@@ -81,9 +81,10 @@ function makeOption(row: GaugeRow, hasPeer: boolean): any {
   // Actual: large, top of center
   // Peer + Planned: small, below — with generous spacing
   const hasSecondary = hasPeerVal || planned > 0;
-  const actualOffset  = hasSecondary ? "-16%" : "8%";
-  const peerOffset    = planned > 0 ? "10%"  : "24%";
-  const plannedOffset = "28%";
+  // Wider vertical spacing between the 3 center lines (Historisch / Ø / Soll)
+  const actualOffset  = hasSecondary ? "-18%" : "8%";
+  const peerOffset    = planned > 0 ? "13%"  : "26%";
+  const plannedOffset = "34%";
 
   // OUTER RING — Historisch (actual) — shows main CHF value
   series.push({
@@ -101,7 +102,7 @@ function makeOption(row: GaugeRow, hasPeer: boolean): any {
     detail: {
       show: true,
       offsetCenter: [0, actualOffset],
-      fontSize: 14,
+      fontSize: 15,
       fontWeight: 700,
       fontFamily: "JetBrains Mono, Fira Code, monospace",
       color: isOverPeer ? "#f87171" : isOverPlan ? "#fbbf24" : colors.textSecondary,
@@ -128,7 +129,7 @@ function makeOption(row: GaugeRow, hasPeer: boolean): any {
       detail: {
         show: true,
         offsetCenter: [0, peerOffset],
-        fontSize: 9,
+        fontSize: 10,
         fontWeight: 400,
         fontFamily: "JetBrains Mono, Fira Code, monospace",
         color: "#64748b",
@@ -156,7 +157,7 @@ function makeOption(row: GaugeRow, hasPeer: boolean): any {
       detail: {
         show: true,
         offsetCenter: [0, plannedOffset],
-        fontSize: 9,
+        fontSize: 10,
         fontWeight: 400,
         fontFamily: "JetBrains Mono, Fira Code, monospace",
         color: sc.color + "bb",
@@ -177,7 +178,7 @@ function makeOption(row: GaugeRow, hasPeer: boolean): any {
       padding: [6, 10],
       textStyle: {
         color: colors.textPrimary,
-        fontSize: 11,
+        fontSize: 12,
         fontFamily: "Syne, system-ui, sans-serif",
       },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -222,7 +223,7 @@ export default function CategoryGaugeChart({ rows, hasPeer, onToggleHide }: Cate
   return (
     <div className="px-4 py-4">
       {/* Legend */}
-      <div className="flex flex-wrap gap-x-5 gap-y-1 mb-4 text-xs text-text-tertiary">
+      <div className="flex flex-wrap gap-x-5 gap-y-2 mb-4 text-[13px] leading-relaxed text-text-tertiary">
         <span className="flex items-center gap-1.5">
           <span className="w-3 h-3 rounded-full inline-block bg-accent/80" />
           Historisch (Ist)
@@ -269,14 +270,14 @@ export default function CategoryGaugeChart({ rows, hasPeer, onToggleHide }: Cate
                 />
 
                 {/* Category label */}
-                <div className="flex items-center gap-1.5 mt-1">
+                <div className="flex items-center gap-1.5 mt-1.5">
                   <span
                     className="w-5 h-5 rounded-md flex items-center justify-center shrink-0"
                     style={{ backgroundColor: row.sc.color + "22" }}
                   >
                     <row.sc.icon className="w-3 h-3" style={{ color: row.sc.color }} />
                   </span>
-                  <span className="text-xs font-medium text-text-secondary truncate max-w-[90px]">
+                  <span className="text-[13px] leading-snug font-medium text-text-secondary truncate max-w-[90px]">
                     {row.sc.label}
                   </span>
                 </div>
@@ -284,7 +285,7 @@ export default function CategoryGaugeChart({ rows, hasPeer, onToggleHide }: Cate
                 {/* Peer comparison hint */}
                 {hasPeer && (row.peer ?? 0) > 0 && (
                   <p
-                    className="text-[10px] mt-0.5 font-mono"
+                    className="text-[11px] mt-1 leading-relaxed font-mono"
                     style={{ color: isOver ? "#f87171" : colors.textTertiary }}
                   >
                     {pctLabel(row.actual, row.peer!)}
