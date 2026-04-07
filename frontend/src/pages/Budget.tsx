@@ -44,6 +44,18 @@ import {
 import { deduplicateWizardBatch } from "@/lib/wizardUtils";
 import type { MultiAnalysisResult } from "@/types/budgetAnalysis";
 
+// ── Transaction row type used in Budget (extended with recurrence) ──
+interface TxnRow {
+  id: number;
+  date: string;
+  amount: number;
+  category?: string;
+  description: string;
+  merchant_normalized?: string;
+  is_recurring?: boolean;
+  periodicity?: string;
+}
+
 // ── Wizard peer-config types + SC→key mapping ─────────────────
 interface PeerConfig {
   housing?: number;
@@ -186,12 +198,12 @@ export default function Budget() {
     staleTime: 30_000,
   });
 
-  // Per-transaction list (drill-down only; limited to current period)
+  // Per-transaction list — used for both drill-down AND frequency-filtered KPIs
   const { data: periodTransactions = [] } = useQuery({
     queryKey: ["period-transactions-drilldown", periodStart, periodEnd],
     queryFn: () =>
       transactionsApi
-        .list({ start: periodStart, end: periodEnd, limit: 500 })
+        .list({ start: periodStart, end: periodEnd, limit: 2000 })
         .then((r) => r.data),
     staleTime: 30_000,
   });
@@ -225,28 +237,75 @@ export default function Budget() {
     enabled: showPeer || gaugeView,
   });
 
-  // ── KPI from stats ───────────────────────────────────────────
-  const kpi = useMemo(() => ({
-    income:   stats?.total_income   ?? 0,
-    expenses: stats?.total_expenses ?? 0,
-    net: (stats?.total_income ?? 0) - (stats?.total_expenses ?? 0),
-  }), [stats]);
+  // ── Frequency filter helpers ─────────────────────────────────
+  // True when every chip is active → use fast stats-API path
+  const ALL_FREQS_SELECTED = useMemo(
+    () => FREQ_OPTIONS.every(({ key }) => selectedFreqs.has(key)),
+    [selectedFreqs],
+  );
 
-  // ── Actual by supercategory: from stats.top_categories ───────
+  // Subset of periodTransactions matching the selected frequencies.
+  // Mapping: "monthly"|"quarterly"|"halfyearly"|"yearly"|"weekly" → is_recurring + periodicity
+  //          "einmalig" → not recurring (one-time payments)
+  const freqFilteredTxns = useMemo((): TxnRow[] => {
+    const txns = periodTransactions as TxnRow[];
+    if (ALL_FREQS_SELECTED) return txns;
+    return txns.filter((t) => {
+      if (!t.is_recurring) return selectedFreqs.has("einmalig");
+      return selectedFreqs.has(t.periodicity ?? "monthly");
+    });
+  }, [periodTransactions, selectedFreqs, ALL_FREQS_SELECTED]);
+
+  // ── KPI: stats-API when all freqs active, computed when filtered ──
+  const kpi = useMemo(() => {
+    if (ALL_FREQS_SELECTED) {
+      return {
+        income:   stats?.total_income   ?? 0,
+        expenses: stats?.total_expenses ?? 0,
+        net: (stats?.total_income ?? 0) - (stats?.total_expenses ?? 0),
+      };
+    }
+    let income = 0, expenses = 0;
+    for (const t of freqFilteredTxns) {
+      if (t.amount > 0) income += t.amount;
+      else expenses += -t.amount;
+    }
+    return { income, expenses, net: income - expenses };
+  }, [ALL_FREQS_SELECTED, stats, freqFilteredTxns]);
+
+  // ── Actual by supercategory ───────────────────────────────────
+  // Fast path: stats.top_categories (authoritative, no limit) when all freqs active.
+  // Filtered path: compute from freqFilteredTxns so frequency chips affect gauges too.
   const actualBySuperCat = useMemo((): Map<string, { total: number; subs: Map<string, number> }> => {
     const m = new Map<string, { total: number; subs: Map<string, number> }>();
-    for (const cat of (stats?.top_categories || [])) {
-      if (cat.total <= 0) continue;
-      const sc = resolveSuperCategory(cat.category, false);
-      if (sc.id === "sparen") continue;
 
-      if (!m.has(sc.id)) m.set(sc.id, { total: 0, subs: new Map() });
-      const entry = m.get(sc.id)!;
-      entry.total += cat.total;
-      entry.subs.set(cat.category, (entry.subs.get(cat.category) ?? 0) + cat.total);
+    if (ALL_FREQS_SELECTED) {
+      for (const cat of (stats?.top_categories || [])) {
+        if (cat.total <= 0) continue;
+        const sc = resolveSuperCategory(cat.category, false);
+        if (sc.id === "sparen") continue;
+        if (!m.has(sc.id)) m.set(sc.id, { total: 0, subs: new Map() });
+        const entry = m.get(sc.id)!;
+        entry.total += cat.total;
+        entry.subs.set(cat.category, (entry.subs.get(cat.category) ?? 0) + cat.total);
+      }
+    } else {
+      for (const t of freqFilteredTxns) {
+        if (t.amount >= 0) continue; // skip income
+        const sc = resolveSuperCategory(t.category || "");
+        if (sc.id === "sparen") continue;
+        const abs = -t.amount;
+        if (!m.has(sc.id)) m.set(sc.id, { total: 0, subs: new Map() });
+        const entry = m.get(sc.id)!;
+        entry.total += abs;
+        entry.subs.set(
+          t.category || "Sonstiges",
+          (entry.subs.get(t.category || "Sonstiges") ?? 0) + abs,
+        );
+      }
     }
     return m;
-  }, [stats]);
+  }, [ALL_FREQS_SELECTED, stats, freqFilteredTxns]);
 
   // ── Wizard planned amounts by label → period CHF ─────────────
   const wizardPlanned = useMemo((): Map<string, number> => {
@@ -322,12 +381,10 @@ export default function Budget() {
   }, [peerData, wizardPeerConfig, months]);
 
   // ── Transactions per supercategory for drill-down ─────────────
+  // Uses freqFilteredTxns so the frequency chips affect drill-down too.
   const txnsBySuperCat = useMemo((): Map<string, DrillDownTransaction[]> => {
     const m = new Map<string, DrillDownTransaction[]>();
-    for (const t of (periodTransactions as Array<{
-      id: number; date: string; amount: number; category?: string;
-      description: string; merchant_normalized?: string;
-    }>)) {
+    for (const t of freqFilteredTxns) {
       if (t.amount >= 0) continue;
       const sc = resolveSuperCategory(t.category || "");
       if (!m.has(sc.id)) m.set(sc.id, []);
@@ -342,7 +399,7 @@ export default function Budget() {
     }
     for (const [, txns] of m) txns.sort((a, b) => b.date.localeCompare(a.date));
     return m;
-  }, [periodTransactions]);
+  }, [freqFilteredTxns]);
 
   // ── Unified SuperRow list (all SUPER_CATEGORIES) ──────────────
   const superRows = useMemo((): SuperRow[] => {
@@ -453,7 +510,7 @@ export default function Budget() {
       </div>
 
       {/* ── Frequency filter chips ──────────────── */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 items-center">
         {FREQ_OPTIONS.map(({ key, label }) => (
           <button
             key={key}
@@ -469,9 +526,16 @@ export default function Budget() {
             {label}
           </button>
         ))}
-        <span className="text-text-disabled text-xs self-center ml-1">
-          (Filter gilt für Drill-down Transaktionen)
-        </span>
+        {!ALL_FREQS_SELECTED ? (
+          <span className="text-amber-400 text-xs self-center ml-1 flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
+            Alle Werte gefiltert nach Wiederkehrend
+          </span>
+        ) : (
+          <span className="text-text-disabled text-xs self-center ml-1">
+            Gilt für alle Werte auf dieser Seite
+          </span>
+        )}
       </div>
 
       {/* ── KPI strip ──────────────────────────── */}

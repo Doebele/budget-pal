@@ -79,6 +79,9 @@ class ForecastResponse(BaseModel):
     total_monthly_income_mean: float
     total_monthly_expense_mean: float
     scenario_id: Optional[int] = None
+    # Reference lines for chart overlay
+    peer_net_monthly: float = 0.0        # peer-group monthly net (income − expenses)
+    empirical_net_monthly: float = 0.0   # empirical Swiss median savings (income × rate)
 
 
 class ScenarioCreate(BaseModel):
@@ -188,6 +191,8 @@ async def generate_forecast(
         total_monthly_income_mean=analysis["total_monthly_income_mean"],
         total_monthly_expense_mean=analysis["total_monthly_expense_mean"],
         scenario_id=scenario_id,
+        peer_net_monthly=result.get("peer_net_monthly", 0.0),
+        empirical_net_monthly=result.get("empirical_net_monthly", 0.0),
     )
 
 

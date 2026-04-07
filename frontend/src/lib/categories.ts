@@ -6,6 +6,10 @@
  *   • Grouping logic    (transaction categories → supercategory)
  *   • Wizard label mapping (wizard notes → supercategory)
  *   • Monochrome icons  (used in all UI components instead of emojis)
+ *
+ * txnCategories  = canonical German names shown in the UI and stored in the DB
+ * legacyAliases  = old/English names kept for backwards-compat matching only
+ *                  (hidden from UI; migrated to German on server startup)
  */
 import type { LucideIcon } from "lucide-react";
 import {
@@ -25,11 +29,13 @@ import {
 export interface SuperCategory {
   id: string;
   label: string;         // German display label
-  icon: LucideIcon;      // monochrome lucide icon (replaces emoji in UI)
+  icon: LucideIcon;      // monochrome lucide icon
   emoji: string;         // kept for plain-text contexts (tooltips, <option>)
   color: string;         // hex – identical in Sankey + Budget + badges
-  /** Lowercase transaction category names that belong here */
+  /** Canonical German transaction category names stored in the DB */
   txnCategories: string[];
+  /** Old / English aliases kept for backwards-compat matching only */
+  legacyAliases?: string[];
   /** Lowercase wizard budget `notes` values that belong here */
   wizardLabels: string[];
 }
@@ -41,7 +47,8 @@ export const SUPER_CATEGORIES: SuperCategory[] = [
     icon: Home,
     emoji: "🏠",
     color: "#f0b429",
-    txnCategories: ["housing", "wohnen", "utilities", "nebenkosten"],
+    txnCategories: ["Wohnen", "Nebenkosten"],
+    legacyAliases: ["housing", "utilities"],
     wizardLabels: ["miete", "hypothek", "hypothek & amortisation", "nebenkosten", "parkplatz"],
   },
   {
@@ -50,7 +57,8 @@ export const SUPER_CATEGORIES: SuperCategory[] = [
     icon: ShoppingCart,
     emoji: "🛒",
     color: "#84cc16",
-    txnCategories: ["groceries", "food & drink", "lebensmittel", "restaurant & takeaway"],
+    txnCategories: ["Lebensmittel", "Restaurant & Takeaway"],
+    legacyAliases: ["groceries", "food & drink"],
     wizardLabels: ["lebensmittel", "freizeit & restaurant"],
   },
   {
@@ -59,8 +67,9 @@ export const SUPER_CATEGORIES: SuperCategory[] = [
     icon: Train,
     emoji: "🚆",
     color: "#38bdf8",
-    txnCategories: [
-      "transport", "travel", "reisen",
+    txnCategories: ["Transport", "Reisen", "ÖV-Kosten"],
+    legacyAliases: [
+      "travel",
       "öv-abonnements", "ov-abonnements", "öv abonnements",
     ],
     wizardLabels: [
@@ -75,9 +84,10 @@ export const SUPER_CATEGORIES: SuperCategory[] = [
     emoji: "🛡️",
     color: "#a78bfa",
     txnCategories: [
-      "insurance", "health", "versicherungen", "krankenkasse",
-      "weitere versicherungen", "gesundheit", "fitness",
+      "Versicherungen", "Gesundheit", "Krankenkasse",
+      "Weitere Versicherungen", "Fitness",
     ],
+    legacyAliases: ["insurance", "health"],
     wizardLabels: [
       "krankenkasse", "zusatzversicherung",
       "hausrat & haftpflicht", "autoversicherung",
@@ -89,7 +99,8 @@ export const SUPER_CATEGORIES: SuperCategory[] = [
     icon: Clapperboard,
     emoji: "🎬",
     color: "#fb923c",
-    txnCategories: ["entertainment", "unterhaltung", "freizeit & unterhaltung"],
+    txnCategories: ["Freizeit & Unterhaltung"],
+    legacyAliases: ["entertainment", "unterhaltung"],
     wizardLabels: ["freizeit & unterhaltung", "sport & fitness", "kultur & events"],
   },
   {
@@ -99,6 +110,14 @@ export const SUPER_CATEGORIES: SuperCategory[] = [
     emoji: "📱",
     color: "#22d3ee",
     txnCategories: [
+      "Abonnements", "Kommunikation", "Streaming",
+      "Musik & Medien", "Internet (Festnetz)", "Mobilfunk",
+      "Cloud & Backup", "Software & Apps", "Nachrichten & Medien",
+      "Treue & Mitgliedschaften", "Bildung & Weiterbildung",
+      "Beruflich", "Shopping & Lieferdienste",
+    ],
+    legacyAliases: [
+      // lowercase variants in old data
       "abonnements", "kommunikation", "streaming",
       "musik & medien", "internet (festnetz)", "mobilfunk",
       "cloud & backup", "software & apps", "nachrichten & medien",
@@ -106,11 +125,8 @@ export const SUPER_CATEGORIES: SuperCategory[] = [
       "beruflich", "shopping & lieferdienste",
     ],
     wizardLabels: [
-      // aggregate fallback (old wizard runs)
       "abonnements",
-      // Serafe (ehemals Billag) — Pflichtabonnement, kein Steuerposten
       "serafe",
-      // individual subscription services (new wizard runs)
       "netflix", "spotify", "disney+", "nzz digital", "blick+",
       "srf play (optional)", "icloud 200gb", "google one", "microsoft 365",
       "migros cumulus extra", "adsl/fiber (swisscom)", "mobile abo (sunrise)",
@@ -124,7 +140,7 @@ export const SUPER_CATEGORIES: SuperCategory[] = [
     icon: ShoppingBag,
     emoji: "👔",
     color: "#ec4899",
-    txnCategories: ["shopping", "kleidung"],
+    txnCategories: ["Shopping", "Kleidung"],
     wizardLabels: ["kleidung", "shopping & kleidung", "bekleidung & schuhe"],
   },
   {
@@ -133,7 +149,8 @@ export const SUPER_CATEGORIES: SuperCategory[] = [
     icon: GraduationCap,
     emoji: "📚",
     color: "#6366f1",
-    txnCategories: ["education"],
+    txnCategories: ["Bildung"],
+    legacyAliases: ["education"],
     wizardLabels: ["weiterbildung & kurse", "bücher & medien", "bildung & weiterbildung"],
   },
   {
@@ -142,14 +159,10 @@ export const SUPER_CATEGORIES: SuperCategory[] = [
     icon: Landmark,
     emoji: "🏛️",
     color: "#f43f5e",
-    txnCategories: [
-      "finance", "taxes", "services", "gebühren",
-      "fees", "steuern", "abgaben",
-    ],
+    txnCategories: ["Steuern", "Abgaben", "Finanzen", "Gebühren", "Dienstleistungen"],
+    legacyAliases: ["finance", "taxes", "services", "fees"],
     wizardLabels: [
-      // Direkte Steuern (Kanton + Gemeinde + Bund)
       "direkte steuern",
-      // Sonstige Gebühren
       "gebühren",
       "kirchensteuern",
     ],
@@ -160,8 +173,9 @@ export const SUPER_CATEGORIES: SuperCategory[] = [
     icon: PiggyBank,
     emoji: "💰",
     color: "#10b981",
-    txnCategories: ["salary", "investment", "einzahlungen"],
-    wizardLabels: [],
+    txnCategories: ["Gehalt", "Investitionen", "Einzahlungen", "Kontoübertrag", "Säule 3A"],
+    legacyAliases: ["salary", "investment"],
+    wizardLabels: ["säule 3a"],
   },
   {
     id: "sonstiges",
@@ -182,10 +196,14 @@ export function getSuperCategoryByLabel(label: string): SuperCategory | undefine
   return SUPER_CATEGORIES.find((sc) => sc.label.toLowerCase() === lower);
 }
 
-/** Find supercategory for a transaction category name */
+/** Find supercategory for a transaction category name (checks canonical + legacy aliases) */
 export function getSuperCategory(txnCategory: string): SuperCategory | undefined {
   const lower = txnCategory.toLowerCase();
-  return SUPER_CATEGORIES.find((sc) => sc.txnCategories.includes(lower));
+  return SUPER_CATEGORIES.find(
+    (sc) =>
+      sc.txnCategories.some((t) => t.toLowerCase() === lower) ||
+      (sc.legacyAliases ?? []).some((a) => a.toLowerCase() === lower),
+  );
 }
 
 /** Find supercategory for a wizard budget label (notes field) */
@@ -254,7 +272,7 @@ export function groupBySuper(
   for (const item of items) {
     if (item.total <= 0) continue;
     const sc = resolveSuperCategory(item.category, isWizard);
-    // Skip income-side categories (salary etc.) from expense grouping
+    // Skip income-side / transfer categories from expense grouping
     if (sc.id === "sparen") continue;
 
     if (!map.has(sc.id)) {

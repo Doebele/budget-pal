@@ -761,6 +761,62 @@ async def monthly_summary(
     ]
 
 
+class MonthlyCategoryItem(BaseModel):
+    month: str        # "2025-01"
+    category: str
+    amount: float     # positive (absolute value of expenses)
+
+
+@router.get("/monthly-category-breakdown", response_model=List[MonthlyCategoryItem])
+async def monthly_category_breakdown(
+    months: int = Query(24, ge=1, le=60),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Expense breakdown by category for each of the last N months."""
+    from datetime import timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(days=months * 31)
+
+    result = await db.execute(
+        select(
+            func.extract("year", Transaction.date).label("yr"),
+            func.extract("month", Transaction.date).label("mo"),
+            Transaction.category,
+            func.sum(func.abs(Transaction.amount)).label("amount"),
+        )
+        .join(Account)
+        .where(
+            and_(
+                Account.user_id == current_user.id,
+                Transaction.amount < 0,
+                Transaction.is_deleted.isnot(True),
+                Transaction.is_transfer.isnot(True),
+                Transaction.date >= cutoff,
+                Transaction.category.isnot(None),
+            )
+        )
+        .group_by(
+            func.extract("year", Transaction.date),
+            func.extract("month", Transaction.date),
+            Transaction.category,
+        )
+        .order_by(
+            func.extract("year", Transaction.date),
+            func.extract("month", Transaction.date),
+            desc("amount"),
+        )
+    )
+
+    return [
+        MonthlyCategoryItem(
+            month=f"{int(row.yr)}-{int(row.mo):02d}",
+            category=row.category,
+            amount=float(row.amount),
+        )
+        for row in result.all()
+    ]
+
+
 @router.get("/budget-analysis", response_model=BudgetAnalysisResponse)
 async def budget_analysis(
     start: Optional[date] = Query(None, description="Analysis period start (YYYY-MM-DD)"),

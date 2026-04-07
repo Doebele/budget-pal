@@ -69,7 +69,7 @@ export default function ForecastCard({ data, isSelected, onClick }: Props) {
       </div>
 
       {/* Net amount — primary */}
-      <p className={`text-xl font-display font-bold ${netColor} mb-1`}>
+      <p className={`text-xl font-mono font-semibold ${netColor} mb-1`}>
         {isPositive ? "+" : ""}{formatCHF(data.net)}
       </p>
 

@@ -67,6 +67,20 @@ async def lifespan(app: FastAPI):
         logger.warning("peer_group_defaults_json column migration skipped: %s", e)
 
     try:
+        from app.core.database import engine
+        from sqlalchemy import text
+        async with engine.begin() as conn:
+            await conn.execute(
+                text(
+                    "ALTER TABLE user_wizard_config "
+                    "ADD COLUMN IF NOT EXISTS wizard_data_json TEXT"
+                )
+            )
+        logger.info("user_wizard_config.wizard_data_json column ensured.")
+    except Exception as e:
+        logger.warning("wizard_data_json column migration skipped: %s", e)
+
+    try:
         from app.services.peer_group_seed import seed_peer_group_system_categories
 
         async with AsyncSessionLocal() as session:
@@ -76,6 +90,24 @@ async def lifespan(app: FastAPI):
                 logger.info("Seeded %d peer-group system categories.", n)
     except Exception as e:
         logger.warning("Peer-group category seed skipped: %s", e)
+
+    # Migrate English category names → German (idempotent)
+    try:
+        from app.services.categorization import EN_TO_DE_CATEGORY
+        from app.core.database import engine
+        from sqlalchemy import text
+        async with engine.begin() as conn:
+            for en, de in EN_TO_DE_CATEGORY.items():
+                await conn.execute(
+                    text(
+                        "UPDATE transactions SET category = :de "
+                        "WHERE LOWER(category) = :en AND category != :de"
+                    ),
+                    {"de": de, "en": en},
+                )
+        logger.info("Category language migration completed.")
+    except Exception as e:
+        logger.warning("Category language migration skipped: %s", e)
 
     # Load currency exchange rates
     try:

@@ -283,6 +283,26 @@ async def get_peer_config(
 
 
 @router.get(
+    "/state",
+    summary="Vollständiger gespeicherter Wizard-Zustand des eingeloggten Nutzers",
+)
+async def get_wizard_state(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Returns the full WizardData payload saved during the last wizard run.
+    Returns null if no wizard has been completed yet.
+    """
+    cfg_result = await db.execute(
+        select(UserWizardConfig).where(UserWizardConfig.user_id == current_user.id)
+    )
+    wizard_cfg = cfg_result.scalar_one_or_none()
+    if not wizard_cfg or not wizard_cfg.wizard_data_json:
+        return None
+    return json.loads(wizard_cfg.wizard_data_json)
+
+
+@router.get(
     "/peer-reference",
     summary="Swiss cantons and common subscription catalog",
 )
@@ -670,13 +690,17 @@ async def wizard_complete(
     )
     wizard_cfg = cfg_result.scalar_one_or_none()
     blob = json.dumps(defaults_to_store, ensure_ascii=False)
+    # Serialize full wizard payload for later restore (camelCase, matching frontend WizardData)
+    wizard_data_blob = json.dumps(payload.model_dump(by_alias=True), ensure_ascii=False)
     if wizard_cfg:
         wizard_cfg.peer_group_defaults_json = blob
+        wizard_cfg.wizard_data_json = wizard_data_blob
     else:
         db.add(
             UserWizardConfig(
                 user_id=current_user.id,
                 peer_group_defaults_json=blob,
+                wizard_data_json=wizard_data_blob,
             )
         )
 

@@ -9,6 +9,8 @@ Pipeline (in order of priority):
 5. OpenAI GPT-4o-mini fallback (if API key configured and confidence still low)
 
 Returns: {"category", "subcategory", "merchant_normalized", "confidence_score"}
+
+Alle Kategorienamen sind einheitlich auf Deutsch.
 """
 import re
 import logging
@@ -17,257 +19,316 @@ from functools import lru_cache
 
 logger = logging.getLogger(__name__)
 
-# ── Merchant Rules ─────────────────────────────────────────────
-# Format: "pattern" → (category, subcategory, normalized_name)
-# Patterns are matched case-insensitively as substrings.
-
-MERCHANT_RULES: Dict[str, Tuple[str, str, str]] = {
-    # ── Groceries (Lebensmittel) ─────────────────────────────
-    "migros": ("Groceries", "Supermarket", "Migros"),
-    "coop": ("Groceries", "Supermarket", "Coop"),
-    "coop-": ("Groceries", "Supermarket", "Coop"),
-    "denner": ("Groceries", "Discount Supermarket", "Denner"),
-    "aldi": ("Groceries", "Discount Supermarket", "Aldi"),
-    "lidl": ("Groceries", "Discount Supermarket", "Lidl"),
-    "rewe": ("Groceries", "Supermarket", "REWE"),
-    "edeka": ("Groceries", "Supermarket", "Edeka"),
-    "penny": ("Groceries", "Discount Supermarket", "Penny"),
-    "netto": ("Groceries", "Discount Supermarket", "Netto"),
-    "manor food": ("Groceries", "Supermarket", "Manor Food"),
-    "pick pay": ("Groceries", "Supermarket", "Pick Pay"),
-    "volg": ("Groceries", "Supermarket", "Volg"),
-    "spar": ("Groceries", "Supermarket", "Spar"),
-    "fenaco": ("Groceries", "Wholesale", "Fenaco"),
-
-    # ── Restaurants & Takeaway ─────────────────────────────
-    "mcdonald": ("Food & Drink", "Fast Food", "McDonald's"),
-    "mcdonalds": ("Food & Drink", "Fast Food", "McDonald's"),
-    "burger king": ("Food & Drink", "Fast Food", "Burger King"),
-    "kfc": ("Food & Drink", "Fast Food", "KFC"),
-    "subway": ("Food & Drink", "Fast Food", "Subway"),
-    "pizza hut": ("Food & Drink", "Pizza", "Pizza Hut"),
-    "domino": ("Food & Drink", "Pizza", "Domino's"),
-    "starbucks": ("Food & Drink", "Coffee", "Starbucks"),
-    "caffè": ("Food & Drink", "Coffee", "Caffè"),
-    "manor restaurant": ("Food & Drink", "Restaurant", "Manor Restaurant"),
-    "tibits": ("Food & Drink", "Restaurant", "tibits"),
-    "hiltl": ("Food & Drink", "Restaurant", "Hiltl"),
-
-    # ── Transport ─────────────────────────────────────────
-    "sbb": ("Transport", "Train", "SBB"),
-    "sbb cff ffs": ("Transport", "Train", "SBB"),
-    "bls ag": ("Transport", "Train", "BLS"),
-    "zvv": ("Transport", "Public Transport", "ZVV"),
-    "bvb": ("Transport", "Public Transport", "BVB"),
-    "tnw": ("Transport", "Public Transport", "TNW"),
-    "rbs": ("Transport", "Train", "RBS"),
-    "flixbus": ("Transport", "Bus", "FlixBus"),
-    "eurostar": ("Transport", "Train", "Eurostar"),
-    "deutsche bahn": ("Transport", "Train", "Deutsche Bahn"),
-    "db bahn": ("Transport", "Train", "Deutsche Bahn"),
-    "postbus": ("Transport", "Bus", "PostBus"),
-    "uber": ("Transport", "Taxi", "Uber"),
-    "mytaxi": ("Transport", "Taxi", "myTaxi"),
-    "taxi": ("Transport", "Taxi", "Taxi"),
-    "mobility": ("Transport", "Car Sharing", "Mobility"),
-    "sharenow": ("Transport", "Car Sharing", "ShareNow"),
-    "bird": ("Transport", "Scooter", "Bird"),
-    "lime": ("Transport", "Scooter", "Lime"),
-    "velospot": ("Transport", "Bike Share", "Velospot"),
-    "nextbike": ("Transport", "Bike Share", "Nextbike"),
-
-    # ── Flights & Travel ──────────────────────────────────
-    "swiss air": ("Travel", "Flight", "Swiss Air"),
-    "swiss intl": ("Travel", "Flight", "SWISS"),
-    "lufthansa": ("Travel", "Flight", "Lufthansa"),
-    "easyjet": ("Travel", "Flight", "easyJet"),
-    "ryanair": ("Travel", "Flight", "Ryanair"),
-    "air france": ("Travel", "Flight", "Air France"),
-    "british airways": ("Travel", "Flight", "British Airways"),
-    "booking.com": ("Travel", "Hotel", "Booking.com"),
-    "airbnb": ("Travel", "Accommodation", "Airbnb"),
-    "hotels.com": ("Travel", "Hotel", "Hotels.com"),
-
-    # ── Telecommunications ────────────────────────────────
-    "swisscom": ("Utilities", "Mobile / Internet", "Swisscom"),
-    "salt": ("Utilities", "Mobile", "Salt"),
-    "sunrise": ("Utilities", "Mobile / Internet", "Sunrise"),
-    "m-budget mobile": ("Utilities", "Mobile", "M-Budget Mobile"),
-    "yallo": ("Utilities", "Mobile", "Yallo"),
-    "wingo": ("Utilities", "Mobile", "Wingo"),
-    "upc": ("Utilities", "Internet / TV", "UPC"),
-    "vodafone": ("Utilities", "Mobile", "Vodafone"),
-    "telenet": ("Utilities", "Internet", "Telenet"),
-    "1und1": ("Utilities", "Internet", "1&1"),
-    "o2": ("Utilities", "Mobile", "O2"),
-
-    # ── Health & Pharmacy ─────────────────────────────────
-    "apotheke": ("Health", "Pharmacy", "Pharmacy"),
-    "pharmacie": ("Health", "Pharmacy", "Pharmacy"),
-    "amavita": ("Health", "Pharmacy", "Amavita"),
-    "coop vitality": ("Health", "Pharmacy", "Coop Vitality"),
-    "sunstore": ("Health", "Pharmacy", "Sun Store"),
-    "docmorris": ("Health", "Online Pharmacy", "DocMorris"),
-    "arzt": ("Health", "Doctor", "Doctor"),
-    "zahnarzt": ("Health", "Dentist", "Dentist"),
-    "sanitarium": ("Health", "Health Store", "Sanitarium"),
-    "helsana": ("Health", "Health Insurance", "Helsana"),
-    "css versicherung": ("Health", "Health Insurance", "CSS Versicherung"),
-    "swica": ("Health", "Health Insurance", "SWICA"),
-    "concordia": ("Health", "Health Insurance", "Concordia"),
-    "sanitas": ("Health", "Health Insurance", "Sanitas"),
-    "visana": ("Health", "Health Insurance", "Visana"),
-
-    # ── Insurance ─────────────────────────────────────────
-    "zurich versicherung": ("Insurance", "General Insurance", "Zurich"),
-    "axa": ("Insurance", "General Insurance", "AXA"),
-    "allianz": ("Insurance", "General Insurance", "Allianz"),
-    "helvetia": ("Insurance", "General Insurance", "Helvetia"),
-    "baloise": ("Insurance", "General Insurance", "Baloise"),
-    "mobiliar": ("Insurance", "General Insurance", "Die Mobiliar"),
-    "vaudoise": ("Insurance", "General Insurance", "Vaudoise"),
-    "generali": ("Insurance", "General Insurance", "Generali"),
-    "suva": ("Insurance", "Accident Insurance", "SUVA"),
-
-    # ── Banking & Finance ──────────────────────────────────
-    "postfinance": ("Finance", "Banking", "PostFinance"),
-    "post finance": ("Finance", "Banking", "PostFinance"),
-    "ubs ag": ("Finance", "Banking", "UBS"),
-    "credit suisse": ("Finance", "Banking", "Credit Suisse"),
-    "raiffeisen": ("Finance", "Banking", "Raiffeisen"),
-    "zkb": ("Finance", "Banking", "Zürcher Kantonalbank"),
-    "zuercher kantonalbank": ("Finance", "Banking", "ZKB"),
-    "migros bank": ("Finance", "Banking", "Migros Bank"),
-    "cler": ("Finance", "Banking", "Bank Cler"),
-    "revolut": ("Finance", "Banking", "Revolut"),
-    "wise": ("Finance", "Money Transfer", "Wise"),
-    "paypal": ("Finance", "Payment Service", "PayPal"),
-    "twint": ("Finance", "Payment Service", "TWINT"),
-    "neon": ("Finance", "Banking", "Neon"),
-
-    # ── Housing & Utilities ───────────────────────────────
-    "miete": ("Housing", "Rent", "Rent"),
-    "nebenkosten": ("Housing", "Utilities", "Nebenkosten"),
-    "ewz": ("Utilities", "Electricity", "EWZ"),
-    "ewb": ("Utilities", "Electricity/Gas", "EWB"),
-    "igs": ("Utilities", "Gas", "IGS"),
-    "stadtwerke": ("Utilities", "Utility Provider", "Stadtwerke"),
-    "iwo": ("Utilities", "Utility Provider", "IWO"),
-    "kehrichtverwertung": ("Utilities", "Waste", "Kehrichtverwertung"),
-
-    # ── Shopping & Retail ─────────────────────────────────
-    "ikea": ("Shopping", "Furniture", "IKEA"),
-    "h&m": ("Shopping", "Clothing", "H&M"),
-    "zara": ("Shopping", "Clothing", "Zara"),
-    "uniqlo": ("Shopping", "Clothing", "Uniqlo"),
-    "manor": ("Shopping", "Department Store", "Manor"),
-    "globus": ("Shopping", "Department Store", "Globus"),
-    "fnac": ("Shopping", "Electronics", "FNAC"),
-    "digitec": ("Shopping", "Electronics", "Digitec"),
-    "interdiscount": ("Shopping", "Electronics", "Interdiscount"),
-    "mediamarkt": ("Shopping", "Electronics", "MediaMarkt"),
-    "saturn": ("Shopping", "Electronics", "Saturn"),
-    "brack": ("Shopping", "Online Retail", "Brack"),
-    "amazon": ("Shopping", "Online Retail", "Amazon"),
-    "zalando": ("Shopping", "Clothing", "Zalando"),
-    "galaxus": ("Shopping", "Online Retail", "Galaxus"),
-    "microspot": ("Shopping", "Online Retail", "Microspot"),
-
-    # ── Entertainment & Subscriptions ─────────────────────
-    "netflix": ("Entertainment", "Streaming", "Netflix"),
-    "spotify": ("Entertainment", "Music Streaming", "Spotify"),
-    "apple": ("Entertainment", "Digital Services", "Apple"),
-    "google": ("Entertainment", "Digital Services", "Google"),
-    "disney": ("Entertainment", "Streaming", "Disney+"),
-    "amazon prime": ("Entertainment", "Streaming", "Amazon Prime"),
-    "youtube premium": ("Entertainment", "Streaming", "YouTube Premium"),
-    "twitch": ("Entertainment", "Gaming / Streaming", "Twitch"),
-    "steam": ("Entertainment", "Gaming", "Steam"),
-    "playstation": ("Entertainment", "Gaming", "PlayStation"),
-    "nintendo": ("Entertainment", "Gaming", "Nintendo"),
-    "kino": ("Entertainment", "Cinema", "Cinema"),
-    "cinema": ("Entertainment", "Cinema", "Cinema"),
-
-    # ── Education ────────────────────────────────────────
-    "coursera": ("Education", "Online Course", "Coursera"),
-    "udemy": ("Education", "Online Course", "Udemy"),
-    "eth": ("Education", "University", "ETH Zürich"),
-    "universitaet": ("Education", "University", "University"),
-    "bibliothek": ("Education", "Library", "Library"),
-
-    # ── Post & Logistics ──────────────────────────────────
-    "die post": ("Services", "Postal", "Swiss Post"),
-    "post ch": ("Services", "Postal", "Swiss Post"),
-    "dhl": ("Services", "Shipping", "DHL"),
-    "fedex": ("Services", "Shipping", "FedEx"),
-    "ups": ("Services", "Shipping", "UPS"),
-
-    # ── Fitness & Sports ──────────────────────────────────
-    "fitness": ("Health", "Gym", "Fitness Studio"),
-    "fitnesspark": ("Health", "Gym", "FitnessPark"),
-    "mcfit": ("Health", "Gym", "McFit"),
-    "urban sports": ("Health", "Sports", "Urban Sports Club"),
-    "decathlon": ("Shopping", "Sports Retail", "Decathlon"),
-    "intersport": ("Shopping", "Sports Retail", "Intersport"),
-
-    # ── Fuel & Cars ───────────────────────────────────────
-    "shell": ("Transport", "Fuel", "Shell"),
-    "esso": ("Transport", "Fuel", "Esso"),
-    "agrola": ("Transport", "Fuel", "Agrola"),
-    "avia": ("Transport", "Fuel", "AVIA"),
-    "migrol": ("Transport", "Fuel", "Migrol"),
-    "bp ": ("Transport", "Fuel", "BP"),
-    "tcs": ("Transport", "Car Club", "TCS"),
-    "amag": ("Transport", "Car Dealer", "AMAG"),
-
-    # ── Government / Tax ──────────────────────────────────
-    "steueramt": ("Taxes", "Income Tax", "Steueramt"),
-    "steuerverwaltung": ("Taxes", "Tax Authority", "Steuerverwaltung"),
-    "ahv": ("Taxes", "Social Security", "AHV"),
-    "ausgleichskasse": ("Taxes", "Social Security", "Ausgleichskasse"),
-    "verwaltungsgebühr": ("Gebühren", "Admin Fee", "Verwaltungsgebühr"),
-    # ── Fees / Gebühren ──────────────────────────────────────
-    "gebühren": ("Gebühren", "Bank Fees", "Gebühren"),
-    "kontoführungsgebühr": ("Gebühren", "Bank Fees", "Kontoführungsgebühr"),
-    "jahresgebühr": ("Gebühren", "Bank Fees", "Jahresgebühr"),
-    "kartengebühr": ("Gebühren", "Bank Fees", "Kartengebühr"),
-    "saldo dienstleistungspreisabschluss": ("Gebühren", "Bank Fees", "UBS Kontogebühr"),
-    "dienstleistungspreisabschluss": ("Gebühren", "Bank Fees", "UBS Kontogebühr"),
-    "bankgebühr": ("Gebühren", "Bank Fees", "Bankgebühr"),
-    "depotgebühr": ("Gebühren", "Bank Fees", "Depotgebühr"),
-    # ── Account Transfers / Kontoüberträge ────────────────────
-    "kontoübertrag": ("Kontoübertrag", "Account Transfer", "Kontoübertrag"),
-    "übertrag": ("Kontoübertrag", "Account Transfer", "Kontoübertrag"),
-    "dauerauftrag": ("Kontoübertrag", "Standing Order", "Dauerauftrag"),
-    "interne umbuchung": ("Kontoübertrag", "Internal Transfer", "Umbuchung"),
-    # ── Deposits / Einzahlungen ───────────────────────────────
-    "einzahlung": ("Einzahlungen", "Deposit", "Einzahlung"),
-    "gutschrift": ("Einzahlungen", "Credit", "Gutschrift"),
-    "bareinzahlung": ("Einzahlungen", "Cash Deposit", "Bareinzahlung"),
+# ── Normalisierungstabelle: Englisch → Deutsch ─────────────────
+# Wird beim Startup als DB-Migration genutzt und in der Pipeline
+# als Sicherheitsnetz (Legacy-Daten aus alten Imports).
+EN_TO_DE_CATEGORY: Dict[str, str] = {
+    "groceries":              "Lebensmittel",
+    "food & drink":           "Restaurant & Takeaway",
+    "transport":              "Transport",
+    "travel":                 "Reisen",
+    "utilities":              "Nebenkosten",
+    "health":                 "Gesundheit",
+    "insurance":              "Versicherungen",
+    "finance":                "Finanzen",
+    "housing":                "Wohnen",
+    "shopping":               "Shopping",
+    "entertainment":          "Freizeit & Unterhaltung",
+    "education":              "Bildung",
+    "services":               "Dienstleistungen",
+    "taxes":                  "Steuern",
+    "salary":                 "Gehalt",
+    "investment":             "Investitionen",
+    "other":                  "Sonstiges",
+    # Bereits teilweise deutsch — auf kanonische Schreibweise normieren
+    "einzahlungen":           "Einzahlungen",
+    "gebühren":               "Gebühren",
+    "kontoübertrag":          "Kontoübertrag",
+    # ÖV-Varianten → ÖV-Kosten (kanonisch)
+    "öv-abonnements":         "ÖV-Kosten",
+    "ov-abonnements":         "ÖV-Kosten",
+    "öv abonnements":         "ÖV-Kosten",
+    "öv-abo":                 "ÖV-Kosten",
+    # Säule 3A Normierung
+    "säule 3a":               "Säule 3A",
+    "pillar 3a":              "Säule 3A",
+    "pillar-3-a":             "Säule 3A",
+    "3. säule":               "Säule 3A",
 }
 
-# ── Category embeddings for sentence-transformer fallback ─────
+# ── Merchant Rules ─────────────────────────────────────────────
+# Format: "pattern" → (kategorie, unterkategorie, normierter_name)
+# Pattern wird case-insensitiv als Substring gesucht.
+
+MERCHANT_RULES: Dict[str, Tuple[str, str, str]] = {
+    # ── Lebensmittel ─────────────────────────────────────────
+    "migros":            ("Lebensmittel",         "Supermarkt",         "Migros"),
+    "coop":              ("Lebensmittel",         "Supermarkt",         "Coop"),
+    "coop-":             ("Lebensmittel",         "Supermarkt",         "Coop"),
+    "denner":            ("Lebensmittel",         "Discounter",         "Denner"),
+    "aldi":              ("Lebensmittel",         "Discounter",         "Aldi"),
+    "lidl":              ("Lebensmittel",         "Discounter",         "Lidl"),
+    "rewe":              ("Lebensmittel",         "Supermarkt",         "REWE"),
+    "edeka":             ("Lebensmittel",         "Supermarkt",         "Edeka"),
+    "penny":             ("Lebensmittel",         "Discounter",         "Penny"),
+    "netto":             ("Lebensmittel",         "Discounter",         "Netto"),
+    "manor food":        ("Lebensmittel",         "Supermarkt",         "Manor Food"),
+    "pick pay":          ("Lebensmittel",         "Supermarkt",         "Pick Pay"),
+    "volg":              ("Lebensmittel",         "Supermarkt",         "Volg"),
+    "spar":              ("Lebensmittel",         "Supermarkt",         "Spar"),
+    "fenaco":            ("Lebensmittel",         "Grosshandel",        "Fenaco"),
+
+    # ── Restaurant & Takeaway ────────────────────────────────
+    "mcdonald":          ("Restaurant & Takeaway","Fastfood",           "McDonald's"),
+    "mcdonalds":         ("Restaurant & Takeaway","Fastfood",           "McDonald's"),
+    "burger king":       ("Restaurant & Takeaway","Fastfood",           "Burger King"),
+    "kfc":               ("Restaurant & Takeaway","Fastfood",           "KFC"),
+    "subway":            ("Restaurant & Takeaway","Fastfood",           "Subway"),
+    "pizza hut":         ("Restaurant & Takeaway","Pizza",              "Pizza Hut"),
+    "domino":            ("Restaurant & Takeaway","Pizza",              "Domino's"),
+    "starbucks":         ("Restaurant & Takeaway","Café",               "Starbucks"),
+    "caffè":             ("Restaurant & Takeaway","Café",               "Caffè"),
+    "manor restaurant":  ("Restaurant & Takeaway","Restaurant",         "Manor Restaurant"),
+    "tibits":            ("Restaurant & Takeaway","Restaurant",         "tibits"),
+    "hiltl":             ("Restaurant & Takeaway","Restaurant",         "Hiltl"),
+
+    # ── Transport ────────────────────────────────────────────
+    "sbb":               ("Transport",            "Zug",                "SBB"),
+    "sbb cff ffs":       ("Transport",            "Zug",                "SBB"),
+    "bls ag":            ("Transport",            "Zug",                "BLS"),
+    "zvv":               ("Transport",            "ÖV",                 "ZVV"),
+    "bvb":               ("Transport",            "ÖV",                 "BVB"),
+    "tnw":               ("Transport",            "ÖV",                 "TNW"),
+    "rbs":               ("Transport",            "Zug",                "RBS"),
+    "flixbus":           ("Transport",            "Bus",                "FlixBus"),
+    "eurostar":          ("Transport",            "Zug",                "Eurostar"),
+    "deutsche bahn":     ("Transport",            "Zug",                "Deutsche Bahn"),
+    "db bahn":           ("Transport",            "Zug",                "Deutsche Bahn"),
+    "postbus":           ("Transport",            "Bus",                "PostBus"),
+    "uber":              ("Transport",            "Taxi",               "Uber"),
+    "mytaxi":            ("Transport",            "Taxi",               "myTaxi"),
+    "taxi":              ("Transport",            "Taxi",               "Taxi"),
+    "mobility":          ("Transport",            "Carsharing",         "Mobility"),
+    "sharenow":          ("Transport",            "Carsharing",         "ShareNow"),
+    "bird":              ("Transport",            "Roller",             "Bird"),
+    "lime":              ("Transport",            "Roller",             "Lime"),
+    "velospot":          ("Transport",            "Velo-Sharing",       "Velospot"),
+    "nextbike":          ("Transport",            "Velo-Sharing",       "Nextbike"),
+    "shell":             ("Transport",            "Tankstelle",         "Shell"),
+    "esso":              ("Transport",            "Tankstelle",         "Esso"),
+    "agrola":            ("Transport",            "Tankstelle",         "Agrola"),
+    "avia":              ("Transport",            "Tankstelle",         "AVIA"),
+    "migrol":            ("Transport",            "Tankstelle",         "Migrol"),
+    "bp ":               ("Transport",            "Tankstelle",         "BP"),
+    "tcs":               ("Transport",            "Automobil-Club",     "TCS"),
+    "amag":              ("Transport",            "Autohandel",         "AMAG"),
+
+    # ── Reisen ───────────────────────────────────────────────
+    "swiss air":         ("Reisen",               "Flug",               "Swiss Air"),
+    "swiss intl":        ("Reisen",               "Flug",               "SWISS"),
+    "lufthansa":         ("Reisen",               "Flug",               "Lufthansa"),
+    "easyjet":           ("Reisen",               "Flug",               "easyJet"),
+    "ryanair":           ("Reisen",               "Flug",               "Ryanair"),
+    "air france":        ("Reisen",               "Flug",               "Air France"),
+    "british airways":   ("Reisen",               "Flug",               "British Airways"),
+    "booking.com":       ("Reisen",               "Hotel",              "Booking.com"),
+    "airbnb":            ("Reisen",               "Unterkunft",         "Airbnb"),
+    "hotels.com":        ("Reisen",               "Hotel",              "Hotels.com"),
+
+    # ── Kommunikation (Abonnements) ───────────────────────────
+    "swisscom":          ("Kommunikation",         "Mobil & Internet",   "Swisscom"),
+    "salt":              ("Kommunikation",         "Mobil",              "Salt"),
+    "sunrise":           ("Kommunikation",         "Mobil & Internet",   "Sunrise"),
+    "m-budget mobile":   ("Kommunikation",         "Mobil",              "M-Budget Mobile"),
+    "yallo":             ("Kommunikation",         "Mobil",              "Yallo"),
+    "wingo":             ("Kommunikation",         "Mobil",              "Wingo"),
+    "upc":               ("Kommunikation",         "Internet / TV",      "UPC"),
+    "vodafone":          ("Kommunikation",         "Mobil",              "Vodafone"),
+    "telenet":           ("Kommunikation",         "Internet",           "Telenet"),
+    "1und1":             ("Kommunikation",         "Internet",           "1&1"),
+    "o2":                ("Kommunikation",         "Mobil",              "O2"),
+
+    # ── Nebenkosten (Strom, Gas, Wasser) ─────────────────────
+    "ewz":               ("Nebenkosten",           "Strom",              "EWZ"),
+    "ewb":               ("Nebenkosten",           "Strom/Gas",          "EWB"),
+    "igs":               ("Nebenkosten",           "Gas",                "IGS"),
+    "stadtwerke":        ("Nebenkosten",           "Energieversorger",   "Stadtwerke"),
+    "iwo":               ("Nebenkosten",           "Energieversorger",   "IWO"),
+    "kehrichtverwertung":("Nebenkosten",           "Abfall",             "Kehrichtverwertung"),
+
+    # ── Gesundheit & Apotheke ────────────────────────────────
+    "apotheke":          ("Gesundheit",            "Apotheke",           "Apotheke"),
+    "pharmacie":         ("Gesundheit",            "Apotheke",           "Apotheke"),
+    "amavita":           ("Gesundheit",            "Apotheke",           "Amavita"),
+    "coop vitality":     ("Gesundheit",            "Apotheke",           "Coop Vitality"),
+    "sunstore":          ("Gesundheit",            "Apotheke",           "Sun Store"),
+    "docmorris":         ("Gesundheit",            "Online-Apotheke",    "DocMorris"),
+    "arzt":              ("Gesundheit",            "Arzt",               "Arzt"),
+    "zahnarzt":          ("Gesundheit",            "Zahnarzt",           "Zahnarzt"),
+    "sanitarium":        ("Gesundheit",            "Gesundheitsladen",   "Sanitarium"),
+    "fitness":           ("Gesundheit",            "Fitnessstudio",      "Fitnessstudio"),
+    "fitnesspark":       ("Gesundheit",            "Fitnessstudio",      "FitnessPark"),
+    "mcfit":             ("Gesundheit",            "Fitnessstudio",      "McFit"),
+    "urban sports":      ("Gesundheit",            "Sport",              "Urban Sports Club"),
+
+    # ── Versicherungen ────────────────────────────────────────
+    "helsana":           ("Versicherungen",        "Krankenkasse",       "Helsana"),
+    "css versicherung":  ("Versicherungen",        "Krankenkasse",       "CSS Versicherung"),
+    "swica":             ("Versicherungen",        "Krankenkasse",       "SWICA"),
+    "concordia":         ("Versicherungen",        "Krankenkasse",       "Concordia"),
+    "sanitas":           ("Versicherungen",        "Krankenkasse",       "Sanitas"),
+    "visana":            ("Versicherungen",        "Krankenkasse",       "Visana"),
+    "zurich versicherung":("Versicherungen",       "Allgemeinversicherung","Zurich"),
+    "axa":               ("Versicherungen",        "Allgemeinversicherung","AXA"),
+    "allianz":           ("Versicherungen",        "Allgemeinversicherung","Allianz"),
+    "helvetia":          ("Versicherungen",        "Allgemeinversicherung","Helvetia"),
+    "baloise":           ("Versicherungen",        "Allgemeinversicherung","Baloise"),
+    "mobiliar":          ("Versicherungen",        "Allgemeinversicherung","Die Mobiliar"),
+    "vaudoise":          ("Versicherungen",        "Allgemeinversicherung","Vaudoise"),
+    "generali":          ("Versicherungen",        "Allgemeinversicherung","Generali"),
+    "suva":              ("Versicherungen",        "Unfallversicherung", "SUVA"),
+
+    # ── Finanzen (Bank, Zahlung, Transfer) ────────────────────
+    "postfinance":       ("Finanzen",              "Bank",               "PostFinance"),
+    "post finance":      ("Finanzen",              "Bank",               "PostFinance"),
+    "ubs ag":            ("Finanzen",              "Bank",               "UBS"),
+    "credit suisse":     ("Finanzen",              "Bank",               "Credit Suisse"),
+    "raiffeisen":        ("Finanzen",              "Bank",               "Raiffeisen"),
+    "zkb":               ("Finanzen",              "Bank",               "Zürcher Kantonalbank"),
+    "zuercher kantonalbank":("Finanzen",           "Bank",               "ZKB"),
+    "migros bank":       ("Finanzen",              "Bank",               "Migros Bank"),
+    "cler":              ("Finanzen",              "Bank",               "Bank Cler"),
+    "revolut":           ("Finanzen",              "Bank",               "Revolut"),
+    "wise":              ("Finanzen",              "Geldüberweisung",    "Wise"),
+    "paypal":            ("Finanzen",              "Zahlungsdienst",     "PayPal"),
+    "twint":             ("Finanzen",              "Zahlungsdienst",     "TWINT"),
+    "neon":              ("Finanzen",              "Bank",               "Neon"),
+
+    # ── Wohnen ────────────────────────────────────────────────
+    "miete":             ("Wohnen",                "Miete",              "Miete"),
+    "nebenkosten":       ("Wohnen",                "Nebenkosten",        "Nebenkosten"),
+
+    # ── Shopping & Kleidung ───────────────────────────────────
+    "ikea":              ("Shopping",              "Möbel",              "IKEA"),
+    "h&m":               ("Shopping",              "Kleidung",           "H&M"),
+    "zara":              ("Shopping",              "Kleidung",           "Zara"),
+    "uniqlo":            ("Shopping",              "Kleidung",           "Uniqlo"),
+    "manor":             ("Shopping",              "Warenhaus",          "Manor"),
+    "globus":            ("Shopping",              "Warenhaus",          "Globus"),
+    "fnac":              ("Shopping",              "Elektronik",         "FNAC"),
+    "digitec":           ("Shopping",              "Elektronik",         "Digitec"),
+    "interdiscount":     ("Shopping",              "Elektronik",         "Interdiscount"),
+    "mediamarkt":        ("Shopping",              "Elektronik",         "MediaMarkt"),
+    "saturn":            ("Shopping",              "Elektronik",         "Saturn"),
+    "brack":             ("Shopping",              "Online-Shop",        "Brack"),
+    "amazon":            ("Shopping",              "Online-Shop",        "Amazon"),
+    "zalando":           ("Shopping",              "Kleidung",           "Zalando"),
+    "galaxus":           ("Shopping",              "Online-Shop",        "Galaxus"),
+    "microspot":         ("Shopping",              "Online-Shop",        "Microspot"),
+    "decathlon":         ("Shopping",              "Sporthandel",        "Decathlon"),
+    "intersport":        ("Shopping",              "Sporthandel",        "Intersport"),
+
+    # ── Freizeit & Unterhaltung ───────────────────────────────
+    "netflix":           ("Freizeit & Unterhaltung","Streaming",          "Netflix"),
+    "spotify":           ("Freizeit & Unterhaltung","Musik-Streaming",    "Spotify"),
+    "apple":             ("Freizeit & Unterhaltung","Digitale Dienste",   "Apple"),
+    "google":            ("Freizeit & Unterhaltung","Digitale Dienste",   "Google"),
+    "disney":            ("Freizeit & Unterhaltung","Streaming",          "Disney+"),
+    "amazon prime":      ("Freizeit & Unterhaltung","Streaming",          "Amazon Prime"),
+    "youtube premium":   ("Freizeit & Unterhaltung","Streaming",          "YouTube Premium"),
+    "twitch":            ("Freizeit & Unterhaltung","Gaming / Streaming", "Twitch"),
+    "steam":             ("Freizeit & Unterhaltung","Gaming",             "Steam"),
+    "playstation":       ("Freizeit & Unterhaltung","Gaming",             "PlayStation"),
+    "nintendo":          ("Freizeit & Unterhaltung","Gaming",             "Nintendo"),
+    "kino":              ("Freizeit & Unterhaltung","Kino",               "Kino"),
+    "cinema":            ("Freizeit & Unterhaltung","Kino",               "Kino"),
+
+    # ── Bildung ───────────────────────────────────────────────
+    "coursera":          ("Bildung",               "Online-Kurs",        "Coursera"),
+    "udemy":             ("Bildung",               "Online-Kurs",        "Udemy"),
+    "eth":               ("Bildung",               "Universität",        "ETH Zürich"),
+    "universitaet":      ("Bildung",               "Universität",        "Universität"),
+    "bibliothek":        ("Bildung",               "Bibliothek",         "Bibliothek"),
+
+    # ── Dienstleistungen (Post, Logistik) ─────────────────────
+    "die post":          ("Dienstleistungen",       "Post",               "Swiss Post"),
+    "post ch":           ("Dienstleistungen",       "Post",               "Swiss Post"),
+    "dhl":               ("Dienstleistungen",       "Versand",            "DHL"),
+    "fedex":             ("Dienstleistungen",       "Versand",            "FedEx"),
+    "ups":               ("Dienstleistungen",       "Versand",            "UPS"),
+
+    # ── Steuern ───────────────────────────────────────────────
+    "steueramt":         ("Steuern",               "Einkommenssteuer",   "Steueramt"),
+    "steuerverwaltung":  ("Steuern",               "Steuerbehörde",      "Steuerverwaltung"),
+    "ahv":               ("Steuern",               "Sozialversicherung", "AHV"),
+    "ausgleichskasse":   ("Steuern",               "Sozialversicherung", "Ausgleichskasse"),
+
+    # ── Gebühren ──────────────────────────────────────────────
+    "verwaltungsgebühr": ("Gebühren",              "Verwaltungsgebühr",  "Verwaltungsgebühr"),
+    "gebühren":          ("Gebühren",              "Bankgebühren",       "Gebühren"),
+    "kontoführungsgebühr":("Gebühren",             "Bankgebühren",       "Kontoführungsgebühr"),
+    "jahresgebühr":      ("Gebühren",              "Bankgebühren",       "Jahresgebühr"),
+    "kartengebühr":      ("Gebühren",              "Bankgebühren",       "Kartengebühr"),
+    "saldo dienstleistungspreisabschluss": ("Gebühren","Bankgebühren",   "UBS Kontogebühr"),
+    "dienstleistungspreisabschluss": ("Gebühren",  "Bankgebühren",       "UBS Kontogebühr"),
+    "bankgebühr":        ("Gebühren",              "Bankgebühren",       "Bankgebühr"),
+    "depotgebühr":       ("Gebühren",              "Bankgebühren",       "Depotgebühr"),
+
+    # ── ÖV-Abonnemente ───────────────────────────────────────
+    "halbtax":           ("ÖV-Kosten",              "Abonnement",         "SBB Halbtax"),
+    "sbb ga":            ("ÖV-Kosten",              "Abonnement",         "SBB GA"),
+    "generalabonnement": ("ÖV-Kosten",              "Abonnement",         "GA"),
+    "zvv abonnement":    ("ÖV-Kosten",              "Abonnement",         "ZVV Abo"),
+    "ÖV-abo":            ("ÖV-Kosten",              "Abonnement",         "ÖV-Abo"),
+
+    # ── Säule 3A ─────────────────────────────────────────────
+    "säule 3a":          ("Säule 3A",               "Vorsorge",           "Säule 3A"),
+    "pillar 3a":         ("Säule 3A",               "Vorsorge",           "Säule 3A"),
+    "3a konto":          ("Säule 3A",               "Vorsorge",           "Säule 3A"),
+    "vorsorgekonto":     ("Säule 3A",               "Vorsorge",           "Vorsorgekonto"),
+    "frankly":           ("Säule 3A",               "Vorsorge",           "Frankly"),
+    "finpension":        ("Säule 3A",               "Vorsorge",           "Finpension"),
+    "viac":              ("Säule 3A",               "Vorsorge",           "VIAC"),
+
+    # ── Kontoüberträge ────────────────────────────────────────
+    "kontoübertrag":     ("Kontoübertrag",          "Kontoübertrag",      "Kontoübertrag"),
+    "übertrag":          ("Kontoübertrag",          "Kontoübertrag",      "Kontoübertrag"),
+    "dauerauftrag":      ("Kontoübertrag",          "Dauerauftrag",       "Dauerauftrag"),
+    "interne umbuchung": ("Kontoübertrag",          "Interne Umbuchung",  "Umbuchung"),
+
+    # ── Einzahlungen ──────────────────────────────────────────
+    "einzahlung":        ("Einzahlungen",           "Einzahlung",         "Einzahlung"),
+    "gutschrift":        ("Einzahlungen",           "Gutschrift",         "Gutschrift"),
+    "bareinzahlung":     ("Einzahlungen",           "Bareinzahlung",      "Bareinzahlung"),
+}
+
+# ── Kategorie-Beschreibungen für Sentence-Transformer ─────────
+# Schlüssel = Kategoriename (Deutsch), Werte = englische Keywords
+# für bessere Embedding-Qualität mit all-MiniLM-L6-v2.
 CATEGORY_DESCRIPTIONS = {
-    "Groceries": "supermarket food shopping grocery store",
-    "Food & Drink": "restaurant cafe bar meal drink takeaway delivery",
-    "Transport": "train bus taxi uber public transport fuel car",
-    "Travel": "hotel flight airbnb booking travel vacation",
-    "Utilities": "electricity gas water internet phone bill",
-    "Health": "pharmacy doctor dentist hospital medicine insurance",
-    "Insurance": "insurance premium coverage policy",
-    "Finance": "bank transfer fee interest investment",
-    "Housing": "rent mortgage landlord apartment deposit",
-    "Shopping": "clothing electronics furniture online retail",
-    "Entertainment": "netflix spotify streaming gaming cinema subscription",
-    "Education": "course university school tuition book",
-    "Services": "postal shipping delivery admin fee government",
-    "Taxes": "tax income tax withholding VAT government",
-    "Salary": "salary wage payroll employer income payment",
-    "Investment": "dividend interest ETF stock fund investment return",
-    "Einzahlungen": "deposit payment incoming credit cash deposit Einzahlung Gutschrift",
-    "Gebühren": "fee charge bank fee Gebühr Kontoführung Jahresgebühr service charge",
-    "Kontoübertrag": "account transfer wire Übertrag Dauerauftrag standing order internal transfer",
-    "Other": "miscellaneous other unknown",
+    "Lebensmittel":           "supermarket food shopping grocery store Migros Coop Denner",
+    "Restaurant & Takeaway":  "restaurant cafe bar meal drink takeaway delivery McDonald's Starbucks",
+    "Transport":              "train bus taxi uber public transport SBB ZVV fuel car",
+    "Reisen":                 "hotel flight airbnb booking travel vacation Lufthansa",
+    "Nebenkosten":            "electricity gas water sewage waste utility provider Stadtwerke",
+    "Kommunikation":          "mobile phone internet TV Swisscom Sunrise Salt telecom",
+    "Gesundheit":             "pharmacy doctor dentist hospital medicine fitness gym sport",
+    "Versicherungen":         "insurance premium coverage policy Helsana AXA Zurich Helvetia",
+    "Finanzen":               "bank transfer fee interest PayPal TWINT Revolut banking",
+    "Wohnen":                 "rent mortgage landlord apartment deposit housing Miete",
+    "Shopping":               "clothing electronics furniture online retail Amazon Zalando IKEA",
+    "Freizeit & Unterhaltung":"netflix spotify streaming gaming cinema subscription entertainment",
+    "Bildung":                "course university school tuition book education ETH",
+    "Dienstleistungen":       "postal shipping delivery DHL FedEx Post admin fee",
+    "Steuern":                "tax income tax withholding government Steueramt AHV",
+    "Gehalt":                 "salary wage payroll employer income payment",
+    "Investitionen":          "dividend interest ETF stock fund investment return",
+    "Einzahlungen":           "deposit payment incoming credit cash deposit Einzahlung Gutschrift",
+    "Gebühren":               "fee charge bank fee Gebühr Kontoführung Jahresgebühr service charge",
+    "Kontoübertrag":          "account transfer wire Übertrag Dauerauftrag standing order internal",
+    "ÖV-Kosten":              "public transport subscription Halbtax GA ZVV Abonnement SBB Jahreskarte",
+    "Säule 3A":               "pillar 3a pension savings retirement Vorsorge frankly VIAC finpension 3. Säule",
+    "Sonstiges":              "miscellaneous other unknown",
 }
 
 
@@ -397,13 +458,13 @@ class CategorizationService:
                     {
                         "role": "system",
                         "content": (
-                            f"You are a Swiss personal finance transaction classifier. "
-                            f"Classify the transaction into one of these categories: {categories_list}. "
-                            f"Return JSON: {{\"category\": \"...\", \"subcategory\": \"...\", \"merchant\": \"...\"}}. "
-                            f"Be concise. If unsure, use 'Other'."
+                            f"Du bist ein Klassifikator für Schweizer Finanztransaktionen. "
+                            f"Ordne die Transaktion einer der folgenden deutschen Kategorien zu: {categories_list}. "
+                            f"Antworte mit JSON: {{\"category\": \"...\", \"subcategory\": \"...\", \"merchant\": \"...\"}}. "
+                            f"Kategorie und Unterkategorie auf Deutsch. Bei Unklarheit: 'Sonstiges'."
                         ),
                     },
-                    {"role": "user", "content": f"Transaction: {description}"},
+                    {"role": "user", "content": f"Transaktion: {description}"},
                 ],
                 temperature=0,
                 max_tokens=100,
@@ -412,7 +473,7 @@ class CategorizationService:
 
             import json
             result = json.loads(response.choices[0].message.content)
-            category = result.get("category", "Other")
+            category = result.get("category", "Sonstiges")
             subcategory = result.get("subcategory", "")
             merchant = result.get("merchant", description[:50])
             return category, subcategory, merchant, 0.75
@@ -420,6 +481,11 @@ class CategorizationService:
         except Exception as e:
             logger.warning(f"OpenAI fallback failed: {e}")
             return None
+
+    @staticmethod
+    def normalize_category(category: str) -> str:
+        """Normalisiert einen Kategorienamen auf Deutsch (Legacy-Mapping)."""
+        return EN_TO_DE_CATEGORY.get(category.lower(), category)
 
     async def categorize(self, description: str) -> Dict:
         """
@@ -435,7 +501,7 @@ class CategorizationService:
         """
         if not description or not description.strip():
             return {
-                "category": "Other",
+                "category": "Sonstiges",
                 "subcategory": "",
                 "merchant_normalized": "",
                 "confidence_score": 0.0,
@@ -490,7 +556,7 @@ class CategorizationService:
 
         # 5. Default fallback
         return {
-            "category": "Other",
+            "category": "Sonstiges",
             "subcategory": "",
             "merchant_normalized": cleaned[:50] if cleaned else description[:50],
             "confidence_score": 0.1,

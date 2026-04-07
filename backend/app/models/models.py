@@ -457,6 +457,8 @@ class UserWizardConfig(Base):
     use_peer_group_defaults: Mapped[int] = mapped_column(Integer, default=1)
     # Full PeerGroupDefaults object from «Empirische Angaben» (user-adjusted), JSON text
     peer_group_defaults_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Full WizardCompletePayload as JSON — restored when user navigates back to /wizard
+    wizard_data_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

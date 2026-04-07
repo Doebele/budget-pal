@@ -22,6 +22,10 @@ import ForecastComparisonChart, {
   type HistoricalPoint,
   type ForecastPoint,
 } from "@/components/charts/ForecastComparisonChart";
+import BudgetStackedBarChart, {
+  type HistoricalCategoryItem,
+  type WizardSnapshot,
+} from "@/components/charts/BudgetStackedBarChart";
 import ForecastCard from "@/components/ForecastCard";
 import RetirementPlanner from "@/components/RetirementPlanner";
 import { useAuth } from "@/lib/auth";
@@ -52,6 +56,8 @@ interface ForecastResult {
   total_monthly_income_mean: number;
   total_monthly_expense_mean: number;
   scenario_id: number | null;
+  peer_net_monthly: number;
+  empirical_net_monthly: number;
 }
 
 // ── Horizon options ──────────────────────────────────────────
@@ -125,7 +131,7 @@ export default function Forecast() {
   const { user } = useAuth();
   const [tab, setTab] = useState<TabKey>("overview");
   const [horizon, setHorizon] = useState<HorizonKey>("12m");
-  const [showBreakdown, setShowBreakdown] = useState(false);
+  // showBreakdown is now managed internally by ForecastComparisonChart toggles
   const [showPeerSettings, setShowPeerSettings] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [scenarioName, setScenarioName] = useState("");
@@ -149,6 +155,41 @@ export default function Forecast() {
     (s: number, a: { balance: number }) => s + a.balance,
     0
   );
+
+  // Fetch raw transactions for the last 24 months → compute category breakdown client-side.
+  // This uses the existing /transactions endpoint (always available) instead of the new
+  // /transactions/monthly-category-breakdown endpoint which requires a Docker rebuild.
+  const cutoff24m = useMemo(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 24);
+    return d.toISOString().split("T")[0];
+  }, []);
+
+  const { data: rawTxnsForChart } = useQuery<Array<{
+    date: string; amount: number; category: string | null; is_transfer: boolean | null;
+  }>>({
+    queryKey: ["transactions-chart-24m", cutoff24m],
+    queryFn: () =>
+      api.get("/transactions", {
+        params: { start: cutoff24m, end: new Date().toISOString().split("T")[0], limit: 1000 },
+      }).then((r) => r.data),
+    staleTime: 15 * 60_000,
+  });
+
+  // Group raw debit transactions by (month, category) for the stacked bar chart
+  const categorySummary = useMemo((): HistoricalCategoryItem[] => {
+    if (!rawTxnsForChart?.length) return [];
+    const map: Record<string, Record<string, number>> = {};
+    for (const t of rawTxnsForChart) {
+      if (t.amount >= 0 || t.is_transfer || !t.category) continue;
+      const month = t.date.slice(0, 7); // "YYYY-MM"
+      if (!map[month]) map[month] = {};
+      map[month][t.category] = (map[month][t.category] ?? 0) + Math.abs(t.amount);
+    }
+    return Object.entries(map).flatMap(([month, cats]) =>
+      Object.entries(cats).map(([category, amount]) => ({ month, category, amount })),
+    );
+  }, [rawTxnsForChart]);
 
   // Fetch historical monthly summary (for overlay chart) — last 2 years
   const { data: historicalSummary } = useQuery({
@@ -190,6 +231,45 @@ export default function Forecast() {
       api.post("/forecasting/scenario", forecastPayload).then((r) => r.data),
     staleTime: 10 * 60_000,
   });
+
+  // Fetch wizard state — used by BudgetStackedBarChart for empirical forecast
+  // (flat monthly amounts from user input, no AI drift on Steuern)
+  const { data: wizardState } = useQuery<WizardSnapshot | null>({
+    queryKey: ["wizard-state"],
+    queryFn: () =>
+      api.get("/wizard/state").then((r) => r.data ?? null).catch(() => null),
+    staleTime: 60 * 60_000, // wizard data is quasi-static
+    retry: false,
+  });
+
+  // Fetch peer-baseline independently (not coupled to forecast cache)
+  const { data: peerBaseline } = useQuery({
+    queryKey: ["peer-baseline", peerProfile],
+    queryFn: () =>
+      api.get("/forecasting/peer-baseline", { params: peerProfile }).then((r) => r.data),
+    staleTime: 30 * 60_000,
+  });
+
+  const PEER_EXPENSE_KEYS = [
+    "housing", "groceries", "transport", "health_insurance", "other_insurance",
+    "communication", "dining_out", "entertainment", "clothing", "travel",
+    "education", "subscriptions",
+  ] as const;
+
+  const peerNetMonthly = useMemo(() => {
+    if (!peerBaseline?.defaults) return 0;
+    const d = peerBaseline.defaults as Record<string, number>;
+    const income = d.incomeMedian ?? 0;
+    const expenses = PEER_EXPENSE_KEYS.reduce((s, k) => s + (d[k] ?? 0), 0);
+    const taxes = d.direct_taxes ?? 0;
+    return income - expenses - taxes;
+  }, [peerBaseline]);
+
+  const empiricalNetMonthly = useMemo(() => {
+    if (!peerBaseline?.defaults) return 0;
+    const d = peerBaseline.defaults as Record<string, number>;
+    return (d.incomeMedian ?? 0) * ((d.savings_rate ?? 0) / 100);
+  }, [peerBaseline]);
 
   // Save scenario mutation
   const saveMutation = useMutation({
@@ -453,7 +533,7 @@ export default function Forecast() {
               ].map(({ label, value, color }) => (
                 <div key={label} className="card py-3">
                   <p className="text-text-tertiary text-[11px] mb-1">{label}</p>
-                  <p className={`text-lg font-display font-bold ${color}`}>{value}</p>
+                  <p className={`text-2xl font-mono font-semibold ${color}`}>{value}</p>
                 </div>
               ))}
             </div>
@@ -461,20 +541,9 @@ export default function Forecast() {
 
           {/* Main chart */}
           <div className="card">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-text-primary font-semibold text-sm">
-                Historisch vs. Prognose (Netto-Cashflow)
-              </h2>
-              <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={showBreakdown}
-                  onChange={(e) => setShowBreakdown(e.target.checked)}
-                  className="accent-accent"
-                />
-                Einnahmen/Ausgaben
-              </label>
-            </div>
+            <h2 className="text-text-primary font-semibold text-sm mb-4">
+              Historisch vs. Prognose (Netto-Cashflow)
+            </h2>
             {historicalPoints.length === 0 && forecastPoints.length === 0 ? (
               <div className="h-64 flex items-center justify-center text-text-tertiary text-sm">
                 Keine Daten — importiere zuerst Kontoauszüge.
@@ -483,11 +552,22 @@ export default function Forecast() {
               <ForecastComparisonChart
                 historical={historicalPoints}
                 forecast={forecastPoints}
-                showBreakdown={showBreakdown}
+                peerNetMonthly={peerNetMonthly}
+                empiricalNetMonthly={empiricalNetMonthly}
                 height={300}
               />
             )}
           </div>
+
+          {/* Stacked bar: Historisch = real transactions, Prognose = wizard empirical */}
+          <BudgetStackedBarChart
+            historicalData={categorySummary ?? []}
+            forecastData={forecast?.forecast ?? []}
+            historicalAxisMonths={historicalPoints.map((p) => p.month)}
+            forecastAxisMonths={forecastPoints.map((p) => p.month)}
+            wizardData={wizardState}
+            height={320}
+          />
         </div>
       )}
 

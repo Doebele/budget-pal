@@ -750,6 +750,7 @@ async def preview_pdf_import(
         from app.services.import_parsers.comdirect_pdf import (
             is_comdirect_pdf,
             parse_comdirect_pdf_tables,
+            parse_comdirect_pdf_words,
             parse_comdirect_pdf_text,
         )
 
@@ -765,18 +766,25 @@ async def preview_pdf_import(
                 detected_bank = "comdirect"
                 # 1st choice: pdfplumber table extraction (precise column mapping)
                 raw_transactions = parse_comdirect_pdf_tables(pdf)
-                if not raw_transactions:
-                    # 2nd choice: text-based regex extraction
-                    if len(full_text.strip()) < 100:
-                        full_text = await _ocr_pdf_to_text(tmp_path)
-                    raw_transactions = parse_comdirect_pdf_text(full_text)
-                    logger.info(
-                        "comdirect PDF: text fallback yielded %d rows.", len(raw_transactions)
-                    )
-                else:
+                if raw_transactions:
                     logger.info(
                         "comdirect PDF: table extraction yielded %d rows.", len(raw_transactions)
                     )
+                else:
+                    # 2nd choice: word-position-based extraction (column-aware, handles +amounts)
+                    raw_transactions = parse_comdirect_pdf_words(pdf)
+                    if raw_transactions:
+                        logger.info(
+                            "comdirect PDF: word-position parser yielded %d rows.", len(raw_transactions)
+                        )
+                    else:
+                        # 3rd choice: text-based regex extraction (last resort)
+                        if len(full_text.strip()) < 100:
+                            full_text = await _ocr_pdf_to_text(tmp_path)
+                        raw_transactions = parse_comdirect_pdf_text(full_text)
+                        logger.info(
+                            "comdirect PDF: text fallback yielded %d rows.", len(raw_transactions)
+                        )
             else:
                 detected_bank = bank or "ubs"
                 # 1st choice: structured UBS table extraction

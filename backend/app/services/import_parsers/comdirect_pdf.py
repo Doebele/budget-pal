@@ -13,23 +13,68 @@ Sign convention (already in PDF):
 
 Filters:
   • "Visa-Kartenabrechnung" rows are inter-account transfers → always removed.
+
+Parser priority:
+  1. parse_comdirect_pdf_tables  — pdfplumber structured table extraction
+  2. parse_comdirect_pdf_words   — word-position-based (x-coordinate column detection)
+  3. parse_comdirect_pdf_text    — regex text fallback (legacy)
 """
 from __future__ import annotations
 
 import re
+from collections import defaultdict
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
 # ── Constants ──────────────────────────────────────────────────
 
 DATE_FMT = "%d.%m.%Y"
-DATE_RE = re.compile(r"\b(\d{2}\.\d{2}\.\d{4})\b")
+DATE_RE = re.compile(r"^(\d{2}\.\d{2}\.\d{4})$")
 
 # Row descriptions that represent internal account-to-account transfers
 _INTERNAL_RE = re.compile(
     r"visa.{0,4}karten.{0,4}abrechnung|"
     r"kartenabrechnung|"
     r"visa\s+card\s+settlement",
+    re.IGNORECASE,
+)
+
+# X-coordinate threshold — words to the right of this are in the amount column.
+# Words to the left are dates or description text and must NOT be parsed as amounts.
+_AMT_X_THRESHOLD = 480
+
+# Header/footer keywords — lines containing these (without a date) are skipped.
+# Also covers AlterSaldo/NeuerSaldo (account balance rows, not transactions).
+_HEADER_KEYWORDS = re.compile(
+    r"^\s*(buchungstag|valuta|vorgang|auftraggeber|buchungstext|"
+    r"ausgang|eingang|seite\s+\d|iban|bic|saldo|alter\s*saldo|neuer\s*saldo|"
+    r"altersaldo|neuersaldo|kontoübersicht|finanzreport|"
+    r"kontonummer|blz|bic\/swift|kundennummer|dispositionskredit|"
+    r"visalimit|verfügungslimit)\b",
+    re.IGNORECASE,
+)
+
+# DEPOTBESTAND / depot-value lines — these appear in Buchungstext column and
+# contain numbers (share counts) that must NOT be treated as transaction amounts.
+_DEPOTBESTAND_RE = re.compile(r"DEPOTBESTAND", re.IGNORECASE)
+
+# Section heading detection — these patterns, when matched against a description-only
+# line (no date, no amount), identify the start of a new account section.
+# mapped to: ('girokonto' | 'visa' | 'skip')
+_SECTION_HEADING_PATTERNS = [
+    # Girokonto section — may appear as "Girokonto" or "Girokonto DE0620…"
+    (re.compile(r"^Girokonto\b", re.IGNORECASE), "girokonto"),
+    # Visa card section — e.g. "Visa-Karte2501" or "Visa Karte 4871…"
+    (re.compile(r"^Visa[-\s]?Karte\s*\d+", re.IGNORECASE), "visa"),
+    # Savings / Tagesgeld section — skip (internal transfer mirror)
+    (re.compile(r"^Tagesgeld\b|^TagesgeldPLUS\b|^Festgeld\b", re.IGNORECASE), "skip"),
+    # Depot / investment section — skip (no spendable transactions)
+    (re.compile(r"^Depot\b|^Depotbestand\b", re.IGNORECASE), "skip"),
+]
+
+# Row description patterns that are account balance rows, not spendable transactions
+_BALANCE_ROW_RE = re.compile(
+    r"^\s*(Alter\s*Saldo|Neuer\s*Saldo|AlterSaldo|NeuerSaldo)\b",
     re.IGNORECASE,
 )
 
@@ -50,28 +95,35 @@ def is_comdirect_pdf(text: str) -> bool:
 # ── Amount parsing ─────────────────────────────────────────────
 
 def _parse_amt(s: str) -> Optional[float]:
-    """Parse German-format amounts (1.234,56 → 1234.56, -1.234,56 → -1234.56)."""
+    """
+    Parse German-format amounts: 1.234,56 → 1234.56, -1.234,56 → -1234.56.
+    Handles explicit '+' and '-' prefixes.
+    """
     s = s.strip().replace("\xa0", "").replace(" ", "")
     if not s or s in ("-", "–", "+"):
         return None
     negative = s.startswith("-")
+    # Strip leading sign
     clean = s.lstrip("+-").strip()
     # German format: period = thousands sep, comma = decimal sep
     if "," in clean:
         clean = clean.replace(".", "").replace(",", ".")
     else:
-        # No comma — could be integer or period-decimal
-        # If the last segment after period has exactly 2 digits → decimal point
+        # No comma — could be integer or period-as-decimal
         if re.search(r"\.\d{2}$", clean):
-            # period is decimal, remove any other periods (shouldn't exist)
-            pass
+            pass  # period is decimal separator — keep as-is
         else:
-            clean = clean.replace(".", "")  # period is thousands sep
+            clean = clean.replace(".", "")  # period is thousands separator
     try:
         val = float(clean)
         return -val if negative else val
     except ValueError:
         return None
+
+
+def _looks_like_amount(text: str) -> bool:
+    """Return True if the text could be a monetary amount (e.g. '1.234,56', '+8,03')."""
+    return bool(re.match(r"^[+-]?\d[\d.,]*$", text.strip()))
 
 # ── Column header sets ─────────────────────────────────────────
 
@@ -267,21 +319,185 @@ def _parse_table_row(
     }
 
 
-# ── Text-based parsing (fallback) ─────────────────────────────
+# ── Word-position-based parsing (robust fallback) ─────────────
+
+def parse_comdirect_pdf_words(pdf) -> List[dict]:
+    """
+    Word-position-based comdirect parser using pdfplumber extract_words().
+
+    Column detection by x-coordinate:
+      x < _AMT_X_THRESHOLD  → dates + description (Buchungstext numbers ignored)
+      x >= _AMT_X_THRESHOLD → amount column only
+
+    Section tracking:
+      Section headings (e.g. "TagesgeldPLUS-Konto", "Visa-Karte2501") are detected
+      inline from word positions.  "girokonto" and "visa" sections produce transactions;
+      "skip" sections (Tagesgeld, Depot) are silently ignored.
+
+    Fixes over the text-based parser:
+      • Positive '+' prefixed amounts (Eingang / Gutschrift) are correctly parsed.
+      • DEPOTBESTAND share-count numbers (x≈405, below threshold) are never misread.
+      • AlterSaldo / NeuerSaldo balance rows are filtered out.
+      • Tagesgeld mirror transactions (would duplicate Girokonto entries) are skipped.
+    """
+    rows: List[dict] = []
+    # Default to girokonto; updated inline when section headings are detected.
+    current_section = "girokonto"
+    pending: Optional[dict] = None
+    # Flag: previous line was a balance-row keyword (AlterSaldo/NeuerSaldo may be
+    # split across two PDF lines where the keyword is on line N and date+amount
+    # on line N+1 — we must skip line N+1 in that case).
+    _skip_next_balance_tail = False
+
+    for page in pdf.pages:
+        words = page.extract_words(x_tolerance=3, y_tolerance=3)
+        if not words:
+            continue
+
+        # ── Group words into visual lines by y-coordinate ─────
+        line_map: Dict[int, list] = defaultdict(list)
+        for w in words:
+            y_key = round(float(w["top"]) / 3) * 3
+            line_map[y_key].append(w)
+
+        for y_key in sorted(line_map.keys()):
+            line_words = sorted(line_map[y_key], key=lambda w: float(w["x0"]))
+
+            # Partition into description zone and amount zone
+            desc_words = [w for w in line_words if float(w["x0"]) < _AMT_X_THRESHOLD]
+            amt_words  = [w for w in line_words if float(w["x0"]) >= _AMT_X_THRESHOLD]
+
+            # ── Detect dates in description zone ──────────────
+            dates_in_line: List[datetime] = []
+            non_date_desc_words: List[dict] = []
+            for w in desc_words:
+                txt = w["text"].strip()
+                if DATE_RE.match(txt):
+                    try:
+                        dates_in_line.append(datetime.strptime(txt, DATE_FMT))
+                    except ValueError:
+                        non_date_desc_words.append(w)
+                else:
+                    non_date_desc_words.append(w)
+
+            desc = " ".join(w["text"] for w in non_date_desc_words).strip()
+
+            # ── Parse amount from right-zone words only ────────
+            parsed_amts: List[float] = []
+            for token in " ".join(w["text"] for w in amt_words).split():
+                a = _parse_amt(token)
+                if a is not None:
+                    parsed_amts.append(a)
+
+            amount: Optional[float] = None
+            if parsed_amts:
+                # Pick the last non-zero amount (handles Ausgang + Eingang side-by-side)
+                for a in reversed(parsed_amts):
+                    if a != 0.0:
+                        amount = a
+                        break
+                if amount is None:
+                    amount = parsed_amts[-1]
+
+            # ── Section heading detection (no date, no amount) ─
+            # Runs regardless of current_section so we can exit "skip" mode.
+            if not dates_in_line and not parsed_amts and desc:
+                for pattern, new_section in _SECTION_HEADING_PATTERNS:
+                    if pattern.match(desc):
+                        if pending and pending.get("amount") is not None:
+                            rows.append(pending)
+                        pending = None
+                        current_section = new_section
+                        _skip_next_balance_tail = False
+                        break
+
+            # ── Skip non-transaction sections (Tagesgeld, Depot…) ──
+            if current_section == "skip":
+                continue
+
+            # ── Skip header / footer / balance rows ───────────
+            # AlterSaldo / NeuerSaldo may span two PDF lines:
+            #   line N   → "AlterSaldo"                (keyword, no date)
+            #   line N+1 → "31.12.2025  +3.841,66"     (date + amount, no desc)
+            # We set _skip_next_balance_tail on line N and skip line N+1.
+            is_balance_row = _BALANCE_ROW_RE.match(desc) or re.search(
+                r"\bAlterSaldo\b|\bNeuerSaldo\b", desc, re.IGNORECASE
+            )
+            is_header_row = _HEADER_KEYWORDS.search(desc)
+
+            if is_balance_row or (is_header_row and not dates_in_line):
+                _skip_next_balance_tail = True
+                if pending and pending.get("amount") is not None and not dates_in_line:
+                    rows.append(pending)
+                    pending = None
+                continue
+
+            # Skip the orphaned date+amount tail of a split balance row
+            if _skip_next_balance_tail and dates_in_line and not desc:
+                _skip_next_balance_tail = False
+                continue
+            _skip_next_balance_tail = False
+
+            # ── Skip cover-page / non-transaction rows ────────
+            # Rows whose description starts with document-level keywords that
+            # survived the header filter (e.g. "FinanzreportNr.1per02.02.2026").
+            if re.match(r"^Finanzreport", desc, re.IGNORECASE):
+                continue
+
+            # ── Skip rows with no useful content ─────────────
+            if not dates_in_line and not desc and not amt_words:
+                continue
+
+            # ── New transaction row (has at least one date) ───
+            if dates_in_line:
+                # Flush previous pending
+                if pending is not None and pending.get("amount") is not None:
+                    rows.append(pending)
+
+                # Use last date on line (Valuta follows Buchungstag in left zone)
+                dt = dates_in_line[-1]
+
+                pending = {
+                    "date":        dt,
+                    "description": desc,
+                    "amount":      round(amount, 2) if amount is not None else None,
+                    "currency":    "EUR",
+                    "section":     current_section,
+                }
+
+            else:
+                # Continuation line — extend pending description; backfill amount
+                if pending is not None:
+                    if desc:
+                        pending["description"] = (pending["description"] + " " + desc).strip()
+                    if amount is not None and pending.get("amount") is None:
+                        pending["amount"] = round(amount, 2)
+
+    # Flush final pending
+    if pending is not None and pending.get("amount") is not None:
+        rows.append(pending)
+
+    # Drop rows without an amount and internal account-to-account transfers
+    rows = [r for r in rows if r.get("amount") is not None]
+    rows = [r for r in rows if not _INTERNAL_RE.search(r.get("description", ""))]
+    return rows
+
+
+# ── Text-based parsing (last-resort fallback) ─────────────────
 
 # Matches a line starting with (optionally) a Buchungstag date followed by
 # a Valuta date, then description tokens, and ending with one or two amounts.
 #   Group 1 = Buchungstag (optional)
 #   Group 2 = Valuta date
 #   Group 3 = text between dates and amounts
-#   Group 4 = amount 1 (Ausgang or combined)
+#   Group 4 = amount 1 (Ausgang or combined — may have leading +/-)
 #   Group 5 = amount 2 (Eingang, optional)
 _TXN_LINE_RE = re.compile(
-    r"(?:(\d{2}\.\d{2}\.\d{4})\s+)?"          # optional Buchungstag
-    r"(\d{2}\.\d{2}\.\d{4})\s+"               # Valuta date
-    r"(.+?)\s+"                                # description / middle
-    r"(-?[\d.,]+)\s*"                          # amount 1
-    r"(-?[\d.,]+)?"                            # amount 2 (optional)
+    r"(?:(\d{2}\.\d{2}\.\d{4})\s+)?"           # optional Buchungstag
+    r"(\d{2}\.\d{2}\.\d{4})\s+"                # Valuta date
+    r"(.+?)\s+"                                 # description / middle
+    r"([+-]?[\d.,]+)\s*"                        # amount 1 (fixed: now accepts '+' prefix)
+    r"([+-]?[\d.,]+)?"                          # amount 2 (optional)
     r"\s*$",
     re.VERBOSE,
 )
@@ -294,7 +510,7 @@ _SECTION_RE = re.compile(
 
 def parse_comdirect_pdf_text(full_text: str) -> List[dict]:
     """
-    Fallback text-based parser for comdirect PDF statements.
+    Last-resort text-based parser for comdirect PDF statements.
 
     Splits on section headers (Girokonto / Visa Karte) and processes
     each line that begins with a date pair.
@@ -322,6 +538,13 @@ def parse_comdirect_pdf_text(full_text: str) -> List[dict]:
             if not line:
                 continue
 
+            # Skip DEPOTBESTAND lines — these are bond/share holding lines within
+            # Kupon transaction descriptions and their numbers are NOT amounts.
+            if _DEPOTBESTAND_RE.search(line):
+                if pending:
+                    pending["description"] = (pending["description"] + " " + line).strip()
+                continue
+
             # Skip obvious header/footer lines
             if re.match(
                 r"^(Buchungstag|Valuta|Vorgang|Auftraggeber|Buchungstext|"
@@ -345,11 +568,16 @@ def parse_comdirect_pdf_text(full_text: str) -> List[dict]:
             if pending:
                 rows.append(pending)
 
-            buch_str  = m.group(1) or ""
+            buch_str   = m.group(1) or ""
             valuta_str = m.group(2)
             desc_raw   = m.group(3).strip()
             amt_str1   = m.group(4) or ""
             amt_str2   = m.group(5) or ""
+
+            # Skip DEPOTBESTAND continuation lines that happen to match the regex
+            if _DEPOTBESTAND_RE.search(desc_raw):
+                pending = None
+                continue
 
             # Parse date — prefer Valuta
             dt: Optional[datetime] = None
@@ -364,24 +592,17 @@ def parse_comdirect_pdf_text(full_text: str) -> List[dict]:
                 pending = None
                 continue
 
-            # Parse amounts — two-column: amt1=Ausgang, amt2=Eingang
-            # Single-column: amt1 is signed
+            # Parse amounts
+            # amt_str1 has explicit sign from PDF → trust the sign directly
             amt1 = _parse_amt(amt_str1)
             amt2 = _parse_amt(amt_str2)
 
             if amt2 is not None and abs(amt2) > 0:
-                # Two populated amounts → treat amt1 as Ausgang, amt2 as Eingang
+                # Two populated amounts → amt1=Ausgang (negate), amt2=Eingang (keep)
                 amount = abs(amt2)
             elif amt1 is not None:
-                if amt1 < 0:
-                    amount = amt1          # signed negative → expense
-                elif amt2 is None and amt1 > 0:
-                    # Ambiguous: single positive — check context
-                    # If column position suggests Ausgang, negate; else keep positive
-                    # Without column position info, keep as-is (user can adjust in preview)
-                    amount = amt1
-                else:
-                    amount = -abs(amt1)    # Ausgang column → negate
+                # Single amount — sign is explicit in the PDF text (+/-)
+                amount = amt1
             else:
                 pending = None
                 continue

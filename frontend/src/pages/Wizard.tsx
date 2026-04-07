@@ -1599,7 +1599,19 @@ export default function Wizard() {
     } catch {}
   }, [wizardData]);
 
-  // Prefill from user profile on mount (name + birthdate)
+  // On mount: if no localStorage draft exists, try to restore from server-saved state
+  useEffect(() => {
+    const hasDraft = !!localStorage.getItem(STORAGE_KEY);
+    if (!hasDraft) {
+      api.get("/wizard/state").then((res) => {
+        if (res.data) {
+          setWizardData({ ...DEFAULT_WIZARD_DATA, ...res.data });
+        }
+      }).catch(() => {});
+    }
+  }, []);
+
+  // Prefill from user profile on mount (name + birthdate) — only if still at defaults
   useEffect(() => {
     api.get("/auth/me").then((res) => {
       const user = res.data;
