@@ -243,94 +243,6 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* Category mapping */}
-      <div className="card">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-text-primary font-semibold text-sm">Kategorie-Zuordnung</h2>
-            <p className="text-text-tertiary text-xs mt-0.5">
-              Verknüpft Budgetkategorien aus empirischen Angaben mit deinen Transaktionskategorien (für die «Ist»-Spalte).
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => resetMappingsMutation.mutate()}
-            disabled={resetMappingsMutation.isPending}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/60 text-text-secondary text-xs hover:bg-bg-surface2 transition-colors disabled:opacity-40"
-            title="Auf Standardzuordnungen zurücksetzen"
-          >
-            <RotateCcw className="w-3 h-3" />
-            Zurücksetzen auf Standard
-          </button>
-        </div>
-
-        {mappingsLoading ? (
-          <p className="text-text-tertiary text-sm py-4">Wird geladen…</p>
-        ) : !mappingsData?.wizard_labels?.length ? (
-          <p className="text-text-tertiary text-sm py-4">
-            Keine Budgets aus empirischen Angaben gefunden. Bitte zuerst unter «Empirische Angaben» abschliessen.
-          </p>
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border/50 text-text-tertiary text-xs">
-                    <th className="text-left py-2 pr-4">Label aus empirischen Angaben</th>
-                    <th className="text-left py-2">Transaktionskategorie (Ist)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/20">
-                  {(mappingsData?.wizard_labels as string[] || []).map((label: string) => (
-                    <tr key={label} className="hover:bg-bg-surface2/30">
-                      <td className="py-2 pr-4 text-text-secondary font-medium">{label}</td>
-                      <td className="py-2">
-                        <select
-                          value={mappingDrafts[label] || ""}
-                          onChange={(e) => {
-                            setMappingDrafts((prev) => ({ ...prev, [label]: e.target.value }));
-                            setMappingDirty(true);
-                            setMappingSaved(false);
-                          }}
-                          className="input w-full max-w-xs"
-                        >
-                          <option value="">— Keine Zuordnung —</option>
-                          {(mappingsData?.transaction_categories as string[] || []).map((cat: string) => (
-                            <option key={cat} value={cat}>{cat}</option>
-                          ))}
-                        </select>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {saveMappingsMutation.isError && (
-              <div className="flex items-center gap-2 text-loss text-xs bg-loss/10 border border-loss/30 rounded-lg px-3 py-2 mt-3">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                Fehler beim Speichern.
-              </div>
-            )}
-
-            <div className="mt-4 flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => saveMappingsMutation.mutate()}
-                disabled={!mappingDirty || saveMappingsMutation.isPending}
-                className="btn-primary flex items-center gap-2 disabled:opacity-40"
-              >
-                <Save className="w-4 h-4" />
-                {mappingSaved ? "✓ Gespeichert!" : saveMappingsMutation.isPending ? "Speichern..." : "Zuordnungen speichern"}
-              </button>
-              {mappingDirty && (
-                <span className="text-xs text-warning">Ungespeicherte Änderungen</span>
-              )}
-            </div>
-          </>
-        )}
-      </div>
-
       {/* Supercategory taxonomy */}
       <div className="card">
         <div className="mb-4">
@@ -497,6 +409,94 @@ export default function Settings() {
             );
           })}
         </div>
+      </div>
+
+      {/* Category mapping */}
+      <div className="card">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-text-primary font-semibold text-sm">Kategorie-Zuordnung</h2>
+            <p className="text-text-tertiary text-xs mt-0.5">
+              Verknüpft Budgetkategorien aus empirischen Angaben mit deinen Transaktionskategorien (für die «Ist»-Spalte).
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => resetMappingsMutation.mutate()}
+            disabled={resetMappingsMutation.isPending}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/60 text-text-secondary text-xs hover:bg-bg-surface2 transition-colors disabled:opacity-40"
+            title="Auf Standardzuordnungen zurücksetzen"
+          >
+            <RotateCcw className="w-3 h-3" />
+            Zurücksetzen auf Standard
+          </button>
+        </div>
+
+        {mappingsLoading ? (
+          <p className="text-text-tertiary text-sm py-4">Wird geladen…</p>
+        ) : !mappingsData?.wizard_labels?.length ? (
+          <p className="text-text-tertiary text-sm py-4">
+            Keine Budgets aus empirischen Angaben gefunden. Bitte zuerst unter «Empirische Angaben» abschliessen.
+          </p>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border/50 text-text-tertiary text-xs">
+                    <th className="text-left py-2 pr-4">Label aus empirischen Angaben</th>
+                    <th className="text-left py-2">Transaktionskategorie (Ist)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/20">
+                  {(mappingsData?.wizard_labels as string[] || []).map((label: string) => (
+                    <tr key={label} className="hover:bg-bg-surface2/30">
+                      <td className="py-2 pr-4 text-text-secondary font-medium">{label}</td>
+                      <td className="py-2">
+                        <select
+                          value={mappingDrafts[label] || ""}
+                          onChange={(e) => {
+                            setMappingDrafts((prev) => ({ ...prev, [label]: e.target.value }));
+                            setMappingDirty(true);
+                            setMappingSaved(false);
+                          }}
+                          className="input w-full max-w-xs"
+                        >
+                          <option value="">— Keine Zuordnung —</option>
+                          {(mappingsData?.transaction_categories as string[] || []).map((cat: string) => (
+                            <option key={cat} value={cat}>{cat}</option>
+                          ))}
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {saveMappingsMutation.isError && (
+              <div className="flex items-center gap-2 text-loss text-xs bg-loss/10 border border-loss/30 rounded-lg px-3 py-2 mt-3">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                Fehler beim Speichern.
+              </div>
+            )}
+
+            <div className="mt-4 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => saveMappingsMutation.mutate()}
+                disabled={!mappingDirty || saveMappingsMutation.isPending}
+                className="btn-primary flex items-center gap-2 disabled:opacity-40"
+              >
+                <Save className="w-4 h-4" />
+                {mappingSaved ? "✓ Gespeichert!" : saveMappingsMutation.isPending ? "Speichern..." : "Zuordnungen speichern"}
+              </button>
+              {mappingDirty && (
+                <span className="text-xs text-warning">Ungespeicherte Änderungen</span>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Info */}

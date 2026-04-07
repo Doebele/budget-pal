@@ -70,7 +70,6 @@ export default function Sidebar() {
       <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto scrollbar-hide">
         {NAV_ITEMS.map((item) => {
           const { path, icon: Icon, label } = item;
-          const highlight = "highlight" in item && item.highlight;
           return (
             <NavLink
               key={path}
@@ -80,9 +79,7 @@ export default function Sidebar() {
                 "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-all duration-150",
                 isActive(path)
                   ? "bg-accent/15 text-accent"
-                  : highlight
-                    ? "text-accent/80 hover:text-accent hover:bg-accent/10"
-                    : "text-text-secondary hover:text-text-primary hover:bg-bg-surface2"
+                  : "text-text-secondary hover:text-text-primary hover:bg-bg-surface2"
               )}
             >
               <Icon className="w-4 h-4 flex-shrink-0" />
@@ -94,7 +91,7 @@ export default function Sidebar() {
 
       {/* Bottom nav */}
       <div className="px-2 py-2 border-t border-border/50 space-y-1">
-        {BOTTOM_ITEMS.map(({ path, icon: Icon, label, highlight }) => (
+        {BOTTOM_ITEMS.map(({ path, icon: Icon, label }) => (
           <NavLink
             key={path}
             to={path}
@@ -103,8 +100,6 @@ export default function Sidebar() {
               "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-all duration-150",
               isActive(path)
                 ? "bg-accent/15 text-accent"
-                : highlight
-                ? "text-accent/80 hover:text-accent hover:bg-accent/10"
                 : "text-text-secondary hover:text-text-primary hover:bg-bg-surface2"
             )}
           >
