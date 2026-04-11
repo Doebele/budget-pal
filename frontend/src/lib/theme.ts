@@ -237,13 +237,25 @@ export function formatCHF(amount: number, compact = false): string {
   }).format(amount);
 }
 
-export function formatAmount(amount: number, currency = "CHF"): string {
+export function formatAmount(amount: number, currency = "CHF", maximumFractionDigits = 2): string {
   return new Intl.NumberFormat("de-CH", {
     style: "currency",
     currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: maximumFractionDigits,
+    maximumFractionDigits,
   }).format(amount);
+}
+
+/** Compact label (e.g. Budgetplan chips): «EUR 12k» style when large. */
+export function formatCurrencyCompact(amount: number, currency: string): string {
+  const a = Math.abs(amount);
+  if (a >= 1_000_000) {
+    return `${currency} ${(amount / 1_000_000).toFixed(1)}M`;
+  }
+  if (a >= 1_000) {
+    return `${currency} ${(amount / 1_000).toFixed(0)}k`;
+  }
+  return formatAmount(amount, currency, 0);
 }
 
 export function formatPercent(value: number): string {

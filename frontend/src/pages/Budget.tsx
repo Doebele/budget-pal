@@ -27,7 +27,8 @@ const CategoryGaugeChart = lazy(
 );
 
 import { api, budgetsApi, transactionsApi, budgetApi } from "@/lib/api";
-import { formatCHF } from "@/lib/theme";
+import { formatAmount } from "@/lib/theme";
+import { useAuth } from "@/lib/auth";
 import GranularityNavigator from "@/components/GranularityNavigator";
 import WizardBudgetSidebar from "@/components/WizardBudgetSidebar";
 import TransactionSidebarEditor from "@/components/TransactionSidebarEditor";
@@ -107,6 +108,9 @@ interface SuperRow {
 // ── Page ──────────────────────────────────────────────────────
 
 export default function Budget() {
+  const { user } = useAuth();
+  const refCcy = user?.currency ?? "CHF";
+  const fmtRef = (n: number) => formatAmount(n, refCcy);
   const { superCategories, resolveSuperCategory } = useTaxonomy();
 
   // ── Time navigation ─────────────────────────────────────────
@@ -553,10 +557,10 @@ export default function Budget() {
             "text-2xl font-mono font-semibold",
             kpi.net >= 0 ? "text-gain" : "text-loss",
           )}>
-            {kpi.net >= 0 ? "+" : ""}{formatCHF(kpi.net)}
+            {kpi.net >= 0 ? "+" : ""}{fmtRef(kpi.net)}
           </p>
           <p className="text-text-tertiary text-xs">
-            {formatCHF(kpi.income)} Einnahmen · {formatCHF(kpi.expenses)} Ausgaben
+            {fmtRef(kpi.income)} Einnahmen · {fmtRef(kpi.expenses)} Ausgaben
           </p>
         </div>
 
@@ -569,12 +573,12 @@ export default function Budget() {
             </div>
           </div>
           <p className="text-2xl font-mono font-semibold text-text-primary">
-            {formatCHF(kpi.expenses)}
+            {fmtRef(kpi.expenses)}
           </p>
           {totalPlanned > 0 ? (
             <div>
               <p className="text-text-tertiary text-xs mb-1">
-                von {formatCHF(totalPlanned)} geplant
+                von {fmtRef(totalPlanned)} geplant
               </p>
               <div className="h-1.5 bg-bg-surface2 rounded-full overflow-hidden">
                 <div
@@ -788,7 +792,7 @@ export default function Budget() {
                   <span className="flex items-center gap-1.5">
                     {showSonstiges ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                     💸 Sonstiges
-                    {sonstigesRow.actual > 0 && ` · ${formatCHF(sonstigesRow.actual)}`}
+                    {sonstigesRow.actual > 0 && ` · ${fmtRef(sonstigesRow.actual)}`}
                   </span>
                 </button>
                 {showSonstiges && (
@@ -829,7 +833,7 @@ export default function Budget() {
                 <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-text-tertiary border-b border-border pb-3">
                   <span>Altersgruppe: <strong className="text-text-secondary">{peerData.peer_info.age_range}</strong></span>
                   <span>Haushalt: <strong className="text-text-secondary">{peerData.peer_info.household_type}</strong></span>
-                  <span>Medianeinkommen: <strong className="text-text-secondary">{formatCHF(peerData.peer_info.median_income)}/Monat</strong></span>
+                  <span>Medianeinkommen: <strong className="text-text-secondary">{fmtRef(peerData.peer_info.median_income)}/Monat</strong></span>
                   <span>Sparquote Peers: <strong className="text-text-secondary">{peerData.peer_info.savings_rate_pct}%</strong></span>
                 </div>
               )}
@@ -859,10 +863,10 @@ export default function Budget() {
                           </span>
                           <div className="flex items-center gap-2 font-mono">
                             <span className={isOver ? "text-loss" : "text-text-primary"}>
-                              {formatCHF(cat.actual ?? 0)}
+                              {fmtRef(cat.actual ?? 0)}
                             </span>
                             <span className="text-text-disabled">/</span>
-                            <span className="text-text-tertiary">Ø {formatCHF(peerPeriod)}</span>
+                            <span className="text-text-tertiary">Ø {fmtRef(peerPeriod)}</span>
                           </div>
                         </div>
                         <div className="relative h-1.5 bg-bg-surface2 rounded-full overflow-hidden">

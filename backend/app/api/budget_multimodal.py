@@ -35,6 +35,11 @@ from app.models.models import (
     Account, Budget, PeerGroupBenchmark, Scenario, Transaction, User,
     WizardCategoryMapping,
 )
+from app.services.currency_service import (
+    currency_service,
+    normalize_reference_currency,
+    convert_with_eur_rates,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -66,6 +71,21 @@ def _peer_col(key: str, benchmark: PeerGroupBenchmark) -> float:
         "clothing":      benchmark.clothing_avg,
         "restaurant":    benchmark.restaurant_avg,
     }.get(key, 0.0)
+
+
+def _peer_monthly_in_ref(
+    key: Optional[str],
+    benchmark: Optional[PeerGroupBenchmark],
+    rates: dict,
+    ref: str,
+) -> Optional[float]:
+    """Peer benchmarks are stored in CHF per month → user's reference currency."""
+    if not key or not benchmark:
+        return None
+    v = float(_peer_col(key, benchmark))
+    if v <= 0:
+        return None
+    return convert_with_eur_rates(rates, v, "CHF", ref)
 
 
 # ── Pydantic response models ──────────────────────────────────
@@ -115,6 +135,7 @@ class MultiAnalysisResponse(BaseModel):
     peer_data_available: bool
     data_sources: List[str]
     opportunities: List[SavingsOpportunity] = []
+    reference_currency: str = "CHF"
 
 
 # ── Helpers ───────────────────────────────────────────────────
@@ -168,11 +189,16 @@ async def _get_wizard_budgets(user_id: int, db: AsyncSession) -> list[Budget]:
 
 
 async def _get_actual_stats(
-    user_id: int, period_start: date, period_end: date, db: AsyncSession
+    user_id: int,
+    period_start: date,
+    period_end: date,
+    db: AsyncSession,
+    rates: dict,
+    ref_currency: str,
 ) -> tuple[float, dict[str, float]]:
-    """Returns (total_income, {category: total_expense}) for the period."""
+    """Returns (total_income, {category: total_expense}) in `ref_currency`."""
     result = await db.execute(
-        select(Transaction)
+        select(Transaction.amount, Transaction.category, Account.currency)
         .join(Account)
         .where(
             and_(
@@ -184,14 +210,16 @@ async def _get_actual_stats(
             )
         )
     )
-    txns = result.scalars().all()
-    income = sum(t.amount for t in txns if t.amount > 0)
+    income = 0.0
     expenses: dict[str, float] = {}
-    for t in txns:
-        if t.amount >= 0:
-            continue
-        cat = t.category or "Sonstiges"
-        expenses[cat] = expenses.get(cat, 0.0) + abs(t.amount)
+    for amt, cat, acur in result.all():
+        cur = (acur or "CHF").strip().upper()
+        conv = convert_with_eur_rates(rates, float(amt), cur, ref_currency)
+        if conv > 0:
+            income += conv
+        else:
+            c = cat or "Sonstiges"
+            expenses[c] = expenses.get(c, 0.0) + abs(conv)
     return income, expenses
 
 
@@ -228,11 +256,13 @@ async def multi_analysis(
     period_start = start or date(today.year, today.month, 1)
     period_end = end or today
 
-    # ── Load data sources ─────────────────────────────────────
+    rates = await currency_service.get_rates("EUR")
+    ref = normalize_reference_currency(current_user.currency)
+
     wizard_params = await _get_wizard_scenario(current_user.id, db)
     wizard_budgets = await _get_wizard_budgets(current_user.id, db)
     actual_income, actual_expenses = await _get_actual_stats(
-        current_user.id, period_start, period_end, db
+        current_user.id, period_start, period_end, db, rates, ref
     )
     peer_benchmark = await _get_peer_benchmark(current_user, wizard_params, db)
 
@@ -256,7 +286,7 @@ async def multi_analysis(
         data_sources = ["transactions"]
         for cat, amount in sorted(actual_expenses.items(), key=lambda x: -x[1]):
             peer_key = peer_key_for_transaction_category(merged_taxonomy, cat)
-            benchmark_val = _peer_col(peer_key, peer_benchmark) if (peer_key and peer_benchmark) else None
+            benchmark_val = _peer_monthly_in_ref(peer_key, peer_benchmark, rates, ref)
             categories.append(CategoryBreakdown(
                 category=cat,
                 peer_key=peer_key,
@@ -272,7 +302,8 @@ async def multi_analysis(
         wizard_totals: dict[str, float] = {}
         for b in wizard_budgets:
             label = b.notes or "Sonstiges"
-            wizard_totals[label] = wizard_totals.get(label, 0.0) + b.amount
+            conv_amt = convert_with_eur_rates(rates, float(b.amount), "CHF", ref)
+            wizard_totals[label] = wizard_totals.get(label, 0.0) + conv_amt
 
         # Load category mappings (DB overrides + defaults)
         mapping_result = await db.execute(
@@ -287,8 +318,13 @@ async def multi_analysis(
             d = default_transaction_category_for_wizard_label(merged_taxonomy, wizard_label)
             return d if d else None
 
-        # Scale monthly wizard amounts to the period for direct comparison with actuals
-        monthly_wizard_income = (wizard_params or {}).get("monthly_income", actual_income)
+        if (wizard_params or {}).get("monthly_income") is not None:
+            monthly_wizard_income = convert_with_eur_rates(
+                rates, float(wizard_params["monthly_income"]), "CHF", ref
+            )
+            income = monthly_wizard_income * months
+        else:
+            income = actual_income
         for cat, monthly_amount in sorted(wizard_totals.items(), key=lambda x: -x[1]):
             txn_cat = resolve_txn_cat(cat)
             actual_val = actual_expenses.get(txn_cat) if txn_cat else actual_expenses.get(cat)
@@ -298,7 +334,6 @@ async def multi_analysis(
                 planned=round(monthly_amount * months, 2),   # period total
                 actual=round(actual_val, 2) if actual_val is not None else None,
             ))
-        income = monthly_wizard_income * months   # period total
         total_expenses = sum(wizard_totals.values()) * months  # period total
         if actual_expenses:
             data_sources.append("transactions")
@@ -309,7 +344,8 @@ async def multi_analysis(
         wizard_by_label: dict[str, float] = {}
         for b in wizard_budgets:
             label = b.notes or "Sonstiges"
-            wizard_by_label[label] = wizard_by_label.get(label, 0.0) + b.amount
+            conv_amt = convert_with_eur_rates(rates, float(b.amount), "CHF", ref)
+            wizard_by_label[label] = wizard_by_label.get(label, 0.0) + conv_amt
         if wizard_by_label:
             data_sources.append("wizard_budgets")
 
@@ -337,7 +373,14 @@ async def multi_analysis(
                 blended=blended,
             ))
         categories.sort(key=lambda c: -(c.blended or 0))
-        income = actual_income or (wizard_params or {}).get("monthly_income", 0.0)
+        if actual_income:
+            income = actual_income
+        elif (wizard_params or {}).get("monthly_income") is not None:
+            income = convert_with_eur_rates(
+                rates, float(wizard_params["monthly_income"]), "CHF", ref
+            )
+        else:
+            income = 0.0
         total_expenses = blended_total
 
     else:  # peer
@@ -356,7 +399,7 @@ async def multi_analysis(
         shown_peer_keys: set[str] = set()
         for cat, amount in sorted(actual_expenses.items(), key=lambda x: -x[1]):
             peer_key = peer_key_for_transaction_category(merged_taxonomy, cat)
-            benchmark_val = _peer_col(peer_key, peer_benchmark) if (peer_key and peer_benchmark) else None
+            benchmark_val = _peer_monthly_in_ref(peer_key, peer_benchmark, rates, ref)
             delta = round(amount - benchmark_val, 2) if benchmark_val is not None else None
             entry = CategoryBreakdown(
                 category=cat,
@@ -397,9 +440,15 @@ async def multi_analysis(
         peer_info = PeerGroupInfo(
             age_range=f"{peer_benchmark.age_range_start}–{peer_benchmark.age_range_end}",
             household_type=peer_benchmark.household_type,
-            median_income=peer_benchmark.median_income_monthly,
-            p25_income=peer_benchmark.p25_income_monthly,
-            p75_income=peer_benchmark.p75_income_monthly,
+            median_income=convert_with_eur_rates(
+                rates, float(peer_benchmark.median_income_monthly), "CHF", ref
+            ),
+            p25_income=convert_with_eur_rates(
+                rates, float(peer_benchmark.p25_income_monthly), "CHF", ref
+            ),
+            p75_income=convert_with_eur_rates(
+                rates, float(peer_benchmark.p75_income_monthly), "CHF", ref
+            ),
             savings_rate_pct=peer_benchmark.savings_rate_pct,
             peer_count=peer_benchmark.peer_count,
         )
@@ -416,8 +465,8 @@ async def multi_analysis(
 
         threshold = 1.15  # flag if >15% over peer benchmark
         for pk, label in PEER_LABELS.items():
-            benchmark_val = _peer_col(pk, peer_benchmark)
-            if benchmark_val <= 0:
+            benchmark_val = _peer_monthly_in_ref(pk, peer_benchmark, rates, ref)
+            if not benchmark_val or benchmark_val <= 0:
                 continue
             user_val = actual_by_peer_key.get(pk, 0.0)
             if user_val <= 0:
@@ -436,7 +485,10 @@ async def multi_analysis(
                     excess=excess,
                     excess_pct=excess_pct,
                     monthly_saving=excess,
-                    action=f"Reduziere {label} von {monthly_user:,.0f} auf ~{benchmark_val:,.0f} CHF/Monat → spare ~{excess:,.0f} CHF/Monat",
+                    action=(
+                        f"Reduziere {label} von {monthly_user:,.0f} auf ~{benchmark_val:,.0f} "
+                        f"{ref}/Monat → spare ~{excess:,.0f} {ref}/Monat"
+                    ),
                 ))
         opportunities.sort(key=lambda o: -o.excess)
 
@@ -453,4 +505,5 @@ async def multi_analysis(
         peer_data_available=peer_data_available,
         data_sources=data_sources,
         opportunities=opportunities,
+        reference_currency=ref,
     )

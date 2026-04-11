@@ -49,4 +49,5 @@ export interface MultiAnalysisResult {
   peer_data_available: boolean;
   data_sources: string[];
   opportunities: SavingsOpportunity[];
+  reference_currency?: string;
 }

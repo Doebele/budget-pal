@@ -73,6 +73,9 @@ export default function Settings() {
   const [name, setName] = useState(user?.name || "");
   const [birthdate, setBirthdate] = useState(user?.birthdate || "");
   const [retirementAge, setRetirementAge] = useState(user?.retirement_age || 65);
+  const [referenceCurrency, setReferenceCurrency] = useState<"CHF" | "EUR" | "USD">(
+    (user?.currency as "CHF" | "EUR" | "USD") || "CHF"
+  );
   const [saved, setSaved] = useState(false);
   const [expandedSc, setExpandedSc] = useState<string | null>(null);
   const [budgetDefaultView, setBudgetDefaultView] = useState<"bar" | "gauge">(() => {
@@ -101,10 +104,27 @@ export default function Settings() {
   const age = calcAge(birthdate);
   const retirementYear = age !== null ? new Date().getFullYear() + (retirementAge - age) : null;
 
+  useEffect(() => {
+    if (user?.currency && ["CHF", "EUR", "USD"].includes(user.currency)) {
+      setReferenceCurrency(user.currency as "CHF" | "EUR" | "USD");
+    }
+  }, [user?.currency]);
+
   const mutation = useMutation({
-    mutationFn: () => authApi.updateMe({ name, birthdate: birthdate || null, retirement_age: retirementAge }),
+    mutationFn: () =>
+      authApi.updateMe({
+        name,
+        birthdate: birthdate || null,
+        retirement_age: retirementAge,
+        currency: referenceCurrency,
+      }),
     onSuccess: async () => {
       await refreshUser();
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["multi-analysis"] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-plan"] });
+      queryClient.invalidateQueries({ queryKey: ["transaction-stats-budget"] });
+      queryClient.invalidateQueries({ queryKey: ["budget-analysis"] });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     },
@@ -300,6 +320,24 @@ export default function Settings() {
           <div>
             <label className="label">E-Mail</label>
             <input className="input" value={user?.email || ""} disabled readOnly />
+          </div>
+
+          <div>
+            <label className="label">
+              Referenzwährung
+              <span className="text-text-tertiary font-normal ml-1 text-xs">
+                (Aggregationen in Budgetanalyse, Reale Angaben, Budgetplan, Prognose)
+              </span>
+            </label>
+            <select
+              className="input w-full max-w-xs"
+              value={referenceCurrency}
+              onChange={(e) => setReferenceCurrency(e.target.value as "CHF" | "EUR" | "USD")}
+            >
+              <option value="CHF">Schweizer Franken (CHF)</option>
+              <option value="EUR">Euro (EUR)</option>
+              <option value="USD">US-Dollar (USD)</option>
+            </select>
           </div>
 
           {/* Birthdate — key for peer group & pension */}

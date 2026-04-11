@@ -21,11 +21,17 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import case, extract, func as sqlfunc, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.core.taxonomy import default_transaction_category_for_wizard_label, load_merged_taxonomy_for_user
 from app.models.models import Account, Category, RecurringPlan, Transaction, User, UserWizardConfig
+from app.services.currency_service import (
+    currency_service,
+    normalize_reference_currency,
+    convert_with_eur_rates,
+)
 
 router = APIRouter()
 
@@ -119,6 +125,9 @@ class RecurringPlanResponse(BaseModel):
     notes: Optional[str]
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
+    plan_currency: str = "CHF"
+    amount_reference: float = 0.0
+    reference_currency: str = "CHF"
 
     model_config = {"from_attributes": True}
 
@@ -150,6 +159,42 @@ class PrefillResponse(BaseModel):
 
 def _now() -> datetime:
     return datetime.now(tz=timezone.utc)
+
+
+def recurring_plan_to_response(entry: RecurringPlan, user: User, rates: dict) -> RecurringPlanResponse:
+    ref = normalize_reference_currency(user.currency)
+    acct = entry.account
+    plan_cur = (acct.currency if acct else "CHF").strip().upper()
+    amt_ref = convert_with_eur_rates(rates, float(entry.amount), plan_cur, ref)
+    return RecurringPlanResponse(
+        id=entry.id,
+        user_id=entry.user_id,
+        account_id=entry.account_id,
+        category_id=entry.category_id,
+        description=entry.description,
+        amount=entry.amount,
+        periodicity=entry.periodicity,
+        start_date=entry.start_date,
+        end_date=entry.end_date,
+        is_future=entry.is_future,
+        notes=entry.notes,
+        created_at=entry.created_at,
+        updated_at=entry.updated_at,
+        plan_currency=plan_cur,
+        amount_reference=amt_ref,
+        reference_currency=ref,
+    )
+
+
+async def _load_recurring_with_account(
+    db: AsyncSession, entry_id: int, user_id: int
+) -> RecurringPlan:
+    r = await db.execute(
+        select(RecurringPlan)
+        .where(RecurringPlan.id == entry_id, RecurringPlan.user_id == user_id)
+        .options(selectinload(RecurringPlan.account))
+    )
+    return r.scalar_one()
 
 
 async def _get_own_entry(
@@ -537,9 +582,14 @@ async def list_recurring_plan(
     if is_future is not None:
         stmt = stmt.where(RecurringPlan.is_future == is_future)
 
-    stmt = stmt.order_by(RecurringPlan.start_date, RecurringPlan.description)
+    stmt = (
+        stmt.options(selectinload(RecurringPlan.account))
+        .order_by(RecurringPlan.start_date, RecurringPlan.description)
+    )
     result = await db.execute(stmt)
-    return result.scalars().all()
+    entries = result.scalars().all()
+    rates = await currency_service.get_rates("EUR")
+    return [recurring_plan_to_response(e, current_user, rates) for e in entries]
 
 
 @router.post("", response_model=RecurringPlanResponse, status_code=status.HTTP_201_CREATED)
@@ -563,7 +613,9 @@ async def create_recurring_plan(
     db.add(entry)
     await db.commit()
     await db.refresh(entry)
-    return entry
+    loaded = await _load_recurring_with_account(db, entry.id, current_user.id)
+    rates = await currency_service.get_rates("EUR")
+    return recurring_plan_to_response(loaded, current_user, rates)
 
 
 @router.put("/{entry_id}", response_model=RecurringPlanResponse)
@@ -581,8 +633,9 @@ async def update_recurring_plan(
     entry.updated_at = _now()
 
     await db.commit()
-    await db.refresh(entry)
-    return entry
+    loaded = await _load_recurring_with_account(db, entry_id, current_user.id)
+    rates = await currency_service.get_rates("EUR")
+    return recurring_plan_to_response(loaded, current_user, rates)
 
 
 @router.delete("/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)

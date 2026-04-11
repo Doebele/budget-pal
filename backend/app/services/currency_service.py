@@ -9,7 +9,7 @@ import os
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, FrozenSet
 import aiofiles
 import httpx
 
@@ -17,6 +17,39 @@ from app.core.database import AsyncSessionLocal as async_session_maker
 from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
+
+# Supported reference currencies in UI / user profile
+REFERENCE_CURRENCIES: FrozenSet[str] = frozenset({"CHF", "EUR", "USD"})
+
+
+def normalize_reference_currency(code: Optional[str]) -> str:
+    """Return CHF, EUR, or USD; unknown values fall back to CHF."""
+    c = (code or "CHF").strip().upper()
+    return c if c in REFERENCE_CURRENCIES else "CHF"
+
+
+def convert_with_eur_rates(
+    rates: Dict[str, float],
+    amount: float,
+    from_currency: str,
+    to_currency: str,
+) -> float:
+    """
+    Convert `amount` from `from_currency` to `to_currency` using Frankfurter-style
+    rates dict with EUR as base (same as CurrencyService.convert).
+    Missing FX pair: returns amount rounded (fail-soft).
+    """
+    fc = (from_currency or "CHF").strip().upper()
+    tc = (to_currency or "CHF").strip().upper()
+    if fc == tc:
+        return round(float(amount), 2)
+    fr = rates.get(fc)
+    tr = rates.get(tc)
+    if not fr or not tr:
+        logger.warning("FX missing for %s or %s — returning unconverted amount", fc, tc)
+        return round(float(amount), 2)
+    return round((float(amount) / fr) * tr, 2)
+
 
 # Configuration
 API_URL = "https://api.frankfurter.app/latest?from=EUR&amount=1"

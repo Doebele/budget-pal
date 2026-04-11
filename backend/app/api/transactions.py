@@ -9,6 +9,7 @@ POST   /transactions/bulk-categorize
 GET    /transactions/stats
 GET    /transactions/monthly-summary
 """
+from collections import defaultdict
 from datetime import datetime, date, timezone
 from typing import List, Optional, Dict, Any
 
@@ -23,6 +24,11 @@ from app.core.security import get_current_user
 from app.models.models import Transaction, Account, User, Category
 from app.services.categorization import CategorizationService
 from app.services.audit_log import record_activity
+from app.services.currency_service import (
+    currency_service,
+    normalize_reference_currency,
+    convert_with_eur_rates,
+)
 
 router = APIRouter()
 categorization_service = CategorizationService()
@@ -78,6 +84,9 @@ class TransactionResponse(BaseModel):
     merchant_normalized: Optional[str]
     amount: float
     currency: str
+    account_currency: str
+    amount_reference: float
+    reference_currency: str
     category: Optional[str]
     subcategory: Optional[str]
     confidence_score: Optional[float]
@@ -180,6 +189,7 @@ class BudgetAnalysisResponse(BaseModel):
     recurring_items: List[RecurringCostItem]
     period_start: date
     period_end: date
+    reference_currency: str
 
 
 # ── Helper ────────────────────────────────────────────────────
@@ -213,6 +223,37 @@ def _apply_recurrence_list_filters(
         filters.append(Transaction.periodicity == periodicity)
     elif is_recurring is not None:
         filters.append(Transaction.is_recurring == is_recurring)
+
+def _transaction_to_response(txn: Transaction, user: User, rates: Dict[str, float]) -> TransactionResponse:
+    ref = normalize_reference_currency(user.currency)
+    acct = txn.account
+    acct_cur = (acct.currency if acct else txn.currency or "CHF").strip().upper()
+    txn_cur = (txn.currency or acct_cur).strip().upper()
+    amt_ref = convert_with_eur_rates(rates, txn.amount, txn_cur, ref)
+    return TransactionResponse(
+        id=txn.id,
+        account_id=txn.account_id,
+        account_name=acct.name if acct else "",
+        date=txn.date,
+        booking_date=txn.booking_date,
+        description=txn.description,
+        merchant_normalized=txn.merchant_normalized,
+        amount=txn.amount,
+        currency=txn_cur,
+        account_currency=acct_cur,
+        amount_reference=amt_ref,
+        reference_currency=ref,
+        category=txn.category,
+        subcategory=txn.subcategory,
+        confidence_score=txn.confidence_score,
+        user_verified=txn.user_verified,
+        notes=txn.notes,
+        is_transfer=txn.is_transfer,
+        is_recurring=txn.is_recurring,
+        periodicity=txn.periodicity,
+        created_at=txn.created_at,
+    )
+
 
 async def get_user_transaction(
     transaction_id: int,
@@ -342,26 +383,8 @@ async def restore_transaction(
         affected_rows=1,
         detail={"transaction_id": transaction_id, "account_id": txn.account_id},
     )
-    return TransactionResponse(
-        id=txn.id,
-        account_id=txn.account_id,
-        account_name=txn.account.name,
-        date=txn.date,
-        booking_date=txn.booking_date,
-        description=txn.description,
-        merchant_normalized=txn.merchant_normalized,
-        amount=txn.amount,
-        currency=txn.currency,
-        category=txn.category,
-        subcategory=txn.subcategory,
-        confidence_score=txn.confidence_score,
-        user_verified=txn.user_verified,
-        notes=txn.notes,
-        is_transfer=txn.is_transfer,
-        is_recurring=txn.is_recurring,
-        periodicity=txn.periodicity,
-        created_at=txn.created_at,
-    )
+    rates = await currency_service.get_rates("EUR")
+    return _transaction_to_response(txn, current_user, rates)
 
 
 @router.delete("/archived/{transaction_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -453,29 +476,8 @@ async def list_transactions(
     result = await db.execute(query)
     transactions = result.scalars().all()
 
-    return [
-        TransactionResponse(
-            id=t.id,
-            account_id=t.account_id,
-            account_name=t.account.name,
-            date=t.date,
-            booking_date=t.booking_date,
-            description=t.description,
-            merchant_normalized=t.merchant_normalized,
-            amount=t.amount,
-            currency=t.currency,
-            category=t.category,
-            subcategory=t.subcategory,
-            confidence_score=t.confidence_score,
-            user_verified=t.user_verified,
-            notes=t.notes,
-            is_transfer=t.is_transfer,
-            is_recurring=t.is_recurring,
-            periodicity=t.periodicity,
-            created_at=t.created_at,
-        )
-        for t in transactions
-    ]
+    rates = await currency_service.get_rates("EUR")
+    return [_transaction_to_response(t, current_user, rates) for t in transactions]
 
 
 @router.post("", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
@@ -525,27 +527,10 @@ async def create_transaction(
     db.add(txn)
     await db.flush()
     await db.refresh(txn)
+    txn.account = account
 
-    return TransactionResponse(
-        id=txn.id,
-        account_id=txn.account_id,
-        account_name=account.name,
-        date=txn.date,
-        booking_date=txn.booking_date,
-        description=txn.description,
-        merchant_normalized=txn.merchant_normalized,
-        amount=txn.amount,
-        currency=txn.currency,
-        category=txn.category,
-        subcategory=txn.subcategory,
-        confidence_score=txn.confidence_score,
-        user_verified=txn.user_verified,
-        notes=txn.notes,
-        is_transfer=txn.is_transfer,
-        is_recurring=txn.is_recurring,
-        periodicity=txn.periodicity,
-        created_at=txn.created_at,
-    )
+    rates = await currency_service.get_rates("EUR")
+    return _transaction_to_response(txn, current_user, rates)
 
 
 @router.put("/{transaction_id}", response_model=TransactionResponse)
@@ -568,26 +553,8 @@ async def update_transaction(
     await db.flush()
     await db.refresh(txn)
 
-    return TransactionResponse(
-        id=txn.id,
-        account_id=txn.account_id,
-        account_name=txn.account.name,
-        date=txn.date,
-        booking_date=txn.booking_date,
-        description=txn.description,
-        merchant_normalized=txn.merchant_normalized,
-        amount=txn.amount,
-        currency=txn.currency,
-        category=txn.category,
-        subcategory=txn.subcategory,
-        confidence_score=txn.confidence_score,
-        user_verified=txn.user_verified,
-        notes=txn.notes,
-        is_transfer=txn.is_transfer,
-        is_recurring=txn.is_recurring,
-        periodicity=txn.periodicity,
-        created_at=txn.created_at,
-    )
+    rates = await currency_service.get_rates("EUR")
+    return _transaction_to_response(txn, current_user, rates)
 
 
 @router.delete("/{transaction_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -683,53 +650,43 @@ async def get_stats(
     if account_id:
         filters.append(Transaction.account_id == account_id)
 
-    # Total income (positive amounts)
-    income_result = await db.execute(
-        select(func.coalesce(func.sum(Transaction.amount), 0.0))
-        .join(Account)
-        .where(and_(*filters, Transaction.amount > 0))
-    )
-    total_income = float(income_result.scalar())
-
-    # Total expenses (negative amounts)
-    expense_result = await db.execute(
-        select(func.coalesce(func.sum(Transaction.amount), 0.0))
-        .join(Account)
-        .where(and_(*filters, Transaction.amount < 0))
-    )
-    total_expenses = float(expense_result.scalar())
-
-    # Count
-    count_result = await db.execute(
-        select(func.count(Transaction.id))
+    stmt = (
+        select(Transaction.amount, Transaction.category, Account.currency)
         .join(Account)
         .where(and_(*filters))
     )
-    txn_count = int(count_result.scalar())
+    raw = (await db.execute(stmt)).all()
 
-    # Top categories by spending
-    cat_result = await db.execute(
-        select(Transaction.category, func.sum(Transaction.amount).label("total"))
-        .join(Account)
-        .where(and_(*filters, Transaction.amount < 0, Transaction.category.isnot(None)))
-        .group_by(Transaction.category)
-        .order_by(func.sum(Transaction.amount))
-        .limit(40)
-    )
-    top_categories = _merge_stats_top_categories(cat_result.all())
+    rates = await currency_service.get_rates("EUR")
+    ref = normalize_reference_currency(current_user.currency)
 
-    # Top categories by income (positive amounts) — für Sankey «Sparen»-Unterknoten
-    income_cat_result = await db.execute(
-        select(Transaction.category, func.sum(Transaction.amount).label("total"))
-        .join(Account)
-        .where(and_(*filters, Transaction.amount > 0, Transaction.category.isnot(None)))
-        .group_by(Transaction.category)
-        .order_by(desc(func.sum(Transaction.amount)))
-        .limit(40)
-    )
-    top_income_categories = _merge_stats_category_totals(income_cat_result.all(), limit=25)
+    total_income = 0.0
+    total_expenses = 0.0
+    cat_expense: Dict[str, float] = defaultdict(float)
+    cat_income: Dict[str, float] = defaultdict(float)
 
-    # Average monthly expenses (rough)
+    for amt, cat, acur in raw:
+        cur = (acur or "CHF").strip().upper()
+        conv = convert_with_eur_rates(rates, float(amt), cur, ref)
+        if conv > 0:
+            total_income += conv
+            if cat:
+                cat_income[str(cat)] += conv
+        else:
+            total_expenses += conv
+            if cat:
+                cat_expense[str(cat)] += abs(conv)
+
+    txn_count = len(raw)
+
+    from types import SimpleNamespace
+
+    exp_rows = [SimpleNamespace(category=k, total=-v) for k, v in cat_expense.items()]
+    top_categories = _merge_stats_category_totals(exp_rows, limit=10)
+
+    inc_rows = [SimpleNamespace(category=k, total=v) for k, v in cat_income.items()]
+    top_income_categories = _merge_stats_category_totals(inc_rows, limit=25)
+
     avg_monthly = total_expenses / 12 if total_expenses else 0.0
 
     return StatsResponse(
@@ -884,33 +841,38 @@ async def budget_analysis(
     if period_end:
         filters.append(Transaction.date <= _utc_end_of_day(period_end))
 
-    # Get all transactions in the period
     result = await db.execute(
         select(Transaction)
         .join(Account)
         .where(and_(*filters))
+        .options(selectinload(Transaction.account))
         .order_by(desc(Transaction.date))
     )
     transactions = result.scalars().all()
 
-    # Calculate income (positive amounts)
-    total_income = sum(
-        t.amount for t in transactions if t.amount > 0
-    )
+    rates = await currency_service.get_rates("EUR")
+    ref = normalize_reference_currency(current_user.currency)
 
-    # Separate recurring and non-recurring expenses
+    def _to_ref(t: Transaction) -> float:
+        ac = t.account
+        acct_cur = (ac.currency if ac else t.currency or "CHF").strip().upper()
+        txn_cur = (t.currency or acct_cur).strip().upper()
+        return convert_with_eur_rates(rates, t.amount, txn_cur, ref)
+
+    ref_by_txn = [(t, _to_ref(t)) for t in transactions]
+    total_income = sum(ra for _, ra in ref_by_txn if ra > 0)
+
     recurring_items: List[RecurringCostItem] = []
     fixed_recurring_total = 0.0
     variable_total = 0.0
 
-    for t in transactions:
-        if t.amount >= 0:
-            continue  # Skip income
+    for t, amt_ref in ref_by_txn:
+        if amt_ref >= 0:
+            continue
 
-        expense_amount = abs(t.amount)
+        expense_amount = abs(amt_ref)
 
         if t.is_recurring and t.periodicity:
-            # Calculate monthly equivalent
             factor = PERIODICITY_MONTHLY_FACTOR.get(t.periodicity, 1.0)
             monthly_equivalent = expense_amount * factor
 
@@ -956,4 +918,5 @@ async def budget_analysis(
         recurring_items=recurring_items,
         period_start=period_start,
         period_end=period_end,
+        reference_currency=ref,
     )

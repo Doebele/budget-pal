@@ -19,6 +19,7 @@ from app.core.database import get_db
 from app.core.security import hash_password, verify_password, create_access_token, get_current_user
 from app.core.rate_limit import SlidingWindowRateLimiter
 from app.models.models import User
+from app.services.currency_service import REFERENCE_CURRENCIES
 
 router = APIRouter()
 login_rate_limiter = SlidingWindowRateLimiter(max_requests=8, window_seconds=60)
@@ -191,7 +192,13 @@ async def update_me(
     if payload.retirement_age is not None:
         current_user.retirement_age = payload.retirement_age
     if payload.currency is not None:
-        current_user.currency = payload.currency
+        cur = payload.currency.strip().upper()
+        if cur not in REFERENCE_CURRENCIES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"currency must be one of: {', '.join(sorted(REFERENCE_CURRENCIES))}",
+            )
+        current_user.currency = cur
     if payload.locale is not None:
         current_user.locale = payload.locale
 

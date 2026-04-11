@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { transactionsApi, accountsApi } from "@/lib/api";
-import { formatCHF, getFrequencyBadgeStyle, PERIODICITY_LABELS } from "@/lib/theme";
+import { formatAmount, getFrequencyBadgeStyle, PERIODICITY_LABELS } from "@/lib/theme";
+import { useAuth } from "@/lib/auth";
 import { useTaxonomy, useTaxonomySuperCategories } from "@/lib/categories";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
@@ -28,6 +29,9 @@ interface Transaction {
   merchant_normalized?: string;
   amount: number;
   currency: string;
+  account_currency: string;
+  amount_reference: number;
+  reference_currency: string;
   category?: string;
   subcategory?: string;
   confidence_score?: number;
@@ -54,9 +58,12 @@ interface BudgetAnalysis {
   recurring_items: RecurringCostItem[];
   period_start: string;
   period_end: string;
+  reference_currency: string;
 }
 
 export default function Transactions() {
+  const { user } = useAuth();
+  const refCcy = user?.currency ?? "CHF";
   const superCategories = useTaxonomySuperCategories();
   const { resolveSuperCategory } = useTaxonomy();
   const [search, setSearch] = useState("");
@@ -376,20 +383,25 @@ export default function Transactions() {
             <Wallet className="w-5 h-5" />
             <h3 className="font-medium">Budget-Analyse: {range.label}</h3>
           </div>
-
-          {/* Summary Cards */}
+          {/* Summary Cards — Beträge in Referenzwährung */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="bg-slate-900 rounded-lg p-3">
               <p className="text-slate-400 text-xs mb-1">Monatliches Einkommen</p>
-              <p className="text-gain font-mono text-lg">+{formatCHF(budgetAnalysis.total_monthly_income)}</p>
+              <p className="text-gain font-mono text-lg">
+                +{formatAmount(budgetAnalysis.total_monthly_income, budgetAnalysis.reference_currency || refCcy)}
+              </p>
             </div>
             <div className="bg-slate-900 rounded-lg p-3">
               <p className="text-slate-400 text-xs mb-1">Fixe Kosten</p>
-              <p className="text-loss font-mono text-lg">-{formatCHF(budgetAnalysis.fixed_recurring_costs)}</p>
+              <p className="text-loss font-mono text-lg">
+                −{formatAmount(budgetAnalysis.fixed_recurring_costs, budgetAnalysis.reference_currency || refCcy)}
+              </p>
             </div>
             <div className="bg-slate-900 rounded-lg p-3">
               <p className="text-slate-400 text-xs mb-1">Variable Kosten</p>
-              <p className="text-loss font-mono text-lg">-{formatCHF(budgetAnalysis.variable_costs)}</p>
+              <p className="text-loss font-mono text-lg">
+                −{formatAmount(budgetAnalysis.variable_costs, budgetAnalysis.reference_currency || refCcy)}
+              </p>
             </div>
             <div className={clsx(
               "rounded-lg p-3",
@@ -400,7 +412,8 @@ export default function Transactions() {
                 "font-mono text-lg",
                 budgetAnalysis.variance >= 0 ? "text-gain" : "text-loss"
               )}>
-                {budgetAnalysis.variance >= 0 ? "+" : ""}{formatCHF(budgetAnalysis.variance)}
+                {budgetAnalysis.variance >= 0 ? "+" : ""}
+                {formatAmount(budgetAnalysis.variance, budgetAnalysis.reference_currency || refCcy)}
               </p>
             </div>
           </div>
@@ -432,10 +445,10 @@ export default function Transactions() {
                           </span>
                         </td>
                         <td className="px-3 py-2 text-right font-mono text-slate-400">
-                          {formatCHF(item.amount)}
+                          {formatAmount(item.amount, budgetAnalysis.reference_currency || refCcy)}
                         </td>
                         <td className="px-3 py-2 text-right font-mono text-loss">
-                          {formatCHF(item.monthly_equivalent)}
+                          {formatAmount(item.monthly_equivalent, budgetAnalysis.reference_currency || refCcy)}
                         </td>
                       </tr>
                     ))}
@@ -540,9 +553,9 @@ export default function Transactions() {
           <table className="w-full">
             <thead className="sticky top-0 z-10 bg-slate-900">
               <tr className="border-b border-border/50">
-                {["Datum", "Beschreibung", "Konto", "Kategorie", "Wiederkehrend", "Betrag", ""].map((h) => (
+                {["Datum", "Beschreibung", "Konto", "Kategorie", "Wiederkehrend", "Betrag", "Referenz", ""].map((h) => (
                   <th key={h} className="text-left text-text-tertiary text-xs uppercase tracking-wide px-4 py-3 font-medium">
-                    {h}
+                    {h === "Referenz" ? `Referenz (${refCcy})` : h}
                   </th>
                 ))}
               </tr>
@@ -551,7 +564,7 @@ export default function Transactions() {
               {isLoading &&
                 Array.from<undefined>({ length: 8 }).map((_el, i) => (
                   <tr key={i} className="border-b border-border/30">
-                    {Array.from<undefined>({ length: 7 }).map((_c, j) => (
+                    {Array.from<undefined>({ length: 8 }).map((_c, j) => (
                       <td key={j} className="px-4 py-3">
                         <div className="skeleton h-4 w-24 rounded" />
                       </td>
@@ -662,7 +675,22 @@ export default function Transactions() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <span className={clsx("text-sm font-mono", txn.amount >= 0 ? "text-gain" : "text-loss")}>
-                        {txn.amount >= 0 ? "+" : ""}{formatCHF(txn.amount)}
+                        {txn.amount >= 0 ? "+" : ""}
+                        {formatAmount(txn.amount, txn.currency || txn.account_currency || "CHF")}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span
+                        className={clsx(
+                          "text-sm font-mono",
+                          txn.amount_reference >= 0 ? "text-gain" : "text-loss",
+                        )}
+                      >
+                        {txn.amount_reference >= 0 ? "+" : ""}
+                        {formatAmount(
+                          txn.amount_reference,
+                          txn.reference_currency || refCcy,
+                        )}
                       </span>
                     </td>
                     <td className="px-2 py-3 w-16">
@@ -696,7 +724,7 @@ export default function Transactions() {
                 ))}
               {!isLoading && (!transactions || transactions.length === 0) && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-text-tertiary text-sm">
+                  <td colSpan={8} className="px-4 py-12 text-center text-text-tertiary text-sm">
                     Keine Transaktionen für {range.label} gefunden.{" "}
                     <Link to="/import" className="text-accent hover:text-accent-light">
                       CSV importieren

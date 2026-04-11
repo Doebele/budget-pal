@@ -23,6 +23,7 @@ from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.models import ForecastScenario, User
 from app.services.prediction_engine import prediction_engine
+from app.services.currency_service import normalize_reference_currency
 from app.services.peer_group import (
     PeerGroupProfile,
     get_peer_group_defaults,
@@ -82,6 +83,7 @@ class ForecastResponse(BaseModel):
     # Reference lines for chart overlay
     peer_net_monthly: float = 0.0        # peer-group monthly net (income − expenses)
     empirical_net_monthly: float = 0.0   # empirical Swiss median savings (income × rate)
+    reference_currency: str = "CHF"
 
 
 class ScenarioCreate(BaseModel):
@@ -116,6 +118,7 @@ async def generate_forecast(
     peer_dict = req.peer_profile.model_dump() if req.peer_profile else None
 
     try:
+        ref_cur = normalize_reference_currency(current_user.currency)
         result = await prediction_engine.generate_forecast(
             db=db,
             user_id=current_user.id,
@@ -124,6 +127,7 @@ async def generate_forecast(
             lookback_months=req.lookback_months,
             peer_profile=peer_dict,
             include_peer_baseline=req.include_peer_baseline,
+            reference_currency=ref_cur,
         )
     except Exception as exc:
         logger.error("Forecast generation failed for user=%d: %s", current_user.id, exc)
@@ -193,6 +197,7 @@ async def generate_forecast(
         scenario_id=scenario_id,
         peer_net_monthly=result.get("peer_net_monthly", 0.0),
         empirical_net_monthly=result.get("empirical_net_monthly", 0.0),
+        reference_currency=normalize_reference_currency(current_user.currency),
     )
 
 
@@ -211,10 +216,12 @@ async def get_analysis(
             user_id=current_user.id,
             account_ids=ids,
             lookback_months=lookback_months,
+            reference_currency=normalize_reference_currency(current_user.currency),
         )
     except Exception as exc:
         logger.error("Analysis failed for user=%d: %s", current_user.id, exc)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+    analysis["reference_currency"] = normalize_reference_currency(current_user.currency)
     return analysis
 
 

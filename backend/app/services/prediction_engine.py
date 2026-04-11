@@ -39,6 +39,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.models import Transaction, Account
 from app.services.peer_group import get_peer_group_defaults, PeerGroupProfile
+from app.services.currency_service import (
+    currency_service,
+    normalize_reference_currency,
+    convert_with_eur_rates,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -172,6 +177,7 @@ class PredictionEngine:
         user_id: int,
         account_ids: Optional[List[int]] = None,
         lookback_months: int = 12,
+        reference_currency: str = "CHF",
     ) -> Dict[str, Any]:
         """
         Build a statistical profile from historical transactions.
@@ -184,12 +190,17 @@ class PredictionEngine:
           first_date / last_date       : date range of analysed data
           recurring_monthly_equiv      : {category: monthly-equivalent CHF from recurring txns}
         """
-        # Primary aggregation: last 12 months (for means)
-        rows_12 = await self._fetch_monthly_aggregates(db, user_id, account_ids, 12)
-        # Secondary: up to 24 months for trend/seasonality (if available)
-        rows_24 = await self._fetch_monthly_aggregates(db, user_id, account_ids, max(lookback_months, 24))
-        # Recurring monthly equivalents
-        recurring = await self._fetch_recurring_equivalents(db, user_id, account_ids)
+        ref = normalize_reference_currency(reference_currency)
+        rates = await currency_service.get_rates("EUR")
+        rows_12 = await self._fetch_monthly_aggregates(
+            db, user_id, account_ids, 12, rates, ref
+        )
+        rows_24 = await self._fetch_monthly_aggregates(
+            db, user_id, account_ids, max(lookback_months, 24), rates, ref
+        )
+        recurring = await self._fetch_recurring_equivalents(
+            db, user_id, account_ids, rates, ref
+        )
 
         return self._build_profiles(rows_12, rows_24, recurring)
 
@@ -202,6 +213,7 @@ class PredictionEngine:
         lookback_months: int = 12,
         peer_profile: Optional[Dict[str, str]] = None,
         include_peer_baseline: bool = True,
+        reference_currency: str = "CHF",
     ) -> Dict[str, Any]:
         """
         Generate a monthly forecast for `horizon_months` into the future.
@@ -210,7 +222,11 @@ class PredictionEngine:
           peer_net_monthly        : flat peer-group monthly net (income − expenses)
           empirical_net_monthly   : empirical median savings (income × savings_rate)
         """
-        analysis = await self.analyze(db, user_id, account_ids, lookback_months)
+        ref = normalize_reference_currency(reference_currency)
+        rates = await currency_service.get_rates("EUR")
+        analysis = await self.analyze(
+            db, user_id, account_ids, lookback_months, reference_currency=ref
+        )
         peer_defaults: Dict[str, float] = {}
 
         if include_peer_baseline and peer_profile:
@@ -226,9 +242,12 @@ class PredictionEngine:
             except Exception as exc:
                 logger.warning("Peer-group lookup failed: %s", exc)
 
-        # Compute flat peer / empirical reference lines
-        peer_net_monthly = _compute_peer_net(peer_defaults)
-        empirical_net_monthly = _compute_empirical_net(peer_defaults)
+        peer_net_monthly = convert_with_eur_rates(
+            rates, _compute_peer_net(peer_defaults), "CHF", ref
+        )
+        empirical_net_monthly = convert_with_eur_rates(
+            rates, _compute_empirical_net(peer_defaults), "CHF", ref
+        )
 
         months: List[str] = []
         forecast_rows: List[Dict[str, Any]] = []
@@ -260,7 +279,9 @@ class PredictionEngine:
                 peer_amount = 0.0
                 peer_key = CATEGORY_TO_PEER_KEY.get(cat)
                 if peer_key and peer_key in peer_defaults:
-                    peer_amount = peer_defaults[peer_key]
+                    peer_amount = convert_with_eur_rates(
+                        rates, float(peer_defaults[peer_key]), "CHF", ref
+                    )
 
                 if data_sparse and peer_amount:
                     blended_mean = 0.3 * mean + 0.7 * peer_amount
@@ -319,8 +340,10 @@ class PredictionEngine:
         user_id: int,
         account_ids: Optional[List[int]],
         lookback_months: int,
+        rates: Dict[str, float],
+        ref_currency: str,
     ) -> List[Dict[str, Any]]:
-        """SUM(amount) per (year, month, category) over the lookback window."""
+        """SUM(amount) per (year, month, category), converted to reference currency."""
         account_subq = (
             select(Account.id)
             .where(Account.user_id == user_id, Account.is_active.is_(True))
@@ -338,52 +361,48 @@ class PredictionEngine:
         cutoff = dt(cutoff_year, cutoff_month, 1, tzinfo=timezone.utc)
 
         stmt = (
-            select(
-                extract("year",  Transaction.date).label("year"),
-                extract("month", Transaction.date).label("month"),
-                Transaction.category.label("category"),
-                func.sum(Transaction.amount).label("total"),
-                func.count(Transaction.id).label("count"),
-            )
+            select(Transaction.date, Transaction.category, Transaction.amount, Account.currency)
+            .join(Account)
             .where(
                 Transaction.account_id.in_(account_subq),
                 Transaction.is_deleted.isnot(True),
                 Transaction.date >= cutoff,
             )
-            .group_by(
-                extract("year",  Transaction.date),
-                extract("month", Transaction.date),
-                Transaction.category,
-            )
-            .order_by(
-                extract("year",  Transaction.date),
-                extract("month", Transaction.date),
-            )
         )
 
         result = await db.execute(stmt)
-        return [
-            {
-                "year":     int(r.year),
-                "month":    int(r.month),
-                "category": r.category or "Sonstiges",
-                "total":    float(r.total),
-                "count":    int(r.count),
-            }
-            for r in result.fetchall()
-        ]
+        buckets: Dict[tuple, Dict[str, Any]] = {}
+        for row in result.all():
+            d = row.date
+            y, mo = int(d.year), int(d.month)
+            cat = row.category or "Sonstiges"
+            cur = (row.currency or "CHF").strip().upper()
+            conv = convert_with_eur_rates(rates, float(row.amount), cur, ref_currency)
+            key = (y, mo, cat)
+            if key not in buckets:
+                buckets[key] = {
+                    "year": y,
+                    "month": mo,
+                    "category": cat,
+                    "total": 0.0,
+                    "count": 0,
+                }
+            buckets[key]["total"] += conv
+            buckets[key]["count"] += 1
+
+        return sorted(buckets.values(), key=lambda x: (x["year"], x["month"]))
 
     async def _fetch_recurring_equivalents(
         self,
         db: AsyncSession,
         user_id: int,
         account_ids: Optional[List[int]],
+        rates: Dict[str, float],
+        ref_currency: str,
     ) -> Dict[str, float]:
         """
-        Query recurring transactions (last 12 months) and return
-        {category: monthly_equivalent_CHF} using each transaction's periodicity.
-
-        Example: a yearly -1200 CHF item → monthly equivalent = -100 CHF.
+        Recurring transactions (last 12 months) → {category: monthly_equivalent}
+        in reference currency.
         """
         account_subq = (
             select(Account.id)
@@ -400,25 +419,32 @@ class PredictionEngine:
 
         stmt = (
             select(
+                Transaction.amount,
                 Transaction.category,
                 Transaction.periodicity,
-                func.avg(Transaction.amount).label("avg_amount"),
-                func.count(Transaction.id).label("count"),
+                Account.currency,
             )
+            .join(Account)
             .where(
                 Transaction.account_id.in_(account_subq),
                 Transaction.is_deleted.isnot(True),
                 Transaction.is_recurring.is_(True),
                 Transaction.date >= cutoff,
             )
-            .group_by(Transaction.category, Transaction.periodicity)
         )
 
         result = await db.execute(stmt)
+        groups: Dict[tuple, List[float]] = defaultdict(list)
+        for r in result.all():
+            cur = (r.currency or "CHF").strip().upper()
+            conv = convert_with_eur_rates(rates, float(r.amount), cur, ref_currency)
+            groups[(r.category or "Sonstiges", r.periodicity or "monthly")].append(conv)
+
         monthly_by_cat: Dict[str, float] = defaultdict(float)
-        for r in result.fetchall():
-            factor = PERIODICITY_MONTHLY_FACTOR.get(r.periodicity or "monthly", 1.0)
-            monthly_by_cat[r.category or "Sonstiges"] += float(r.avg_amount) * factor
+        for (cat, per), amounts in groups.items():
+            avg_amt = sum(amounts) / len(amounts)
+            factor = PERIODICITY_MONTHLY_FACTOR.get(per, 1.0)
+            monthly_by_cat[cat] += avg_amt * factor
 
         return dict(monthly_by_cat)
 

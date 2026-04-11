@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 
 import { api, accountsApi, transactionsApi } from "@/lib/api";
-import { formatCHF } from "@/lib/theme";
+import { formatAmount } from "@/lib/theme";
 import ForecastComparisonChart, {
   type HistoricalPoint,
   type ForecastPoint,
@@ -58,6 +58,7 @@ interface ForecastResult {
   scenario_id: number | null;
   peer_net_monthly: number;
   empirical_net_monthly: number;
+  reference_currency?: string;
 }
 
 // ── Horizon options ──────────────────────────────────────────
@@ -232,6 +233,9 @@ export default function Forecast() {
     staleTime: 10 * 60_000,
   });
 
+  const forecastCcy = forecast?.reference_currency ?? user?.currency ?? "CHF";
+  const fmtFc = (n: number) => formatAmount(n, forecastCcy);
+
   // Fetch wizard state — used by BudgetStackedBarChart for empirical forecast
   // (flat monthly amounts from user input, no AI drift on Steuern)
   const { data: wizardState } = useQuery<WizardSnapshot | null>({
@@ -386,7 +390,7 @@ export default function Forecast() {
               ? `Nur ${forecast.data_months} Monate Transaktionsdaten — Peer-Gruppe-Werte werden stärker gewichtet.`
               : `${forecast.data_months} Monate Transaktionshistorie analysiert (${forecast.first_date} – ${forecast.last_date}).`
             }
-            {" "}Ø Einnahmen: {formatCHF(forecast.total_monthly_income_mean)}/Mt · Ø Ausgaben: {formatCHF(forecast.total_monthly_expense_mean)}/Mt
+            {" "}Ø Einnahmen: {fmtFc(forecast.total_monthly_income_mean)}/Mt · Ø Ausgaben: {fmtFc(forecast.total_monthly_expense_mean)}/Mt
           </span>
         </div>
       )}
@@ -497,7 +501,7 @@ export default function Forecast() {
               {[
                 {
                   label: "Ø Prognose Einnahmen",
-                  value: formatCHF(
+                  value: fmtFc(
                     (forecast.forecast ?? []).reduce((s, f) => s + f.predicted_income, 0) /
                       Math.max(forecast.forecast?.length ?? 1, 1)
                   ),
@@ -505,7 +509,7 @@ export default function Forecast() {
                 },
                 {
                   label: "Ø Prognose Ausgaben",
-                  value: formatCHF(
+                  value: fmtFc(
                     (forecast.forecast ?? []).reduce((s, f) => s + f.predicted_expense, 0) /
                       Math.max(forecast.forecast?.length ?? 1, 1)
                   ),
@@ -513,7 +517,7 @@ export default function Forecast() {
                 },
                 {
                   label: "Ø Netto/Monat",
-                  value: formatCHF(
+                  value: fmtFc(
                     (forecast.forecast ?? []).reduce((s, f) => s + f.net, 0) /
                       Math.max(forecast.forecast?.length ?? 1, 1)
                   ),
@@ -522,7 +526,7 @@ export default function Forecast() {
                 },
                 {
                   label: "Ø Konfidenz-Band",
-                  value: `±${formatCHF(
+                  value: `±${fmtFc(
                     (forecast.forecast ?? []).reduce(
                       (s, f) => s + (f.confidence_high - f.confidence_low) / 2,
                       0
@@ -604,7 +608,7 @@ export default function Forecast() {
                               <span className="text-text-secondary">{cat}</span>
                             </div>
                             <span className={vals.predicted >= 0 ? "text-gain font-mono" : "text-loss font-mono"}>
-                              {formatCHF(vals.predicted)}
+                              {fmtFc(vals.predicted)}
                             </span>
                           </div>
                         ))}
@@ -665,7 +669,7 @@ export default function Forecast() {
                           val >= 0 ? "text-gain/90" : "text-loss/90"
                         }`}
                       >
-                        {formatCHF(val)}
+                        {fmtFc(val)}
                       </td>
                     );
                   })}
@@ -682,7 +686,7 @@ export default function Forecast() {
                       f.net >= 0 ? "text-gain" : "text-loss"
                     }`}
                   >
-                    {formatCHF(f.net)}
+                    {fmtFc(f.net)}
                   </td>
                 ))}
               </tr>

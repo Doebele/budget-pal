@@ -32,7 +32,8 @@ import { clsx } from "clsx";
 import { recurringPlanApi, accountsApi, categoriesApi } from "@/lib/api";
 import { useTaxonomy } from "@/lib/categories";
 import { matchPlanEntryProviderId } from "@/lib/planEntryProviderMatch";
-import { formatCHF } from "@/lib/theme";
+import { formatAmount, formatCurrencyCompact } from "@/lib/theme";
+import { useAuth } from "@/lib/auth";
 import ProviderBrandIcon from "@/components/wizard/ProviderBrandIcon";
 
 // ── Types ────────────────────────────────────────────────────
@@ -44,6 +45,9 @@ interface RecurringPlanEntry {
   category_id: number | null;
   description: string;
   amount: number;
+  amount_reference?: number;
+  reference_currency?: string;
+  plan_currency?: string;
   periodicity: string;
   start_date: string;
   end_date: string | null;
@@ -490,6 +494,13 @@ function entryToForm(e: RecurringPlanEntry): FormState {
 
 export default function Budgetplan() {
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const refCcy = user?.currency ?? "CHF";
+
+  function planDisplayAmt(e: RecurringPlanEntry): number {
+    return e.amount_reference ?? e.amount;
+  }
+
   const {
     superCategories,
     superCategoryGroupLabel,
@@ -884,8 +895,12 @@ export default function Budgetplan() {
   // Summary per month
   function monthSummary(m: number) {
     const list = monthEntries[m];
-    const income = list.filter((e) => e.amount > 0).reduce((s, e) => s + e.amount, 0);
-    const expense = list.filter((e) => e.amount < 0).reduce((s, e) => s + Math.abs(e.amount), 0);
+    const income = list
+      .filter((e) => e.amount > 0)
+      .reduce((s, e) => s + planDisplayAmt(e), 0);
+    const expense = list
+      .filter((e) => e.amount < 0)
+      .reduce((s, e) => s + Math.abs(planDisplayAmt(e)), 0);
     return { income, expense, count: list.length };
   }
 
@@ -1114,12 +1129,12 @@ export default function Budgetplan() {
                         <>
                           {income > 0 && (
                             <span className="text-gain text-[11px] font-medium leading-tight">
-                              +{formatCHF(income, false)}
+                              +{formatAmount(income, refCcy)}
                             </span>
                           )}
                           {expense > 0 && (
                             <span className="text-loss text-[11px] font-medium leading-tight">
-                              −{formatCHF(expense, false)}
+                              −{formatAmount(expense, refCcy)}
                             </span>
                           )}
                           {(income > 0 || expense > 0) && (
@@ -1134,7 +1149,7 @@ export default function Budgetplan() {
                                 )}
                               >
                                 {net >= 0 ? "+" : "−"}
-                                {formatCHF(Math.abs(net), false)}
+                                {formatAmount(Math.abs(net), refCcy)}
                               </p>
                             </div>
                           )}
@@ -1211,7 +1226,7 @@ export default function Budgetplan() {
                                 )}
                               >
                                 {entry.amount < 0 ? "−" : "+"}
-                                {formatCHF(Math.abs(entry.amount), false)}
+                                {formatAmount(Math.abs(planDisplayAmt(entry)), refCcy)}
                               </span>
                             </div>
                             <span
@@ -1276,11 +1291,11 @@ export default function Budgetplan() {
                       {count} {count === 1 ? "Eintrag" : "Einträge"}
                     </span>
                     <div className="flex flex-wrap gap-2 sm:gap-3 ml-auto text-xs justify-end">
-                      {income > 0 && <span className="text-gain font-medium">+{formatCHF(income, true)}</span>}
-                      {expense > 0 && <span className="text-loss font-medium">−{formatCHF(expense, true)}</span>}
+                      {income > 0 && <span className="text-gain font-medium">+{formatCurrencyCompact(income, refCcy)}</span>}
+                      {expense > 0 && <span className="text-loss font-medium">−{formatCurrencyCompact(expense, refCcy)}</span>}
                       {count > 0 && (
                         <span className={clsx("font-semibold", net >= 0 ? "text-gain" : "text-loss")}>
-                          = {net >= 0 ? "+" : "−"}{formatCHF(Math.abs(net), true)}
+                          = {net >= 0 ? "+" : "−"}{formatCurrencyCompact(Math.abs(net), refCcy)}
                         </span>
                       )}
                     </div>
@@ -1338,7 +1353,7 @@ export default function Budgetplan() {
                                   "py-2 text-right font-semibold tabular-nums",
                                   entry.amount < 0 ? "text-loss" : "text-gain"
                                 )}>
-                                  {entry.amount < 0 ? "−" : "+"}{formatCHF(Math.abs(entry.amount), true)}
+                                  {entry.amount < 0 ? "−" : "+"}{formatCurrencyCompact(Math.abs(planDisplayAmt(entry)), refCcy)}
                                 </td>
                                 <td className="py-2 pl-4 text-text-secondary text-xs">{periodicityLabel(entry.periodicity)}</td>
                                 <td className="py-2 pl-4 text-text-secondary text-xs hidden sm:table-cell">
@@ -1492,7 +1507,7 @@ export default function Budgetplan() {
                                     )}
                                   >
                                     {s.amount < 0 ? "−" : "+"}
-                                    {formatCHF(Math.abs(s.amount), true)}
+                                    {formatCurrencyCompact(Math.abs(s.amount), refCcy)}
                                   </span>
                                   <span className="text-text-tertiary shrink-0 text-[10px]">
                                     {periodicityLabel(s.periodicity)}
@@ -1833,7 +1848,7 @@ export default function Budgetplan() {
                           : <Square className="w-3.5 h-3.5 flex-shrink-0 text-text-tertiary" />}
                         <span className="flex-1 text-text-primary font-medium truncate">{s.description}</span>
                         <span className={clsx("font-semibold tabular-nums flex-shrink-0", s.amount < 0 ? "text-loss" : "text-gain")}>
-                          {s.amount < 0 ? "−" : "+"}{formatCHF(Math.abs(s.amount), true)}
+                          {s.amount < 0 ? "−" : "+"}{formatCurrencyCompact(Math.abs(s.amount), refCcy)}
                         </span>
                         <span className="text-text-tertiary flex-shrink-0">{periodicityLabel(s.periodicity)}</span>
                       </button>

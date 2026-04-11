@@ -13,11 +13,16 @@ ARG VITE_API_BASE_URL=/api
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
 # Install dependencies first (cache layer)
-COPY package.json package-lock.json* ./
+COPY frontend/package.json frontend/package-lock.json* ./
 RUN npm ci --prefer-offline 2>/dev/null || npm install
 
-# Copy source and build
-COPY . .
+# Copy frontend source
+COPY frontend/ .
+
+# shared/taxonomy.json is imported as "../../../shared/taxonomy.json" from
+# src/lib/categories.ts. From WORKDIR /app that resolves to /shared/.
+COPY shared/ /shared/
+
 RUN npm run build
 
 # ── Stage 2: Serve ────────────────────────────────────────────
@@ -27,7 +32,7 @@ FROM nginx:1.25-alpine AS runtime
 RUN rm -rf /etc/nginx/conf.d/default.conf
 
 # Copy custom nginx config
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 
 # Copy built assets from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
