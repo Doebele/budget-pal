@@ -517,22 +517,24 @@ export default function Settings() {
                     </td>
                     <td className="py-2.5 px-3">
                       <div className="flex flex-wrap gap-1">
-                        {sc.wizardLabels.filter((l) => !isLabelHidden(sc.id, l, "wl")).length === 0 && ownCats.filter((c) => c.icon === `wl:${sc.id}`).length === 0 ? (
-                          <span className="text-text-disabled italic">—</span>
-                        ) : (
-                          <>
-                            {sc.wizardLabels.filter((l) => !isLabelHidden(sc.id, l, "wl")).map((l) => (
-                              <span
-                                key={l}
-                                className="px-1.5 py-0.5 rounded text-[11px] text-text-secondary"
-                                style={{ backgroundColor: sc.color + "24", border: `1px solid ${sc.color}44` }}
-                              >
-                                {l}
-                              </span>
-                            ))}
-                            {ownCats
-                              .filter((c) => c.icon === `wl:${sc.id}`)
-                              .map((c) => (
+                        {(() => {
+                          const ownWlNames = new Set(ownCats.filter((c) => c.icon === `wl:${sc.id}`).map((c) => c.name.toLowerCase()));
+                          const canonicalWl = sc.wizardLabels.filter((l) => !isLabelHidden(sc.id, l, "wl") && !ownWlNames.has(l.toLowerCase()));
+                          const ownWl = ownCats.filter((c) => c.icon === `wl:${sc.id}`);
+                          return canonicalWl.length === 0 && ownWl.length === 0 ? (
+                            <span className="text-text-disabled italic">—</span>
+                          ) : (
+                            <>
+                                {canonicalWl.map((l) => (
+                                <span
+                                  key={l}
+                                  className="px-1.5 py-0.5 rounded text-[11px] text-text-secondary"
+                                  style={{ backgroundColor: sc.color + "24", border: `1px solid ${sc.color}44` }}
+                                >
+                                  {l}
+                                </span>
+                              ))}
+                              {ownWl.map((c) => (
                                 <span
                                   key={c.id}
                                   className="px-1.5 py-0.5 rounded text-[11px] text-text-secondary border"
@@ -542,28 +544,31 @@ export default function Settings() {
                                   <span className="text-text-disabled ml-1">(eigen)</span>
                                 </span>
                               ))}
-                          </>
-                        )}
+                            </>
+                          );
+                        })()}
                       </div>
                     </td>
                     <td className="py-2.5 px-3">
                       <div className="flex flex-wrap gap-1">
-                        {sc.txnCategories.filter((c) => !isLabelHidden(sc.id, c, "txn")).length === 0 && ownCats.filter((c) => c.icon === sc.id).length === 0 ? (
-                          <span className="text-text-disabled italic">—</span>
-                        ) : (
-                          <>
-                            {sc.txnCategories.filter((c) => !isLabelHidden(sc.id, c, "txn")).map((c) => (
-                              <span
-                                key={c}
-                                className="px-1.5 py-0.5 rounded text-[11px] text-text-secondary"
-                                style={{ backgroundColor: sc.color + "18" }}
-                              >
-                                {c}
-                              </span>
-                            ))}
-                            {ownCats
-                              .filter((cat) => cat.icon === sc.id)
-                              .map((cat) => (
+                        {(() => {
+                          const ownTxnNames = new Set(ownCats.filter((c) => c.icon === sc.id).map((c) => c.name.toLowerCase()));
+                          const canonicalTxn = sc.txnCategories.filter((c) => !isLabelHidden(sc.id, c, "txn") && !ownTxnNames.has(c.toLowerCase()));
+                          const ownTxn = ownCats.filter((c) => c.icon === sc.id);
+                          return canonicalTxn.length === 0 && ownTxn.length === 0 ? (
+                            <span className="text-text-disabled italic">—</span>
+                          ) : (
+                            <>
+                              {canonicalTxn.map((c) => (
+                                <span
+                                  key={c}
+                                  className="px-1.5 py-0.5 rounded text-[11px] text-text-secondary"
+                                  style={{ backgroundColor: sc.color + "18" }}
+                                >
+                                  {c}
+                                </span>
+                              ))}
+                              {ownTxn.map((cat) => (
                                 <span
                                   key={cat.id}
                                   className="px-1.5 py-0.5 rounded text-[11px] text-text-secondary border"
@@ -573,8 +578,9 @@ export default function Settings() {
                                   <span className="text-text-disabled ml-1">(eigen)</span>
                                 </span>
                               ))}
-                          </>
-                        )}
+                            </>
+                          );
+                        })()}
                       </div>
                     </td>
                   </tr>
@@ -706,8 +712,8 @@ export default function Settings() {
                           </button>
                         </div>
                         <div className="flex flex-wrap gap-1">
-                          {/* Static canonical labels */}
-                          {sc.txnCategories.filter((c) => !isLabelHidden(sc.id, c, "txn")).map((c) => (
+                          {/* Static canonical labels (exclude user-added to avoid duplicates) */}
+                          {sc.txnCategories.filter((c) => !isLabelHidden(sc.id, c, "txn") && !ownCats.some((oc) => oc.icon === sc.id && oc.name.toLowerCase() === c.toLowerCase())).map((c) => (
                             taxoDelete?.label === c && taxoDelete.scId === sc.id && taxoDelete.type === "txn" ? (
                               /* Delete confirmation inline */
                               <div key={c} className="w-full mt-1 p-2 rounded-lg border border-loss/30 bg-loss/5 space-y-1.5 text-[11px]">
@@ -782,7 +788,7 @@ export default function Settings() {
                               </button>
                             </span>
                           ))}
-                          {sc.txnCategories.length === 0 && ownCats.filter((cat) => cat.icon === sc.id).length === 0 && (
+                          {sc.txnCategories.filter((c) => !ownCats.some((oc) => oc.icon === sc.id && oc.name.toLowerCase() === c.toLowerCase())).length === 0 && ownCats.filter((cat) => cat.icon === sc.id).length === 0 && (
                             <span className="text-text-disabled italic text-[11px]">Keine — fällt in Sonstiges</span>
                           )}
                         </div>
@@ -840,11 +846,11 @@ export default function Settings() {
                           </button>
                         </div>
                         <div className="flex flex-wrap gap-1">
-                          {sc.wizardLabels.filter((l) => !isLabelHidden(sc.id, l, "wl")).length === 0 && ownCats.filter((cat) => cat.icon === "wl:" + sc.id).length === 0 ? (
+                          {sc.wizardLabels.filter((l) => !isLabelHidden(sc.id, l, "wl") && !ownCats.some((oc) => oc.icon === "wl:" + sc.id && oc.name.toLowerCase() === l.toLowerCase())).length === 0 && ownCats.filter((cat) => cat.icon === "wl:" + sc.id).length === 0 ? (
                             <span className="text-text-disabled italic text-[11px]">Keine</span>
                           ) : (
                             <>
-                              {sc.wizardLabels.filter((l) => !isLabelHidden(sc.id, l, "wl")).map((l) => (
+                              {sc.wizardLabels.filter((l) => !isLabelHidden(sc.id, l, "wl") && !ownCats.some((oc) => oc.icon === "wl:" + sc.id && oc.name.toLowerCase() === l.toLowerCase())).map((l) => (
                                 taxoDelete?.label === l && taxoDelete.scId === sc.id && taxoDelete.type === "wizard" ? (
                                   <div key={l} className="w-full mt-1 p-2 rounded-lg border border-loss/30 bg-loss/5 space-y-1.5 text-[11px]">
                                     <p className="text-text-secondary">
