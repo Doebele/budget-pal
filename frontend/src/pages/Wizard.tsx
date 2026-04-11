@@ -1591,6 +1591,7 @@ export default function Wizard() {
   const [animating, setAnimating] = useState(false);
   const [direction, setDirection] = useState<"forward" | "back">("forward");
   const [isReview, setIsReview] = useState(false);
+  const [serverStateLoaded, setServerStateLoaded] = useState(false);
 
   // Auto-save to localStorage on every change
   useEffect(() => {
@@ -1599,17 +1600,24 @@ export default function Wizard() {
     } catch {}
   }, [wizardData]);
 
-  // On mount: if no localStorage draft exists, try to restore from server-saved state
+  // On mount: restore from server first (DB is source of truth),
+  // then keep localStorage as an offline draft cache.
   useEffect(() => {
-    const hasDraft = !!localStorage.getItem(STORAGE_KEY);
-    if (!hasDraft) {
-      api.get("/wizard/state").then((res) => {
-        if (res.data) {
-          setWizardData({ ...DEFAULT_WIZARD_DATA, ...res.data });
-        }
-      }).catch(() => {});
-    }
+    api.get("/wizard/state").then((res) => {
+      if (res.data) {
+        setWizardData({ ...DEFAULT_WIZARD_DATA, ...res.data });
+      }
+    }).catch(() => {}).finally(() => setServerStateLoaded(true));
   }, []);
+
+  // Debounced DB autosave so wizard progress survives browser/storage resets.
+  useEffect(() => {
+    if (!serverStateLoaded) return;
+    const t = window.setTimeout(() => {
+      api.put("/wizard/state", wizardData).catch(() => {});
+    }, 800);
+    return () => window.clearTimeout(t);
+  }, [wizardData, serverStateLoaded]);
 
   // Prefill from user profile on mount (name + birthdate) — only if still at defaults
   useEffect(() => {

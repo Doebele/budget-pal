@@ -14,11 +14,7 @@ const SankeyChart = lazy(() => import("@/components/charts/SankeyChart"));
 import GranularityNavigator from "@/components/GranularityNavigator";
 import { computeDateRange, TimeGranularity } from "@/lib/granularity";
 import { clsx } from "clsx";
-import {
-  resolveSuperCategory,
-  SUPER_CATEGORIES,
-  type SuperCategory,
-} from "@/lib/categories";
+import { useTaxonomy, type SuperCategory } from "@/lib/categories";
 import { deduplicateWizardBatch } from "@/lib/wizardUtils";
 
 // ── Stat card ─────────────────────────────────────────────────
@@ -67,6 +63,7 @@ function StatCard({
 // ── Main Dashboard ────────────────────────────────────────────
 
 export default function Dashboard() {
+  const { resolveSuperCategory, superCategories } = useTaxonomy();
   const [granularity, setGranularity] = useState<TimeGranularity>("ytd");
   const [anchor, setAnchor] = useState<Date>(() => new Date());
   const [sankeySource, setSankeySource] = useState<"real" | "empirisch">("real");
@@ -110,12 +107,17 @@ export default function Dashboard() {
   );
 
   // ── Sankey data (mode-aware) ───────────────────────────────────
+  const sparenSuper = useMemo(
+    () => superCategories.find((s) => s.id === "sparen"),
+    [superCategories],
+  );
+
   const sankeyData = useMemo(() => {
     if (sankeySource === "empirisch") {
-      return buildSankeyDataEmpirical(wizardBudgets, months);
+      return buildSankeyDataEmpirical(wizardBudgets, months, resolveSuperCategory, sparenSuper);
     }
-    return buildSankeyDataReal(stats);
-  }, [sankeySource, stats, wizardBudgets, months]);
+    return buildSankeyDataReal(stats, resolveSuperCategory, sparenSuper);
+  }, [sankeySource, stats, wizardBudgets, months, resolveSuperCategory, sparenSuper]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -358,10 +360,111 @@ interface StatsPayload {
   total_income?: number;
   total_expenses?: number;
   top_categories?: Array<{ category: string; total: number }>;
+  top_income_categories?: Array<{ category: string; total: number }>;
+}
+
+type ResolveSuper = (name: string, isWizard?: boolean) => SuperCategory;
+
+/**
+ * Unterkategorien mit gleichem Namen (nur Schreibweise) zusammenführen;
+ * Anzeige = kanonischer Txn-Name aus der Taxonomie, falls vorhanden.
+ */
+function mergeSubItemsForSuper(
+  subs: Array<{ label: string; value: number }>,
+  sc: SuperCategory,
+): Array<{ label: string; value: number }> {
+  const byKey = new Map<string, { label: string; value: number }>();
+  for (const s of subs) {
+    const key = s.label.trim().toLowerCase();
+    if (!key) continue;
+    const canonical =
+      sc.txnCategories.find((t) => t.toLowerCase() === key) ??
+      sc.legacyAliases?.find((a) => a.toLowerCase() === key);
+    const display = canonical ?? s.label.trim();
+    const prev = byKey.get(key);
+    if (!prev) {
+      byKey.set(key, { label: display, value: s.value });
+    } else {
+      prev.value += s.value;
+    }
+  }
+  return [...byKey.values()];
+}
+
+/** Skaliert Unterknoten so ihre Summe der Zielbreite des Mittelknotens entspricht (Sankey-Konsistenz). */
+function scaleSubsToTotal(
+  subs: Array<{ label: string; value: number }>,
+  targetTotal: number,
+): Array<{ label: string; value: number }> {
+  if (targetTotal <= 0) return [];
+  if (subs.length === 0) return [{ label: "Überschuss", value: targetTotal }];
+  const sum = subs.reduce((s, x) => s + x.value, 0);
+  if (sum <= 0) return [{ label: "Überschuss", value: targetTotal }];
+  const k = targetTotal / sum;
+  return subs.map((x) => ({ label: x.label, value: x.value * k }));
+}
+
+function buildSparenSubsFromIncomeRows(
+  rows: Array<{ category: string; total: number }> | undefined,
+  resolveSuperCategory: ResolveSuper,
+  sparenSuper: SuperCategory | undefined,
+): Array<{ label: string; value: number }> {
+  const raw: Array<{ label: string; value: number }> = [];
+  for (const row of rows || []) {
+    if (row.total <= 0) continue;
+    const name = (row.category || "").trim();
+    if (!name) continue;
+    let sc = resolveSuperCategory(name, false);
+    if (sc.id !== "sparen") {
+      sc = resolveSuperCategory(name, true);
+    }
+    if (sc.id !== "sparen") continue;
+    raw.push({ label: name, value: row.total });
+  }
+  if (!sparenSuper || raw.length === 0) return raw;
+  return mergeSubItemsForSuper(raw, sparenSuper);
+}
+
+/** Summe der Unterkanten an den skalierten Mittelkantenwert anbinden (Rundungsdrift / Nullwerte). */
+function subItemsForSankeyLink(
+  subs: Array<{ label: string; value: number }>,
+  parentScaled: number,
+  source: "txn" | "wizard",
+): Array<{ label: string; value: number; source: "txn" | "wizard" }> {
+  if (parentScaled <= 0) return [];
+  const scaled = subs
+    .filter((s) => s.label?.trim())
+    .map((s) => ({
+      label: s.label.trim(),
+      value: Math.max(0, Math.round(s.value * 100) / 100),
+    }))
+    .filter((s) => s.value > 0);
+  if (scaled.length === 0) {
+    return [{ label: "Überschuss (nicht kategorisiert)", value: parentScaled, source }];
+  }
+  const sum = scaled.reduce((a, b) => a + b.value, 0);
+  if (sum <= 0) {
+    return [{ label: "Überschuss (nicht kategorisiert)", value: parentScaled, source }];
+  }
+  const factor = parentScaled / sum;
+  const out = scaled.map((s) => ({
+    label: s.label,
+    value: Math.round(s.value * factor * 100) / 100,
+    source,
+  }));
+  const drift = parentScaled - out.reduce((a, b) => a + b.value, 0);
+  if (Math.abs(drift) >= 0.01 && out.length > 0) {
+    out[0] = { ...out[0], value: Math.round((out[0].value + drift) * 100) / 100 };
+  }
+  return out.filter((x) => x.value > 0);
 }
 
 /** Build Sankey from real transaction data, grouped by supercategory */
-function buildSankeyDataReal(stats: StatsPayload | undefined) {
+function buildSankeyDataReal(
+  stats: StatsPayload | undefined,
+  resolveSuperCategory: ResolveSuper,
+  sparenSuper: SuperCategory | undefined,
+) {
   if (!stats?.total_income || stats.total_income <= 0) {
     return { nodes: [], links: [] };
   }
@@ -389,18 +492,32 @@ function buildSankeyDataReal(stats: StatsPayload | undefined) {
     agg.subs.push({ label: cat.category, value: cat.total });
   }
 
-  // Build link segments (Sparen first, then by total desc, max 8 categories)
+  for (const agg of superMap.values()) {
+    agg.subs = mergeSubItemsForSuper(agg.subs, agg.sc);
+    agg.total = agg.subs.reduce((s, x) => s + x.value, 0);
+  }
+
+  // Ausgaben-Segmente nach Taxonomie-Super (mittlere Spalte), max. 8; «Sparen» = Rest unten.
   const expSegments = [...superMap.values()]
     .filter((e) => e.total > 0)
     .sort((a, b) => b.total - a.total)
     .slice(0, 8);
 
+  const sparenSubsMerged = buildSparenSubsFromIncomeRows(
+    stats.top_income_categories,
+    resolveSuperCategory,
+    sparenSuper,
+  );
+  const sparenSubs = scaleSubsToTotal(sparenSubsMerged, savings);
+
   const segments: Array<{
     id: string; value: number; color: string;
     subs: Array<{ label: string; value: number }>;
   }> = [
-    ...(savings > 0 ? [{ id: "Sparen", value: savings, color: "#10b981", subs: [] }] : []),
     ...expSegments.map((e) => ({ id: e.sc.label, value: e.total, color: e.sc.color, subs: e.subs })),
+    ...(savings > 0
+      ? [{ id: "Sparen", value: savings, color: sparenSuper?.color ?? "#10b981", subs: sparenSubs }]
+      : []),
   ];
 
   if (!segments.length) return { nodes: [], links: [] };
@@ -409,17 +526,24 @@ function buildSankeyDataReal(stats: StatsPayload | undefined) {
   const scale    = totalSeg > income ? income / totalSeg : 1;
 
   const nodes = [{ id: "Einnahmen" }, ...segments.map((s) => ({ id: s.id }))];
-  const links: SankeyLink[] = segments.map((s) => ({
-    source: "Einnahmen",
-    target: s.id,
-    value: Math.round(s.value * scale * 100) / 100,
-    color: s.color,
-    subItems: s.subs.length > 0
-      ? s.subs
-          .sort((a, b) => b.value - a.value)
-          .map((sub) => ({ label: sub.label, value: Math.round(sub.value * scale * 100) / 100, source: "txn" as const }))
-      : undefined,
-  }));
+  const links: SankeyLink[] = segments.map((s) => {
+    const parentScaled = Math.round(s.value * scale * 100) / 100;
+    const subsSorted = [...s.subs].sort((a, b) => b.value - a.value);
+    const scaledSubs = subsSorted.map((sub) => ({
+      label: sub.label,
+      value: Math.round(sub.value * scale * 100) / 100,
+    }));
+    return {
+      source: "Einnahmen",
+      target: s.id,
+      value: parentScaled,
+      color: s.color,
+      subItems:
+        scaledSubs.length > 0
+          ? subItemsForSankeyLink(scaledSubs, parentScaled, "txn")
+          : undefined,
+    };
+  });
 
   return { nodes, links };
 }
@@ -428,6 +552,8 @@ function buildSankeyDataReal(stats: StatsPayload | undefined) {
 function buildSankeyDataEmpirical(
   budgetsRaw: Array<{ id: number; notes: string | null; amount: number; created_at?: string }> | undefined,
   months: number,
+  resolveSuperCategory: ResolveSuper,
+  sparenSuper: SuperCategory | undefined,
 ) {
   if (!budgetsRaw || budgetsRaw.length === 0) return { nodes: [], links: [] };
 
@@ -445,14 +571,15 @@ function buildSankeyDataEmpirical(
   >();
 
   let monthlyIncome = 0;
+  const sparenIncomeRaw: Array<{ label: string; value: number }> = [];
 
   for (const b of latest) {
     const label = b.notes || "Sonstiges";
     const sc = resolveSuperCategory(label, true);
 
     if (sc.id === "sparen") {
-      // Treat as income (e.g. lohn / nebeneinkommen wizard entries)
       monthlyIncome += b.amount;
+      sparenIncomeRaw.push({ label, value: b.amount * months });
       continue;
     }
 
@@ -465,6 +592,11 @@ function buildSankeyDataEmpirical(
     agg.subs.push({ label, value: periodAmt });
   }
 
+  for (const agg of superMap.values()) {
+    agg.subs = mergeSubItemsForSuper(agg.subs, agg.sc);
+    agg.total = agg.subs.reduce((s, x) => s + x.value, 0);
+  }
+
   const expSegments = [...superMap.values()]
     .filter((e) => e.total > 0)
     .sort((a, b) => b.total - a.total);
@@ -475,12 +607,19 @@ function buildSankeyDataEmpirical(
   const income = monthlyIncome > 0 ? monthlyIncome * months : totalExp / 0.70;
   const savings = Math.max(0, income - totalExp);
 
+  const sparenSubsMerged = sparenSuper
+    ? mergeSubItemsForSuper(sparenIncomeRaw, sparenSuper)
+    : sparenIncomeRaw;
+  const sparenSubs = scaleSubsToTotal(sparenSubsMerged, savings);
+
   const segments: Array<{
     id: string; value: number; color: string;
     subs: Array<{ label: string; value: number }>;
   }> = [
-    ...(savings > 0 ? [{ id: "Sparen", value: savings, color: "#10b981", subs: [] }] : []),
     ...expSegments.map((e) => ({ id: e.sc.label, value: e.total, color: e.sc.color, subs: e.subs })),
+    ...(savings > 0
+      ? [{ id: "Sparen", value: savings, color: sparenSuper?.color ?? "#10b981", subs: sparenSubs }]
+      : []),
   ];
 
   if (!segments.length) return { nodes: [], links: [] };
@@ -489,17 +628,24 @@ function buildSankeyDataEmpirical(
   const scale    = totalSeg > income ? income / totalSeg : 1;
 
   const nodes = [{ id: "Einnahmen" }, ...segments.map((s) => ({ id: s.id }))];
-  const links: SankeyLink[] = segments.map((s) => ({
-    source: "Einnahmen",
-    target: s.id,
-    value: Math.round(s.value * scale * 100) / 100,
-    color: s.color,
-    subItems: s.subs.length > 0
-      ? s.subs
-          .sort((a, b) => b.value - a.value)
-          .map((sub) => ({ label: sub.label, value: Math.round(sub.value * scale * 100) / 100, source: "wizard" as const }))
-      : undefined,
-  }));
+  const links: SankeyLink[] = segments.map((s) => {
+    const parentScaled = Math.round(s.value * scale * 100) / 100;
+    const subsSorted = [...s.subs].sort((a, b) => b.value - a.value);
+    const scaledSubs = subsSorted.map((sub) => ({
+      label: sub.label,
+      value: Math.round(sub.value * scale * 100) / 100,
+    }));
+    return {
+      source: "Einnahmen",
+      target: s.id,
+      value: parentScaled,
+      color: s.color,
+      subItems:
+        scaledSubs.length > 0
+          ? subItemsForSankeyLink(scaledSubs, parentScaled, "wizard")
+          : undefined,
+    };
+  });
 
   return { nodes, links };
 }

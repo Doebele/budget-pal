@@ -36,11 +36,7 @@ import CategoryDrillDown from "@/components/budget/CategoryDrillDown";
 import type { SubItem } from "@/components/budget/SuperCategoryBar";
 import type { DrillDownTransaction } from "@/components/budget/CategoryDrillDown";
 import { computeDateRange, TimeGranularity } from "@/lib/granularity";
-import {
-  SUPER_CATEGORIES,
-  resolveSuperCategory,
-  type SuperCategory,
-} from "@/lib/categories";
+import { useTaxonomy, type SuperCategory } from "@/lib/categories";
 import { deduplicateWizardBatch } from "@/lib/wizardUtils";
 import type { MultiAnalysisResult } from "@/types/budgetAnalysis";
 
@@ -111,6 +107,8 @@ interface SuperRow {
 // ── Page ──────────────────────────────────────────────────────
 
 export default function Budget() {
+  const { superCategories, resolveSuperCategory } = useTaxonomy();
+
   // ── Time navigation ─────────────────────────────────────────
   const [granularity, setGranularity] = useState<TimeGranularity>("ytd");
   const [anchor, setAnchor] = useState<Date>(() => new Date());
@@ -305,7 +303,7 @@ export default function Budget() {
       }
     }
     return m;
-  }, [ALL_FREQS_SELECTED, stats, freqFilteredTxns]);
+  }, [ALL_FREQS_SELECTED, stats, freqFilteredTxns, superCategories, resolveSuperCategory]);
 
   // ── Wizard planned amounts by label → period CHF ─────────────
   const wizardPlanned = useMemo((): Map<string, number> => {
@@ -338,7 +336,7 @@ export default function Budget() {
       entry.subs.set(label, (entry.subs.get(label) ?? 0) + periodAmt);
     }
     return m;
-  }, [wizardPlanned]);
+  }, [wizardPlanned, superCategories, resolveSuperCategory]);
 
   const totalPlanned = useMemo(
     () => [...plannedBySuperCat.values()].reduce((s, e) => s + e.total, 0),
@@ -378,7 +376,7 @@ export default function Budget() {
     }
 
     return m;
-  }, [peerData, wizardPeerConfig, months]);
+  }, [peerData, wizardPeerConfig, months, superCategories, resolveSuperCategory]);
 
   // ── Transactions per supercategory for drill-down ─────────────
   // Uses freqFilteredTxns so the frequency chips affect drill-down too.
@@ -399,13 +397,13 @@ export default function Budget() {
     }
     for (const [, txns] of m) txns.sort((a, b) => b.date.localeCompare(a.date));
     return m;
-  }, [freqFilteredTxns]);
+  }, [freqFilteredTxns, superCategories, resolveSuperCategory]);
 
   // ── Unified SuperRow list (all SUPER_CATEGORIES) ──────────────
   const superRows = useMemo((): SuperRow[] => {
     const rows: SuperRow[] = [];
 
-    for (const sc of SUPER_CATEGORIES) {
+    for (const sc of superCategories) {
       if (sc.id === "sparen") continue; // income side — never shown as expense
 
       const actEntry  = actualBySuperCat.get(sc.id);
@@ -447,7 +445,7 @@ export default function Budget() {
     // "default" keeps SUPER_CATEGORIES insertion order
 
     return rows;
-  }, [actualBySuperCat, plannedBySuperCat, txnsBySuperCat, sortOrder]);
+  }, [actualBySuperCat, plannedBySuperCat, txnsBySuperCat, sortOrder, superCategories]);
 
   const mainRows     = superRows.filter((r) => r.sc.id !== "sonstiges");
   const sonstigesRow = superRows.find((r) => r.sc.id === "sonstiges");
@@ -702,7 +700,7 @@ export default function Budget() {
 
         {/* Category visibility filter chips */}
         <div className="flex flex-wrap gap-1.5 px-4 py-2 border-b border-border/40 bg-bg-surface/30">
-          {SUPER_CATEGORIES.filter((sc) => sc.id !== "sparen").map((sc) => {
+          {superCategories.filter((sc) => sc.id !== "sparen").map((sc) => {
             const isHidden = hiddenScIds.has(sc.id);
             return (
               <button

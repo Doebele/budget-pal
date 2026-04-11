@@ -18,6 +18,7 @@ import {
   Archive,
   Brain,
   FileBarChart2,
+  CalendarRange,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { clsx } from "clsx";
@@ -29,6 +30,7 @@ const NAV_ITEMS = [
   { path: "/finanzplan", icon: FileBarChart2, label: "Finanzplan" },
   { path: "/transactions/archived", icon: Archive, label: "Archiv" },
   { path: "/budget", icon: PiggyBank, label: "Budgetanalyse" },
+  { path: "/budgetplan", icon: CalendarRange, label: "Budgetplan" },
   { path: "/forecast", icon: Brain, label: "Budgetprognose" },
   { path: "/projections", icon: TrendingUp, label: "Rentenprognose" },
   { path: "/import", icon: Upload, label: "Import" },

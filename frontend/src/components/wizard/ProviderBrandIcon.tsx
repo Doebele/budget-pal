@@ -1,6 +1,6 @@
 /**
- * ProviderBrandIcon — Shows a brand logo from @icons-pack/react-simple-icons.
- * Falls back to Globe (Lucide) for unknown providers.
+ * ProviderBrandIcon — Shows local provider icons first (stored in public/provider-icons),
+ * then falls back to react-simple-icons and finally to Globe.
  */
 import { Globe } from "lucide-react";
 import {
@@ -52,6 +52,51 @@ const ID_ALIASES: Record<string, string> = {
   "google-drive":  "google-drive",
 };
 
+const LOCAL_ICON_IDS = new Set<string>([
+  "1password",
+  "adobe-cc",
+  "amazon-prime",
+  "apple-fitness",
+  "apple-music",
+  "apple-tv",
+  "blick-plus",
+  "chatgpt",
+  "claude-pro",
+  "cumulus-extra",
+  "dazn",
+  "disney-plus",
+  "fitnesscenter",
+  "galaxus-plus",
+  "gartenpflege",
+  "google-one",
+  "guardian",
+  "icloud",
+  "linkedin",
+  "mobility",
+  "ms365",
+  "netflix",
+  "notion",
+  "nzz",
+  "reinigung",
+  "salt-home",
+  "salt-mobile",
+  "sbb-ga",
+  "sbb-halbtax",
+  "schwimmbad",
+  "security",
+  "slack",
+  "spotify",
+  "strava",
+  "sunrise-internet",
+  "sunrise-mobile",
+  "swisscom-internet",
+  "swisscom-mobile",
+  "tagi",
+  "tidal",
+  "wingo",
+  "yt-premium",
+]);
+
 function resolveBrandId(providerId: string): string {
   return ID_ALIASES[providerId] ?? providerId;
 }
@@ -63,18 +108,42 @@ interface Props {
 }
 
 export default function ProviderBrandIcon({ providerId, size = 20, className }: Props) {
-  const BrandIcon = BRAND_MAP[resolveBrandId(providerId)];
+  const resolvedId = resolveBrandId(providerId);
+  const BrandIcon = BRAND_MAP[resolvedId];
+  const localId = LOCAL_ICON_IDS.has(providerId)
+    ? providerId
+    : (LOCAL_ICON_IDS.has(resolvedId) ? resolvedId : null);
+
+  if (localId) {
+    return (
+      <div
+        className={clsx(
+          "flex items-center justify-center rounded-sm bg-white/5 flex-shrink-0 overflow-hidden",
+          className
+        )}
+        style={{ width: size, height: size }}
+      >
+        <img
+          src={`/provider-icons/${localId}.svg`}
+          alt=""
+          aria-hidden="true"
+          className="w-[140%] h-[140%] object-contain grayscale opacity-80"
+          loading="lazy"
+        />
+      </div>
+    );
+  }
 
   if (BrandIcon) {
     return (
       <div
         className={clsx(
-          "flex items-center justify-center rounded-sm bg-white/5 flex-shrink-0",
+          "flex items-center justify-center rounded-sm bg-white/5 flex-shrink-0 overflow-hidden",
           className
         )}
         style={{ width: size, height: size }}
       >
-        <BrandIcon size={Math.round(size * 0.65)} className="filter-grayscale text-text-secondary" />
+        <BrandIcon size={Math.round(size * 1.3)} className="filter-grayscale text-text-secondary" />
       </div>
     );
   }
@@ -83,12 +152,12 @@ export default function ProviderBrandIcon({ providerId, size = 20, className }: 
   return (
     <div
       className={clsx(
-        "flex items-center justify-center rounded-sm bg-white/5 flex-shrink-0",
+        "flex items-center justify-center rounded-sm bg-white/5 flex-shrink-0 overflow-hidden",
         className
       )}
       style={{ width: size, height: size }}
     >
-      <Globe className="text-text-tertiary" style={{ width: size * 0.6, height: size * 0.6 }} />
+      <Globe className="text-text-tertiary" style={{ width: size * 1.2, height: size * 1.2 }} />
     </div>
   );
 }

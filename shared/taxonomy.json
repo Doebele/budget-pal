@@ -1,0 +1,127 @@
+{
+  "version": 3,
+  "superCategories": [
+    {
+      "id": "wohnen",
+      "label": "Wohnen",
+      "emoji": "🏠",
+      "color": "#f0b429",
+      "txnCategories": ["Wohnen", "Nebenkosten"],
+      "legacyAliases": ["housing", "utilities"],
+      "wizardLabels": ["miete", "hypothek", "hypothek & amortisation", "nebenkosten", "parkplatz"]
+    },
+    {
+      "id": "essen",
+      "label": "Essen & Trinken",
+      "emoji": "🛒",
+      "color": "#84cc16",
+      "txnCategories": ["Lebensmittel", "Restaurant & Takeaway"],
+      "legacyAliases": ["groceries", "food & drink"],
+      "wizardLabels": ["lebensmittel", "freizeit & restaurant"]
+    },
+    {
+      "id": "mobilitaet",
+      "label": "Mobilität",
+      "emoji": "🚆",
+      "color": "#38bdf8",
+      "txnCategories": ["Transport", "Reisen", "ÖV-Kosten", "Parkgebühren"],
+      "legacyAliases": ["travel", "öv-abonnements", "ov-abonnements", "öv abonnements"],
+      "wizardLabels": ["benzin / strom (auto)", "auto-amortisation", "sbb halbtax", "sbb ga 2. klasse", "transport"]
+    },
+    {
+      "id": "versicherungen",
+      "label": "Versicherungen & Gesundheit",
+      "emoji": "🛡️",
+      "color": "#a78bfa",
+      "txnCategories": ["Versicherungen", "Gesundheit", "Krankenkasse", "Weitere Versicherungen", "Fitness"],
+      "legacyAliases": ["insurance", "health"],
+      "wizardLabels": ["krankenkasse", "zusatzversicherung", "hausrat & haftpflicht", "autoversicherung"]
+    },
+    {
+      "id": "freizeit",
+      "label": "Freizeit & Unterhaltung",
+      "emoji": "🎬",
+      "color": "#fb923c",
+      "txnCategories": ["Freizeit & Unterhaltung"],
+      "legacyAliases": ["entertainment", "unterhaltung"],
+      "wizardLabels": ["freizeit & unterhaltung", "sport & fitness", "kultur & events"]
+    },
+    {
+      "id": "abos",
+      "label": "Abonnements & Kommunikation",
+      "emoji": "📱",
+      "color": "#22d3ee",
+      "txnCategories": [
+        "Abonnements", "Kommunikation", "Streaming", "Musik & Medien", "Internet (Festnetz)", "Mobilfunk",
+        "Cloud & Backup", "Software & Apps", "Nachrichten & Medien", "Treue & Mitgliedschaften",
+        "Bildung & Weiterbildung", "Beruflich", "Shopping & Lieferdienste"
+      ],
+      "legacyAliases": [
+        "abonnements", "kommunikation", "streaming", "musik & medien", "internet (festnetz)", "mobilfunk",
+        "cloud & backup", "software & apps", "nachrichten & medien", "treue & mitgliedschaften",
+        "bildung & weiterbildung", "beruflich", "shopping & lieferdienste"
+      ],
+      "wizardLabels": [
+        "abonnements", "serafe", "netflix", "spotify", "disney+", "nzz digital", "blick+",
+        "srf play (optional)", "icloud 200gb", "google one", "microsoft 365", "migros cumulus extra",
+        "adsl/fiber (swisscom)", "mobile abo (sunrise)", "fitnesscenter", "adobe creative cloud",
+        "linkedin premium", "dropbox plus", "amazon prime", "youtube premium"
+      ]
+    },
+    {
+      "id": "shopping",
+      "label": "Shopping & Kleidung",
+      "emoji": "👔",
+      "color": "#ec4899",
+      "txnCategories": ["Shopping", "Kleidung"],
+      "wizardLabels": ["kleidung", "shopping & kleidung", "bekleidung & schuhe"]
+    },
+    {
+      "id": "bildung",
+      "label": "Bildung",
+      "emoji": "📚",
+      "color": "#6366f1",
+      "txnCategories": ["Bildung"],
+      "legacyAliases": ["education"],
+      "wizardLabels": ["weiterbildung & kurse", "bücher & medien", "bildung & weiterbildung"]
+    },
+    {
+      "id": "steuern",
+      "label": "Steuern & Abgaben",
+      "emoji": "🏛️",
+      "color": "#f43f5e",
+      "txnCategories": ["Steuern", "Abgaben", "Finanzen", "Gebühren", "Dienstleistungen", "Säule 3A"],
+      "legacyAliases": ["finance", "taxes", "services", "fees"],
+      "wizardLabels": ["direkte steuern", "gebühren", "kirchensteuern", "säule 3a"]
+    },
+    {
+      "id": "sparen",
+      "label": "Sparen",
+      "emoji": "💰",
+      "color": "#10b981",
+      "txnCategories": [
+        "Gehalt", "Investitionen", "Einzahlungen", "Kontoübertrag", "Dividende", "Zinsen",
+        "Rückerstattung", "Erstattung", "Bonus", "Sonstige Einnahmen"
+      ],
+      "legacyAliases": ["salary", "investment", "dividend", "interest", "refund"],
+      "wizardLabels": [
+        "lohn (netto)",
+        "selbstständige tätigkeit",
+        "ahv-rente",
+        "dividenden",
+        "mieteinnahmen",
+        "auslandeinkommen",
+        "lohn",
+        "gehalt"
+      ]
+    },
+    {
+      "id": "sonstiges",
+      "label": "Sonstiges",
+      "emoji": "💸",
+      "color": "#94a3b8",
+      "txnCategories": [],
+      "wizardLabels": []
+    }
+  ]
+}

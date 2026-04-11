@@ -155,6 +155,23 @@ export const budgetApi = {
     api.get("/budget/multi-analysis", { params }),
 };
 
+/** Supercategory taxonomy (shared/taxonomy.json + merged Category rows) */
+export const taxonomyApi = {
+  snapshot: () =>
+    api.get<{
+      version: number;
+      superCategories: Array<{
+        id: string;
+        label: string;
+        color: string;
+        emoji: string;
+        txnCategories: string[];
+        wizardLabels: string[];
+        legacyAliases: string[];
+      }>;
+    }>("/taxonomy"),
+};
+
 // Pension
 export const pensionApi = {
   list: () => api.get("/pension"),
@@ -192,6 +209,31 @@ export const forecastingApi = {
   saveScenario: (data: Record<string, unknown>) =>
     api.post("/forecasting/scenarios", data),
   deleteScenario: (id: number) => api.delete(`/forecasting/scenarios/${id}`),
+};
+
+// Recurring Plan (Budgetplan)
+export const recurringPlanApi = {
+  list: (params?: { year?: number; is_future?: boolean }) =>
+    api.get("/recurring-plan", { params }),
+  create: (data: Record<string, unknown>) => api.post("/recurring-plan", data),
+  update: (id: number, data: Record<string, unknown>) =>
+    api.put(`/recurring-plan/${id}`, data),
+  delete: (id: number) => api.delete(`/recurring-plan/${id}`),
+  suggest: (source: "historical" | "empirical", year: number) =>
+    api.get("/recurring-plan/suggest", { params: { source, year } }),
+  prefill: (payload: {
+    source: "historical" | "empirical";
+    year: number;
+    target_year: number;
+    entries?: Array<{
+      description: string;
+      amount: number;
+      periodicity: string;
+      category?: string | null;
+      notes?: string | null;
+      source: string;
+    }>;
+  }) => api.post("/recurring-plan/prefill", payload),
 };
 
 // Settings (category mappings)

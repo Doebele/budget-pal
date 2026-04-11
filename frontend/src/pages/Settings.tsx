@@ -6,7 +6,7 @@ import { api, authApi, settingsApi } from "@/lib/api";
 import { Save, ExternalLink, Wand2, RotateCcw, AlertCircle, ChevronDown, ChevronUp, Users, Plus, Pencil, Trash2, X, Check, Tag } from "lucide-react";
 import { Link } from "react-router-dom";
 import { differenceInYears, parseISO } from "date-fns";
-import { SUPER_CATEGORIES } from "@/lib/categories";
+import { useTaxonomySuperCategories } from "@/lib/categories";
 
 // ── Peer-Gruppe: Schlüssel je Superkategorie ───────────────────
 // Summe der aufgeführten PeerGroupDefaults-Felder ergibt den monatlichen
@@ -69,6 +69,7 @@ interface CategoryMapping {
 export default function Settings() {
   const { user, refreshUser } = useAuth();
   const queryClient = useQueryClient();
+  const SUPER_CATEGORIES = useTaxonomySuperCategories();
   const [name, setName] = useState(user?.name || "");
   const [birthdate, setBirthdate] = useState(user?.birthdate || "");
   const [retirementAge, setRetirementAge] = useState(user?.retirement_age || 65);
@@ -194,6 +195,8 @@ export default function Settings() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["user-categories"] });
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      queryClient.invalidateQueries({ queryKey: ["taxonomy"] });
       setCatAddForm(null);
     },
   });
@@ -208,6 +211,8 @@ export default function Settings() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["user-categories"] });
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      queryClient.invalidateQueries({ queryKey: ["taxonomy"] });
       setCatEditId(null);
     },
   });
@@ -219,6 +224,8 @@ export default function Settings() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["user-categories"] });
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      queryClient.invalidateQueries({ queryKey: ["taxonomy"] });
       setCatDeleteId(null);
       setCatReassignTo("");
     },
@@ -259,6 +266,8 @@ export default function Settings() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["label-stats"] });
       queryClient.invalidateQueries({ queryKey: ["user-categories"] });
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      queryClient.invalidateQueries({ queryKey: ["taxonomy"] });
       setTaxoDelete(null);
       setTaxoDeleteTarget("");
     },

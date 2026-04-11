@@ -4,11 +4,7 @@ import { budgetsApi } from "@/lib/api";
 import { formatCHF } from "@/lib/theme";
 import { clsx } from "clsx";
 import { X, Save, AlertCircle, DollarSign, ChevronDown } from "lucide-react";
-import {
-  SUPER_CATEGORIES,
-  resolveSuperCategory,
-  type SuperCategory,
-} from "@/lib/categories";
+import { useTaxonomy, type SuperCategory } from "@/lib/categories";
 import { deduplicateWizardBatch } from "@/lib/wizardUtils";
 
 interface WizardBudget {
@@ -29,11 +25,9 @@ interface Props {
   onClose: () => void;
 }
 
-// ── Supercategories that have wizard labels ────────────────────
-const SC_WITH_WIZARD = SUPER_CATEGORIES.filter((sc) => sc.wizardLabels.length > 0 || sc.id === "sonstiges");
-
 export default function WizardBudgetSidebar({ periodLabel, months, initialScId, onClose }: Props) {
   const queryClient = useQueryClient();
+  const { superCategories, resolveSuperCategory } = useTaxonomy();
 
   // ── Selected supercategory filter ("" = show all) ─────────────
   const [activeSc, setActiveSc] = useState<string>(initialScId ?? "");
@@ -56,13 +50,13 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
   // ── Filter by active supercategory ────────────────────────────
   const visibleBudgets = useMemo(() => {
     if (!activeSc) return latestBatch;
-    const sc = SUPER_CATEGORIES.find((s) => s.id === activeSc);
+    const sc = superCategories.find((s) => s.id === activeSc);
     if (!sc) return latestBatch;
     return latestBatch.filter((b) => {
       const resolved = resolveSuperCategory(b.notes ?? "", true);
       return resolved.id === sc.id;
     });
-  }, [latestBatch, activeSc]);
+  }, [latestBatch, activeSc, superCategories, resolveSuperCategory]);
 
   // ── Draft state: id → monthly amount string ───────────────────
   const [drafts, setDrafts] = useState<Record<number, string>>({});
@@ -132,10 +126,10 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
     const scIds = new Set(
       latestBatch.map((b) => resolveSuperCategory(b.notes ?? "", true).id)
     );
-    return SUPER_CATEGORIES.filter((sc) => scIds.has(sc.id) && sc.id !== "sparen");
-  }, [latestBatch]);
+    return superCategories.filter((sc) => scIds.has(sc.id) && sc.id !== "sparen");
+  }, [latestBatch, superCategories, resolveSuperCategory]);
 
-  const activeSCObj = SUPER_CATEGORIES.find((s) => s.id === activeSc);
+  const activeSCObj = superCategories.find((s) => s.id === activeSc);
 
   // ── Render ────────────────────────────────────────────────────
   return (

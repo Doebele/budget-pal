@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { transactionsApi, accountsApi } from "@/lib/api";
 import { formatCHF, getFrequencyBadgeStyle, PERIODICITY_LABELS } from "@/lib/theme";
-import { resolveSuperCategory, SUPER_CATEGORIES } from "@/lib/categories";
+import { useTaxonomy, useTaxonomySuperCategories } from "@/lib/categories";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { Search, Upload, ChevronDown, Check, X, LayoutGrid, Building2, Repeat, Wallet, TrendingUp, PieChart, Trash2 } from "lucide-react";
@@ -57,6 +57,8 @@ interface BudgetAnalysis {
 }
 
 export default function Transactions() {
+  const superCategories = useTaxonomySuperCategories();
+  const { resolveSuperCategory } = useTaxonomy();
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [recurrenceFilter, setRecurrenceFilter] = useState<RecurrenceFilterValue>("");
@@ -71,10 +73,14 @@ export default function Transactions() {
 
   const [showAccountDropdown, setShowAccountDropdown] = useState(false);
 
-  // All selectable categories, grouped by supercategory
-  const ALL_CAT_GROUPS = SUPER_CATEGORIES
-    .filter((sc) => sc.txnCategories.length > 0)
-    .map((sc) => ({ sc, cats: sc.txnCategories }));
+  // All selectable categories, grouped by supercategory (txn labels from taxonomy)
+  const ALL_CAT_GROUPS = useMemo(
+    () =>
+      superCategories
+        .filter((sc) => sc.txnCategories.length > 0)
+        .map((sc) => ({ sc, cats: sc.txnCategories })),
+    [superCategories],
+  );
 
   function titleCase(s: string) {
     return s.replace(/(?:^|\s|-)\S/g, (c) => c.toUpperCase());

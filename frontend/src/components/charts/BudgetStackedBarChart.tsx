@@ -19,7 +19,8 @@
  */
 import { useMemo, useState } from "react";
 import ReactECharts from "echarts-for-react";
-import { SUPER_CATEGORIES, resolveSuperCategory } from "@/lib/categories";
+import type { SuperCategory } from "@/lib/categories";
+import { resolveSuperCategoryFromList, useTaxonomySuperCategories } from "@/lib/categories";
 import { formatCHF } from "@/lib/theme";
 
 // ── Types ────────────────────────────────────────────────────────
@@ -78,10 +79,6 @@ const CHART_SC_ORDER = [
   "freizeit", "versicherungen", "essen", "shopping", "mobilitaet",
 ];
 
-const CHART_SC = CHART_SC_ORDER
-  .map((id) => SUPER_CATEGORIES.find((sc) => sc.id === id))
-  .filter((sc): sc is (typeof SUPER_CATEGORIES)[number] => sc !== undefined);
-
 // ── Month helpers ─────────────────────────────────────────────────
 
 const MONTH_NAMES_SHORT = ["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
@@ -100,7 +97,10 @@ function cutoffMonth(n: number): string {
 
 // ── 1. Aggregate real transactions ───────────────────────────────
 
-function aggregateHistoricalFull(items: HistoricalCategoryItem[]): {
+function aggregateHistoricalFull(
+  items: HistoricalCategoryItem[],
+  resolveTxn: (cat: string) => SuperCategory,
+): {
   byMonth: Record<string, Record<string, number>>;
   subsByMonth: SubCatDetail;
 } {
@@ -109,7 +109,7 @@ function aggregateHistoricalFull(items: HistoricalCategoryItem[]): {
 
   for (const item of items) {
     if (!item.category) continue;
-    const sc = resolveSuperCategory(item.category);
+    const sc = resolveTxn(item.category);
     if (sc.id === "sparen" || sc.id === "sonstiges") continue;
 
     if (!byMonth[item.month]) byMonth[item.month] = {};
@@ -139,7 +139,8 @@ function aggregateHistoricalFull(items: HistoricalCategoryItem[]): {
  */
 function computeRecurringPatterns(
   items: HistoricalCategoryItem[],
-  lookbackMonths = 12,
+  lookbackMonths: number,
+  resolveTxn: (cat: string) => SuperCategory,
 ): {
   monthlyAvg: Record<string, number>;
   seasonal: Record<string, Record<number, number>>;
@@ -150,7 +151,7 @@ function computeRecurringPatterns(
   const byMonthSc: Record<string, Record<string, number>> = {};
   for (const item of items) {
     if (!item.category || item.month < cutoff) continue;
-    const sc = resolveSuperCategory(item.category);
+    const sc = resolveTxn(item.category);
     if (sc.id === "sparen" || sc.id === "sonstiges") continue;
     if (!byMonthSc[item.month]) byMonthSc[item.month] = {};
     byMonthSc[item.month][sc.id] = (byMonthSc[item.month][sc.id] ?? 0) + item.amount;
@@ -216,7 +217,10 @@ function projectRecurring(
 
 // ── 3. AI forecast aggregation (with cap) ────────────────────────
 
-function aggregateForecastFull(months: ForecastMonthBreakdown[]): {
+function aggregateForecastFull(
+  months: ForecastMonthBreakdown[],
+  resolveTxn: (cat: string) => SuperCategory,
+): {
   byMonth: Record<string, Record<string, number>>;
   subsByMonth: SubCatDetail;
 } {
@@ -226,7 +230,7 @@ function aggregateForecastFull(months: ForecastMonthBreakdown[]): {
   for (const f of months) {
     for (const [cat, v] of Object.entries(f.category_breakdown)) {
       if (v.predicted >= 0) continue; // skip income / savings
-      const sc = resolveSuperCategory(cat);
+      const sc = resolveTxn(cat);
       if (sc.id === "sparen" || sc.id === "sonstiges") continue;
       const abs = Math.abs(v.predicted);
 
@@ -322,13 +326,14 @@ function buildOption(
   months: string[],
   byMonth: Record<string, Record<string, number>>,
   subsByMonth: SubCatDetail,
+  chartSc: SuperCategory[],
   firstForecastIdx = -1,
 ) {
   const axisColor = "#64748b";
   const gridColor = "#1e293b";
   const labelColor = "#94a3b8";
 
-  const series = CHART_SC.map((sc, si) => {
+  const series = chartSc.map((sc, si) => {
     const s: Record<string, unknown> = {
       name: sc.label,
       type: "bar",
@@ -402,7 +407,7 @@ function buildOption(
             <span style="color:#64748b;font-size:11px;min-width:38px;text-align:right">${pct}%</span>
           </div>`;
 
-          const scId = CHART_SC.find((sc) => sc.label === p.seriesName)?.id ?? "";
+          const scId = chartSc.find((sc) => sc.label === p.seriesName)?.id ?? "";
           const subEntries = Object.entries(monthSubs[scId] ?? {})
             .sort((a, b) => b[1] - a[1])
             .filter(([, amt]) => amt > 0);
@@ -429,7 +434,7 @@ function buildOption(
     legend: {
       bottom: 0,
       textStyle: { color: labelColor, fontSize: 11 },
-      data: [...CHART_SC].reverse().map((sc) => sc.label),
+      data: [...chartSc].reverse().map((sc) => sc.label),
     },
     grid: { top: 12, left: 16, right: 16, bottom: 72, containLabel: true },
     xAxis: {
@@ -465,11 +470,23 @@ export default function BudgetStackedBarChart({
   height = 320,
 }: Props) {
   const [mode, setMode] = useState<"historical" | "forecast">("historical");
+  const superCategories = useTaxonomySuperCategories();
+  const chartSc = useMemo(
+    () =>
+      CHART_SC_ORDER.map((id) => superCategories.find((sc) => sc.id === id)).filter(
+        (sc): sc is SuperCategory => sc !== undefined,
+      ),
+    [superCategories],
+  );
+  const resolveTxn = useMemo(
+    () => (cat: string) => resolveSuperCategoryFromList(superCategories, cat, false),
+    [superCategories],
+  );
 
   // ── Historical: real transactions ──────────────────────────────
   const { byMonth: historicalByMonth, subsByMonth: historicalSubs } = useMemo(
-    () => aggregateHistoricalFull(historicalData),
-    [historicalData],
+    () => aggregateHistoricalFull(historicalData, resolveTxn),
+    [historicalData, resolveTxn],
   );
 
   const historicalMonths = useMemo(() => {
@@ -479,8 +496,8 @@ export default function BudgetStackedBarChart({
 
   // ── Recurring patterns from last 12 months ────────────────────
   const recurringPatterns = useMemo(
-    () => computeRecurringPatterns(historicalData, 12),
-    [historicalData],
+    () => computeRecurringPatterns(historicalData, 12, resolveTxn),
+    [historicalData, resolveTxn],
   );
 
   // ── Forecast months axis ──────────────────────────────────────
@@ -497,8 +514,8 @@ export default function BudgetStackedBarChart({
 
   // ── AI forecast (capped) — last resort fallback ───────────────
   const { byMonth: aiForecastByMonthRaw, subsByMonth: aiForecastSubs } = useMemo(
-    () => aggregateForecastFull(forecastData),
-    [forecastData],
+    () => aggregateForecastFull(forecastData, resolveTxn),
+    [forecastData, resolveTxn],
   );
 
   const aiForecastByMonth = useMemo(
@@ -559,8 +576,9 @@ export default function BudgetStackedBarChart({
   const activeFirstForecastIdx = mode === "historical" ? histFirstForecastIdx : -1;
 
   const option = useMemo(
-    () => buildOption(activeMonths, activeByMonth, activeSubs, activeFirstForecastIdx),
-    [activeMonths, activeByMonth, activeSubs, activeFirstForecastIdx],
+    () =>
+      buildOption(activeMonths, activeByMonth, activeSubs, chartSc, activeFirstForecastIdx),
+    [activeMonths, activeByMonth, activeSubs, chartSc, activeFirstForecastIdx],
   );
 
   // Status label under the chart title

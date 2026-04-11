@@ -18,10 +18,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatCHF } from "@/lib/theme";
-import {
-  SUPER_CATEGORIES,
-  resolveSuperCategory,
-} from "@/lib/categories";
+import { useTaxonomy } from "@/lib/categories";
 
 // ── Types mirroring backend responses ─────────────────────────
 
@@ -105,6 +102,7 @@ const ASSET_COLOR: Record<string, string> = {
 // ── Component ──────────────────────────────────────────────────
 
 export default function Finanzplan() {
+  const { resolveSuperCategory } = useTaxonomy();
   const { data: budgets = [], isLoading: budgetsLoading, error: budgetsError } = useQuery<BudgetItem[]>({
     queryKey: ["finanzplan-budgets"],
     queryFn: () => api.get("/budgets").then((r) => r.data),
@@ -146,7 +144,7 @@ export default function Finanzplan() {
       g.items.push(b);
     }
     return [...map.values()].sort((a, b) => b.total - a.total);
-  }, [wizardBudgets]);
+  }, [wizardBudgets, resolveSuperCategory]);
 
   // ── Pension totals ──────────────────────────────────────────
   const pensionByPillar = useMemo(() => {

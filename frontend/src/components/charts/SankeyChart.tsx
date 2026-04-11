@@ -15,7 +15,7 @@
 import ReactECharts from "echarts-for-react";
 import { useMemo } from "react";
 import { colors } from "@/lib/theme";
-import { getCategoryColor } from "@/lib/categories";
+import { useTaxonomy } from "@/lib/categories";
 
 // ── Public types (unchanged for caller compatibility) ──────────
 export interface SankeyNode {
@@ -55,13 +55,6 @@ const FALLBACK_COLORS = [
   "#22d3ee", "#34d399", "#94a3b8",
 ];
 
-function flowColor(link: SankeyLink, idx: number): string {
-  if (link.color) return link.color;
-  const c = getCategoryColor(link.target);
-  if (c && c !== "#94a3b8") return c;
-  return FALLBACK_COLORS[idx % FALLBACK_COLORS.length];
-}
-
 function fmt(v: number): string {
   if (v >= 1_000_000) return `CHF ${(v / 1_000_000).toFixed(2)} Mio.`;
   if (v >= 1_000)     return `CHF ${(v / 1_000).toFixed(1)}k`;
@@ -77,16 +70,26 @@ function displayName(raw: string): string {
 
 // ── Component ──────────────────────────────────────────────────
 export default function SankeyChart({ data, height = 340 }: SankeyChartProps) {
+  const { getCategoryColor } = useTaxonomy();
   const option = useMemo(() => {
+    function flowColor(link: SankeyLink, idx: number): string {
+      if (link.color) return link.color;
+      const c = getCategoryColor(link.target);
+      if (c && c !== "#94a3b8") return c;
+      return FALLBACK_COLORS[idx % FALLBACK_COLORS.length];
+    }
+
     // Filter + sort: only direct links from income node, positive values
     const direct = data.links.filter(
       (l) => (l.source === "Einnahmen" || l.source === "Verfügbar") && l.value > 0,
     );
     if (!direct.length) return null;
 
+    // «Sparen» = Rest-Cashflow ohne Unterknoten: unten platzieren, damit Bänder sich nicht
+    // mit den mittleren Super-Kategorien (z. B. Steuern) überkreuzen.
     const flows = [...direct].sort((a, b) => {
-      if (a.target === "Sparen") return -1;
-      if (b.target === "Sparen") return 1;
+      if (a.target === "Sparen") return 1;
+      if (b.target === "Sparen") return -1;
       return b.value - a.value;
     });
 
@@ -146,7 +149,14 @@ export default function SankeyChart({ data, height = 340 }: SankeyChartProps) {
 
       // Sub-item nodes + links (3-level only)
       if (hasSubItems) {
-        (f.subItems ?? []).forEach((sub) => {
+        const positive = (f.subItems ?? []).filter((s) => s.value > 0);
+        // Wenn andere Flüsse Unterknoten haben, muss jeder Mittelknoten mindestens einen rechten
+        // Abfluss haben — sonst wirkt z. B. «Sparen» wie Endknoten ohne Auflösung.
+        const list =
+          positive.length > 0 ? positive : [{ label: "Gesamtbetrag", value: f.value, source: f.subItems?.[0]?.source }];
+        list.forEach((sub) => {
+          const v = sub.value > 0 ? sub.value : f.value;
+          if (v <= 0) return;
           // Unique name: "Wohnen\x00Miete"  — label formatter strips the prefix
           const key = `${f.target}${SEP}${sub.label}`;
           addNode(key, c, {
@@ -158,7 +168,7 @@ export default function SankeyChart({ data, height = 340 }: SankeyChartProps) {
           eLinks.push({
             source: f.target,
             target: key,
-            value: sub.value,
+            value: v,
             lineStyle: { opacity: 0.40 },
           });
         });
@@ -229,9 +239,9 @@ export default function SankeyChart({ data, height = 340 }: SankeyChartProps) {
           links: eLinks,
           orient: "horizontal",
           nodeWidth: 10,
-          nodeGap: 10,
-          // 0 = preserve insertion order (Sparen first) instead of crossing-minimisation
-          layoutIterations: 0,
+          nodeGap: 14,
+          // Wenige Iterationen reduzieren Überkreuzungen; Reihenfolge bleibt über Sort oben stabil.
+          layoutIterations: 6,
           draggable: false,
           emphasis: {
             focus: "adjacency",
@@ -259,7 +269,7 @@ export default function SankeyChart({ data, height = 340 }: SankeyChartProps) {
         },
       ],
     };
-  }, [data]);
+  }, [data, getCategoryColor]);
 
   if (!option) {
     return (

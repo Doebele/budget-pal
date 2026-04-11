@@ -1,15 +1,10 @@
 /**
- * Canonical super-category taxonomy for budget-pal.
+ * Supercategory taxonomy — Daten aus `shared/taxonomy.json`, nach Login angereichert per
+ * GET /api/taxonomy (merge eigener Category-Zeilen: icon = Super-ID bzw. wl:Super-ID).
  *
- * This is the single source of truth for:
- *   • Category colours  (used in Sankey, Budget bars, transaction badges)
- *   • Grouping logic    (transaction categories → supercategory)
- *   • Wizard label mapping (wizard notes → supercategory)
- *   • Monochrome icons  (used in all UI components instead of emojis)
- *
- * txnCategories  = canonical German names shown in the UI and stored in the DB
- * legacyAliases  = old/English names kept for backwards-compat matching only
- *                  (hidden from UI; migrated to German on server startup)
+ * Verwendung:
+ *   • `useTaxonomy()` in React-Komponenten (Farben, resolve*, groupBySuper, …)
+ *   • `useTaxonomySuperCategories()` wenn nur die Liste nötig ist
  */
 import type { LucideIcon } from "lucide-react";
 import {
@@ -25,233 +20,209 @@ import {
   PiggyBank,
   Layers,
 } from "lucide-react";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/lib/auth";
+import { taxonomyApi } from "@/lib/api";
+
+import taxonomyJson from "../../../shared/taxonomy.json";
+
+// ── Lucide icons by supercategory id (not in JSON) ─────────────
+
+const SUPER_ICONS: Record<string, LucideIcon> = {
+  wohnen: Home,
+  essen: ShoppingCart,
+  mobilitaet: Train,
+  versicherungen: ShieldCheck,
+  freizeit: Clapperboard,
+  abos: Smartphone,
+  shopping: ShoppingBag,
+  bildung: GraduationCap,
+  steuern: Landmark,
+  sparen: PiggyBank,
+  sonstiges: Layers,
+};
 
 export interface SuperCategory {
   id: string;
-  label: string;         // German display label
-  icon: LucideIcon;      // monochrome lucide icon
-  emoji: string;         // kept for plain-text contexts (tooltips, <option>)
-  color: string;         // hex – identical in Sankey + Budget + badges
-  /** Canonical German transaction category names stored in the DB */
+  label: string;
+  icon: LucideIcon;
+  emoji: string;
+  color: string;
   txnCategories: string[];
-  /** Old / English aliases kept for backwards-compat matching only */
   legacyAliases?: string[];
-  /** Lowercase wizard budget `notes` values that belong here */
   wizardLabels: string[];
 }
 
-export const SUPER_CATEGORIES: SuperCategory[] = [
-  {
-    id: "wohnen",
-    label: "Wohnen",
-    icon: Home,
-    emoji: "🏠",
-    color: "#f0b429",
-    txnCategories: ["Wohnen", "Nebenkosten"],
-    legacyAliases: ["housing", "utilities"],
-    wizardLabels: ["miete", "hypothek", "hypothek & amortisation", "nebenkosten", "parkplatz"],
-  },
-  {
-    id: "essen",
-    label: "Essen & Trinken",
-    icon: ShoppingCart,
-    emoji: "🛒",
-    color: "#84cc16",
-    txnCategories: ["Lebensmittel", "Restaurant & Takeaway"],
-    legacyAliases: ["groceries", "food & drink"],
-    wizardLabels: ["lebensmittel", "freizeit & restaurant"],
-  },
-  {
-    id: "mobilitaet",
-    label: "Mobilität",
-    icon: Train,
-    emoji: "🚆",
-    color: "#38bdf8",
-    txnCategories: ["Transport", "Reisen", "ÖV-Kosten"],
-    legacyAliases: [
-      "travel",
-      "öv-abonnements", "ov-abonnements", "öv abonnements",
-    ],
-    wizardLabels: [
-      "benzin / strom (auto)", "auto-amortisation",
-      "sbb halbtax", "sbb ga 2. klasse", "transport",
-    ],
-  },
-  {
-    id: "versicherungen",
-    label: "Versicherungen & Gesundheit",
-    icon: ShieldCheck,
-    emoji: "🛡️",
-    color: "#a78bfa",
-    txnCategories: [
-      "Versicherungen", "Gesundheit", "Krankenkasse",
-      "Weitere Versicherungen", "Fitness",
-    ],
-    legacyAliases: ["insurance", "health"],
-    wizardLabels: [
-      "krankenkasse", "zusatzversicherung",
-      "hausrat & haftpflicht", "autoversicherung",
-    ],
-  },
-  {
-    id: "freizeit",
-    label: "Freizeit & Unterhaltung",
-    icon: Clapperboard,
-    emoji: "🎬",
-    color: "#fb923c",
-    txnCategories: ["Freizeit & Unterhaltung"],
-    legacyAliases: ["entertainment", "unterhaltung"],
-    wizardLabels: ["freizeit & unterhaltung", "sport & fitness", "kultur & events"],
-  },
-  {
-    id: "abos",
-    label: "Abonnements & Kommunikation",
-    icon: Smartphone,
-    emoji: "📱",
-    color: "#22d3ee",
-    txnCategories: [
-      "Abonnements", "Kommunikation", "Streaming",
-      "Musik & Medien", "Internet (Festnetz)", "Mobilfunk",
-      "Cloud & Backup", "Software & Apps", "Nachrichten & Medien",
-      "Treue & Mitgliedschaften", "Bildung & Weiterbildung",
-      "Beruflich", "Shopping & Lieferdienste",
-    ],
-    legacyAliases: [
-      // lowercase variants in old data
-      "abonnements", "kommunikation", "streaming",
-      "musik & medien", "internet (festnetz)", "mobilfunk",
-      "cloud & backup", "software & apps", "nachrichten & medien",
-      "treue & mitgliedschaften", "bildung & weiterbildung",
-      "beruflich", "shopping & lieferdienste",
-    ],
-    wizardLabels: [
-      "abonnements",
-      "serafe",
-      "netflix", "spotify", "disney+", "nzz digital", "blick+",
-      "srf play (optional)", "icloud 200gb", "google one", "microsoft 365",
-      "migros cumulus extra", "adsl/fiber (swisscom)", "mobile abo (sunrise)",
-      "fitnesscenter", "adobe creative cloud", "linkedin premium",
-      "dropbox plus", "amazon prime", "youtube premium",
-    ],
-  },
-  {
-    id: "shopping",
-    label: "Shopping & Kleidung",
-    icon: ShoppingBag,
-    emoji: "👔",
-    color: "#ec4899",
-    txnCategories: ["Shopping", "Kleidung"],
-    wizardLabels: ["kleidung", "shopping & kleidung", "bekleidung & schuhe"],
-  },
-  {
-    id: "bildung",
-    label: "Bildung",
-    icon: GraduationCap,
-    emoji: "📚",
-    color: "#6366f1",
-    txnCategories: ["Bildung"],
-    legacyAliases: ["education"],
-    wizardLabels: ["weiterbildung & kurse", "bücher & medien", "bildung & weiterbildung"],
-  },
-  {
-    id: "steuern",
-    label: "Steuern & Abgaben",
-    icon: Landmark,
-    emoji: "🏛️",
-    color: "#f43f5e",
-    txnCategories: ["Steuern", "Abgaben", "Finanzen", "Gebühren", "Dienstleistungen"],
-    legacyAliases: ["finance", "taxes", "services", "fees"],
-    wizardLabels: [
-      "direkte steuern",
-      "gebühren",
-      "kirchensteuern",
-    ],
-  },
-  {
-    id: "sparen",
-    label: "Sparen",
-    icon: PiggyBank,
-    emoji: "💰",
-    color: "#10b981",
-    txnCategories: ["Gehalt", "Investitionen", "Einzahlungen", "Kontoübertrag", "Säule 3A"],
-    legacyAliases: ["salary", "investment"],
-    wizardLabels: ["säule 3a"],
-  },
-  {
-    id: "sonstiges",
-    label: "Sonstiges",
-    icon: Layers,
-    emoji: "💸",
-    color: "#94a3b8",
-    txnCategories: [],   // catch-all – everything not matched above
-    wizardLabels: [],
-  },
-];
-
-// ── Lookup helpers ─────────────────────────────────────────────
-
-/** Find supercategory by its label (e.g. "Wohnen") */
-export function getSuperCategoryByLabel(label: string): SuperCategory | undefined {
-  const lower = label.toLowerCase();
-  return SUPER_CATEGORIES.find((sc) => sc.label.toLowerCase() === lower);
+interface TaxonomyJsonRow {
+  id: string;
+  label: string;
+  emoji: string;
+  color: string;
+  txnCategories: string[];
+  wizardLabels: string[];
+  legacyAliases?: string[];
 }
 
-/** Find supercategory for a transaction category name (checks canonical + legacy aliases) */
-export function getSuperCategory(txnCategory: string): SuperCategory | undefined {
+export function buildSuperCategoriesFromRows(rows: TaxonomyJsonRow[]): SuperCategory[] {
+  return rows.map((row) => ({
+    id: row.id,
+    label: row.label,
+    icon: SUPER_ICONS[row.id] ?? Layers,
+    emoji: row.emoji,
+    color: row.color,
+    txnCategories: [...row.txnCategories],
+    wizardLabels: [...row.wizardLabels],
+    legacyAliases: row.legacyAliases ? [...row.legacyAliases] : undefined,
+  }));
+}
+
+/** Bundled snapshot (vor Login / Fallback) — entspricht shared/taxonomy.json */
+export const BUNDLED_SUPER_CATEGORIES: SuperCategory[] = buildSuperCategoriesFromRows(
+  taxonomyJson.superCategories as TaxonomyJsonRow[],
+);
+
+async function fetchTaxonomySuperCategories(): Promise<SuperCategory[]> {
+  const { data } = await taxonomyApi.snapshot();
+  const rows = data.superCategories as TaxonomyJsonRow[];
+  return buildSuperCategoriesFromRows(rows);
+}
+
+/** React Query: eine Anfrage, alle Subscriber aktualisieren sich. */
+export function useTaxonomySuperCategories(): SuperCategory[] {
+  const { isAuthenticated } = useAuth();
+  const { data } = useQuery({
+    queryKey: ["taxonomy"],
+    queryFn: fetchTaxonomySuperCategories,
+    enabled: isAuthenticated,
+    placeholderData: BUNDLED_SUPER_CATEGORIES,
+    staleTime: 60_000,
+  });
+  return data ?? BUNDLED_SUPER_CATEGORIES;
+}
+
+export function useTaxonomy() {
+  const list = useTaxonomySuperCategories();
+  return useMemo(
+    () => ({
+      superCategories: list,
+      resolveSuperCategory: (name: string, isWizard = false) =>
+        resolveSuperCategoryFromList(list, name, isWizard),
+      resolveSuperCategoryForRow: (cat: { name: string; icon?: string | null }) =>
+        resolveSuperCategoryForRowFromList(list, cat),
+      superCategoryGroupLabel: (cat: { name: string; icon?: string | null }) =>
+        resolveSuperCategoryForRowFromList(list, cat).label,
+      getCategoryColor: (name: string) => resolveSuperCategoryFromList(list, name, false).color,
+      groupBySuper: (items: Array<{ category: string; total: number }>, isWizard = false) =>
+        groupBySuperFromList(list, items, isWizard),
+      categoryIsIncomeOriented: (cat: { name: string; icon?: string | null }) =>
+        categoryIsIncomeOrientedFromList(list, cat),
+      categoryIsExpenseOriented: (cat: { name: string; icon?: string | null }) =>
+        categoryIsExpenseOrientedFromList(list, cat),
+    }),
+    [list],
+  );
+}
+
+// ── Pure lookups (list = useTaxonomySuperCategories() oder BUNDLED) ──
+
+export function getSuperCategoryByLabel(list: SuperCategory[], label: string): SuperCategory | undefined {
+  const lower = label.toLowerCase();
+  return list.find((sc) => sc.label.toLowerCase() === lower);
+}
+
+export function getSuperCategoryFromList(list: SuperCategory[], txnCategory: string): SuperCategory | undefined {
   const lower = txnCategory.toLowerCase();
-  return SUPER_CATEGORIES.find(
+  return list.find(
     (sc) =>
       sc.txnCategories.some((t) => t.toLowerCase() === lower) ||
       (sc.legacyAliases ?? []).some((a) => a.toLowerCase() === lower),
   );
 }
 
-/** Find supercategory for a wizard budget label (notes field) */
-export function getSuperCategoryByWizardLabel(label: string): SuperCategory | undefined {
+export function getSuperCategoryByWizardLabelFromList(
+  list: SuperCategory[],
+  label: string,
+): SuperCategory | undefined {
   const lower = label.toLowerCase();
-  return SUPER_CATEGORIES.find((sc) => sc.wizardLabels.includes(lower));
+  return list.find((sc) => sc.wizardLabels.includes(lower));
 }
 
-/**
- * Resolve the best supercategory for any name, trying multiple lookup
- * strategies. Returns the "Sonstiges" catch-all if nothing matches.
- */
-export function resolveSuperCategory(name: string, isWizard = false): SuperCategory {
+export function resolveSuperCategoryFromList(
+  list: SuperCategory[],
+  name: string,
+  isWizard = false,
+): SuperCategory {
   const lower = name.toLowerCase();
 
-  // 1. Exact label match ("Wohnen", "Mobilität", …)
-  const byLabel = SUPER_CATEGORIES.find((sc) => sc.label.toLowerCase() === lower);
+  const byLabel = list.find((sc) => sc.label.toLowerCase() === lower);
   if (byLabel) return byLabel;
 
-  // 2. Supercategory ID match ("wohnen", "sparen", …)
-  const byId = SUPER_CATEGORIES.find((sc) => sc.id === lower);
+  const byId = list.find((sc) => sc.id === lower);
   if (byId) return byId;
 
   if (isWizard) {
-    const byWizard = getSuperCategoryByWizardLabel(name);
+    const byWizard = getSuperCategoryByWizardLabelFromList(list, name);
     if (byWizard) return byWizard;
-    const byTxn = getSuperCategory(name);
+    const byTxn = getSuperCategoryFromList(list, name);
     if (byTxn) return byTxn;
   } else {
-    const byTxn = getSuperCategory(name);
+    const byTxn = getSuperCategoryFromList(list, name);
     if (byTxn) return byTxn;
-    const byWizard = getSuperCategoryByWizardLabel(name);
+    const byWizard = getSuperCategoryByWizardLabelFromList(list, name);
     if (byWizard) return byWizard;
   }
 
-  // Catch-all
-  return SUPER_CATEGORIES[SUPER_CATEGORIES.length - 1];
+  return list[list.length - 1];
 }
 
-/**
- * Returns the canonical hex colour for any category name (txn or wizard).
- * Falls back to slate (#94a3b8) for unknowns.
- */
-export function getCategoryColor(name: string): string {
-  return resolveSuperCategory(name).color;
+export function resolveSuperCategoryForRowFromList(
+  list: SuperCategory[],
+  cat: { name: string; icon?: string | null },
+  isWizard = false,
+): SuperCategory {
+  const rawIcon = (cat.icon ?? "").trim();
+  const lowIcon = rawIcon.toLowerCase();
+  if (lowIcon.startsWith("wl:")) {
+    const scId = lowIcon.slice(3);
+    const sc = list.find((s) => s.id === scId);
+    if (sc) return sc;
+  }
+  if (rawIcon) {
+    const byIconId = list.find((s) => s.id === lowIcon);
+    if (byIconId) return byIconId;
+  }
+  return resolveSuperCategoryFromList(list, cat.name, isWizard);
 }
 
-// ── Aggregation helper ─────────────────────────────────────────
+export function superCategoryGroupLabelFromList(
+  cat: { name: string; icon?: string | null },
+  list: SuperCategory[],
+): string {
+  return resolveSuperCategoryForRowFromList(list, cat).label;
+}
+
+export function categoryIsIncomeOrientedFromList(
+  list: SuperCategory[],
+  cat: { name: string; icon?: string | null },
+): boolean {
+  const raw = (cat.icon ?? "").trim();
+  const low = raw.toLowerCase();
+  if (low === "sparen") return true;
+  if (low.startsWith("wl:") && low.slice(3) === "sparen") return true;
+  return resolveSuperCategoryFromList(list, cat.name, false).id === "sparen";
+}
+
+export function categoryIsExpenseOrientedFromList(
+  list: SuperCategory[],
+  cat: { name: string; icon?: string | null },
+): boolean {
+  return !categoryIsIncomeOrientedFromList(list, cat);
+}
+
+export function getCategoryColorFromList(list: SuperCategory[], name: string): string {
+  return resolveSuperCategoryFromList(list, name, false).color;
+}
 
 export interface SuperCategoryAggregate {
   superCategory: SuperCategory;
@@ -259,11 +230,8 @@ export interface SuperCategoryAggregate {
   subItems: Array<{ label: string; value: number }>;
 }
 
-/**
- * Groups a flat list of { category, total } entries into supercategories.
- * Preserves order by total descending within each group.
- */
-export function groupBySuper(
+export function groupBySuperFromList(
+  list: SuperCategory[],
   items: Array<{ category: string; total: number }>,
   isWizard = false,
 ): SuperCategoryAggregate[] {
@@ -271,8 +239,7 @@ export function groupBySuper(
 
   for (const item of items) {
     if (item.total <= 0) continue;
-    const sc = resolveSuperCategory(item.category, isWizard);
-    // Skip income-side / transfer categories from expense grouping
+    const sc = resolveSuperCategoryFromList(list, item.category, isWizard);
     if (sc.id === "sparen") continue;
 
     if (!map.has(sc.id)) {
@@ -284,4 +251,48 @@ export function groupBySuper(
   }
 
   return [...map.values()].sort((a, b) => b.total - a.total);
+}
+
+/** @deprecated Nutze useTaxonomySuperCategories() */
+export const SUPER_CATEGORIES = BUNDLED_SUPER_CATEGORIES;
+
+/** @deprecated Nutze useTaxonomy().resolveSuperCategory */
+export function resolveSuperCategory(name: string, isWizard = false): SuperCategory {
+  return resolveSuperCategoryFromList(BUNDLED_SUPER_CATEGORIES, name, isWizard);
+}
+
+/** @deprecated Nutze useTaxonomy().resolveSuperCategoryForRow */
+export function resolveSuperCategoryForRow(
+  cat: { name: string; icon?: string | null },
+  isWizard = false,
+): SuperCategory {
+  return resolveSuperCategoryForRowFromList(BUNDLED_SUPER_CATEGORIES, cat, isWizard);
+}
+
+/** @deprecated Nutze useTaxonomy().superCategoryGroupLabel */
+export function superCategoryGroupLabel(cat: { name: string; icon?: string | null }): string {
+  return resolveSuperCategoryForRowFromList(BUNDLED_SUPER_CATEGORIES, cat).label;
+}
+
+/** @deprecated Nutze useTaxonomy().categoryIsIncomeOriented */
+export function categoryIsIncomeOriented(cat: { name: string; icon?: string | null }): boolean {
+  return categoryIsIncomeOrientedFromList(BUNDLED_SUPER_CATEGORIES, cat);
+}
+
+/** @deprecated Nutze useTaxonomy().categoryIsExpenseOriented */
+export function categoryIsExpenseOriented(cat: { name: string; icon?: string | null }): boolean {
+  return categoryIsExpenseOrientedFromList(BUNDLED_SUPER_CATEGORIES, cat);
+}
+
+/** @deprecated Nutze useTaxonomy().getCategoryColor */
+export function getCategoryColor(name: string): string {
+  return getCategoryColorFromList(BUNDLED_SUPER_CATEGORIES, name);
+}
+
+/** @deprecated Nutze useTaxonomy().groupBySuper */
+export function groupBySuper(
+  items: Array<{ category: string; total: number }>,
+  isWizard = false,
+): SuperCategoryAggregate[] {
+  return groupBySuperFromList(BUNDLED_SUPER_CATEGORIES, items, isWizard);
 }
