@@ -32,8 +32,8 @@ services:
 
   budget-pal-backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: budget-pal-backend
     restart: unless-stopped
     networks:

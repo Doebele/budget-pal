@@ -20,7 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python deps into /build/wheels
-COPY requirements.txt .
+COPY backend/requirements.txt .
 RUN pip install --upgrade pip && \
     pip wheel --no-cache-dir --wheel-dir /build/wheels -r requirements.txt
 
@@ -57,13 +57,15 @@ RUN pip install --upgrade pip && \
 
 # Create non-root user for security
 RUN useradd -m -u 1000 appuser && \
-    mkdir -p /app/data/uploads /app/data/ocr_cache && \
-    chown -R appuser:appuser /app
+    mkdir -p /app/data/uploads /app/data/ocr_cache /shared && \
+    chown -R appuser:appuser /app /shared
 
 # Copy application code
-COPY --chown=appuser:appuser app/ ./app/
-COPY --chown=appuser:appuser alembic/ ./alembic/
-COPY --chown=appuser:appuser alembic.ini ./alembic.ini
+COPY --chown=appuser:appuser backend/app/ ./app/
+COPY --chown=appuser:appuser backend/alembic/ ./alembic/
+COPY --chown=appuser:appuser backend/alembic.ini ./alembic.ini
+# Shared taxonomy (must be at /shared/taxonomy.json — resolved by core/taxonomy.py)
+COPY --chown=appuser:appuser shared/taxonomy.json /shared/taxonomy.json
 
 USER appuser
 
