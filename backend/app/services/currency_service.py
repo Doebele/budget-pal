@@ -153,9 +153,9 @@ class CurrencyService:
             "Accept": "application/json",
         }
 
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
             response = await client.get(API_URL, headers=headers)
-            
+
             if response.status_code != 200:
                 raise httpx.HTTPError(
                     f"HTTP {response.status_code}: {response.reason_phrase}"
@@ -182,13 +182,12 @@ class CurrencyService:
             return rates
 
     async def _persist_rates(self, rates: Dict[str, float]) -> None:
-        """Persist rates to JSON cache file."""
+        """Persist rates to JSON cache file (best-effort, non-fatal)."""
         try:
             async with aiofiles.open(self.cache_file, "w", encoding="utf-8") as f:
                 await f.write(json.dumps(rates, indent=2, ensure_ascii=False))
         except Exception as e:
-            logger.error(f"[CurrencyService] Failed to persist rates: {e}")
-            raise
+            logger.warning(f"[CurrencyService] Could not persist rates (non-fatal): {e}")
 
     async def _load_cached_rates(self) -> Optional[Dict[str, float]]:
         """Load numeric rates from JSON cache file (metadata excluded)."""
@@ -279,8 +278,12 @@ class CurrencyService:
         rates = await self._load_cached_rates()
 
         if not rates:
-            # Initialize if empty
-            rates = await self.load_rates()
+            # Initialize if empty; fall back to hardcoded rates if service unavailable
+            try:
+                rates = await self.load_rates()
+            except Exception as e:
+                logger.warning(f"[CurrencyService] load_rates failed, using fallback: {e}")
+                rates = FALLBACK_RATES.copy()
 
         if base_currency == "EUR":
             return rates

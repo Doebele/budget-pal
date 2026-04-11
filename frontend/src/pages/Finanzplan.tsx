@@ -136,6 +136,7 @@ export default function Finanzplan() {
     const map = new Map<string, { color: string; label: string; icon: React.ElementType; total: number; items: BudgetItem[] }>();
     for (const b of wizardBudgets) {
       const sc = resolveSuperCategory(b.notes ?? "", true);
+      if (!sc) continue;
       if (!map.has(sc.id)) {
         map.set(sc.id, { color: sc.color, label: sc.label, icon: sc.icon, total: 0, items: [] });
       }

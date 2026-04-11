@@ -5,7 +5,7 @@ from the 8-step wizard in one transactional POST.
 POST /wizard/complete
   Accepts: WizardCompletePayload (all wizard form data)
   Creates:
-    - Savings account + budget entries from entered expenses
+    - Budget entries from entered expenses
     - Income budget entries
     - Pension entries (Pillar 1 / 2 / 3a)
     - Asset entries
@@ -28,8 +28,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.models import (
-    Account,
-    AccountType,
     Asset,
     AssetType,
     Budget,
@@ -434,7 +432,6 @@ async def wizard_complete(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> WizardSummary:
-    accounts_created = 0
     budgets_created = 0
     pension_entries_created = 0
     assets_created = 0
@@ -469,36 +466,7 @@ async def wizard_complete(
         current_user.date_of_birth = datetime(payload.geburtsjahr, 6, 1, tzinfo=timezone.utc)
     current_user.retirement_age = payload.ziel_rentenalter
 
-    # ── 2. Create checking account (Lohnkonto) ─────────────────
-    if payload.estimated_netto_monthly > 0:
-        checking = Account(
-            user_id=current_user.id,
-            name=f"{payload.vorname or 'Mein'} Lohnkonto",
-            bank="Hauptbank",
-            currency="CHF",
-            balance=payload.bank_balance if payload.bank_enabled else 0.0,
-            account_type=AccountType.checking,
-        )
-        db.add(checking)
-        accounts_created += 1
-
-    # ── 3. Create savings account if data entered ──────────────
-    if payload.bank_enabled and payload.bank_balance > 0:
-        savings = Account(
-            user_id=current_user.id,
-            name="Sparkonto",
-            bank="Hauptbank",
-            currency="CHF",
-            balance=payload.bank_balance,
-            account_type=AccountType.savings,
-        )
-        db.add(savings)
-        accounts_created += 1
-
-    # ── 4. Flush to ensure IDs are available ──────────────────
-    await db.flush()
-
-    # ── 5. Budget entries (monthly) ───────────────────────────
+    # ── 2. Budget entries (monthly) ───────────────────────────
     def add_budget(amount: float, notes: str) -> None:
         nonlocal budgets_created
         if amount <= 0:
@@ -569,7 +537,7 @@ async def wizard_complete(
     if payload.has_sbb_ga:
         add_budget(345.0, "SBB GA 2. Klasse")
 
-    # ── 6. Pension entries ────────────────────────────────────
+    # ── 3. Pension entries ────────────────────────────────────
 
     # Pillar 1 (AHV) — informational
     ahv = PensionData(
@@ -623,7 +591,7 @@ async def wizard_complete(
         db.add(p3a)
         pension_entries_created += 1
 
-    # ── 7. Asset entries ──────────────────────────────────────
+    # ── 4. Asset entries ──────────────────────────────────────
 
     if payload.stocks_enabled and payload.stocks_value > 0:
         db.add(Asset(
@@ -698,7 +666,7 @@ async def wizard_complete(
         ))
         assets_created += 1
 
-    # ── 8. Initial projection scenario ────────────────────────
+    # ── 5. Initial projection scenario ────────────────────────
 
     scenario_params = _build_scenario_params(payload)
     monthly_expenses = _compute_monthly_expenses(payload)
@@ -726,7 +694,7 @@ async def wizard_complete(
     db.add(scenario)
     scenarios_created += 1
 
-    # ── 8b. Persist peer-group defaults snapshot ──────────────────
+    # ── 5b. Persist peer-group defaults snapshot ──────────────────
     # If the frontend sent user-adjusted values, use those.
     # Otherwise compute from payload demographics so the /peer-config
     # endpoint always returns something useful after wizard completion.
@@ -789,13 +757,13 @@ async def wizard_complete(
             )
         )
 
-    # ── 9. Commit ─────────────────────────────────────────────
+    # ── 6. Commit ─────────────────────────────────────────────
     await db.commit()
 
     monthly_surplus = max(monthly_income - monthly_expenses, 0.0)
 
     return WizardSummary(
-        accounts_created=accounts_created,
+        accounts_created=0,
         budgets_created=budgets_created,
         pension_entries_created=pension_entries_created,
         assets_created=assets_created,
