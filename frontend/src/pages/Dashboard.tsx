@@ -498,8 +498,9 @@ function buildSankeyDataReal(
   }
 
   // Ausgaben-Segmente nach Taxonomie-Super (mittlere Spalte), max. 8; «Sparen» = Rest unten.
+  // «Sonstiges» (nicht klassifizierte Transaktionen) wird ausgeblendet.
   const expSegments = [...superMap.values()]
-    .filter((e) => e.total > 0)
+    .filter((e) => e.total > 0 && e.sc.id !== "sonstiges")
     .sort((a, b) => b.total - a.total)
     .slice(0, 8);
 
@@ -593,12 +594,22 @@ function buildSankeyDataEmpirical(
   }
 
   for (const agg of superMap.values()) {
-    agg.subs = mergeSubItemsForSuper(agg.subs, agg.sc);
-    agg.total = agg.subs.reduce((s, x) => s + x.value, 0);
+    // For wizard data, keep the raw wizard label as-is (no txnCategory mapping).
+    // Deduplicate by label. Suppress sub items whose name is identical to the
+    // parent supercategory label (would render as a meaningless duplicate node).
+    // The segment total is kept regardless so the middle node has correct width.
+    const rawTotal = agg.subs.reduce((s, x) => s + x.value, 0);
+    const byLabel = new Map<string, number>();
+    for (const sub of agg.subs) {
+      if (sub.label.toLowerCase() === agg.sc.label.toLowerCase()) continue;
+      byLabel.set(sub.label, (byLabel.get(sub.label) ?? 0) + sub.value);
+    }
+    agg.subs = [...byLabel.entries()].map(([label, value]) => ({ label, value }));
+    agg.total = rawTotal; // always keep original total for correct node width
   }
 
   const expSegments = [...superMap.values()]
-    .filter((e) => e.total > 0)
+    .filter((e) => e.total > 0 && e.sc.id !== "sonstiges") // hide unclassified entries
     .sort((a, b) => b.total - a.total);
 
   const totalExp = expSegments.reduce((s, e) => s + e.total, 0);

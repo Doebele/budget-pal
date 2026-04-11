@@ -8,7 +8,7 @@
       "color": "#f0b429",
       "txnCategories": ["Wohnen", "Nebenkosten"],
       "legacyAliases": ["housing", "utilities"],
-      "wizardLabels": ["miete", "hypothek", "hypothek & amortisation", "nebenkosten", "parkplatz"]
+      "wizardLabels": ["miete", "miete & nebenkosten", "hypothek", "hypothek amortisation", "hypothek & amortisation", "nebenkosten", "parkplatz"]
     },
     {
       "id": "essen",
@@ -26,7 +26,7 @@
       "color": "#38bdf8",
       "txnCategories": ["Transport", "Reisen", "ÖV-Kosten", "Parkgebühren"],
       "legacyAliases": ["travel", "öv-abonnements", "ov-abonnements", "öv abonnements"],
-      "wizardLabels": ["benzin / strom (auto)", "auto-amortisation", "sbb halbtax", "sbb ga 2. klasse", "transport"]
+      "wizardLabels": ["benzin / strom (auto)", "benzin / strom", "auto-amortisation", "sbb halbtax", "sbb ga 2. klasse", "sbb ga", "transport"]
     },
     {
       "id": "versicherungen",

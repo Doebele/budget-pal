@@ -7,6 +7,7 @@ from sqlalchemy import select, or_, func, update, distinct
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.models import Category, Transaction, User
+from app.services.peer_group_seed import seed_peer_group_system_categories
 
 router = APIRouter()
 
@@ -60,6 +61,17 @@ async def list_categories(
         )
         for c, count in rows
     ]
+
+
+@router.post("/bootstrap-peer-system", status_code=status.HTTP_200_OK)
+async def bootstrap_peer_system_categories(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Idempotent: ensure peer-group system categories exist (incl. Einnahmen / Sparen)."""
+    inserted = await seed_peer_group_system_categories(db)
+    await db.commit()
+    return {"inserted": inserted}
 
 
 @router.post("", response_model=CategoryResponse, status_code=status.HTTP_201_CREATED)

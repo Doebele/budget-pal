@@ -210,7 +210,9 @@ export function categoryIsIncomeOrientedFromList(
   const low = raw.toLowerCase();
   if (low === "sparen") return true;
   if (low.startsWith("wl:") && low.slice(3) === "sparen") return true;
-  return resolveSuperCategoryFromList(list, cat.name, false).id === "sparen";
+  if (resolveSuperCategoryFromList(list, cat.name, false).id === "sparen") return true;
+  // Wizard-Labels (z. B. «Lohn (netto)») vor Txn priorisieren, falls beides zutrifft.
+  return resolveSuperCategoryFromList(list, cat.name, true).id === "sparen";
 }
 
 export function categoryIsExpenseOrientedFromList(

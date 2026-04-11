@@ -551,6 +551,20 @@ export default function Budgetplan() {
     queryFn: () => categoriesApi.list().then((r) => r.data as Category[]),
   });
 
+  const bootstrapPeerRef = useRef(false);
+  useEffect(() => {
+    if (bootstrapPeerRef.current) return;
+    bootstrapPeerRef.current = true;
+    categoriesApi
+      .bootstrapPeerSystem()
+      .then((r) => {
+        if ((r.data?.inserted ?? 0) > 0) {
+          qc.invalidateQueries({ queryKey: ["categories"] });
+        }
+      })
+      .catch(() => {});
+  }, [qc]);
+
   // Suggest query (only fires when prefill panel is open)
   const { data: suggestions = [], isLoading: suggestLoading } = useQuery({
     queryKey: ["recurring-plan-suggest", prefillSource, prefillSourceYear],
@@ -788,9 +802,12 @@ export default function Budgetplan() {
       if (c.parent_id != null) parentIds.add(c.parent_id);
     }
 
-    // Blätter der Kategorie-Hierarchie. Wizard-Zuordnungen (icon wl:…) bleiben wählbar,
-    // wenn es keine parallele Txn-Zeile gibt — sonst fehlen z. B. Mobilfunk/Abos im Planer.
-    const leaves = categories.filter((c) => !parentIds.has(c.id));
+    // Blätter + Eltern mit icon «sparen» (System-Einnahmen), damit nicht nur Unterkategorien
+    // erscheinen, wenn die DB Hierarchie mit Zwischenknoten modelliert ist.
+    const leaves = categories.filter(
+      (c) =>
+        !parentIds.has(c.id) || String(c.icon ?? "").trim().toLowerCase() === "sparen",
+    );
 
     type Bucket = { label: string; items: Category[] };
     const buckets = new Map<string, Bucket>();
