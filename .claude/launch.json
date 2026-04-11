@@ -19,7 +19,7 @@
     {
       "name": "Full Stack (Docker Compose)",
       "runtimeExecutable": "docker",
-      "runtimeArgs": ["compose", "-f", "/Users/clausmedvesek/projects/budget-pal/docker-compose.yml", "up"],
+      "runtimeArgs": ["compose", "-f", "/Users/clausmedvesek/Developer/projects/budget-pal/docker-compose.yml", "up"],
       "port": 8011,
       "autoPort": false
     }
