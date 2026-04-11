@@ -753,16 +753,29 @@ async def preview_pdf_import(
             parse_comdirect_pdf_words,
             parse_comdirect_pdf_text,
         )
+        from app.services.import_parsers.n26_pdf import (
+            is_n26_web_pdf,
+            parse_n26_web_pdf,
+        )
 
         with pdfplumber.open(tmp_path) as pdf:
             full_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
 
-            # Auto-detect comdirect vs UBS when bank not specified
-            _is_comdirect = (bank or "").lower() == "comdirect" or (
-                not bank and is_comdirect_pdf(full_text)
+            # Auto-detect bank format
+            _is_n26_web = (bank or "").lower() == "n26" or (
+                not bank and is_n26_web_pdf(full_text)
+            )
+            _is_comdirect = not _is_n26_web and (
+                (bank or "").lower() == "comdirect" or (
+                    not bank and is_comdirect_pdf(full_text)
+                )
             )
 
-            if _is_comdirect:
+            if _is_n26_web:
+                detected_bank = "n26"
+                raw_transactions = parse_n26_web_pdf(pdf)
+                logger.info("N26 web PDF: parser yielded %d rows.", len(raw_transactions))
+            elif _is_comdirect:
                 detected_bank = "comdirect"
                 # 1st choice: pdfplumber table extraction (precise column mapping)
                 raw_transactions = parse_comdirect_pdf_tables(pdf)
@@ -1154,26 +1167,48 @@ async def import_pdf(
     raw_transactions = []
     try:
         import pdfplumber
+        from app.services.import_parsers.comdirect_pdf import (
+            is_comdirect_pdf,
+            parse_comdirect_pdf_tables,
+            parse_comdirect_pdf_words,
+            parse_comdirect_pdf_text,
+        )
+        from app.services.import_parsers.n26_pdf import (
+            is_n26_web_pdf,
+            parse_n26_web_pdf,
+        )
 
         with pdfplumber.open(tmp_path) as pdf:
-            # 1st choice: structured table extraction (reads Betrag column directly,
-            # avoiding the Saldo-vs-Betrag confusion that plagued the old regex).
-            raw_transactions = _parse_ubs_pdf_tables(pdf)
+            full_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
 
-            if not raw_transactions:
-                # 2nd choice: text extraction + fixed two-date regex parser
-                full_text = "\n".join(
-                    page.extract_text() or "" for page in pdf.pages
+            _is_n26_web = (bank or "").lower() == "n26" or (
+                not bank and is_n26_web_pdf(full_text)
+            )
+            _is_comdirect = not _is_n26_web and (
+                (bank or "").lower() == "comdirect" or (
+                    not bank and is_comdirect_pdf(full_text)
                 )
+            )
 
-                if len(full_text.strip()) < 100:
-                    try:
-                        full_text = await _ocr_pdf_to_text(tmp_path)
-                    except Exception as ocr_err:
-                        logger.warning("OCR pipeline failed: %s", ocr_err)
-
-                detected_bank = bank or "ubs"
-                raw_transactions = _parse_pdf_text(full_text, detected_bank)
+            if _is_n26_web:
+                raw_transactions = parse_n26_web_pdf(pdf)
+                logger.info("N26 web PDF: parser yielded %d rows.", len(raw_transactions))
+            elif _is_comdirect:
+                raw_transactions = parse_comdirect_pdf_tables(pdf)
+                if not raw_transactions:
+                    raw_transactions = parse_comdirect_pdf_words(pdf)
+                if not raw_transactions:
+                    raw_transactions = parse_comdirect_pdf_text(full_text)
+            else:
+                # UBS (default)
+                raw_transactions = _parse_ubs_pdf_tables(pdf)
+                if not raw_transactions:
+                    if len(full_text.strip()) < 100:
+                        try:
+                            full_text = await _ocr_pdf_to_text(tmp_path)
+                        except Exception as ocr_err:
+                            logger.warning("OCR pipeline failed: %s", ocr_err)
+                    raw_transactions = _parse_pdf_text(full_text, bank or "ubs")
 
     finally:
         os.unlink(tmp_path)

@@ -103,7 +103,7 @@ async def seed_peer_group_system_categories(session: AsyncSession) -> int:
                 Category.is_system == True,  # noqa: E712
             )
         )
-        if res.scalar_one_or_none():
+        if res.first():
             continue
         session.add(
             Category(
