@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import { clsx } from "clsx";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
-import { api, authApi, settingsApi } from "@/lib/api";
-import { Save, ExternalLink, Wand2, RotateCcw, AlertCircle, ChevronDown, ChevronUp, Users, Plus, Pencil, Trash2, X, Check, Tag } from "lucide-react";
+import { api, authApi, settingsApi, taxonomyApi } from "@/lib/api";
+import { Save, ExternalLink, Wand2, RotateCcw, AlertCircle, ChevronDown, ChevronUp, Users, Plus, Pencil, Trash2, X, Check, Tag, Eye } from "lucide-react";
 import { Link } from "react-router-dom";
 import { differenceInYears, parseISO } from "date-fns";
 import { useTaxonomySuperCategories } from "@/lib/categories";
@@ -63,6 +63,7 @@ function calcAge(birthdate: string): number | null {
 
 interface CategoryMapping {
   wizard_label: string;
+  /** Superkategorie-ID (z. B. wohnen, essen) */
   transaction_category: string;
 }
 
@@ -293,6 +294,57 @@ export default function Settings() {
     },
   });
 
+  // Hidden canonical labels
+  const { data: hiddenLabelsData, refetch: refetchHidden } = useQuery({
+    queryKey: ["taxonomy-hidden-labels"],
+    queryFn: () => taxonomyApi.getHiddenLabels().then((r) => r.data.hidden as Record<string, string[]>),
+    staleTime: 60_000,
+  });
+
+  const hideLabelMutation = useMutation({
+    mutationFn: ({ sc_id, label, label_type }: { sc_id: string; label: string; label_type: "txn" | "wl" }) =>
+      taxonomyApi.hideCanonicalLabel(sc_id, label, label_type),
+    onSuccess: () => {
+      refetchHidden();
+      queryClient.invalidateQueries({ queryKey: ["taxonomy"] });
+    },
+  });
+
+  const unhideLabelMutation = useMutation({
+    mutationFn: ({ sc_id, label, label_type }: { sc_id: string; label: string; label_type: "txn" | "wl" }) =>
+      taxonomyApi.unhideCanonicalLabel(sc_id, label, label_type),
+    onSuccess: () => {
+      refetchHidden();
+      queryClient.invalidateQueries({ queryKey: ["taxonomy"] });
+    },
+  });
+
+  function isLabelHidden(scId: string, label: string, type: "txn" | "wl"): boolean {
+    if (!hiddenLabelsData) return false;
+    const key = `${scId}:${type}`;
+    return (hiddenLabelsData[key] ?? []).some((h) => h.toLowerCase() === label.toLowerCase());
+  }
+
+  // When deleting a canonical label: migrate transactions AND hide the label from taxonomy
+  function handleConfirmTaxoDelete() {
+    if (!taxoDelete) return;
+    const { scId, label, type } = taxoDelete;
+    const labelType = type === "txn" ? "txn" : "wl";
+    if (taxoDeleteTarget) {
+      migrateLabelMutation.mutate(
+        { old_label: label, new_label: taxoDeleteTarget },
+        {
+          onSuccess: () => {
+            hideLabelMutation.mutate({ sc_id: scId, label, label_type: labelType });
+          },
+        }
+      );
+    } else {
+      hideLabelMutation.mutate({ sc_id: scId, label, label_type: labelType });
+      setTaxoDelete(null);
+    }
+  }
+
   function openTaxoDelete(scId: string, label: string, type: "txn" | "wizard") {
     const count = txnCountFor(label);
     setTaxoDelete({ scId, label, type, txnCount: count });
@@ -303,7 +355,7 @@ export default function Settings() {
   const allTxnLabels = SUPER_CATEGORIES.flatMap((sc) => sc.txnCategories);
 
   return (
-    <div className="space-y-6 animate-fade-in max-w-2xl">
+    <div className="space-y-6 animate-fade-in max-w-4xl">
       <div>
         <h1 className="text-2xl font-display text-text-primary">Einstellungen</h1>
         <p className="text-text-tertiary text-sm mt-0.5">Profil und Konfiguration</p>
@@ -428,6 +480,113 @@ export default function Settings() {
             </div>
           )}
         </div>
+
+        {/* Übersicht: Superkategorie ↔ empirische vs. reale Kategorien (farbkodiert) */}
+        <div className="rounded-xl border border-border/50 overflow-hidden mb-4">
+          <p className="text-[11px] text-text-tertiary px-3 py-2 bg-bg-surface2/40 border-b border-border/30">
+            Zuordnung aus der Taxonomie: <span className="text-text-secondary">empirische Angaben</span> (Wizard-Deckel) und{" "}
+            <span className="text-text-secondary">reale Angaben</span> (Transaktionskategorien) — Farbe = Superkategorie.
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs min-w-[640px]">
+              <thead>
+                <tr className="text-text-tertiary text-[11px] uppercase tracking-wide border-b border-border/30">
+                  <th className="text-left py-2.5 px-3 w-[22%]">Superkategorie</th>
+                  <th className="text-left py-2.5 px-3 w-[39%]">Empirische Angaben</th>
+                  <th className="text-left py-2.5 px-3 w-[39%]">Reale Angaben (Ist)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {SUPER_CATEGORIES.map((sc) => (
+                  <tr key={sc.id} className="border-b border-border/20 last:border-0 align-top">
+                    <td className="py-2.5 px-3">
+                      <div className="flex items-start gap-2">
+                        <span
+                          className="w-1 rounded-full shrink-0 mt-0.5 self-stretch min-h-[2rem]"
+                          style={{ backgroundColor: sc.color }}
+                          aria-hidden
+                        />
+                        <span
+                          className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+                          style={{ backgroundColor: sc.color + "22" }}
+                        >
+                          <sc.icon className="w-4 h-4" style={{ color: sc.color }} />
+                        </span>
+                        <span className="text-text-primary font-medium leading-snug pt-0.5">{sc.label}</span>
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <div className="flex flex-wrap gap-1">
+                        {sc.wizardLabels.filter((l) => !isLabelHidden(sc.id, l, "wl")).length === 0 && ownCats.filter((c) => c.icon === `wl:${sc.id}`).length === 0 ? (
+                          <span className="text-text-disabled italic">—</span>
+                        ) : (
+                          <>
+                            {sc.wizardLabels.filter((l) => !isLabelHidden(sc.id, l, "wl")).map((l) => (
+                              <span
+                                key={l}
+                                className="px-1.5 py-0.5 rounded text-[11px] text-text-secondary"
+                                style={{ backgroundColor: sc.color + "24", border: `1px solid ${sc.color}44` }}
+                              >
+                                {l}
+                              </span>
+                            ))}
+                            {ownCats
+                              .filter((c) => c.icon === `wl:${sc.id}`)
+                              .map((c) => (
+                                <span
+                                  key={c.id}
+                                  className="px-1.5 py-0.5 rounded text-[11px] text-text-secondary border"
+                                  style={{ backgroundColor: sc.color + "18", borderColor: sc.color + "55" }}
+                                >
+                                  {c.name}
+                                  <span className="text-text-disabled ml-1">(eigen)</span>
+                                </span>
+                              ))}
+                          </>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <div className="flex flex-wrap gap-1">
+                        {sc.txnCategories.filter((c) => !isLabelHidden(sc.id, c, "txn")).length === 0 && ownCats.filter((c) => c.icon === sc.id).length === 0 ? (
+                          <span className="text-text-disabled italic">—</span>
+                        ) : (
+                          <>
+                            {sc.txnCategories.filter((c) => !isLabelHidden(sc.id, c, "txn")).map((c) => (
+                              <span
+                                key={c}
+                                className="px-1.5 py-0.5 rounded text-[11px] text-text-secondary"
+                                style={{ backgroundColor: sc.color + "18" }}
+                              >
+                                {c}
+                              </span>
+                            ))}
+                            {ownCats
+                              .filter((cat) => cat.icon === sc.id)
+                              .map((cat) => (
+                                <span
+                                  key={cat.id}
+                                  className="px-1.5 py-0.5 rounded text-[11px] text-text-secondary border"
+                                  style={{ backgroundColor: sc.color + "14", borderColor: sc.color + "44" }}
+                                >
+                                  {cat.name}
+                                  <span className="text-text-disabled ml-1">(eigen)</span>
+                                </span>
+                              ))}
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <p className="text-xs text-text-tertiary font-medium mt-6 mb-2">
+          Details: Peer-Ø, Ergänzungen und Bearbeitung (pro Superkategorie ausklappen)
+        </p>
         <div className="space-y-1">
           {SUPER_CATEGORIES.filter((sc) => sc.id !== "sonstiges").map((sc) => {
             const isOpen = expandedSc === sc.id;
@@ -548,7 +707,7 @@ export default function Settings() {
                         </div>
                         <div className="flex flex-wrap gap-1">
                           {/* Static canonical labels */}
-                          {sc.txnCategories.map((c) => (
+                          {sc.txnCategories.filter((c) => !isLabelHidden(sc.id, c, "txn")).map((c) => (
                             taxoDelete?.label === c && taxoDelete.scId === sc.id && taxoDelete.type === "txn" ? (
                               /* Delete confirmation inline */
                               <div key={c} className="w-full mt-1 p-2 rounded-lg border border-loss/30 bg-loss/5 space-y-1.5 text-[11px]">
@@ -578,17 +737,11 @@ export default function Settings() {
                                 <div className="flex gap-2">
                                   <button
                                     type="button"
-                                    disabled={taxoDelete.txnCount > 0 && !taxoDeleteTarget || migrateLabelMutation.isPending}
-                                    onClick={() => {
-                                      if (taxoDeleteTarget) {
-                                        migrateLabelMutation.mutate({ old_label: c, new_label: taxoDeleteTarget });
-                                      } else {
-                                        setTaxoDelete(null);
-                                      }
-                                    }}
+                                    disabled={(taxoDelete.txnCount > 0 && !taxoDeleteTarget) || migrateLabelMutation.isPending || hideLabelMutation.isPending}
+                                    onClick={handleConfirmTaxoDelete}
                                     className="px-2 py-0.5 rounded bg-loss/20 text-loss border border-loss/30 hover:bg-loss/30 disabled:opacity-40 transition-colors"
                                   >
-                                    {taxoDelete.txnCount > 0 ? "Migrieren & Entfernen" : "Entfernen"}
+                                    {taxoDelete.txnCount > 0 ? "Migrieren & Ausblenden" : "Ausblenden"}
                                   </button>
                                   <button type="button" onClick={() => setTaxoDelete(null)} className="text-text-tertiary hover:text-text-primary">Abbrechen</button>
                                 </div>
@@ -687,18 +840,60 @@ export default function Settings() {
                           </button>
                         </div>
                         <div className="flex flex-wrap gap-1">
-                          {sc.wizardLabels.length === 0 && ownCats.filter((cat) => cat.icon === "wl:" + sc.id).length === 0 ? (
+                          {sc.wizardLabels.filter((l) => !isLabelHidden(sc.id, l, "wl")).length === 0 && ownCats.filter((cat) => cat.icon === "wl:" + sc.id).length === 0 ? (
                             <span className="text-text-disabled italic text-[11px]">Keine</span>
                           ) : (
                             <>
-                              {sc.wizardLabels.map((l) => (
+                              {sc.wizardLabels.filter((l) => !isLabelHidden(sc.id, l, "wl")).map((l) => (
+                                taxoDelete?.label === l && taxoDelete.scId === sc.id && taxoDelete.type === "wizard" ? (
+                                  <div key={l} className="w-full mt-1 p-2 rounded-lg border border-loss/30 bg-loss/5 space-y-1.5 text-[11px]">
+                                    <p className="text-text-secondary">
+                                      <span className="font-semibold text-loss">«{l}»</span> ausblenden?
+                                      {taxoDelete.txnCount > 0 && (
+                                        <span className="text-text-tertiary ml-1">
+                                          {taxoDelete.txnCount} Transaktion{taxoDelete.txnCount !== 1 ? "en" : ""} betroffen.
+                                        </span>
+                                      )}
+                                    </p>
+                                    {taxoDelete.txnCount > 0 && (
+                                      <select
+                                        className="input-field text-[11px] w-full"
+                                        value={taxoDeleteTarget}
+                                        onChange={(e) => setTaxoDeleteTarget(e.target.value)}
+                                      >
+                                        <option value="">— Neu zuweisen zu —</option>
+                                        {allTxnLabels.filter((tl) => tl !== l).map((tl) => <option key={tl} value={tl}>{tl}</option>)}
+                                      </select>
+                                    )}
+                                    <div className="flex gap-2">
+                                      <button
+                                        type="button"
+                                        disabled={(taxoDelete.txnCount > 0 && !taxoDeleteTarget) || migrateLabelMutation.isPending || hideLabelMutation.isPending}
+                                        onClick={handleConfirmTaxoDelete}
+                                        className="px-2 py-0.5 rounded bg-loss/20 text-loss border border-loss/30 hover:bg-loss/30 disabled:opacity-40 transition-colors"
+                                      >
+                                        {taxoDelete.txnCount > 0 ? "Migrieren & Ausblenden" : "Ausblenden"}
+                                      </button>
+                                      <button type="button" onClick={() => setTaxoDelete(null)} className="text-text-tertiary hover:text-text-primary">Abbrechen</button>
+                                    </div>
+                                  </div>
+                                ) : (
                                 <span
                                   key={l}
-                                  className="px-1.5 py-0.5 rounded text-text-secondary text-[11px]"
+                                  className="group flex items-center gap-0.5 px-1.5 py-0.5 rounded text-text-secondary text-[11px]"
                                   style={{ backgroundColor: sc.color + "18" }}
                                 >
                                   {l}
+                                  <button
+                                    type="button"
+                                    title="Ausblenden / Migrieren"
+                                    onClick={() => openTaxoDelete(sc.id, l, "wizard")}
+                                    className="opacity-0 group-hover:opacity-100 ml-0.5 w-3.5 h-3.5 flex items-center justify-center rounded-full hover:bg-loss/20 text-text-tertiary hover:text-loss transition-all"
+                                  >
+                                    <X className="w-2.5 h-2.5" />
+                                  </button>
                                 </span>
+                                )
                               ))}
                               {/* User-added wizard labels */}
                               {ownCats.filter((cat) => cat.icon === "wl:" + sc.id).map((cat) => (
@@ -758,6 +953,47 @@ export default function Settings() {
                         )}
                       </div>
                     </div>
+
+                    {/* Hidden canonical labels — restore option */}
+                    {(() => {
+                      const hiddenTxn = (hiddenLabelsData?.[`${sc.id}:txn`] ?? []);
+                      const hiddenWl = (hiddenLabelsData?.[`${sc.id}:wl`] ?? []);
+                      if (hiddenTxn.length === 0 && hiddenWl.length === 0) return null;
+                      return (
+                        <div className="pt-2 border-t border-border/20">
+                          <p className="text-text-disabled text-[10px] uppercase tracking-wide mb-1 flex items-center gap-1">
+                            <Eye className="w-2.5 h-2.5" />
+                            Ausgeblendete Labels — klicken zum Einblenden
+                          </p>
+                          <div className="flex flex-wrap gap-1">
+                            {hiddenTxn.map((l) => (
+                              <button
+                                key={`txn:${l}`}
+                                type="button"
+                                title="Wieder einblenden (Transaktionskategorie)"
+                                onClick={() => unhideLabelMutation.mutate({ sc_id: sc.id, label: l, label_type: "txn" })}
+                                className="px-1.5 py-0.5 rounded text-[11px] text-text-disabled border border-dashed border-border/40 hover:border-text-tertiary hover:text-text-secondary transition-colors"
+                              >
+                                {l}
+                                <span className="ml-1 text-[10px] opacity-60">Ist</span>
+                              </button>
+                            ))}
+                            {hiddenWl.map((l) => (
+                              <button
+                                key={`wl:${l}`}
+                                type="button"
+                                title="Wieder einblenden (Wizard-Label)"
+                                onClick={() => unhideLabelMutation.mutate({ sc_id: sc.id, label: l, label_type: "wl" })}
+                                className="px-1.5 py-0.5 rounded text-[11px] text-text-disabled border border-dashed border-border/40 hover:border-text-tertiary hover:text-text-secondary transition-colors"
+                              >
+                                {l}
+                                <span className="ml-1 text-[10px] opacity-60">Emp</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
@@ -772,7 +1008,8 @@ export default function Settings() {
           <div>
             <h2 className="text-text-primary font-semibold text-sm">Kategorie-Zuordnung</h2>
             <p className="text-text-tertiary text-xs mt-0.5">
-              Verknüpft Budgetkategorien aus empirischen Angaben mit deinen Transaktionskategorien (für die «Ist»-Spalte).
+              Ordnet jedes Budget-Label aus empirischen Angaben einer Superkategorie zu.
+              Die Budgetanalyse nutzt daraus die passende Ist-Transaktionskategorie und Peer-Gruppe.
             </p>
           </div>
           <button
@@ -800,7 +1037,7 @@ export default function Settings() {
                 <thead>
                   <tr className="border-b border-border/50 text-text-tertiary text-xs">
                     <th className="text-left py-2 pr-4">Label aus empirischen Angaben</th>
-                    <th className="text-left py-2">Transaktionskategorie (Ist)</th>
+                    <th className="text-left py-2">Superkategorie</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/20">
@@ -809,17 +1046,19 @@ export default function Settings() {
                       <td className="py-2 pr-4 text-text-secondary font-medium">{label}</td>
                       <td className="py-2">
                         <select
-                          value={mappingDrafts[label] || ""}
+                          value={mappingDrafts[label] ?? ""}
                           onChange={(e) => {
                             setMappingDrafts((prev) => ({ ...prev, [label]: e.target.value }));
                             setMappingDirty(true);
                             setMappingSaved(false);
                           }}
-                          className="input w-full max-w-xs"
+                          className="input w-full max-w-md"
                         >
-                          <option value="">— Keine Zuordnung —</option>
-                          {(mappingsData?.transaction_categories as string[] || []).map((cat: string) => (
-                            <option key={cat} value={cat}>{cat}</option>
+                          <option value="">Taxonomie-Standard (automatisch)</option>
+                          {SUPER_CATEGORIES.map((sc) => (
+                            <option key={sc.id} value={sc.id}>
+                              {sc.emoji} {sc.label}
+                            </option>
                           ))}
                         </select>
                       </td>

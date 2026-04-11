@@ -172,6 +172,12 @@ export const taxonomyApi = {
         legacyAliases: string[];
       }>;
     }>("/taxonomy"),
+  getHiddenLabels: () =>
+    api.get<{ hidden: Record<string, string[]> }>("/taxonomy/hidden-labels"),
+  hideCanonicalLabel: (sc_id: string, label: string, label_type: "txn" | "wl") =>
+    api.post("/taxonomy/hide-canonical-label", { sc_id, label, label_type }),
+  unhideCanonicalLabel: (sc_id: string, label: string, label_type: "txn" | "wl") =>
+    api.delete("/taxonomy/hide-canonical-label", { data: { sc_id, label, label_type } }),
 };
 
 // Pension

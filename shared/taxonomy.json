@@ -90,9 +90,9 @@
       "label": "Steuern & Abgaben",
       "emoji": "🏛️",
       "color": "#f43f5e",
-      "txnCategories": ["Steuern", "Abgaben", "Finanzen", "Gebühren", "Dienstleistungen", "Säule 3A"],
+      "txnCategories": ["Steuern", "Abgaben", "Finanzen", "Gebühren", "Dienstleistungen"],
       "legacyAliases": ["finance", "taxes", "services", "fees"],
-      "wizardLabels": ["direkte steuern", "gebühren", "kirchensteuern", "säule 3a"]
+      "wizardLabels": ["direkte steuern", "gebühren", "kirchensteuern"]
     },
     {
       "id": "sparen",
@@ -101,7 +101,7 @@
       "color": "#10b981",
       "txnCategories": [
         "Gehalt", "Investitionen", "Einzahlungen", "Kontoübertrag", "Dividende", "Zinsen",
-        "Rückerstattung", "Erstattung", "Bonus", "Sonstige Einnahmen"
+        "Rückerstattung", "Erstattung", "Bonus", "Sonstige Einnahmen", "Säule 3A"
       ],
       "legacyAliases": ["salary", "investment", "dividend", "interest", "refund"],
       "wizardLabels": [
@@ -112,7 +112,8 @@
         "mieteinnahmen",
         "auslandeinkommen",
         "lohn",
-        "gehalt"
+        "gehalt",
+        "säule 3a"
       ]
     },
     {

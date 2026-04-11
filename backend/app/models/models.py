@@ -88,6 +88,8 @@ class User(Base):
     retirement_age: Mapped[int] = mapped_column(Integer, default=65)
     currency: Mapped[str] = mapped_column(String(3), default="CHF")
     locale: Mapped[str] = mapped_column(String(10), default="de-CH")
+    # Per-user hidden canonical taxonomy labels (JSON: {"sc_id:txn": [...], "sc_id:wl": [...]})
+    taxonomy_hidden_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Relationships
     accounts: Mapped[List["Account"]] = relationship("Account", back_populates="user", cascade="all, delete-orphan")
@@ -510,7 +512,7 @@ class UserWizardConfig(Base):
 # ── WizardCategoryMapping ─────────────────────────────────────
 
 class WizardCategoryMapping(Base):
-    """User-defined mapping from wizard budget labels to transaction categories."""
+    """User-defined mapping from wizard budget labels to supercategory id (legacy: txn category name)."""
 
     __tablename__ = "wizard_category_mappings"
     __table_args__ = (UniqueConstraint("user_id", "wizard_label"),)

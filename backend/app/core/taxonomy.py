@@ -239,6 +239,9 @@ DEFAULT_WIZARD_TO_TXN: dict[str, str] = {
     "sbb halbtax": "ÖV-Kosten",
     "sbb ga 2. klasse": "ÖV-Kosten",
     "säule 3a": "Säule 3A",
+    "säule 3a einzahlung": "Säule 3A",
+    "pillar 3a": "Säule 3A",
+    "3. säule": "Säule 3A",
 }
 
 
@@ -287,6 +290,88 @@ def default_transaction_category_for_wizard_label(
     sc = resolve_super_category_row(merged_rows, wizard_label, is_wizard=True)
     txns = [str(t) for t in (sc.get("txnCategories") or []) if t]
     return txns[0] if txns else ""
+
+
+def is_super_category_id(rows: List[dict[str, Any]], value: str) -> bool:
+    """True if `value` matches a supercategory row id (case-insensitive)."""
+    if not (value or "").strip():
+        return False
+    v = value.strip().lower()
+    return any(str(r.get("id", "")).lower() == v for r in rows)
+
+
+def first_txn_category_for_super(rows: List[dict[str, Any]], super_id: str) -> str:
+    """First canonical transaction-category label under this super (for Ist lookups)."""
+    sid = super_id.strip().lower()
+    for r in rows:
+        if str(r.get("id", "")).lower() == sid:
+            txns = [str(t) for t in (r.get("txnCategories") or []) if t]
+            return txns[0] if txns else ""
+    return ""
+
+
+def default_super_category_id_for_wizard_label(
+    merged_rows: List[dict[str, Any]],
+    wizard_label: str,
+) -> str:
+    """Supercategory id inferred from a wizard budget label (notes)."""
+    sc = resolve_super_category_row(merged_rows, wizard_label, is_wizard=True)
+    return str(sc.get("id") or "sonstiges")
+
+
+def normalize_stored_mapping_to_super_id(
+    merged_rows: List[dict[str, Any]],
+    raw: str,
+) -> str:
+    """
+    Normalize DB value to a supercategory id for API/UI.
+    New rows store super ids; legacy rows may store a transaction category name.
+    """
+    s = (raw or "").strip()
+    if not s:
+        return ""
+    if is_super_category_id(merged_rows, s):
+        for r in merged_rows:
+            if str(r.get("id", "")).lower() == s.lower():
+                return str(r.get("id"))
+        return s
+    sc = resolve_super_category_row(merged_rows, s, is_wizard=False)
+    return str(sc.get("id") or "sonstiges")
+
+
+def resolve_mapping_value_to_txn_category(
+    merged_rows: List[dict[str, Any]],
+    stored: str,
+    wizard_label: str,
+) -> str:
+    """
+    Map stored user mapping to a concrete transaction category for Ist/actual comparison.
+    Accepts supercategory id (preferred) or legacy transaction category name.
+    """
+    s = (stored or "").strip()
+    if not s:
+        return default_transaction_category_for_wizard_label(merged_rows, wizard_label)
+    if is_super_category_id(merged_rows, s):
+        txn = first_txn_category_for_super(merged_rows, s)
+        if txn:
+            return txn
+        return default_transaction_category_for_wizard_label(merged_rows, wizard_label)
+    return s
+
+
+def peer_key_for_wizard_mapping(
+    merged_rows: List[dict[str, Any]],
+    wizard_label: str,
+    stored_mapping: Optional[str],
+) -> Optional[str]:
+    """Peer benchmark column: explicit super assignment wins; else derive from wizard label."""
+    s = (stored_mapping or "").strip()
+    if s and is_super_category_id(merged_rows, s):
+        for r in merged_rows:
+            if str(r.get("id", "")).lower() == s.lower():
+                return SUPER_ID_TO_PEER.get(str(r.get("id")))
+        return SUPER_ID_TO_PEER.get(s.lower())
+    return peer_key_for_wizard_label(merged_rows, wizard_label)
 
 
 async def load_merged_taxonomy_for_user(session: Any, user_id: int) -> List[dict[str, Any]]:

@@ -39,6 +39,11 @@ EN_TO_DE_CATEGORY: Dict[str, str] = {
     "taxes":                  "Steuern",
     "salary":                 "Gehalt",
     "investment":             "Investitionen",
+    "dividend":               "Dividende",
+    "dividends":              "Dividende",
+    "interest":               "Zinsen",
+    "refund":                 "Rückerstattung",
+    "bonus":                  "Bonus",
     "other":                  "Sonstiges",
     # Bereits teilweise deutsch — auf kanonische Schreibweise normieren
     "einzahlungen":           "Einzahlungen",

@@ -103,11 +103,23 @@ async def lifespan(app: FastAPI):
                         "UPDATE transactions SET category = :de "
                         "WHERE LOWER(category) = :en AND category != :de"
                     ),
-                    {"de": de, "en": en},
+                    {"de": de, "en": en.lower()},
                 )
         logger.info("Category language migration completed.")
     except Exception as e:
         logger.warning("Category language migration skipped: %s", e)
+
+    # Add taxonomy_hidden_json column to users table (idempotent)
+    try:
+        from app.core.database import engine
+        from sqlalchemy import text
+        async with engine.begin() as conn:
+            await conn.execute(
+                text("ALTER TABLE users ADD COLUMN IF NOT EXISTS taxonomy_hidden_json TEXT")
+            )
+        logger.info("users.taxonomy_hidden_json column ensured.")
+    except Exception as e:
+        logger.warning("taxonomy_hidden_json column migration skipped: %s", e)
 
     # Create recurring_plan table (new feature — idempotent)
     try:

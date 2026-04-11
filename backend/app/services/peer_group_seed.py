@@ -22,7 +22,7 @@ PEER_SYSTEM_CATEGORIES: List[Dict[str, Any]] = [
     {"slug": "einnahmen-einzahlung", "name": "Einzahlungen", "icon": "sparen", "color": "#10B981", "sort_order": 8},
     {"slug": "einnahmen-kontouebertrag", "name": "Kontoübertrag", "icon": "sparen", "color": "#10B981", "sort_order": 9},
     {"slug": "einnahmen-sonstige", "name": "Sonstige Einnahmen", "icon": "sparen", "color": "#10B981", "sort_order": 10},
-    {"slug": "steuern-saeule-3a", "name": "Säule 3A", "icon": "steuern", "color": "#f43f5e", "sort_order": 11},
+    {"slug": "sparen-saeule-3a", "name": "Säule 3A", "icon": "sparen", "color": "#10B981", "sort_order": 11},
     {"slug": "wohnen", "name": "Wohnen", "icon": "🏠", "color": "#3B82F6", "sort_order": 12},
     {"slug": "lebensmittel", "name": "Lebensmittel", "icon": "🛒", "color": "#22C55E", "sort_order": 20},
     {"slug": "transport", "name": "Transport", "icon": "🚂", "color": "#EAB308", "sort_order": 30},
@@ -74,7 +74,7 @@ PEER_SYSTEM_CATEGORIES: List[Dict[str, Any]] = [
     {"slug": "abo-treue", "name": "Treue & Mitgliedschaften", "icon": "🎁", "color": "#EA580C", "sort_order": 250},
     {"slug": "abo-internet", "name": "Internet (Festnetz)", "icon": "🌐", "color": "#2563EB", "sort_order": 260},
     {"slug": "abo-mobilfunk", "name": "Mobilfunk", "icon": "📶", "color": "#059669", "sort_order": 270},
-    {"slug": "abo-oev", "name": "ÖV-Abonnements", "icon": "🎫", "color": "#D97706", "sort_order": 280},
+    {"slug": "abo-oev", "name": "ÖV-Kosten", "icon": "🎫", "color": "#D97706", "sort_order": 280},
     {"slug": "abo-fitness", "name": "Fitness", "icon": "💪", "color": "#DC2626", "sort_order": 290},
     {"slug": "abo-beruflich", "name": "Beruflich", "icon": "💼", "color": "#4F46E5", "sort_order": 300},
     {"slug": "abo-shopping", "name": "Shopping & Lieferdienste", "icon": "📦", "color": "#BE185D", "sort_order": 310},
@@ -82,15 +82,36 @@ PEER_SYSTEM_CATEGORIES: List[Dict[str, Any]] = [
 
 
 async def seed_peer_group_system_categories(session: AsyncSession) -> int:
-    # Legacy slug was under «einnahmen»/Sparen; taxonomy + UI expect Steuern & Abgaben.
+    # Migrate legacy slugs for Säule 3A → canonical sparen context.
+    # Step 1: einnahmen-saeule-3a → sparen-saeule-3a (original rename path)
     await session.execute(
         update(Category)
         .where(
             Category.slug == "einnahmen-saeule-3a",
             Category.user_id.is_(None),
-            Category.is_system.is_(True),  # noqa: E712
+            Category.is_system.is_(True),
         )
-        .values(slug="steuern-saeule-3a", icon="steuern", color="#f43f5e")
+        .values(slug="sparen-saeule-3a", icon="sparen", color="#10B981")
+    )
+    # Step 2: steuern-saeule-3a → sparen-saeule-3a (previous incorrect assignment)
+    await session.execute(
+        update(Category)
+        .where(
+            Category.slug == "steuern-saeule-3a",
+            Category.user_id.is_(None),
+            Category.is_system.is_(True),
+        )
+        .values(slug="sparen-saeule-3a", icon="sparen", color="#10B981")
+    )
+    # Step 3: normalize ÖV-Abonnements → ÖV-Kosten (canonical label)
+    await session.execute(
+        update(Category)
+        .where(
+            Category.slug == "abo-oev",
+            Category.user_id.is_(None),
+            Category.is_system.is_(True),
+        )
+        .values(name="ÖV-Kosten")
     )
 
     inserted = 0
