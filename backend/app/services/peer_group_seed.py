@@ -4,14 +4,26 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.models import Category
 
 # Mirrors PeerGroupCard + full PeerGroupDefaults expense keys (German labels, stable slugs).
+# Income-side rows use icon "sparen" (Super «Sparen»). Säule-3A-Einzahlungen gehören zur Super «Steuern & Abgaben».
 PEER_SYSTEM_CATEGORIES: List[Dict[str, Any]] = [
-    {"slug": "wohnen", "name": "Wohnen", "icon": "🏠", "color": "#3B82F6", "sort_order": 10},
+    {"slug": "einnahmen-gehalt", "name": "Gehalt", "icon": "sparen", "color": "#10B981", "sort_order": 1},
+    {"slug": "einnahmen-investitionen", "name": "Investitionen", "icon": "sparen", "color": "#10B981", "sort_order": 2},
+    {"slug": "einnahmen-dividende", "name": "Dividende", "icon": "sparen", "color": "#10B981", "sort_order": 3},
+    {"slug": "einnahmen-zinsen", "name": "Zinsen", "icon": "sparen", "color": "#10B981", "sort_order": 4},
+    {"slug": "einnahmen-rueckerstattung", "name": "Rückerstattung", "icon": "sparen", "color": "#10B981", "sort_order": 5},
+    {"slug": "einnahmen-erstattung", "name": "Erstattung", "icon": "sparen", "color": "#10B981", "sort_order": 6},
+    {"slug": "einnahmen-bonus", "name": "Bonus", "icon": "sparen", "color": "#10B981", "sort_order": 7},
+    {"slug": "einnahmen-einzahlung", "name": "Einzahlungen", "icon": "sparen", "color": "#10B981", "sort_order": 8},
+    {"slug": "einnahmen-kontouebertrag", "name": "Kontoübertrag", "icon": "sparen", "color": "#10B981", "sort_order": 9},
+    {"slug": "einnahmen-sonstige", "name": "Sonstige Einnahmen", "icon": "sparen", "color": "#10B981", "sort_order": 10},
+    {"slug": "steuern-saeule-3a", "name": "Säule 3A", "icon": "steuern", "color": "#f43f5e", "sort_order": 11},
+    {"slug": "wohnen", "name": "Wohnen", "icon": "🏠", "color": "#3B82F6", "sort_order": 12},
     {"slug": "lebensmittel", "name": "Lebensmittel", "icon": "🛒", "color": "#22C55E", "sort_order": 20},
     {"slug": "transport", "name": "Transport", "icon": "🚂", "color": "#EAB308", "sort_order": 30},
     {"slug": "krankenkasse", "name": "Krankenkasse", "icon": "🏥", "color": "#EF4444", "sort_order": 40},
@@ -70,6 +82,17 @@ PEER_SYSTEM_CATEGORIES: List[Dict[str, Any]] = [
 
 
 async def seed_peer_group_system_categories(session: AsyncSession) -> int:
+    # Legacy slug was under «einnahmen»/Sparen; taxonomy + UI expect Steuern & Abgaben.
+    await session.execute(
+        update(Category)
+        .where(
+            Category.slug == "einnahmen-saeule-3a",
+            Category.user_id.is_(None),
+            Category.is_system.is_(True),  # noqa: E712
+        )
+        .values(slug="steuern-saeule-3a", icon="steuern", color="#f43f5e")
+    )
+
     inserted = 0
     for row in PEER_SYSTEM_CATEGORIES:
         slug = row["slug"]

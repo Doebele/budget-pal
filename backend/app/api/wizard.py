@@ -66,6 +66,40 @@ class Pillar3aAccountPayload(BaseModel):
     strategy: Literal["interest", "funds"] = "funds"
 
 
+class SelectedExpenseEntryPayload(BaseModel):
+    """Step 5 accordion: selected provider + variant (mirrors frontend SelectedExpenseEntry)."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    provider_id: str
+    category_id: str
+    variant_id: str
+    custom_price: Optional[float] = None
+    note: Optional[str] = None
+    view_mode: Optional[Literal["simple", "individual"]] = None
+    individual_amount: Optional[float] = None
+    frequency: Optional[str] = None
+    currency: Optional[str] = None
+    first_payment_date: Optional[str] = None
+
+
+class CustomExpenseEntryPayload(BaseModel):
+    """Step 5 accordion: user-defined provider row (mirrors frontend CustomExpenseEntry)."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    id: str
+    category_id: str
+    name: str
+    website: Optional[str] = None
+    individual_amount: Optional[float] = None
+    frequency: Optional[str] = None
+    currency: Optional[str] = None
+    first_payment_date: Optional[str] = None
+    note: Optional[str] = None
+    price: float = 0.0
+
+
 class WizardCompletePayload(BaseModel):
     """Full wizard data — mirrors the WizardData TypeScript interface.
 
@@ -134,6 +168,9 @@ class WizardCompletePayload(BaseModel):
     direkte_steuern: float = 700.0   # CHF 700/Mo — BFS HABE 2021 avg direct taxes
     serafe: float = 27.92            # CHF 335/Jahr ÷ 12 — Serafe (ehem. Billag)
     weiterbildung: float = 30.0      # CHF 30/Mo  — BFS HABE 2021 education/training
+    # Step 5 accordion (Alltag & Abonnements) — must persist in wizard_data_json
+    expense_entries: List[SelectedExpenseEntryPayload] = Field(default_factory=list)
+    custom_expense_entries: List[CustomExpenseEntryPayload] = Field(default_factory=list)
 
     # ── Step 6: Assets
     bank_balance: float = 0.0
@@ -194,6 +231,12 @@ class WizardSummary(BaseModel):
     estimated_monthly_surplus: float
     redirect_to: str = "/dashboard"
     message: str
+
+
+class WizardStateSavePayload(BaseModel):
+    """Loose payload for draft autosave from frontend wizard state."""
+
+    model_config = ConfigDict(extra="allow")
 
 
 # ── Helpers ────────────────────────────────────────────────────
@@ -300,6 +343,48 @@ async def get_wizard_state(
     if not wizard_cfg or not wizard_cfg.wizard_data_json:
         return None
     return json.loads(wizard_cfg.wizard_data_json)
+
+
+@router.put(
+    "/state",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Persistenter Draft-Speicher für Wizard-Zustand",
+)
+async def save_wizard_state(
+    payload: WizardStateSavePayload,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Persist current wizard draft so state survives browser/localStorage resets."""
+    data = payload.model_dump(by_alias=True)
+    wizard_data_blob = json.dumps(data, ensure_ascii=False)
+
+    # Keep peer defaults in sync when present in draft payload.
+    peer_defaults = data.get("peerGroupDefaults")
+    peer_defaults_blob = (
+        json.dumps(peer_defaults, ensure_ascii=False)
+        if isinstance(peer_defaults, dict)
+        else None
+    )
+
+    cfg_result = await db.execute(
+        select(UserWizardConfig).where(UserWizardConfig.user_id == current_user.id)
+    )
+    wizard_cfg = cfg_result.scalar_one_or_none()
+    if wizard_cfg:
+        wizard_cfg.wizard_data_json = wizard_data_blob
+        if peer_defaults_blob is not None:
+            wizard_cfg.peer_group_defaults_json = peer_defaults_blob
+    else:
+        db.add(
+            UserWizardConfig(
+                user_id=current_user.id,
+                wizard_data_json=wizard_data_blob,
+                peer_group_defaults_json=peer_defaults_blob,
+            )
+        )
+
+    await db.commit()
 
 
 @router.get(

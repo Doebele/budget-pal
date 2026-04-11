@@ -6,11 +6,12 @@ All models use SQLAlchemy 2.0 mapped_column style with type annotations.
 from __future__ import annotations
 
 import enum
-from datetime import datetime
+from datetime import date, datetime
 from typing import List, Optional
 
 from sqlalchemy import (
     Boolean,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -267,6 +268,47 @@ class Budget(Base):
 
     user: Mapped["User"] = relationship("User", back_populates="budgets")
     category: Mapped[Optional["Category"]] = relationship("Category", back_populates="budgets")
+
+
+# ── RecurringPlan ─────────────────────────────────────────────
+
+class RecurringPlan(Base):
+    """User-managed recurring income/expense plan entries.
+
+    Each row represents one recurring payment or income stream.
+    amount > 0 = income, amount < 0 = expense.
+    is_future=True  → planned entry (created in Budgetplan UI)
+    is_future=False → derived from historical/empirical data
+    periodicity determines which months the entry applies to within a year.
+    """
+    __tablename__ = "recurring_plan"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    account_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True
+    )
+    category_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True
+    )
+    description: Mapped[str] = mapped_column(String(255), nullable=False)
+    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    # weekly | monthly | quarterly | halfyearly | yearly
+    periodicity: Mapped[str] = mapped_column(String(32), nullable=False, default="monthly")
+    start_date: Mapped[date] = mapped_column(Date, nullable=False)
+    end_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)  # None = ongoing
+    is_future: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    user: Mapped["User"] = relationship("User")
+    account: Mapped[Optional["Account"]] = relationship("Account")
+    category: Mapped[Optional["Category"]] = relationship("Category")
 
 
 # ── PensionData ───────────────────────────────────────────────

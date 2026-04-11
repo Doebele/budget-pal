@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal, init_db
-from app.api import auth, transactions, imports, projections, accounts, categories, budgets, pension, assets, wizard, currency, forecasting, budget_multimodal
+from app.api import auth, transactions, imports, projections, accounts, categories, budgets, pension, assets, wizard, currency, forecasting, budget_multimodal, recurring_plan, taxonomy
 from app.api import settings as settings_api
 from app.services.currency_service import currency_service
 
@@ -109,6 +109,32 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("Category language migration skipped: %s", e)
 
+    # Create recurring_plan table (new feature — idempotent)
+    try:
+        from app.core.database import engine
+        from sqlalchemy import text
+        async with engine.begin() as conn:
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS recurring_plan (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    account_id INTEGER REFERENCES accounts(id) ON DELETE SET NULL,
+                    category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+                    description VARCHAR(255) NOT NULL,
+                    amount FLOAT NOT NULL,
+                    periodicity VARCHAR(32) NOT NULL DEFAULT 'monthly',
+                    start_date DATE NOT NULL,
+                    end_date DATE,
+                    is_future BOOLEAN NOT NULL DEFAULT TRUE,
+                    notes TEXT,
+                    created_at TIMESTAMPTZ DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """))
+        logger.info("recurring_plan table ensured.")
+    except Exception as e:
+        logger.warning("recurring_plan table creation skipped: %s", e)
+
     # Load currency exchange rates
     try:
         rates = await currency_service.load_rates()
@@ -152,6 +178,7 @@ app.include_router(imports.router, prefix="/api/imports", tags=["imports"])
 app.include_router(projections.router, prefix="/api/projections", tags=["projections"])
 app.include_router(accounts.router, prefix="/api/accounts", tags=["accounts"])
 app.include_router(categories.router, prefix="/api/categories", tags=["categories"])
+app.include_router(taxonomy.router, prefix="/api/taxonomy", tags=["taxonomy"])
 app.include_router(budgets.router, prefix="/api/budgets", tags=["budgets"])
 app.include_router(pension.router, prefix="/api/pension", tags=["pension"])
 app.include_router(assets.router, prefix="/api/assets", tags=["assets"])
@@ -160,6 +187,7 @@ app.include_router(currency.router, prefix="/api/currency", tags=["currency"])
 app.include_router(forecasting.router, prefix="/api/forecasting", tags=["forecasting"])
 app.include_router(budget_multimodal.router, prefix="/api/budget", tags=["budget"])
 app.include_router(settings_api.router, prefix="/api/settings", tags=["settings"])
+app.include_router(recurring_plan.router, prefix="/api/recurring-plan", tags=["recurring-plan"])
 
 
 # ── Health Check ──────────────────────────────────────────────

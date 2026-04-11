@@ -16,32 +16,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import get_current_user
+from app.core.taxonomy import default_transaction_category_for_wizard_label, load_merged_taxonomy_for_user
 from app.models.models import Account, Transaction, User, WizardCategoryMapping
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-
-# ── Default mapping (mirrored from budget_multimodal.py) ─────
-
-DEFAULT_WIZARD_TO_TXN: dict[str, str] = {
-    "miete": "Wohnen",
-    "hypothek": "Wohnen",
-    "hypothek & amortisation": "Wohnen",
-    "nebenkosten": "Nebenkosten",
-    "krankenkasse": "Versicherungen",
-    "zusatzversicherung": "Versicherungen",
-    "hausrat & haftpflicht": "Versicherungen",
-    "autoversicherung": "Versicherungen",
-    "lebensmittel": "Lebensmittel",
-    "freizeit & restaurant": "Restaurant & Takeaway",
-    "abonnements": "Abonnements",
-    "benzin / strom (auto)": "Transport",
-    "parkplatz": "Transport",
-    "auto-amortisation": "Transport",
-    "sbb halbtax": "Öv-Abonnements",
-    "sbb ga 2. klasse": "Öv-Abonnements",
-}
 
 
 # ── Pydantic models ───────────────────────────────────────────
@@ -115,15 +94,16 @@ async def get_category_mappings(
 
     wizard_labels = await _get_wizard_labels(current_user.id, db)
     txn_categories = await _get_txn_categories(current_user.id, db)
+    merged = await load_merged_taxonomy_for_user(db, current_user.id)
 
-    # Build effective mappings: user override → default → None
+    # Build effective mappings: user override → taxonomy default → ""
     mappings: list[CategoryMappingItem] = []
     for label in wizard_labels:
         lower = label.lower()
         if lower in user_rows:
             txn_cat = user_rows[lower].transaction_category
         else:
-            txn_cat = DEFAULT_WIZARD_TO_TXN.get(lower, "")
+            txn_cat = default_transaction_category_for_wizard_label(merged, label)
         mappings.append(CategoryMappingItem(wizard_label=label, transaction_category=txn_cat))
 
     return CategoryMappingsResponse(
@@ -164,6 +144,7 @@ async def put_category_mappings(
     # Return updated state
     wizard_labels = await _get_wizard_labels(current_user.id, db)
     txn_categories = await _get_txn_categories(current_user.id, db)
+    merged = await load_merged_taxonomy_for_user(db, current_user.id)
 
     result2 = await db.execute(
         select(WizardCategoryMapping).where(
@@ -178,7 +159,7 @@ async def put_category_mappings(
         if lower in user_rows2:
             txn_cat = user_rows2[lower].transaction_category
         else:
-            txn_cat = DEFAULT_WIZARD_TO_TXN.get(lower, "")
+            txn_cat = default_transaction_category_for_wizard_label(merged, label)
         mappings.append(CategoryMappingItem(wizard_label=label, transaction_category=txn_cat))
 
     return CategoryMappingsResponse(

@@ -10,7 +10,7 @@ GET    /transactions/stats
 GET    /transactions/monthly-summary
 """
 from datetime import datetime, date, timezone
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status, BackgroundTasks
 from pydantic import BaseModel
@@ -36,6 +36,34 @@ def _utc_start_of_day(d: date) -> datetime:
 def _utc_end_of_day(d: date) -> datetime:
     """Inclusive upper bound for TIMESTAMPTZ columns."""
     return datetime.combine(d, datetime.max.time(), tzinfo=timezone.utc)
+
+
+def _merge_stats_category_totals(rows: list, *, limit: int) -> List[dict]:
+    """
+    Combine category keys that only differ by case/whitespace (e.g. Krankenkasse vs krankenkasse).
+    Keeps the first-seen display string; sums totals. Caller should fetch enough rows before merging.
+    """
+    merged: Dict[str, Dict[str, Any]] = {}
+    for row in rows:
+        raw = (getattr(row, "category", None) or "").strip()
+        if not raw:
+            continue
+        key = raw.lower()
+        val = abs(float(row.total))
+        if key not in merged:
+            merged[key] = {"category": raw, "total": val}
+        else:
+            merged[key]["total"] += val
+            prev = merged[key]["category"]
+            if raw and prev and raw[0].isupper() and not prev[0].isupper():
+                merged[key]["category"] = raw
+    out = [{"category": m["category"], "total": round(m["total"], 2)} for m in merged.values()]
+    out.sort(key=lambda x: -x["total"])
+    return out[:limit]
+
+
+def _merge_stats_top_categories(rows: list) -> List[dict]:
+    return _merge_stats_category_totals(rows, limit=10)
 
 
 # ── Schemas ───────────────────────────────────────────────────
@@ -131,6 +159,7 @@ class StatsResponse(BaseModel):
     net: float
     avg_monthly_expenses: float
     top_categories: List[dict]
+    top_income_categories: List[dict]
     transaction_count: int
 
 
@@ -685,12 +714,20 @@ async def get_stats(
         .where(and_(*filters, Transaction.amount < 0, Transaction.category.isnot(None)))
         .group_by(Transaction.category)
         .order_by(func.sum(Transaction.amount))
-        .limit(10)
+        .limit(40)
     )
-    top_categories = [
-        {"category": row.category, "total": abs(float(row.total))}
-        for row in cat_result.all()
-    ]
+    top_categories = _merge_stats_top_categories(cat_result.all())
+
+    # Top categories by income (positive amounts) — für Sankey «Sparen»-Unterknoten
+    income_cat_result = await db.execute(
+        select(Transaction.category, func.sum(Transaction.amount).label("total"))
+        .join(Account)
+        .where(and_(*filters, Transaction.amount > 0, Transaction.category.isnot(None)))
+        .group_by(Transaction.category)
+        .order_by(desc(func.sum(Transaction.amount)))
+        .limit(40)
+    )
+    top_income_categories = _merge_stats_category_totals(income_cat_result.all(), limit=25)
 
     # Average monthly expenses (rough)
     avg_monthly = total_expenses / 12 if total_expenses else 0.0
@@ -701,6 +738,7 @@ async def get_stats(
         net=total_income + total_expenses,
         avg_monthly_expenses=abs(avg_monthly),
         top_categories=top_categories,
+        top_income_categories=top_income_categories,
         transaction_count=txn_count,
     )
 

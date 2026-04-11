@@ -25,6 +25,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import get_current_user
+from app.core.taxonomy import (
+    default_transaction_category_for_wizard_label,
+    load_merged_taxonomy_for_user,
+    peer_key_for_transaction_category,
+    peer_key_for_wizard_label,
+)
 from app.models.models import (
     Account, Budget, PeerGroupBenchmark, Scenario, Transaction, User,
     WizardCategoryMapping,
@@ -34,99 +40,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 AnalysisMode = Literal["past", "wizard", "combined", "peer"]
-
-# ── Category mapping helpers ──────────────────────────────────
-
-# Maps wizard budget `notes` → peer-group column key
-WIZARD_TO_PEER: dict[str, str] = {
-    "miete": "housing",
-    "hypothek": "housing",
-    "hypothek & amortisation": "housing",
-    "nebenkosten": "housing",
-    "krankenkasse": "insurance",
-    "zusatzversicherung": "insurance",
-    "hausrat & haftpflicht": "insurance",
-    "autoversicherung": "insurance",
-    "lebensmittel": "food",
-    "freizeit & restaurant": "food",
-    "abonnements": "leisure",
-    "benzin / strom (auto)": "transport",
-    "parkplatz": "transport",
-    "auto-amortisation": "transport",
-    "sbb halbtax": "transport",
-    "sbb ga 2. klasse": "transport",
-}
-
-# Default mapping: wizard budget label (lower) → transaction category name
-DEFAULT_WIZARD_TO_TXN: dict[str, str] = {
-    "miete": "Wohnen",
-    "hypothek": "Wohnen",
-    "hypothek & amortisation": "Wohnen",
-    "nebenkosten": "Nebenkosten",
-    "krankenkasse": "Versicherungen",
-    "zusatzversicherung": "Versicherungen",
-    "hausrat & haftpflicht": "Versicherungen",
-    "autoversicherung": "Versicherungen",
-    "lebensmittel": "Lebensmittel",
-    "freizeit & restaurant": "Restaurant & Takeaway",
-    "abonnements": "Abonnements",
-    "benzin / strom (auto)": "Transport",
-    "parkplatz": "Transport",
-    "auto-amortisation": "Transport",
-    "sbb halbtax": "Öv-Abonnements",
-    "sbb ga 2. klasse": "Öv-Abonnements",
-}
-
-# Maps transaction category → peer-group column key
-TXN_TO_PEER: dict[str, str] = {
-    # Food / Lebensmittel
-    "groceries": "food",
-    "food & drink": "food",
-    "lebensmittel": "food",
-    # Restaurant & Takeaway
-    "restaurant & takeaway": "restaurant",
-    "freizeit & restaurant": "restaurant",
-    # Transport
-    "transport": "transport",
-    "travel": "transport",
-    "reisen": "transport",
-    "öv-abonnements": "transport",
-    # Housing / Wohnen
-    "housing": "housing",
-    "wohnen": "housing",
-    "utilities": "housing",
-    "nebenkosten": "housing",
-    # Insurance / Versicherungen
-    "insurance": "insurance",
-    "versicherungen": "insurance",
-    "krankenkasse": "insurance",
-    "weitere versicherungen": "insurance",
-    # Health / Gesundheit
-    "health": "health",
-    "gesundheit": "health",
-    "fitness": "health",
-    # Leisure / Freizeit
-    "entertainment": "leisure",
-    "unterhaltung": "leisure",
-    "freizeit & unterhaltung": "leisure",
-    "abonnements": "leisure",
-    "streaming": "leisure",
-    "musik & medien": "leisure",
-    "nachrichten & medien": "leisure",
-    "cloud & backup": "leisure",
-    "software & apps": "leisure",
-    "treue & mitgliedschaften": "leisure",
-    "bildung & weiterbildung": "leisure",
-    "beruflich": "leisure",
-    # Communication / Kommunikation
-    "kommunikation": "communication",
-    "internet (festnetz)": "communication",
-    "mobilfunk": "communication",
-    # Clothing / Kleidung
-    "kleidung": "clothing",
-    "shopping": "clothing",
-    "shopping & lieferdienste": "clothing",
-}
 
 PEER_LABELS: dict[str, str] = {
     "housing":       "Wohnen",
@@ -323,6 +236,8 @@ async def multi_analysis(
     )
     peer_benchmark = await _get_peer_benchmark(current_user, wizard_params, db)
 
+    merged_taxonomy = await load_merged_taxonomy_for_user(db, current_user.id)
+
     wizard_available = wizard_params is not None and len(wizard_budgets) > 0
     peer_data_available = peer_benchmark is not None
 
@@ -340,7 +255,7 @@ async def multi_analysis(
     if mode == "past":
         data_sources = ["transactions"]
         for cat, amount in sorted(actual_expenses.items(), key=lambda x: -x[1]):
-            peer_key = TXN_TO_PEER.get(cat.lower())
+            peer_key = peer_key_for_transaction_category(merged_taxonomy, cat)
             benchmark_val = _peer_col(peer_key, peer_benchmark) if (peer_key and peer_benchmark) else None
             categories.append(CategoryBreakdown(
                 category=cat,
@@ -367,7 +282,10 @@ async def multi_analysis(
 
         def resolve_txn_cat(wizard_label: str) -> Optional[str]:
             lower = wizard_label.lower()
-            return user_mappings.get(lower) or DEFAULT_WIZARD_TO_TXN.get(lower)
+            if lower in user_mappings:
+                return user_mappings[lower]
+            d = default_transaction_category_for_wizard_label(merged_taxonomy, wizard_label)
+            return d if d else None
 
         # Scale monthly wizard amounts to the period for direct comparison with actuals
         monthly_wizard_income = (wizard_params or {}).get("monthly_income", actual_income)
@@ -376,7 +294,7 @@ async def multi_analysis(
             actual_val = actual_expenses.get(txn_cat) if txn_cat else actual_expenses.get(cat)
             categories.append(CategoryBreakdown(
                 category=cat,
-                peer_key=WIZARD_TO_PEER.get(cat.lower()),
+                peer_key=peer_key_for_wizard_label(merged_taxonomy, cat),
                 planned=round(monthly_amount * months, 2),   # period total
                 actual=round(actual_val, 2) if actual_val is not None else None,
             ))
@@ -410,7 +328,10 @@ async def multi_analysis(
             blended_total += blended
             categories.append(CategoryBreakdown(
                 category=cat,
-                peer_key=TXN_TO_PEER.get(cat.lower()) or WIZARD_TO_PEER.get(cat.lower()),
+                peer_key=(
+                    peer_key_for_transaction_category(merged_taxonomy, cat)
+                    or peer_key_for_wizard_label(merged_taxonomy, cat)
+                ),
                 planned=round(planned, 2) if planned is not None else None,
                 actual=round(actual, 2) if actual is not None else None,
                 blended=blended,
@@ -426,7 +347,7 @@ async def multi_analysis(
         # Use actual transactions; add peer benchmark per peer_key
         peer_groups: dict[str, list[str]] = {}
         for cat, amount in actual_expenses.items():
-            peer_key = TXN_TO_PEER.get(cat.lower())
+            peer_key = peer_key_for_transaction_category(merged_taxonomy, cat)
             if peer_key:
                 peer_groups.setdefault(peer_key, [])
                 peer_groups[peer_key].append(cat)
@@ -434,7 +355,7 @@ async def multi_analysis(
         # Show one row per peer category
         shown_peer_keys: set[str] = set()
         for cat, amount in sorted(actual_expenses.items(), key=lambda x: -x[1]):
-            peer_key = TXN_TO_PEER.get(cat.lower())
+            peer_key = peer_key_for_transaction_category(merged_taxonomy, cat)
             benchmark_val = _peer_col(peer_key, peer_benchmark) if (peer_key and peer_benchmark) else None
             delta = round(amount - benchmark_val, 2) if benchmark_val is not None else None
             entry = CategoryBreakdown(
@@ -489,7 +410,7 @@ async def multi_analysis(
         # Aggregate actual spending by peer_key
         actual_by_peer_key: dict[str, float] = {}
         for cat_name, amount in actual_expenses.items():
-            pk = TXN_TO_PEER.get(cat_name.lower())
+            pk = peer_key_for_transaction_category(merged_taxonomy, cat_name)
             if pk:
                 actual_by_peer_key[pk] = actual_by_peer_key.get(pk, 0.0) + amount
 
