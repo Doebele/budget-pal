@@ -257,6 +257,7 @@ export default function Dashboard() {
               currency: string;
             }) => {
               const sc = resolveSuperCategory(txn.category || "");
+              if (!sc) return null;
               return (
                 <div key={txn.id} className="flex items-center justify-between py-1.5">
                   <div className="flex items-center gap-3 min-w-0">

@@ -1,8 +1,11 @@
 """
-Settings API — category mappings between wizard labels and transaction categories.
+Settings API — maps wizard budget labels (empirical) to supercategory ids.
 
-GET  /api/settings/category-mappings  → list of {wizard_label, transaction_category}
-PUT  /api/settings/category-mappings  → upsert mappings for the user
+GET  /api/settings/category-mappings  → { wizard_label, transaction_category }
+  `transaction_category` holds the supercategory id (e.g. wohnen, essen). Legacy DB
+  values that stored a transaction category name are normalized to a super id.
+
+PUT  /api/settings/category-mappings  → upsert; empty string clears override (revert to taxonomy default).
 """
 from __future__ import annotations
 
@@ -16,7 +19,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import get_current_user
-from app.core.taxonomy import default_transaction_category_for_wizard_label, load_merged_taxonomy_for_user
+from app.core.taxonomy import (
+    default_super_category_id_for_wizard_label,
+    load_merged_taxonomy_for_user,
+    normalize_stored_mapping_to_super_id,
+)
 from app.models.models import Account, Transaction, User, WizardCategoryMapping
 
 logger = logging.getLogger(__name__)
@@ -27,7 +34,7 @@ router = APIRouter()
 
 class CategoryMappingItem(BaseModel):
     wizard_label: str
-    transaction_category: str
+    transaction_category: str = ""  # supercategory id; empty = clear override on PUT
 
 
 class CategoryMappingsResponse(BaseModel):
@@ -76,6 +83,22 @@ async def _get_txn_categories(user_id: int, db: AsyncSession) -> list[str]:
     return sorted([r for r in result.scalars() if r])
 
 
+def _mapping_items_for_labels(
+    merged: list,
+    wizard_labels: list[str],
+    user_rows: dict[str, WizardCategoryMapping],
+) -> list[CategoryMappingItem]:
+    items: list[CategoryMappingItem] = []
+    for label in wizard_labels:
+        lower = label.lower()
+        if lower in user_rows:
+            eff = normalize_stored_mapping_to_super_id(merged, user_rows[lower].transaction_category)
+        else:
+            eff = default_super_category_id_for_wizard_label(merged, label)
+        items.append(CategoryMappingItem(wizard_label=label, transaction_category=eff))
+    return items
+
+
 # ── Endpoints ─────────────────────────────────────────────────
 
 @router.get("/category-mappings", response_model=CategoryMappingsResponse)
@@ -83,8 +106,7 @@ async def get_category_mappings(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Return the user's category mappings merged with defaults."""
-    # User-specific overrides
+    """Return wizard label → supercategory id (effective, with legacy normalization)."""
     result = await db.execute(
         select(WizardCategoryMapping).where(
             WizardCategoryMapping.user_id == current_user.id
@@ -96,15 +118,7 @@ async def get_category_mappings(
     txn_categories = await _get_txn_categories(current_user.id, db)
     merged = await load_merged_taxonomy_for_user(db, current_user.id)
 
-    # Build effective mappings: user override → taxonomy default → ""
-    mappings: list[CategoryMappingItem] = []
-    for label in wizard_labels:
-        lower = label.lower()
-        if lower in user_rows:
-            txn_cat = user_rows[lower].transaction_category
-        else:
-            txn_cat = default_transaction_category_for_wizard_label(merged, label)
-        mappings.append(CategoryMappingItem(wizard_label=label, transaction_category=txn_cat))
+    mappings = _mapping_items_for_labels(merged, wizard_labels, user_rows)
 
     return CategoryMappingsResponse(
         mappings=mappings,
@@ -119,8 +133,7 @@ async def put_category_mappings(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Upsert category mappings for the current user."""
-    # Load existing
+    """Upsert supercategory mappings; empty `transaction_category` removes the override."""
     result = await db.execute(
         select(WizardCategoryMapping).where(
             WizardCategoryMapping.user_id == current_user.id
@@ -130,18 +143,25 @@ async def put_category_mappings(
 
     for item in body.mappings:
         lower = item.wizard_label.lower()
+        val = (item.transaction_category or "").strip()
+        if not val:
+            if lower in existing:
+                await db.delete(existing[lower])
+                del existing[lower]
+            continue
         if lower in existing:
-            existing[lower].transaction_category = item.transaction_category
+            existing[lower].transaction_category = val
         else:
-            db.add(WizardCategoryMapping(
-                user_id=current_user.id,
-                wizard_label=item.wizard_label,
-                transaction_category=item.transaction_category,
-            ))
+            db.add(
+                WizardCategoryMapping(
+                    user_id=current_user.id,
+                    wizard_label=item.wizard_label,
+                    transaction_category=val,
+                )
+            )
 
     await db.commit()
 
-    # Return updated state
     wizard_labels = await _get_wizard_labels(current_user.id, db)
     txn_categories = await _get_txn_categories(current_user.id, db)
     merged = await load_merged_taxonomy_for_user(db, current_user.id)
@@ -153,14 +173,7 @@ async def put_category_mappings(
     )
     user_rows2 = {m.wizard_label.lower(): m for m in result2.scalars()}
 
-    mappings: list[CategoryMappingItem] = []
-    for label in wizard_labels:
-        lower = label.lower()
-        if lower in user_rows2:
-            txn_cat = user_rows2[lower].transaction_category
-        else:
-            txn_cat = default_transaction_category_for_wizard_label(merged, label)
-        mappings.append(CategoryMappingItem(wizard_label=label, transaction_category=txn_cat))
+    mappings = _mapping_items_for_labels(merged, wizard_labels, user_rows2)
 
     return CategoryMappingsResponse(
         mappings=mappings,

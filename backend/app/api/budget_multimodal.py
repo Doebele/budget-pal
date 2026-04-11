@@ -30,6 +30,8 @@ from app.core.taxonomy import (
     load_merged_taxonomy_for_user,
     peer_key_for_transaction_category,
     peer_key_for_wizard_label,
+    peer_key_for_wizard_mapping,
+    resolve_mapping_value_to_txn_category,
 )
 from app.models.models import (
     Account, Budget, PeerGroupBenchmark, Scenario, Transaction, User,
@@ -314,7 +316,9 @@ async def multi_analysis(
         def resolve_txn_cat(wizard_label: str) -> Optional[str]:
             lower = wizard_label.lower()
             if lower in user_mappings:
-                return user_mappings[lower]
+                return resolve_mapping_value_to_txn_category(
+                    merged_taxonomy, user_mappings[lower], wizard_label
+                )
             d = default_transaction_category_for_wizard_label(merged_taxonomy, wizard_label)
             return d if d else None
 
@@ -328,9 +332,11 @@ async def multi_analysis(
         for cat, monthly_amount in sorted(wizard_totals.items(), key=lambda x: -x[1]):
             txn_cat = resolve_txn_cat(cat)
             actual_val = actual_expenses.get(txn_cat) if txn_cat else actual_expenses.get(cat)
+            _mk = user_mappings.get(cat.lower())
+            _peer = peer_key_for_wizard_mapping(merged_taxonomy, cat, _mk)
             categories.append(CategoryBreakdown(
                 category=cat,
-                peer_key=peer_key_for_wizard_label(merged_taxonomy, cat),
+                peer_key=_peer,
                 planned=round(monthly_amount * months, 2),   # period total
                 actual=round(actual_val, 2) if actual_val is not None else None,
             ))

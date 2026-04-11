@@ -98,7 +98,9 @@ export function useTaxonomySuperCategories(): SuperCategory[] {
     placeholderData: BUNDLED_SUPER_CATEGORIES,
     staleTime: 60_000,
   });
-  return data ?? BUNDLED_SUPER_CATEGORIES;
+  // Never return an empty list — fall back to bundled snapshot if API
+  // returned nothing (e.g. during startup when taxonomy.json was unavailable).
+  return (data && data.length > 0) ? data : BUNDLED_SUPER_CATEGORIES;
 }
 
 export function useTaxonomy() {
@@ -173,7 +175,9 @@ export function resolveSuperCategoryFromList(
     if (byWizard) return byWizard;
   }
 
-  return list[list.length - 1];
+  // Fallback: last entry (usually "sonstiges"). If list is somehow empty,
+  // return sonstiges from the bundled snapshot so callers never get undefined.
+  return list[list.length - 1] ?? BUNDLED_SUPER_CATEGORIES[BUNDLED_SUPER_CATEGORIES.length - 1];
 }
 
 export function resolveSuperCategoryForRowFromList(
