@@ -9,11 +9,11 @@
 ## Überblick / Overview
 
 Budget-Pal ist eine selbst gehostete Webanwendung zur persönlichen Finanzplanung.
-Sie kombiniert Transaktionsverwaltung, Bankimport, KI-Kategorisierung und langfristige
-Finanzprognosen mit dem Schweizer 3-Säulen-Rentensystem.
+Sie kombiniert Transaktionsverwaltung, Bankimport, KI-Kategorisierung, langfristige
+Finanzprognosen und das Schweizer 3-Säulen-Rentensystem.
 
 *Budget-Pal is a self-hosted personal finance planning application. It combines transaction management,
-bank import, AI categorization, and long-term financial projections incorporating the Swiss 3-pillar pension system.*
+bank import, AI categorization, long-term financial projections, and the Swiss 3-pillar pension system.*
 
 ---
 
@@ -21,32 +21,48 @@ bank import, AI categorization, and long-term financial projections incorporatin
 
 ### Import
 - **CSV-Import**: UBS, N26, Revolut, comdirect (automatische Formaterkennung)
-- **PDF-Import**: OCR-Extraktion mit pdfplumber + EasyOCR
+- **PDF-Import**: OCR-Extraktion mit pdfplumber + EasyOCR (inkl. N26 PDF)
 - Duplikaterkennung (SHA-256 Hash)
 - Import-Historie und Protokoll
 
-### KI-Kategorisierung
-- Regelbasiertes Keyword-Matching (50+ Schweizer/Deutsche Händler)
-- Fuzzy-Matching mit RapidFuzz
-- Sentence-Transformer Embedding-Klassifizierung (lokal, `all-MiniLM-L6-v2`)
-- OpenAI GPT-4o-mini Fallback (optional, wenn API-Key gesetzt)
+### KI-Kategorisierung (5-stufige Pipeline)
+1. Manueller Kategorie-Cache (vorherige Entscheidungen)
+2. Regelbasiertes Keyword-Matching (50+ Schweizer/Deutsche Händler)
+3. Fuzzy-Matching mit RapidFuzz
+4. Sentence-Transformer Embedding-Klassifizierung (lokal, `all-MiniLM-L6-v2`)
+5. OpenAI GPT-4o-mini Fallback (optional, wenn API-Key gesetzt)
+
+### Kategorie-Taxonomie
+- 11 Superkategorien: Wohnen, Essen, Mobilität, Versicherungen, Freizeit, Abos, Shopping, Bildung, Steuern, Sparen, Sonstiges
+- Zentrale Definition in `shared/taxonomy.json` (txnCategories, wizardLabels, legacyAliases)
+- Per-User Anpassungen: Labels ausblenden, eigene Labels hinzufügen (Settings)
+- Kategorienverwaltung: Migrierung von Transaktionen beim Ausblenden eines Labels
+
+### Budgetplanung
+- Monatsbudget pro Superkategorie
+- **Budgetplan**: Jahresübersicht wiederkehrender Einträge über 12 Monate (Kalender- und Listenansicht)
+- Wiederkehrende Einnahmen/Ausgaben (monatlich, quartalsweise, jährlich, ...)
 
 ### Prognosen
-- Monte Carlo Simulation (10.000 Durchläufe)
-- Perzentilbänder (p10, p25, p50, p75, p90)
-- Schweizer Rentenberechnung:
-  - **AHV** (Säule 1): Beitragsjahre, Durchschnittseinkommen
-  - **BVG/Pensionskasse** (Säule 2): Umwandlungssatz 6.8%, Altersklassen
-  - **Säule 3a**: Zinseszins, max. CHF 7'056/Jahr steuerlich abzugsfähig
+- **Monte Carlo Simulation** (10.000 Durchläufe), Perzentilbänder (p10, p25, p50, p75, p90)
+- **Schweizer Rentenberechnung**:
+  - AHV (Säule 1): Beitragsjahre, Durchschnittseinkommen, max. CHF 2'520/Monat
+  - BVG/Pensionskasse (Säule 2): Umwandlungssatz 6.8%, Altersklassen
+  - Säule 3a: Zinseszins, max. CHF 7'056/Jahr steuerlich abzugsfähig
 - Inflationsbereinigung (Standard: 1.5% CHF)
 - Szenario-Vergleich (Was-wäre-wenn-Analysen)
 
 ### Visualisierungen
-- Sankey-Diagramm (Cashflow: Einnahmen → Kategorien → Sparen)
-- Monte Carlo Fan-Chart (Recharts AreaChart mit Perzentilbändern)
-- Gestapeltes Flächendiagramm (Rentenentwicklung 3 Säulen)
+- **Sankey-Diagramm**: Cashflow — Einnahmen → Superkategorien → Sparen (real & empirisch)
+- **Monte Carlo Fan-Chart**: Recharts AreaChart mit Perzentilbändern
+- **Finanzplan**: Gestapeltes Flächendiagramm (Rentenentwicklung 3 Säulen)
 - Budget-Statusbalken pro Kategorie
 - Monatsübersicht Einnahmen vs. Ausgaben
+
+### Referenzwährung
+- Wahl zwischen CHF, EUR, USD in den Einstellungen
+- Live-Wechselkursabruf (ECB / fixer.io Fallback)
+- Alle Berechnungen und Anzeigen umgerechnet
 
 ### Authentifizierung
 - Multi-User mit JWT (python-jose, bcrypt)
@@ -72,15 +88,10 @@ cp .env.example .env
 # .env mit eigenem Editor bearbeiten — mindestens setzen:
 #   POSTGRES_PASSWORD, JWT_SECRET_KEY
 
-# 3. Starten
-make dev
-# oder direkt:
+# 3. Starten (baut alle Images aus dem Repo-Root)
 docker compose up -d --build
 
-# 4. Erste Migration
-make db-migrate
-
-# 5. Öffnen
+# 4. Öffnen
 # Frontend: http://localhost:8011
 # Backend API-Docs: http://localhost:8010/api/docs
 ```
@@ -93,9 +104,11 @@ POSTGRES_PASSWORD=sicheres_passwort_hier
 JWT_SECRET_KEY=64_zeichen_hex_string_hier  # openssl rand -hex 32
 
 # Optional
-OPENAI_API_KEY=sk-...   # für KI-Fallback Kategorisierung
-BACKEND_PORT=8010        # Standard-Port Backend
-FRONTEND_PORT=8011       # Standard-Port Frontend
+OPENAI_API_KEY=sk-...        # für KI-Fallback Kategorisierung
+MISTRAL_API_KEY=...          # alternatives KI-Modell
+BACKEND_PORT=8010            # Standard-Port Backend
+FRONTEND_PORT=8011           # Standard-Port Frontend
+AUTO_CREATE_SCHEMA=false     # true = DB ohne Alembic beim ersten Start
 ```
 
 ---
@@ -114,12 +127,6 @@ uvicorn app.main:app --reload --port 8000
 cd frontend
 npm install
 npm run dev    # Vite Dev-Server auf :5173 mit Proxy zu :8000
-
-# Datenbank-Migration erstellen
-make db-migrate-create MSG="add new table"
-
-# Backup erstellen
-make backup
 
 # Logs streamen
 make logs
@@ -147,18 +154,12 @@ nano .env
 # starke Passwörter für POSTGRES_PASSWORD und JWT_SECRET_KEY
 
 # 4. Starten
-make dev
+docker compose up -d --build
 
-# 5. Reverse Proxy / SSL
-# traefik oder nginx auf Host-Ebene konfigurieren
-# Ports 8010 (Backend) und 8011 (Frontend) weiterleiten
-# Let's Encrypt SSL für budgetpal.doebele12.de
-
-# 6. Updates
+# 5. Updates
 git pull
-make build
-make dev
-make db-migrate
+docker compose build
+docker compose up -d
 ```
 
 ### Nginx Reverse Proxy Beispiel (Host-Ebene)
@@ -191,8 +192,6 @@ server {
 ## Lokales NAS Deployment (Synology / QNAP)
 
 ```bash
-# Docker auf dem NAS aktivieren (Synology: Container Manager)
-
 # Per SSH auf NAS verbinden
 ssh admin@nas-ip
 
@@ -202,14 +201,13 @@ cd /volume1/docker/budget-pal
 
 # .env anpassen
 cp .env.example .env
-# FRONTEND_PORT=8011  (oder eigener Port)
+# FRONTEND_PORT=8011
 # BACKEND_PORT=8010
 
 # Starten
 docker compose up -d --build
 
 # Zugriff: http://nas-ip:8011
-# Über Tailscale VPN auch von unterwegs erreichbar
 ```
 
 ---
@@ -220,23 +218,29 @@ docker compose up -d --build
 budget-pal/
 ├── backend/                    # Python FastAPI
 │   ├── app/
-│   │   ├── main.py             # FastAPI App Entry Point
+│   │   ├── main.py             # FastAPI App Entry Point + startup migrations
 │   │   ├── core/
 │   │   │   ├── config.py       # Pydantic Settings
 │   │   │   ├── database.py     # SQLAlchemy async engine
-│   │   │   └── security.py     # JWT + bcrypt
+│   │   │   ├── security.py     # JWT + bcrypt
+│   │   │   └── taxonomy.py     # Taxonomy-Lookups, WIZARD_TO_TXN Mapping
 │   │   ├── models/
-│   │   │   └── models.py       # ORM Models (User, Transaction, ...)
+│   │   │   └── models.py       # ORM Models (User, Transaction, RecurringPlan, ...)
 │   │   ├── api/
 │   │   │   ├── auth.py         # POST /auth/register, /login, /me
 │   │   │   ├── transactions.py # CRUD + stats
 │   │   │   ├── imports.py      # CSV/PDF import
 │   │   │   ├── projections.py  # Monte Carlo scenarios
-│   │   │   └── ...
+│   │   │   ├── recurring_plan.py # Budgetplan CRUD
+│   │   │   ├── taxonomy.py     # Taxonomy + per-User Label-Hiding
+│   │   │   ├── wizard.py       # Empirisches Finanzprofil
+│   │   │   ├── currency.py     # Wechselkurse
+│   │   │   └── settings.py     # User-Einstellungen
 │   │   └── services/
-│   │       ├── categorization.py  # AI pipeline
-│   │       ├── projection.py      # Monte Carlo + AHV/BVG
-│   │       └── import_parsers/    # UBS, N26, Revolut, comdirect
+│   │       ├── categorization.py     # 5-stage AI pipeline
+│   │       ├── projection.py         # Monte Carlo + AHV/BVG
+│   │       ├── peer_group_seed.py    # System-Kategorie Seeding + Migrationen
+│   │       └── import_parsers/       # UBS, N26, Revolut, comdirect
 │   ├── Dockerfile
 │   └── requirements.txt
 │
@@ -244,34 +248,34 @@ budget-pal/
 │   ├── src/
 │   │   ├── App.tsx             # Routes
 │   │   ├── lib/
-│   │   │   ├── api.ts          # Axios + JWT interceptor
+│   │   │   ├── api.ts          # Axios + JWT interceptor + alle API-Calls
 │   │   │   ├── auth.tsx        # Auth Context
-│   │   │   └── theme.ts        # Design constants
-│   │   ├── pages/              # Dashboard, Transactions, Projections, ...
-│   │   └── components/
-│   │       ├── charts/         # SankeyChart, MonteCarloChart
-│   │       └── layout/         # Sidebar, LoadingScreen
+│   │   │   └── categories.ts   # useTaxonomy(), SuperCategory Typen, Lookups
+│   │   └── pages/
+│   │       ├── Dashboard.tsx   # Sankey, Top-Kategorien, Letzte Transaktionen
+│   │       ├── Transactions.tsx
+│   │       ├── Import.tsx
+│   │       ├── Budget.tsx
+│   │       ├── Budgetplan.tsx  # Jahresübersicht wiederkehrender Einträge
+│   │       ├── Finanzplan.tsx  # Langfristprognose + Rentensäulen
+│   │       ├── Projections.tsx # Monte Carlo Fan-Chart
+│   │       ├── Forecast.tsx
+│   │       ├── Wizard.tsx      # Empirisches Finanzprofil
+│   │       ├── Accounts.tsx
+│   │       └── Settings.tsx    # Einstellungen inkl. Kategorie-Taxonomie
 │   ├── nginx.conf
 │   ├── Dockerfile
 │   └── package.json
 │
-├── docker-compose.yml
+├── shared/
+│   └── taxonomy.json           # Zentrale Superkategorie-Definition
+│
+├── docker-compose.yml          # Build-Kontext: Repo-Root für alle Services
 ├── .env.example
 ├── Makefile
-└── context.md
+├── context.md                  # Änderungsprotokoll
+└── README.md
 ```
-
----
-
-## Integration mit portfolio-tracker (FinTools)
-
-Budget-Pal und portfolio-tracker sind Schwester-Projekte unter `~/projects/` und bilden
-gemeinsam die **FinTools**-Suite:
-
-- **Gleiches Design-System**: identische Tailwind-Farben, Schriften, Card-Styles
-- **Gemeinsame Auth** (geplant): Single Sign-On
-- **Nettovermögen-Sync** (geplant): Portfolio-Tracker Werte fließen in Budget-Pal ein
-- **Navigation**: Budget-Pal Sidebar verlinkt auf portfolio-tracker
 
 ---
 
@@ -283,6 +287,17 @@ gemeinsam die **FinTools**-Suite:
 | BVG (2) | Berufsvorsorge | Kapital × 6.8% | Pflicht ab CHF 22'050 |
 | 3a | Privat gebunden | CHF 7'056/Jahr | Freiwillig, steuerfrei |
 | 3b | Privat frei | Unbegrenzt | Freiwillig |
+
+---
+
+## Integration mit portfolio-tracker (FinTools)
+
+Budget-Pal und portfolio-tracker sind Schwester-Projekte unter `~/projects/` und bilden
+gemeinsam die **FinTools**-Suite:
+
+- **Gleiches Design-System**: identische Tailwind-Farben, Schriften, Card-Styles
+- **Gemeinsame Auth** (geplant): Single Sign-On
+- **Nettovermögen-Sync** (geplant): Portfolio-Tracker Werte fließen in Budget-Pal ein
 
 ---
 
