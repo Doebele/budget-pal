@@ -757,6 +757,10 @@ async def preview_pdf_import(
             is_n26_web_pdf,
             parse_n26_web_pdf,
         )
+        from app.services.import_parsers.ubs_creditcard_pdf import (
+            is_ubs_creditcard_pdf,
+            parse_ubs_creditcard_pdf,
+        )
 
         with pdfplumber.open(tmp_path) as pdf:
             full_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
@@ -768,6 +772,11 @@ async def preview_pdf_import(
             _is_comdirect = not _is_n26_web and (
                 (bank or "").lower() == "comdirect" or (
                     not bank and is_comdirect_pdf(full_text)
+                )
+            )
+            _is_ubs_cc = not _is_n26_web and not _is_comdirect and (
+                (bank or "").lower() == "ubs_cc" or (
+                    not bank and is_ubs_creditcard_pdf(full_text)
                 )
             )
 
@@ -798,6 +807,10 @@ async def preview_pdf_import(
                         logger.info(
                             "comdirect PDF: text fallback yielded %d rows.", len(raw_transactions)
                         )
+            elif _is_ubs_cc:
+                detected_bank = "ubs_cc"
+                raw_transactions = parse_ubs_creditcard_pdf(pdf)
+                logger.info("UBS credit card PDF: parser yielded %d rows.", len(raw_transactions))
             else:
                 detected_bank = bank or "ubs"
                 # 1st choice: structured UBS table extraction
@@ -873,10 +886,13 @@ async def preview_pdf_import(
         )
 
         # AI category suggestion for preview
+        # Use MCC merchant category (from credit card PDFs) as extra context for the AI
         preview_category: Optional[str] = None
         if parsed and description_val:
             try:
-                cat_result = await categorization_service.categorize(description_val)
+                notes_val = str(row.get("notes", "")).strip()
+                cat_hint = f"{description_val} {notes_val}".strip() if notes_val else description_val
+                cat_result = await categorization_service.categorize(cat_hint)
                 preview_category = cat_result.get("category") or None
             except Exception:
                 pass
@@ -1177,6 +1193,10 @@ async def import_pdf(
             is_n26_web_pdf,
             parse_n26_web_pdf,
         )
+        from app.services.import_parsers.ubs_creditcard_pdf import (
+            is_ubs_creditcard_pdf,
+            parse_ubs_creditcard_pdf,
+        )
 
         with pdfplumber.open(tmp_path) as pdf:
             full_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
@@ -1189,6 +1209,11 @@ async def import_pdf(
                     not bank and is_comdirect_pdf(full_text)
                 )
             )
+            _is_ubs_cc = not _is_n26_web and not _is_comdirect and (
+                (bank or "").lower() == "ubs_cc" or (
+                    not bank and is_ubs_creditcard_pdf(full_text)
+                )
+            )
 
             if _is_n26_web:
                 raw_transactions = parse_n26_web_pdf(pdf)
@@ -1199,6 +1224,9 @@ async def import_pdf(
                     raw_transactions = parse_comdirect_pdf_words(pdf)
                 if not raw_transactions:
                     raw_transactions = parse_comdirect_pdf_text(full_text)
+            elif _is_ubs_cc:
+                raw_transactions = parse_ubs_creditcard_pdf(pdf)
+                logger.info("UBS credit card PDF: parser yielded %d rows.", len(raw_transactions))
             else:
                 # UBS (default)
                 raw_transactions = _parse_ubs_pdf_tables(pdf)
@@ -1240,7 +1268,10 @@ async def import_pdf(
                 skipped += 1
                 continue
 
-            cat_result = await categorization_service.categorize(raw.get("description", ""))
+            # Use MCC notes (credit card PDFs) to improve AI categorization
+            _cat_notes = str(raw.get("notes", "")).strip()
+            _cat_text = f"{raw.get('description', '')} {_cat_notes}".strip() if _cat_notes else raw.get("description", "")
+            cat_result = await categorization_service.categorize(_cat_text)
 
             raw_dt = raw["date"]
             txn_dt = (
