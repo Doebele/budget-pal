@@ -6,7 +6,7 @@ import { api, authApi, settingsApi, taxonomyApi } from "@/lib/api";
 import { Save, ExternalLink, Wand2, RotateCcw, AlertCircle, ChevronDown, ChevronUp, Users, Plus, Pencil, Trash2, X, Check, Tag, Eye } from "lucide-react";
 import { Link } from "react-router-dom";
 import { differenceInYears, parseISO } from "date-fns";
-import { useTaxonomySuperCategories } from "@/lib/categories";
+import { useTaxonomySuperCategories, type SuperCategory } from "@/lib/categories";
 
 // ── Peer-Gruppe: Schlüssel je Superkategorie ───────────────────
 // Summe der aufgeführten PeerGroupDefaults-Felder ergibt den monatlichen
@@ -351,6 +351,51 @@ export default function Settings() {
     setTaxoDeleteTarget("");
   }
 
+  function renderTaxonomyAddForm(sc: SuperCategory, type: "txn" | "wizard") {
+    if (!taxoAdd || taxoAdd.scId !== sc.id || taxoAdd.type !== type) return null;
+    const superId = type === "txn" ? sc.id : `wl:${sc.id}`;
+    const placeholder = type === "txn" ? "z.B. Kontoübertrag" : "z.B. Säule 3A";
+    return (
+      <div className="flex items-center gap-1 mt-1.5 w-full min-w-0 max-w-[320px]">
+        <input
+          autoFocus
+          type="text"
+          className="input-field text-[11px] flex-1 py-0.5 min-w-0"
+          placeholder={placeholder}
+          value={taxoAdd.value}
+          onChange={(e) => setTaxoAdd((a) => (a ? { ...a, value: e.target.value } : null))}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && taxoAdd.value.trim()) {
+              createCatMutation.mutate({ name: taxoAdd.value.trim(), super_id: superId, color: sc.color });
+              setTaxoAdd(null);
+            }
+            if (e.key === "Escape") setTaxoAdd(null);
+          }}
+        />
+        <button
+          type="button"
+          disabled={!taxoAdd.value.trim() || createCatMutation.isPending}
+          onClick={() => {
+            if (taxoAdd.value.trim()) {
+              createCatMutation.mutate({ name: taxoAdd.value.trim(), super_id: superId, color: sc.color });
+              setTaxoAdd(null);
+            }
+          }}
+          className="p-1 rounded text-gain hover:bg-gain/10 disabled:opacity-40 shrink-0"
+        >
+          <Check className="w-3 h-3" />
+        </button>
+        <button
+          type="button"
+          onClick={() => setTaxoAdd(null)}
+          className="p-1 rounded text-text-tertiary hover:text-text-primary hover:bg-bg-surface2 shrink-0"
+        >
+          <X className="w-3 h-3" />
+        </button>
+      </div>
+    );
+  }
+
   // All canonical txnCategory labels across all supercategories (for reassignment dropdown)
   const allTxnLabels = SUPER_CATEGORIES.flatMap((sc) => sc.txnCategories);
 
@@ -516,71 +561,93 @@ export default function Settings() {
                       </div>
                     </td>
                     <td className="py-2.5 px-3">
-                      <div className="flex flex-wrap gap-1">
-                        {(() => {
-                          const ownWlNames = new Set(ownCats.filter((c) => c.icon === `wl:${sc.id}`).map((c) => c.name.toLowerCase()));
-                          const canonicalWl = sc.wizardLabels.filter((l) => !isLabelHidden(sc.id, l, "wl") && !ownWlNames.has(l.toLowerCase()));
-                          const ownWl = ownCats.filter((c) => c.icon === `wl:${sc.id}`);
-                          return canonicalWl.length === 0 && ownWl.length === 0 ? (
-                            <span className="text-text-disabled italic">—</span>
-                          ) : (
-                            <>
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex flex-wrap gap-1 items-center">
+                          {(() => {
+                            const ownWlNames = new Set(ownCats.filter((c) => c.icon === `wl:${sc.id}`).map((c) => c.name.toLowerCase()));
+                            const canonicalWl = sc.wizardLabels.filter((l) => !isLabelHidden(sc.id, l, "wl") && !ownWlNames.has(l.toLowerCase()));
+                            const ownWl = ownCats.filter((c) => c.icon === `wl:${sc.id}`);
+                            const empty = canonicalWl.length === 0 && ownWl.length === 0;
+                            return (
+                              <>
+                                {empty && <span className="text-text-disabled italic">—</span>}
                                 {canonicalWl.map((l) => (
-                                <span
-                                  key={l}
-                                  className="px-1.5 py-0.5 rounded text-[11px] text-text-secondary"
-                                  style={{ backgroundColor: sc.color + "24", border: `1px solid ${sc.color}44` }}
+                                  <span
+                                    key={l}
+                                    className="px-1.5 py-0.5 rounded text-[11px] text-text-secondary"
+                                    style={{ backgroundColor: sc.color + "24", border: `1px solid ${sc.color}44` }}
+                                  >
+                                    {l}
+                                  </span>
+                                ))}
+                                {ownWl.map((c) => (
+                                  <span
+                                    key={c.id}
+                                    className="px-1.5 py-0.5 rounded text-[11px] text-text-secondary border"
+                                    style={{ backgroundColor: sc.color + "18", borderColor: sc.color + "55" }}
+                                  >
+                                    {c.name}
+                                    <span className="text-text-disabled ml-1">(eigen)</span>
+                                  </span>
+                                ))}
+                                <button
+                                  type="button"
+                                  title="Neues Wizard-Label hinzufügen"
+                                  onClick={() => setTaxoAdd({ scId: sc.id, type: "wizard", value: "" })}
+                                  className="w-5 h-5 flex items-center justify-center rounded text-text-tertiary hover:text-accent hover:bg-accent/10 transition-colors shrink-0"
                                 >
-                                  {l}
-                                </span>
-                              ))}
-                              {ownWl.map((c) => (
-                                <span
-                                  key={c.id}
-                                  className="px-1.5 py-0.5 rounded text-[11px] text-text-secondary border"
-                                  style={{ backgroundColor: sc.color + "18", borderColor: sc.color + "55" }}
-                                >
-                                  {c.name}
-                                  <span className="text-text-disabled ml-1">(eigen)</span>
-                                </span>
-                              ))}
-                            </>
-                          );
-                        })()}
+                                  <Plus className="w-3 h-3" />
+                                </button>
+                              </>
+                            );
+                          })()}
+                        </div>
+                        {renderTaxonomyAddForm(sc, "wizard")}
                       </div>
                     </td>
                     <td className="py-2.5 px-3">
-                      <div className="flex flex-wrap gap-1">
-                        {(() => {
-                          const ownTxnNames = new Set(ownCats.filter((c) => c.icon === sc.id).map((c) => c.name.toLowerCase()));
-                          const canonicalTxn = sc.txnCategories.filter((c) => !isLabelHidden(sc.id, c, "txn") && !ownTxnNames.has(c.toLowerCase()));
-                          const ownTxn = ownCats.filter((c) => c.icon === sc.id);
-                          return canonicalTxn.length === 0 && ownTxn.length === 0 ? (
-                            <span className="text-text-disabled italic">—</span>
-                          ) : (
-                            <>
-                              {canonicalTxn.map((c) => (
-                                <span
-                                  key={c}
-                                  className="px-1.5 py-0.5 rounded text-[11px] text-text-secondary"
-                                  style={{ backgroundColor: sc.color + "18" }}
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex flex-wrap gap-1 items-center">
+                          {(() => {
+                            const ownTxnNames = new Set(ownCats.filter((c) => c.icon === sc.id).map((c) => c.name.toLowerCase()));
+                            const canonicalTxn = sc.txnCategories.filter((c) => !isLabelHidden(sc.id, c, "txn") && !ownTxnNames.has(c.toLowerCase()));
+                            const ownTxn = ownCats.filter((c) => c.icon === sc.id);
+                            const empty = canonicalTxn.length === 0 && ownTxn.length === 0;
+                            return (
+                              <>
+                                {empty && <span className="text-text-disabled italic">—</span>}
+                                {canonicalTxn.map((c) => (
+                                  <span
+                                    key={c}
+                                    className="px-1.5 py-0.5 rounded text-[11px] text-text-secondary"
+                                    style={{ backgroundColor: sc.color + "18" }}
+                                  >
+                                    {c}
+                                  </span>
+                                ))}
+                                {ownTxn.map((cat) => (
+                                  <span
+                                    key={cat.id}
+                                    className="px-1.5 py-0.5 rounded text-[11px] text-text-secondary border"
+                                    style={{ backgroundColor: sc.color + "14", borderColor: sc.color + "44" }}
+                                  >
+                                    {cat.name}
+                                    <span className="text-text-disabled ml-1">(eigen)</span>
+                                  </span>
+                                ))}
+                                <button
+                                  type="button"
+                                  title="Neue Transaktionskategorie hinzufügen"
+                                  onClick={() => setTaxoAdd({ scId: sc.id, type: "txn", value: "" })}
+                                  className="w-5 h-5 flex items-center justify-center rounded text-text-tertiary hover:text-accent hover:bg-accent/10 transition-colors shrink-0"
                                 >
-                                  {c}
-                                </span>
-                              ))}
-                              {ownTxn.map((cat) => (
-                                <span
-                                  key={cat.id}
-                                  className="px-1.5 py-0.5 rounded text-[11px] text-text-secondary border"
-                                  style={{ backgroundColor: sc.color + "14", borderColor: sc.color + "44" }}
-                                >
-                                  {cat.name}
-                                  <span className="text-text-disabled ml-1">(eigen)</span>
-                                </span>
-                              ))}
-                            </>
-                          );
-                        })()}
+                                  <Plus className="w-3 h-3" />
+                                </button>
+                              </>
+                            );
+                          })()}
+                        </div>
+                        {renderTaxonomyAddForm(sc, "txn")}
                       </div>
                     </td>
                   </tr>
@@ -792,42 +859,7 @@ export default function Settings() {
                             <span className="text-text-disabled italic text-[11px]">Keine — fällt in Sonstiges</span>
                           )}
                         </div>
-                        {/* Inline add form for txn category */}
-                        {taxoAdd?.scId === sc.id && taxoAdd.type === "txn" && (
-                          <div className="flex items-center gap-1 mt-1.5">
-                            <input
-                              autoFocus
-                              type="text"
-                              className="input-field text-[11px] flex-1 py-0.5"
-                              placeholder="z.B. Kontoübertrag"
-                              value={taxoAdd.value}
-                              onChange={(e) => setTaxoAdd((a) => a ? { ...a, value: e.target.value } : null)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" && taxoAdd.value.trim()) {
-                                  createCatMutation.mutate({ name: taxoAdd.value.trim(), super_id: sc.id, color: sc.color });
-                                  setTaxoAdd(null);
-                                }
-                                if (e.key === "Escape") setTaxoAdd(null);
-                              }}
-                            />
-                            <button
-                              type="button"
-                              disabled={!taxoAdd.value.trim() || createCatMutation.isPending}
-                              onClick={() => {
-                                if (taxoAdd.value.trim()) {
-                                  createCatMutation.mutate({ name: taxoAdd.value.trim(), super_id: sc.id, color: sc.color });
-                                  setTaxoAdd(null);
-                                }
-                              }}
-                              className="p-1 rounded text-gain hover:bg-gain/10 disabled:opacity-40"
-                            >
-                              <Check className="w-3 h-3" />
-                            </button>
-                            <button type="button" onClick={() => setTaxoAdd(null)} className="p-1 rounded text-text-tertiary hover:text-text-primary hover:bg-bg-surface2">
-                              <X className="w-3 h-3" />
-                            </button>
-                          </div>
-                        )}
+                        {renderTaxonomyAddForm(sc, "txn")}
                       </div>
 
                       {/* ── Empirische Labels (Wizard) ── */}
@@ -921,42 +953,7 @@ export default function Settings() {
                             </>
                           )}
                         </div>
-                        {/* Inline add form for wizard label */}
-                        {taxoAdd?.scId === sc.id && taxoAdd.type === "wizard" && (
-                          <div className="flex items-center gap-1 mt-1.5">
-                            <input
-                              autoFocus
-                              type="text"
-                              className="input-field text-[11px] flex-1 py-0.5"
-                              placeholder="z.B. Säule 3A"
-                              value={taxoAdd.value}
-                              onChange={(e) => setTaxoAdd((a) => a ? { ...a, value: e.target.value } : null)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" && taxoAdd.value.trim()) {
-                                  createCatMutation.mutate({ name: taxoAdd.value.trim(), super_id: "wl:" + sc.id, color: sc.color });
-                                  setTaxoAdd(null);
-                                }
-                                if (e.key === "Escape") setTaxoAdd(null);
-                              }}
-                            />
-                            <button
-                              type="button"
-                              disabled={!taxoAdd.value.trim() || createCatMutation.isPending}
-                              onClick={() => {
-                                if (taxoAdd.value.trim()) {
-                                  createCatMutation.mutate({ name: taxoAdd.value.trim(), super_id: "wl:" + sc.id, color: sc.color });
-                                  setTaxoAdd(null);
-                                }
-                              }}
-                              className="p-1 rounded text-gain hover:bg-gain/10 disabled:opacity-40"
-                            >
-                              <Check className="w-3 h-3" />
-                            </button>
-                            <button type="button" onClick={() => setTaxoAdd(null)} className="p-1 rounded text-text-tertiary hover:text-text-primary hover:bg-bg-surface2">
-                              <X className="w-3 h-3" />
-                            </button>
-                          </div>
-                        )}
+                        {renderTaxonomyAddForm(sc, "wizard")}
                       </div>
                     </div>
 

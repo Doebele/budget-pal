@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
+import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard,
   ArrowLeftRight,
@@ -23,19 +24,24 @@ import {
 import { useAuth } from "@/lib/auth";
 import { clsx } from "clsx";
 
-const NAV_ITEMS = [
+const NAV_ITEMS: {
+  path: string;
+  icon: LucideIcon;
+  label: string;
+  dividerAfter?: boolean;
+}[] = [
   { path: "/", icon: LayoutDashboard, label: "Dashboard" },
-  { path: "/transactions", icon: ArrowLeftRight, label: "Reale Angaben" },
-  { path: "/wizard", icon: Wand2, label: "Empirische Angaben" },
   { path: "/finanzplan", icon: FileBarChart2, label: "Finanzplan" },
-  { path: "/transactions/archived", icon: Archive, label: "Archiv" },
   { path: "/budget", icon: PiggyBank, label: "Budgetanalyse" },
   { path: "/budgetplan", icon: CalendarRange, label: "Budgetplan" },
   { path: "/forecast", icon: Brain, label: "Budgetprognose" },
-  { path: "/projections", icon: TrendingUp, label: "Rentenprognose" },
+  { path: "/projections", icon: TrendingUp, label: "Rentenprognose", dividerAfter: true },
+  { path: "/wizard", icon: Wand2, label: "Empirische Angaben" },
+  { path: "/transactions", icon: ArrowLeftRight, label: "Reale Angaben" },
   { path: "/import", icon: Upload, label: "Import" },
   { path: "/accounts", icon: Wallet, label: "Konten" },
-] as const;
+  { path: "/transactions/archived", icon: Archive, label: "Archiv" },
+];
 
 const BOTTOM_ITEMS = [
   { path: "/settings", icon: Settings, label: "Einstellungen", highlight: false },
@@ -71,22 +77,30 @@ export default function Sidebar() {
       {/* Main nav */}
       <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto scrollbar-hide">
         {NAV_ITEMS.map((item) => {
-          const { path, icon: Icon, label } = item;
+          const { path, icon: Icon, label, dividerAfter } = item;
           return (
-            <NavLink
-              key={path}
-              to={path}
-              onClick={() => setMobileOpen(false)}
-              className={clsx(
-                "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-all duration-150",
-                isActive(path)
-                  ? "bg-accent/15 text-accent"
-                  : "text-text-secondary hover:text-text-primary hover:bg-bg-surface2"
+            <Fragment key={path}>
+              <NavLink
+                to={path}
+                onClick={() => setMobileOpen(false)}
+                className={clsx(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-all duration-150",
+                  isActive(path)
+                    ? "bg-accent/15 text-accent"
+                    : "text-text-secondary hover:text-text-primary hover:bg-bg-surface2"
+                )}
+              >
+                <Icon className="w-4 h-4 flex-shrink-0" />
+                {!collapsed && <span>{label}</span>}
+              </NavLink>
+              {dividerAfter && (
+                <div
+                  role="separator"
+                  aria-hidden
+                  className="my-2 mx-1 border-t border-border/50"
+                />
               )}
-            >
-              <Icon className="w-4 h-4 flex-shrink-0" />
-              {!collapsed && <span>{label}</span>}
-            </NavLink>
+            </Fragment>
           );
         })}
       </nav>

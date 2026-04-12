@@ -128,6 +128,63 @@ export function useTaxonomy() {
 
 // ── Pure lookups (list = useTaxonomySuperCategories() oder BUNDLED) ──
 
+/**
+ * Unterkategorien-Sortierung (Sankey, «Nach Superkategorie»):
+ * Reihenfolge wie in der Taxonomie — zuerst alle `txnCategories`, dann `wizardLabels`,
+ * jeweils ohne Duplikate (case-insensitive).
+ */
+export function buildSubCategoryOrderKeys(sc: SuperCategory): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const t of sc.txnCategories) {
+    const k = t.trim().toLowerCase();
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    out.push(k);
+  }
+  for (const w of sc.wizardLabels) {
+    const k = w.trim().toLowerCase();
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    out.push(k);
+  }
+  return out;
+}
+
+function isSyntheticSubLabel(label: string): boolean {
+  const low = label.trim().toLowerCase();
+  if (low === "gesamtbetrag") return true;
+  if (low.startsWith("überschuss")) return true;
+  return false;
+}
+
+/** Bekannte Taxonomie-Labels zuerst, dann übrige A–Z, synthetische Einträge zuletzt. */
+export function compareSubLabelsByTaxonomy(
+  labelA: string,
+  labelB: string,
+  sc: SuperCategory | undefined,
+): number {
+  const pa = isSyntheticSubLabel(labelA);
+  const pb = isSyntheticSubLabel(labelB);
+  if (pa !== pb) return pa ? 1 : -1;
+
+  if (!sc) {
+    return labelA.localeCompare(labelB, "de", { sensitivity: "base" });
+  }
+
+  const keys = buildSubCategoryOrderKeys(sc);
+  const la = labelA.trim().toLowerCase();
+  const lb = labelB.trim().toLowerCase();
+  const ia = keys.findIndex((k) => k === la);
+  const ib = keys.findIndex((k) => k === lb);
+
+  if (ia >= 0 && ib >= 0) return ia - ib;
+  if (ia >= 0) return -1;
+  if (ib >= 0) return 1;
+
+  return labelA.localeCompare(labelB, "de", { sensitivity: "base" });
+}
+
 export function getSuperCategoryByLabel(list: SuperCategory[], label: string): SuperCategory | undefined {
   const lower = label.toLowerCase();
   return list.find((sc) => sc.label.toLowerCase() === lower);

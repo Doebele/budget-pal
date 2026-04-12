@@ -80,7 +80,7 @@ export default function Transactions() {
 
   const [showAccountDropdown, setShowAccountDropdown] = useState(false);
 
-  // All selectable categories, grouped by supercategory (txn labels from taxonomy)
+  // All selectable categories, grouped by supercategory (full txn labels from taxonomy)
   const ALL_CAT_GROUPS = useMemo(
     () =>
       superCategories
@@ -141,6 +141,26 @@ export default function Transactions() {
         .then((r) => r.data),
   });
 
+  const taxonomyCatLower = useMemo(() => {
+    const s = new Set<string>();
+    for (const sc of superCategories) {
+      for (const c of sc.txnCategories) s.add(c.toLowerCase());
+    }
+    return s;
+  }, [superCategories]);
+
+  /** Category strings present in loaded txns but not in taxonomy (still filterable). */
+  const orphanFilterCategories = useMemo(() => {
+    if (!transactions?.length) return [];
+    const out = new Set<string>();
+    for (const t of transactions) {
+      const c = t.category;
+      if (!c) continue;
+      if (!taxonomyCatLower.has(c.toLowerCase())) out.add(c);
+    }
+    return Array.from(out).sort((a, b) => a.localeCompare(b, "de-CH"));
+  }, [transactions, taxonomyCatLower]);
+
   // Budget analysis query
   const { data: budgetAnalysis } = useQuery({
     queryKey: ["budget-analysis", granularity, anchor.toISOString(), viewMode],
@@ -188,14 +208,6 @@ export default function Transactions() {
       updateMutation.mutate({ id: txn.id, data: { is_recurring: true, periodicity: value } });
     }
   };
-
-  const categories = Array.from(
-    new Set(
-      (transactions || [])
-        .map((t: Transaction) => t.category)
-        .filter((c): c is string => Boolean(c))
-    )
-  ).sort();
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -522,14 +534,26 @@ export default function Transactions() {
           />
         </div>
         <select
-          className="input w-auto"
+          className="input w-auto min-w-[14rem]"
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
+          aria-label="Nach Kategorie filtern"
         >
           <option value="">Alle Kategorien</option>
-          {categories.map((cat) => (
-            <option key={cat} value={cat}>{cat}</option>
+          {ALL_CAT_GROUPS.map(({ sc, cats }) => (
+            <optgroup key={sc.id} label={`${sc.emoji} ${sc.label}`}>
+              {cats.map((cat) => (
+                <option key={cat} value={cat}>{titleCase(cat)}</option>
+              ))}
+            </optgroup>
           ))}
+          {orphanFilterCategories.length > 0 && (
+            <optgroup label="Weitere (in deinen Daten)">
+              {orphanFilterCategories.map((cat) => (
+                <option key={cat} value={cat}>{titleCase(cat)}</option>
+              ))}
+            </optgroup>
+          )}
         </select>
         <select
           className="input w-auto min-w-[12rem]"
@@ -553,8 +577,15 @@ export default function Transactions() {
           <table className="w-full">
             <thead className="sticky top-0 z-10 bg-slate-900">
               <tr className="border-b border-border/50">
-                {["Datum", "Beschreibung", "Konto", "Kategorie", "Wiederkehrend", "Betrag", "Referenz", ""].map((h) => (
-                  <th key={h} className="text-left text-text-tertiary text-xs uppercase tracking-wide px-4 py-3 font-medium">
+                {["Datum", "Beschreibung", "Konto", "Kategorie", "Wiederkehrend", "Betrag", "Referenz", ""].map((h, colIdx) => (
+                  <th
+                    key={h || "actions"}
+                    className={clsx(
+                      "text-text-tertiary text-xs uppercase tracking-wide px-4 py-3 font-medium",
+                      // Betrag (5) und Referenz (6): rechts wie die Zahlen in den Zellen
+                      colIdx === 5 || colIdx === 6 ? "text-right" : "text-left",
+                    )}
+                  >
                     {h === "Referenz" ? `Referenz (${refCcy})` : h}
                   </th>
                 ))}
@@ -577,12 +608,26 @@ export default function Transactions() {
                     <td className="px-4 py-3 text-text-tertiary text-xs font-mono whitespace-nowrap">
                       {format(new Date(txn.date), "dd.MM.yyyy")}
                     </td>
-                    <td className="px-4 py-3 max-w-xs">
-                      <p className="text-text-primary text-sm truncate">
+                    <td
+                      className="px-4 py-3 max-w-xs"
+                      title={
+                        txn.merchant_normalized &&
+                        txn.description &&
+                        txn.merchant_normalized !== txn.description
+                          ? `${txn.merchant_normalized} — ${txn.description}`
+                          : (txn.merchant_normalized || txn.description || undefined)
+                      }
+                    >
+                      <p
+                        className="text-text-primary text-sm truncate"
+                        title={txn.merchant_normalized || txn.description || undefined}
+                      >
                         {txn.merchant_normalized || txn.description}
                       </p>
                       {txn.merchant_normalized && txn.description !== txn.merchant_normalized && (
-                        <p className="text-text-tertiary text-xs truncate">{txn.description}</p>
+                        <p className="text-text-tertiary text-xs truncate" title={txn.description}>
+                          {txn.description}
+                        </p>
                       )}
                     </td>
                     <td className="px-4 py-3 text-text-tertiary text-xs whitespace-nowrap">

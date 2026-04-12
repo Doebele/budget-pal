@@ -8,7 +8,7 @@ import {
 import { transactionsApi, accountsApi, budgetsApi } from "@/lib/api";
 import { formatCHF } from "@/lib/theme";
 import { format } from "date-fns";
-import type { SankeyLink } from "@/components/charts/SankeyChart";
+import type { SankeyFlowOrder, SankeyLink } from "@/components/charts/SankeyChart";
 
 const SankeyChart = lazy(() => import("@/components/charts/SankeyChart"));
 import GranularityNavigator from "@/components/GranularityNavigator";
@@ -66,7 +66,7 @@ export default function Dashboard() {
   const { resolveSuperCategory, superCategories } = useTaxonomy();
   const [granularity, setGranularity] = useState<TimeGranularity>("ytd");
   const [anchor, setAnchor] = useState<Date>(() => new Date());
-  const [sankeySource, setSankeySource] = useState<"real" | "empirisch">("real");
+  const [sankeyFlowOrder, setSankeyFlowOrder] = useState<SankeyFlowOrder>("value");
 
   const range = useMemo(() => computeDateRange(granularity, anchor), [granularity, anchor]);
   const periodStart = format(range.from, "yyyy-MM-dd");
@@ -95,7 +95,6 @@ export default function Dashboard() {
     queryFn: () => transactionsApi.list({ limit: 8 }).then((r) => r.data),
   });
 
-  // Fetch wizard budgets for the Empirisch Sankey view (always fetched so toggle is instant)
   const { data: wizardBudgets, isLoading: wizardLoading } = useQuery({
     queryKey: ["wizard-budgets-dashboard"],
     queryFn: () => budgetsApi.list().then((r) => r.data),
@@ -106,18 +105,25 @@ export default function Dashboard() {
     (sum: number, a: { balance: number }) => sum + a.balance, 0
   );
 
-  // ── Sankey data (mode-aware) ───────────────────────────────────
   const sparenSuper = useMemo(
     () => superCategories.find((s) => s.id === "sparen"),
     [superCategories],
   );
 
-  const sankeyData = useMemo(() => {
-    if (sankeySource === "empirisch") {
-      return buildSankeyDataEmpirical(wizardBudgets, months, resolveSuperCategory, sparenSuper);
-    }
-    return buildSankeyDataReal(stats, resolveSuperCategory, sparenSuper);
-  }, [sankeySource, stats, wizardBudgets, months, resolveSuperCategory, sparenSuper]);
+  const superCategoryOrderIds = useMemo(
+    () => superCategories.map((s) => s.id),
+    [superCategories],
+  );
+
+  const sankeyDataReal = useMemo(
+    () => buildSankeyDataReal(stats, resolveSuperCategory, sparenSuper),
+    [stats, resolveSuperCategory, sparenSuper],
+  );
+
+  const sankeyDataEmpirical = useMemo(
+    () => buildSankeyDataEmpirical(wizardBudgets, months, resolveSuperCategory, sparenSuper),
+    [wizardBudgets, months, resolveSuperCategory, sparenSuper],
+  );
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -180,65 +186,154 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Sankey + Recent transactions */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        {/* Sankey cash flow */}
-        <div className="xl:col-span-2 card">
-          <div className="mb-4 flex items-start justify-between gap-2">
-            <div>
-              <h2 className="text-text-primary font-semibold text-sm">Cashflow</h2>
-              <p className="text-text-tertiary text-xs mt-0.5">{range.label}</p>
-            </div>
-            {/* Source toggle */}
-            <div className="flex rounded-lg border border-border overflow-hidden text-xs shrink-0">
-              <button
-                onClick={() => setSankeySource("real")}
-                className={clsx(
-                  "px-2.5 py-1.5 transition-colors",
-                  sankeySource === "real"
-                    ? "bg-accent text-white"
-                    : "text-text-tertiary hover:text-text-primary hover:bg-bg-surface2",
-                )}
-              >
-                Reale Angaben
-              </button>
-              <button
-                onClick={() => setSankeySource("empirisch")}
-                className={clsx(
-                  "px-2.5 py-1.5 transition-colors border-l border-border",
-                  sankeySource === "empirisch"
-                    ? "bg-accent text-white"
-                    : "text-text-tertiary hover:text-text-primary hover:bg-bg-surface2",
-                )}
-              >
-                Empirische Angaben
-              </button>
-            </div>
+      {/* Cashflow — Reale vs. Empirische nebeneinander */}
+      <div className="card">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-text-primary font-semibold text-sm">Cashflow</h2>
+            <p className="text-text-tertiary text-xs mt-0.5">{range.label}</p>
           </div>
-
-          {sankeyData.links.length > 0 ? (
-            <Suspense
-              fallback={
-                <div
-                  style={{ height: 360 }}
-                  className="animate-pulse rounded-xl bg-bg-surface2"
-                />
-              }
+          <div
+            className="flex rounded-lg border border-border overflow-hidden text-xs shrink-0"
+            role="group"
+            aria-label="Sankey-Sortierung"
+          >
+            <button
+              type="button"
+              onClick={() => setSankeyFlowOrder("value")}
+              className={clsx(
+                "px-2.5 py-1.5 transition-colors",
+                sankeyFlowOrder === "value"
+                  ? "bg-accent text-white"
+                  : "text-text-tertiary hover:text-text-primary hover:bg-bg-surface2",
+              )}
             >
-              <SankeyChart data={sankeyData} height={360} />
-            </Suspense>
-          ) : (
-            <div className="h-64 flex items-center justify-center text-text-tertiary text-sm text-center px-4">
-              {sankeySource === "empirisch" && wizardLoading
-                ? "Lade empirische Angaben…"
-                : sankeySource === "empirisch"
-                  ? "Keine empirischen Angaben. Bitte zuerst den Setup-Wizard abschliessen."
-                  : `Noch keine Transaktionen im gewählten Zeitraum (${range.label})`}
-            </div>
-          )}
+              Nach Betrag
+            </button>
+            <button
+              type="button"
+              onClick={() => setSankeyFlowOrder("superCategory")}
+              className={clsx(
+                "px-2.5 py-1.5 transition-colors border-l border-border",
+                sankeyFlowOrder === "superCategory"
+                  ? "bg-accent text-white"
+                  : "text-text-tertiary hover:text-text-primary hover:bg-bg-surface2",
+              )}
+            >
+              Nach Kategorien
+            </button>
+          </div>
         </div>
 
-        {/* Recent transactions */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 xl:gap-8">
+          <div className="min-w-0">
+            <h3 className="text-text-secondary text-xs font-semibold uppercase tracking-wide mb-3">
+              Reale Angaben
+            </h3>
+            {sankeyDataReal.links.length > 0 ? (
+              <Suspense
+                fallback={
+                  <div
+                    style={{ height: 320 }}
+                    className="animate-pulse rounded-xl bg-bg-surface2"
+                  />
+                }
+              >
+                <SankeyChart
+                  data={sankeyDataReal}
+                  height={320}
+                  flowOrder={sankeyFlowOrder}
+                  superCategoryOrder={superCategoryOrderIds}
+                />
+              </Suspense>
+            ) : (
+              <div className="h-56 flex items-center justify-center text-text-tertiary text-sm text-center px-3 rounded-xl bg-bg-surface2/40 border border-border/30">
+                {`Noch keine Transaktionen im gewählten Zeitraum (${range.label})`}
+              </div>
+            )}
+          </div>
+
+          <div className="min-w-0">
+            <h3 className="text-text-secondary text-xs font-semibold uppercase tracking-wide mb-3">
+              Empirische Angaben
+            </h3>
+            {wizardLoading ? (
+              <div className="h-56 flex items-center justify-center text-text-tertiary text-sm rounded-xl bg-bg-surface2/40 border border-border/30">
+                Lade empirische Angaben…
+              </div>
+            ) : sankeyDataEmpirical.links.length > 0 ? (
+              <Suspense
+                fallback={
+                  <div
+                    style={{ height: 320 }}
+                    className="animate-pulse rounded-xl bg-bg-surface2"
+                  />
+                }
+              >
+                <SankeyChart
+                  data={sankeyDataEmpirical}
+                  height={320}
+                  flowOrder={sankeyFlowOrder}
+                  superCategoryOrder={superCategoryOrderIds}
+                />
+              </Suspense>
+            ) : (
+              <div className="h-56 flex items-center justify-center text-text-tertiary text-sm text-center px-3 rounded-xl bg-bg-surface2/40 border border-border/30">
+                Keine empirischen Angaben. Bitte zuerst den Setup-Wizard abschliessen.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Top Ausgaben-Kategorien + Letzte Transaktionen (nebeneinander ab xl) */}
+      <div
+        className={clsx(
+          "grid grid-cols-1 gap-4",
+          stats?.top_categories && stats.top_categories.length > 0 && "xl:grid-cols-2",
+        )}
+      >
+        {stats?.top_categories && stats.top_categories.length > 0 && (
+          <div className="card">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between mb-4">
+              <h2 className="text-text-primary font-semibold text-sm">Top Ausgaben-Kategorien</h2>
+              <span className="text-text-tertiary text-xs">{range.label}</span>
+            </div>
+            <div className="space-y-3">
+              {stats.top_categories.slice(0, 10).map((cat: { category: string; total: number }) => {
+                const sc = resolveSuperCategory(cat.category);
+                const pct = stats.total_expenses > 0 ? (cat.total / stats.total_expenses) * 100 : 0;
+                return (
+                  <div key={cat.category}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="flex items-center gap-1.5 text-text-secondary text-xs">
+                        <span
+                          className="w-4 h-4 rounded flex items-center justify-center shrink-0"
+                          style={{ backgroundColor: sc.color + "22" }}
+                        >
+                          <sc.icon className="w-2.5 h-2.5" style={{ color: sc.color }} />
+                        </span>
+                        {cat.category || "Sonstige"}
+                      </span>
+                      <span className="text-text-primary text-xs font-mono">{formatCHF(cat.total)}</span>
+                    </div>
+                    <div className="h-1.5 bg-bg-surface2 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${Math.min(100, pct)}%`,
+                          backgroundColor: sc.color,
+                          opacity: 0.75,
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="card flex flex-col">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-text-primary font-semibold text-sm">Letzte Transaktionen</h2>
@@ -288,48 +383,6 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
-
-      {/* Top categories */}
-      {stats?.top_categories && stats.top_categories.length > 0 && (
-        <div className="card">
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between mb-4">
-            <h2 className="text-text-primary font-semibold text-sm">Top Ausgaben-Kategorien</h2>
-            <span className="text-text-tertiary text-xs">{range.label}</span>
-          </div>
-          <div className="space-y-3">
-            {stats.top_categories.slice(0, 6).map((cat: { category: string; total: number }) => {
-              const sc = resolveSuperCategory(cat.category);
-              const pct = stats.total_expenses > 0 ? (cat.total / stats.total_expenses) * 100 : 0;
-              return (
-                <div key={cat.category}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="flex items-center gap-1.5 text-text-secondary text-xs">
-                      <span
-                        className="w-4 h-4 rounded flex items-center justify-center shrink-0"
-                        style={{ backgroundColor: sc.color + "22" }}
-                      >
-                        <sc.icon className="w-2.5 h-2.5" style={{ color: sc.color }} />
-                      </span>
-                      {cat.category || "Sonstige"}
-                    </span>
-                    <span className="text-text-primary text-xs font-mono">{formatCHF(cat.total)}</span>
-                  </div>
-                  <div className="h-1.5 bg-bg-surface2 rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{
-                        width: `${Math.min(100, pct)}%`,
-                        backgroundColor: sc.color,
-                        opacity: 0.75,
-                      }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       {/* Quick nav */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -513,12 +566,27 @@ function buildSankeyDataReal(
   const sparenSubs = scaleSubsToTotal(sparenSubsMerged, savings);
 
   const segments: Array<{
-    id: string; value: number; color: string;
+    id: string;
+    value: number;
+    color: string;
     subs: Array<{ label: string; value: number }>;
+    superCategoryId: string;
   }> = [
-    ...expSegments.map((e) => ({ id: e.sc.label, value: e.total, color: e.sc.color, subs: e.subs })),
+    ...expSegments.map((e) => ({
+      id: e.sc.label,
+      value: e.total,
+      color: e.sc.color,
+      subs: e.subs,
+      superCategoryId: e.sc.id,
+    })),
     ...(savings > 0
-      ? [{ id: "Sparen", value: savings, color: sparenSuper?.color ?? "#10b981", subs: sparenSubs }]
+      ? [{
+          id: "Sparen",
+          value: savings,
+          color: sparenSuper?.color ?? "#10b981",
+          subs: sparenSubs,
+          superCategoryId: "sparen",
+        }]
       : []),
   ];
 
@@ -540,6 +608,7 @@ function buildSankeyDataReal(
       target: s.id,
       value: parentScaled,
       color: s.color,
+      superCategoryId: s.superCategoryId,
       subItems:
         scaledSubs.length > 0
           ? subItemsForSankeyLink(scaledSubs, parentScaled, "txn")
@@ -625,12 +694,27 @@ function buildSankeyDataEmpirical(
   const sparenSubs = scaleSubsToTotal(sparenSubsMerged, savings);
 
   const segments: Array<{
-    id: string; value: number; color: string;
+    id: string;
+    value: number;
+    color: string;
     subs: Array<{ label: string; value: number }>;
+    superCategoryId: string;
   }> = [
-    ...expSegments.map((e) => ({ id: e.sc.label, value: e.total, color: e.sc.color, subs: e.subs })),
+    ...expSegments.map((e) => ({
+      id: e.sc.label,
+      value: e.total,
+      color: e.sc.color,
+      subs: e.subs,
+      superCategoryId: e.sc.id,
+    })),
     ...(savings > 0
-      ? [{ id: "Sparen", value: savings, color: sparenSuper?.color ?? "#10b981", subs: sparenSubs }]
+      ? [{
+          id: "Sparen",
+          value: savings,
+          color: sparenSuper?.color ?? "#10b981",
+          subs: sparenSubs,
+          superCategoryId: "sparen",
+        }]
       : []),
   ];
 
@@ -652,6 +736,7 @@ function buildSankeyDataEmpirical(
       target: s.id,
       value: parentScaled,
       color: s.color,
+      superCategoryId: s.superCategoryId,
       subItems:
         scaledSubs.length > 0
           ? subItemsForSankeyLink(scaledSubs, parentScaled, "wizard")

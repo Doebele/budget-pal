@@ -15,7 +15,7 @@
 import ReactECharts from "echarts-for-react";
 import { useMemo } from "react";
 import { colors } from "@/lib/theme";
-import { useTaxonomy } from "@/lib/categories";
+import { compareSubLabelsByTaxonomy, useTaxonomy } from "@/lib/categories";
 
 // ── Public types (unchanged for caller compatibility) ──────────
 export interface SankeyNode {
@@ -36,6 +36,8 @@ export interface SankeyLink {
   color?: string;
   /** Sub-items shown in the 3rd column + hover tooltip */
   subItems?: SankeySubItem[];
+  /** Taxonomy supercategory id — used when `flowOrder` is `superCategory` */
+  superCategoryId?: string;
 }
 
 export interface SankeyData {
@@ -43,9 +45,15 @@ export interface SankeyData {
   links: SankeyLink[];
 }
 
+export type SankeyFlowOrder = "value" | "superCategory";
+
 interface SankeyChartProps {
   data: SankeyData;
   height?: number;
+  /** Middle column: by flow size (default) or by taxonomy supercategory order */
+  flowOrder?: SankeyFlowOrder;
+  /** Supercategory ids in display order (e.g. `superCategories.map((s) => s.id)`) */
+  superCategoryOrder?: string[];
 }
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -69,9 +77,15 @@ function displayName(raw: string): string {
 }
 
 // ── Component ──────────────────────────────────────────────────
-export default function SankeyChart({ data, height = 340 }: SankeyChartProps) {
-  const { getCategoryColor } = useTaxonomy();
+export default function SankeyChart({
+  data,
+  height = 340,
+  flowOrder = "value",
+  superCategoryOrder = [],
+}: SankeyChartProps) {
+  const { getCategoryColor, superCategories } = useTaxonomy();
   const option = useMemo(() => {
+    const scById = new Map(superCategories.map((s) => [s.id, s] as const));
     function flowColor(link: SankeyLink, idx: number): string {
       if (link.color) return link.color;
       const c = getCategoryColor(link.target);
@@ -85,11 +99,20 @@ export default function SankeyChart({ data, height = 340 }: SankeyChartProps) {
     );
     if (!direct.length) return null;
 
-    // «Sparen» = Rest-Cashflow ohne Unterknoten: unten platzieren, damit Bänder sich nicht
-    // mit den mittleren Super-Kategorien (z. B. Steuern) überkreuzen.
+    const orderIndex = new Map(superCategoryOrder.map((id, i) => [id, i]));
+
     const flows = [...direct].sort((a, b) => {
-      if (a.target === "Sparen") return 1;
-      if (b.target === "Sparen") return -1;
+      // Nur bei «Nach Betrag»: Rest-Cashflow «Sparen» nach unten (weniger Kreuzungen).
+      if (flowOrder !== "superCategory") {
+        if (a.target === "Sparen") return 1;
+        if (b.target === "Sparen") return -1;
+      }
+      if (flowOrder === "superCategory" && superCategoryOrder.length > 0) {
+        const ia = orderIndex.get(a.superCategoryId ?? "") ?? 999;
+        const ib = orderIndex.get(b.superCategoryId ?? "") ?? 999;
+        if (ia !== ib) return ia - ib;
+        return b.value - a.value;
+      }
       return b.value - a.value;
     });
 
@@ -98,73 +121,114 @@ export default function SankeyChart({ data, height = 340 }: SankeyChartProps) {
 
     const hasSubItems = flows.some((f) => f.subItems && f.subItems.length > 0);
 
+    type PreparedSub = { label: string; value: number };
+    const prepared = flows.map((f, i) => {
+      const c = flowColor(f, i);
+      const positive = (f.subItems ?? []).filter((s) => s.value > 0);
+      let list: PreparedSub[] =
+        positive.length > 0
+          ? positive.map((s) => ({ label: s.label, value: s.value }))
+          : [{ label: "Gesamtbetrag", value: f.value }];
+      if (flowOrder === "superCategory" && positive.length > 0) {
+        const sc = f.superCategoryId ? scById.get(f.superCategoryId) : undefined;
+        list = [...list].sort((x, y) =>
+          compareSubLabelsByTaxonomy(x.label, y.label, sc),
+        );
+      }
+      return { flow: f, color: c, idx: i, subList: list };
+    });
+
     // ── Build ECharts nodes + links ──────────────────────────
+    // Schichten: links Einnahmen → alle Superknoten → alle Unterknoten (in derselben
+    // Super-Reihenfolge). So bleibt die rechte Spalte an die mittlere gekoppelt und
+    // layoutIterations:0 übernimmt diese Reihenfolge ohne Neuordnung.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const eNodes: any[] = [];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const eLinks: any[] = [];
-    const seen = new Set<string>();
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    function addNode(name: string, nodeColor: string, labelOverride?: any) {
-      if (seen.has(name)) return;
-      seen.add(name);
-      eNodes.push({
-        name,
-        itemStyle: { color: nodeColor, borderColor: nodeColor, borderWidth: 0 },
-        ...(labelOverride ? { label: labelOverride } : {}),
-      });
-    }
-
-    // Income (Einnahmen) node — label on the LEFT
-    addNode("Einnahmen", colors.accent, {
-      position: "left",
-      color: colors.textPrimary,
-      fontWeight: "bold",
-      fontSize: 12,
-      formatter: () => "Einnahmen",
+    eNodes.push({
+      name: "Einnahmen",
+      itemStyle: { color: colors.accent, borderColor: colors.accent, borderWidth: 0 },
+      label: {
+        position: "left",
+        color: colors.textPrimary,
+        fontWeight: "bold",
+        fontSize: 12,
+        formatter: () => "Einnahmen",
+      },
     });
 
-    flows.forEach((f, i) => {
-      const c = flowColor(f, i);
-
-      // Supercategory node
-      // In 3-level: label on the left (between the two flow bands)
-      // In 2-level: label on the right (normal)
-      addNode(
-        f.target,
-        c,
-        hasSubItems
-          ? { position: "left", color: colors.textTertiary, fontSize: 10, formatter: (p: { name: string }) => displayName(p.name) }
-          : { position: "right", color: colors.textSecondary, fontSize: 11, formatter: (p: { name: string }) => displayName(p.name) },
-      );
-
-      // Einnahmen → Supercategory link
-      eLinks.push({
-        source: "Einnahmen",
-        target: f.target,
-        value: f.value,
-        lineStyle: { opacity: 0.45 },
-      });
-
-      // Sub-item nodes + links (3-level only)
-      if (hasSubItems) {
-        const positive = (f.subItems ?? []).filter((s) => s.value > 0);
-        // Wenn andere Flüsse Unterknoten haben, muss jeder Mittelknoten mindestens einen rechten
-        // Abfluss haben — sonst wirkt z. B. «Sparen» wie Endknoten ohne Auflösung.
-        const list =
-          positive.length > 0 ? positive : [{ label: "Gesamtbetrag", value: f.value, source: f.subItems?.[0]?.source }];
-        list.forEach((sub) => {
-          const v = sub.value > 0 ? sub.value : f.value;
-          if (v <= 0) return;
-          // Unique name: "Wohnen\x00Miete"  — label formatter strips the prefix
-          const key = `${f.target}${SEP}${sub.label}`;
-          addNode(key, c, {
+    if (!hasSubItems) {
+      prepared.forEach((p) => {
+        const f = p.flow;
+        eNodes.push({
+          name: f.target,
+          itemStyle: { color: p.color, borderColor: p.color, borderWidth: 0 },
+          label: {
             position: "right",
             color: colors.textSecondary,
+            fontSize: 11,
+            formatter: (x: { name: string }) => displayName(x.name),
+          },
+        });
+        eLinks.push({
+          source: "Einnahmen",
+          target: f.target,
+          value: f.value,
+          lineStyle: { opacity: 0.45 },
+        });
+      });
+    } else {
+      prepared.forEach((p) => {
+        const f = p.flow;
+        eNodes.push({
+          name: f.target,
+          itemStyle: { color: p.color, borderColor: p.color, borderWidth: 0 },
+          label: {
+            position: "left",
+            color: colors.textTertiary,
             fontSize: 10,
-            formatter: (p: { name: string }) => displayName(p.name),
+            formatter: (x: { name: string }) => displayName(x.name),
+          },
+        });
+      });
+
+      prepared.forEach((p) => {
+        const f = p.flow;
+        p.subList.forEach((sub) => {
+          const v = sub.value > 0 ? sub.value : f.value;
+          if (v <= 0) return;
+          const key = `${f.target}${SEP}${sub.label}`;
+          eNodes.push({
+            name: key,
+            itemStyle: { color: p.color, borderColor: p.color, borderWidth: 0 },
+            label: {
+              position: "right",
+              color: colors.textSecondary,
+              fontSize: 10,
+              formatter: (x: { name: string }) => displayName(x.name),
+            },
           });
+        });
+      });
+
+      prepared.forEach((p) => {
+        const f = p.flow;
+        eLinks.push({
+          source: "Einnahmen",
+          target: f.target,
+          value: f.value,
+          lineStyle: { opacity: 0.45 },
+        });
+      });
+
+      prepared.forEach((p) => {
+        const f = p.flow;
+        p.subList.forEach((sub) => {
+          const v = sub.value > 0 ? sub.value : f.value;
+          if (v <= 0) return;
+          const key = `${f.target}${SEP}${sub.label}`;
           eLinks.push({
             source: f.target,
             target: key,
@@ -172,8 +236,8 @@ export default function SankeyChart({ data, height = 340 }: SankeyChartProps) {
             lineStyle: { opacity: 0.40 },
           });
         });
-      }
-    });
+      });
+    }
 
     // ── ECharts option ────────────────────────────────────────
     return {
@@ -200,7 +264,15 @@ export default function SankeyChart({ data, height = 340 }: SankeyChartProps) {
           if (params.dataType === "node") {
             // Build sub-items list for supercategory tooltip
             const flow = flows.find((f) => f.target === name);
-            const subs = flow?.subItems ?? [];
+            let subs = flow?.subItems ?? [];
+            if (flowOrder === "superCategory" && subs.length > 1) {
+              const flowSc = flow?.superCategoryId
+                ? scById.get(flow.superCategoryId)
+                : undefined;
+              subs = [...subs].sort((x, y) =>
+                compareSubLabelsByTaxonomy(x.label, y.label, flowSc),
+              );
+            }
             const subRows = subs
               .map(
                 (s) =>
@@ -240,8 +312,9 @@ export default function SankeyChart({ data, height = 340 }: SankeyChartProps) {
           orient: "horizontal",
           nodeWidth: 10,
           nodeGap: 14,
-          // Wenige Iterationen reduzieren Überkreuzungen; Reihenfolge bleibt über Sort oben stabil.
-          layoutIterations: 6,
+          // Bei Taxonomie-Ansicht: 0 — sonst mischen die Layout-Iterationen die
+          // Super-/Kategorie-Reihenfolge und erzeugen unnötige Kreuzungen.
+          layoutIterations: flowOrder === "superCategory" ? 0 : 6,
           draggable: false,
           emphasis: {
             focus: "adjacency",
@@ -269,7 +342,7 @@ export default function SankeyChart({ data, height = 340 }: SankeyChartProps) {
         },
       ],
     };
-  }, [data, getCategoryColor]);
+  }, [data, flowOrder, getCategoryColor, superCategoryOrder, superCategories]);
 
   if (!option) {
     return (
