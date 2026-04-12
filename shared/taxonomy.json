@@ -1,14 +1,14 @@
 {
-  "version": 3,
+  "version": 4,
   "superCategories": [
     {
       "id": "wohnen",
       "label": "Wohnen",
       "emoji": "🏠",
       "color": "#f0b429",
-      "txnCategories": ["Wohnen", "Nebenkosten"],
-      "legacyAliases": ["housing", "utilities"],
-      "wizardLabels": ["miete", "miete & nebenkosten", "hypothek", "hypothek amortisation", "hypothek & amortisation", "nebenkosten", "parkplatz"]
+      "txnCategories": ["Wohnen", "Nebenkosten", "Hypothek"],
+      "legacyAliases": ["housing", "utilities", "mortgage", "hypothek", "hypothekarzins", "amortisation"],
+      "wizardLabels": ["miete", "miete & nebenkosten", "hypothek", "hypothek amortisation", "hypothek & amortisation", "nebenkosten", "parkplatz", "hausverwaltung", "stockwerkeigentum"]
     },
     {
       "id": "essen",

@@ -157,6 +157,7 @@ TXN_TO_PEER_LEGACY: dict[str, str] = {
     "öv abonnements": "transport",
     "housing": "housing",
     "wohnen": "housing",
+    "hypothek": "housing",
     "utilities": "housing",
     "nebenkosten": "housing",
     "insurance": "insurance",
@@ -188,9 +189,16 @@ TXN_TO_PEER_LEGACY: dict[str, str] = {
 
 WIZARD_TO_PEER_LEGACY: dict[str, str] = {
     "miete": "housing",
+    "miete & nebenkosten": "housing",
     "hypothek": "housing",
+    "hypothek amortisation": "housing",
     "hypothek & amortisation": "housing",
+    "hypothekarzins": "housing",
+    "amortisation": "housing",
     "nebenkosten": "housing",
+    "hausverwaltung": "housing",
+    "stockwerkeigentum": "housing",
+    "parkplatz": "housing",          # home parking = housing cost
     "krankenkasse": "insurance",
     "zusatzversicherung": "insurance",
     "hausrat & haftpflicht": "insurance",
@@ -199,7 +207,6 @@ WIZARD_TO_PEER_LEGACY: dict[str, str] = {
     "freizeit & restaurant": "food",
     "abonnements": "leisure",
     "benzin / strom (auto)": "transport",
-    "parkplatz": "transport",
     "auto-amortisation": "transport",
     "sbb halbtax": "transport",
     "sbb ga 2. klasse": "transport",
@@ -222,22 +229,35 @@ SUPER_ID_TO_PEER: dict[str, Optional[str]] = {
 
 # Wizard notes (lower) → canonical transaction category name (explicit overrides)
 DEFAULT_WIZARD_TO_TXN: dict[str, str] = {
+    # Wohnen
     "miete": "Wohnen",
-    "hypothek": "Wohnen",
-    "hypothek & amortisation": "Wohnen",
+    "miete & nebenkosten": "Wohnen",
+    "hausverwaltung": "Wohnen",
+    "stockwerkeigentum": "Wohnen",
+    "parkplatz": "Wohnen",           # home garage/parking space = Wohnkosten
     "nebenkosten": "Nebenkosten",
+    # Hypothek (eigene txnKategorie unter Wohnen)
+    "hypothek": "Hypothek",
+    "hypothek amortisation": "Hypothek",
+    "hypothek & amortisation": "Hypothek",
+    "hypothekarzins": "Hypothek",
+    "amortisation": "Hypothek",
+    # Versicherungen
     "krankenkasse": "Versicherungen",
     "zusatzversicherung": "Versicherungen",
     "hausrat & haftpflicht": "Versicherungen",
     "autoversicherung": "Versicherungen",
+    # Essen
     "lebensmittel": "Lebensmittel",
     "freizeit & restaurant": "Restaurant & Takeaway",
+    # Abos
     "abonnements": "Abonnements",
+    # Mobilität
     "benzin / strom (auto)": "Transport",
-    "parkplatz": "Transport",
     "auto-amortisation": "Transport",
     "sbb halbtax": "ÖV-Kosten",
     "sbb ga 2. klasse": "ÖV-Kosten",
+    # Sparen
     "säule 3a": "Säule 3A",
     "säule 3a einzahlung": "Säule 3A",
     "pillar 3a": "Säule 3A",
