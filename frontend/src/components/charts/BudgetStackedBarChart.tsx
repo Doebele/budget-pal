@@ -17,7 +17,7 @@
  *
  * Tooltip shows per-supercategory total AND sub-category breakdown (historical mode).
  */
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import ReactECharts from "echarts-for-react";
 import type { SuperCategory } from "@/lib/categories";
 import { resolveSuperCategoryFromList, useTaxonomySuperCategories } from "@/lib/categories";
@@ -69,14 +69,21 @@ interface Props {
   forecastAxisMonths?: string[];
   wizardData?: WizardSnapshot | null;
   height?: number;
+  /** When true: skip the outer card div + title row (embed inside a parent card) */
+  embedded?: boolean;
+  /** Supercategory IDs to hide from the chart (mirrors Budget page filter chips) */
+  hiddenScIds?: Set<string>;
+  /** "amount" → sort stack layers by first-month total descending; "default" → taxonomy order */
+  sortOrder?: "default" | "amount";
 }
 
 type SubCatDetail = Record<string, Record<string, Record<string, number>>>;
 
-// ── Supercategory order — warm/cool alternation for max contrast ──
+// ── Supercategory order (bottom → top of stacked bar) ────────────
+// Matches the taxonomy order used in filter chips; excludes "sparen" (income).
 const CHART_SC_ORDER = [
-  "wohnen", "bildung", "steuern", "abos",
-  "freizeit", "versicherungen", "essen", "shopping", "mobilitaet",
+  "wohnen", "essen", "mobilitaet", "versicherungen",
+  "freizeit", "abos", "shopping", "bildung", "steuern", "sonstiges",
 ];
 
 // ── Month helpers ─────────────────────────────────────────────────
@@ -110,7 +117,7 @@ function aggregateHistoricalFull(
   for (const item of items) {
     if (!item.category) continue;
     const sc = resolveTxn(item.category);
-    if (sc.id === "sparen" || sc.id === "sonstiges") continue;
+    if (sc.id === "sparen") continue; // income — never shown as expense
 
     if (!byMonth[item.month]) byMonth[item.month] = {};
     byMonth[item.month][sc.id] = (byMonth[item.month][sc.id] ?? 0) + item.amount;
@@ -314,129 +321,219 @@ function buildWizardForecast(
   return result;
 }
 
-// ── ECharts option builder ────────────────────────────────────────
+// ── Color shade generator ─────────────────────────────────────────
+
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace("#", "");
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
 
 /**
- * @param firstForecastIdx  index of the first "future" month in `months`.
- *   -1 = all months are actual data (no separator).
- *   ≥0 = draw a dashed separator before that index and render those bars at
- *        reduced opacity so the user can distinguish past from projected.
+ * Generate `count` shades of `baseColor` from full saturation (i=0) to
+ * ~60 % lighter (i=count-1), so the most-dominant sub-cat gets the richest tone.
  */
-function buildOption(
+function generateShades(baseColor: string, count: number): string[] {
+  if (!baseColor.startsWith("#") || count <= 0) return Array(count).fill(baseColor);
+  if (count === 1) return [baseColor];
+  const [r, g, b] = hexToRgb(baseColor);
+  return Array.from({ length: count }, (_, i) => {
+    const t = (i / (count - 1)) * 0.62; // 0 → base, (count-1) → 62 % towards white
+    const nr = Math.round(r + (255 - r) * t);
+    const ng = Math.round(g + (255 - g) * t);
+    const nb = Math.round(b + (255 - b) * t);
+    return `#${nr.toString(16).padStart(2, "0")}${ng.toString(16).padStart(2, "0")}${nb.toString(16).padStart(2, "0")}`;
+  });
+}
+
+// ── Layer computation (shared by buildOption + injectRibbons) ────────
+
+export interface ChartLayers {
+  keys: string[];
+  labels: string[];
+  colors: string[];
+  data: Record<string, Record<string, number>>;
+  singleScMode: boolean;
+  subCatColors: string[];
+  orderedSc: SuperCategory[];
+}
+
+export function computeLayers(
   months: string[],
   byMonth: Record<string, Record<string, number>>,
   subsByMonth: SubCatDetail,
-  chartSc: SuperCategory[],
+  chartScIn: SuperCategory[],
+  sortOrder: "default" | "amount" = "default",
+): ChartLayers {
+  let chartSc = chartScIn;
+  if (sortOrder === "amount" && months.length > 0) {
+    const firstMonth = months[0];
+    chartSc = [...chartScIn].sort(
+      (a, b) => (byMonth[firstMonth]?.[b.id] ?? 0) - (byMonth[firstMonth]?.[a.id] ?? 0),
+    );
+  }
+
+  const singleScMode = chartSc.length === 1;
+  let subCats: string[] = [];
+  let subCatColors: string[] = [];
+  const subCatData: Record<string, Record<string, number>> = {};
+
+  if (singleScMode) {
+    const sc = chartSc[0];
+    const totals: Record<string, number> = {};
+    for (const m of months) {
+      const subs = subsByMonth[m]?.[sc.id] ?? {};
+      for (const [name, amt] of Object.entries(subs)) {
+        totals[name] = (totals[name] ?? 0) + amt;
+      }
+    }
+    subCats = Object.keys(totals).sort((a, b) => totals[b] - totals[a]);
+    subCatColors = generateShades(sc.color, subCats.length);
+    for (const m of months) {
+      subCatData[m] = {};
+      const subs = subsByMonth[m]?.[sc.id] ?? {};
+      for (const name of subCats) subCatData[m][name] = subs[name] ?? 0;
+    }
+  }
+
+  return {
+    keys:        singleScMode ? subCats             : chartSc.map((sc) => sc.id),
+    labels:      singleScMode ? subCats             : chartSc.map((sc) => sc.label),
+    colors:      singleScMode ? subCatColors        : chartSc.map((sc) => sc.color),
+    data:        singleScMode ? subCatData          : byMonth,
+    singleScMode,
+    subCatColors,
+    orderedSc: chartSc,
+  };
+}
+
+// ── ECharts option builder ────────────────────────────────────────
+
+function buildOption(
+  months: string[],
+  layers: ChartLayers,
+  subsByMonth: SubCatDetail,
   firstForecastIdx = -1,
 ) {
+  const { keys, labels, colors, data, singleScMode, subCatColors, orderedSc } = layers;
   const axisColor = "#64748b";
   const gridColor = "#1e293b";
   const labelColor = "#94a3b8";
 
-  const series = chartSc.map((sc, si) => {
+  // ── Bar series ────────────────────────────────────────────────────
+  const series = keys.map((key, i) => {
+    const isTop = i === keys.length - 1;
     const s: Record<string, unknown> = {
-      name: sc.label,
+      name: labels[i],
       type: "bar",
       stack: "ausgaben",
       data: months.map((m, mi) => ({
-        value: +(byMonth[m]?.[sc.id] ?? 0).toFixed(2),
+        value: +(data[m]?.[key] ?? 0).toFixed(2),
         itemStyle: {
-          color: sc.color,
-          // Future bars rendered at lower opacity to distinguish from actual data
+          color: colors[i],
           opacity: firstForecastIdx >= 0 && mi >= firstForecastIdx ? 0.55 : 1,
-          borderRadius: 0,
+          borderRadius: isTop ? [2, 2, 0, 0] : 0,
+          ...(singleScMode && keys.length > 1
+            ? { borderColor: "#0f172a44", borderWidth: 1 }
+            : {}),
         },
       })),
-      emphasis: { focus: "series" },
+      emphasis: { focus: "series" as const },
     };
 
-    // Add boundary markLine on the bottom-most series only
-    if (si === 0 && firstForecastIdx > 0) {
+    if (i === 0 && firstForecastIdx > 0) {
       s.markLine = {
         silent: true,
         symbol: ["none", "none"],
         lineStyle: { color: "#475569", type: "dashed", width: 1.5 },
-        label: {
-          show: true,
-          position: "insideStartTop",
-          color: "#64748b",
-          fontSize: 10,
-          formatter: "Prognose →",
-        },
-        // Fractional index places the line between the last actual and first projected bar
+        label: { show: true, position: "insideStartTop", color: "#64748b", fontSize: 10, formatter: "Prognose →" },
         data: [{ xAxis: firstForecastIdx - 0.5 }],
       };
     }
-
     return s;
   });
+
+  // ── Tooltip formatter ─────────────────────────────────────────────
+  type TooltipParam = { seriesName: string; value: number; color: string; name: string; dataIndex: number };
+
+  const tooltipFormatter = (raw: TooltipParam[] | TooltipParam) => {
+    const first = Array.isArray(raw) ? raw[0] : raw;
+    if (!first) return "";
+    const idx = first.dataIndex;
+    if (idx == null || idx < 0 || idx >= months.length) return "";
+
+    const visible = labels
+      .map((label, i) => ({
+        seriesName: label,
+        value: +(data[months[idx]]?.[keys[i]] ?? 0).toFixed(2),
+        color: colors[i],
+      }))
+      .filter((p) => p.value > 0);
+    if (!visible.length) return "";
+
+    const monthKey = months[idx] ?? "";
+    const monthSubs = subsByMonth[monthKey] ?? {};
+    const total = visible.reduce((s, p) => s + (p.value ?? 0), 0);
+    const isFuture = firstForecastIdx >= 0 && idx >= firstForecastIdx;
+
+    let html = `<div style="font-weight:600;margin-bottom:4px;font-size:13px;color:#f1f5f9">${first.name ?? fmtMonth(monthKey)}</div>`;
+    if (isFuture) {
+      html += `<div style="margin-bottom:6px"><span style="background:#7c3aed22;border:1px solid #7c3aed55;color:#a78bfa;font-size:10px;padding:1px 6px;border-radius:9999px">Prognose (Periodizität)</span></div>`;
+    }
+    for (const p of visible) {
+      const pct = total > 0 ? ((p.value / total) * 100).toFixed(1) : "0.0";
+      html += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
+        <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${p.color};flex-shrink:0"></span>
+        <span style="color:#e2e8f0;flex:1;font-weight:500">${p.seriesName}</span>
+        <span style="font-family:monospace;color:#f1f5f9">${formatCHF(p.value)}</span>
+        <span style="color:#64748b;font-size:11px;min-width:38px;text-align:right">${pct}%</span>
+      </div>`;
+
+      if (!singleScMode) {
+        const scId = orderedSc.find((sc) => sc.label === p.seriesName)?.id ?? "";
+        const subEntries = Object.entries(monthSubs[scId] ?? {})
+          .sort((a, b) => b[1] - a[1]).filter(([, amt]) => amt > 0);
+        if (subEntries.length > 1) {
+          for (const [subCat, amt] of subEntries) {
+            const subPct = p.value > 0 ? ((amt / p.value) * 100).toFixed(0) : "0";
+            html += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:1px;padding-left:16px;">
+              <span style="color:#475569;flex:1;font-size:11px">${subCat}</span>
+              <span style="font-family:monospace;color:#94a3b8;font-size:11px">${formatCHF(amt)}</span>
+              <span style="color:#475569;font-size:10px;min-width:38px;text-align:right">${subPct}%</span>
+            </div>`;
+          }
+        }
+      }
+    }
+    html += `<div style="border-top:1px solid #334155;margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;">
+      <span style="color:#94a3b8">Total</span>
+      <span style="font-family:monospace;font-weight:600;color:#f1f5f9">${formatCHF(total)}</span>
+    </div>`;
+    return html;
+  };
+
+  const legendData = singleScMode
+    ? (layers.keys as string[]).map((subName, ci) => ({
+        name: subName,
+        itemStyle: { color: subCatColors[ci] ?? orderedSc[0]?.color },
+      }))
+    : orderedSc.map((sc) => ({ name: sc.label, itemStyle: { color: sc.color } }));
+  const legendBottom = singleScMode && keys.length > 6 ? 96 : 72;
 
   return {
     backgroundColor: "transparent",
     animation: true,
     animationDuration: 400,
     tooltip: {
-      trigger: "axis" as const,
-      axisPointer: { type: "shadow" as const },
+      trigger: "item" as const,
+      appendToBody: true,
       backgroundColor: "#1e293b",
       borderColor: "#334155",
       borderWidth: 1,
       textStyle: { color: "#e2e8f0", fontSize: 12 },
-      formatter: (params: Array<{
-        seriesName: string; value: number; color: string;
-        name: string; dataIndex: number;
-      }>) => {
-        if (!params?.length) return "";
-        const idx = params[0].dataIndex;
-        const monthKey = months[idx] ?? "";
-        const monthSubs = subsByMonth[monthKey] ?? {};
-        const total = params.reduce((s, p) => s + (p.value ?? 0), 0);
-        const isFuture = firstForecastIdx >= 0 && idx >= firstForecastIdx;
-
-        let html = `<div style="font-weight:600;margin-bottom:4px;font-size:13px;color:#f1f5f9">${params[0]?.name ?? ""}</div>`;
-        if (isFuture) {
-          html += `<div style="margin-bottom:6px"><span style="background:#7c3aed22;border:1px solid #7c3aed55;color:#a78bfa;font-size:10px;padding:1px 6px;border-radius:9999px">Prognose (Periodizität)</span></div>`;
-        }
-
-        for (const p of params.filter((p) => p.value > 0)) {
-          const pct = total > 0 ? ((p.value / total) * 100).toFixed(1) : "0.0";
-          html += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
-            <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${p.color};flex-shrink:0"></span>
-            <span style="color:#e2e8f0;flex:1;font-weight:500">${p.seriesName}</span>
-            <span style="font-family:monospace;color:#f1f5f9">${formatCHF(p.value)}</span>
-            <span style="color:#64748b;font-size:11px;min-width:38px;text-align:right">${pct}%</span>
-          </div>`;
-
-          const scId = chartSc.find((sc) => sc.label === p.seriesName)?.id ?? "";
-          const subEntries = Object.entries(monthSubs[scId] ?? {})
-            .sort((a, b) => b[1] - a[1])
-            .filter(([, amt]) => amt > 0);
-
-          if (subEntries.length > 1) {
-            for (const [subCat, amt] of subEntries) {
-              const subPct = p.value > 0 ? ((amt / p.value) * 100).toFixed(0) : "0";
-              html += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:1px;padding-left:16px;">
-                <span style="color:#475569;flex:1;font-size:11px">${subCat}</span>
-                <span style="font-family:monospace;color:#94a3b8;font-size:11px">${formatCHF(amt)}</span>
-                <span style="color:#475569;font-size:10px;min-width:38px;text-align:right">${subPct}%</span>
-              </div>`;
-            }
-          }
-        }
-
-        html += `<div style="border-top:1px solid #334155;margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;">
-          <span style="color:#94a3b8">Total</span>
-          <span style="font-family:monospace;font-weight:600;color:#f1f5f9">${formatCHF(total)}</span>
-        </div>`;
-        return html;
-      },
+      formatter: tooltipFormatter,
     },
-    legend: {
-      bottom: 0,
-      textStyle: { color: labelColor, fontSize: 11 },
-      data: [...chartSc].reverse().map((sc) => sc.label),
-    },
-    grid: { top: 12, left: 16, right: 16, bottom: 72, containLabel: true },
+    legend: { bottom: 0, textStyle: { color: labelColor, fontSize: 11 }, data: legendData },
+    grid: { top: 12, left: 16, right: 16, bottom: legendBottom, containLabel: true },
     xAxis: {
       type: "category" as const,
       data: months.map(fmtMonth),
@@ -449,14 +546,182 @@ function buildOption(
       axisLabel: {
         color: labelColor,
         fontSize: 11,
-        formatter: (v: number) =>
-          v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v),
+        formatter: (v: number) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v),
       },
       splitLine: { lineStyle: { color: gridColor } },
       axisLine: { show: false },
     },
+    // graphic is injected separately after render via injectRibbons()
+    graphic: { elements: [] },
     series,
   };
+}
+
+// ── Graphic polygon ribbon injector ───────────────────────────────
+/**
+ * Computes trapezoid polygons that fill the gap between adjacent stacked bars.
+ * Called after the chart renders so we have pixel-space coordinates via
+ * convertToPixel. Mirrors the technique from the official ECharts example:
+ * https://echarts.apache.org/examples/en/editor.html?c=bar-stack-normalization-and-variation
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function computeRibbonGraphic(inst: any, months: string[], layers: ChartLayers): object {
+  if (!inst || months.length < 2) return { elements: [] };
+  const { keys, colors, data } = layers;
+  const snap = (v: number) => Math.round(v * 2) / 2;
+
+  // ── Measure bar pixel edges per month ───────────────────────────
+  // barEdges[j] = { left, right } in screen-pixel space.
+  //
+  // Method 1 (exact): Read from the chart VIEW's rendered data layout.
+  //   In ECharts 5, layout is written onto the view's data store during render,
+  //   not onto the model's data. We must go via getViewOfSeriesModel().
+  //
+  // Method 2 (fallback): derive from convertToPixel category centres +
+  //   the actual barCategoryGap option (default '20%' → bar = 80% of band).
+  //   This is accurate because we control the chart options.
+  const barEdges: Array<{ left: number; right: number } | null> = months.map(() => null);
+
+  // Pre-format month labels so we can look up categories by string (guaranteed match)
+  const fmtMonths = months.map(fmtMonth);
+
+  // Method 1 — chart view layout (exact pixel coords from ECharts internals)
+  let method1Found = 0;
+  try {
+    const seriesModels = inst.getModel().getSeries();
+    for (const sm of seriesModels) {
+      if (sm.type !== "bar") continue;
+      // getViewOfSeriesModel is a public ECharts API; view._data has post-render layout
+      const view = inst.getViewOfSeriesModel?.(sm);
+      const barData = view?._data ?? view?.getData?.() ?? sm.getData?.();
+      if (!barData) continue;
+      let found = 0;
+      for (let idx = 0; idx < months.length; idx++) {
+        const lay = barData.getItemLayout?.(idx);
+        if (lay && Number.isFinite(lay.x) && lay.width > 0) {
+          barEdges[idx] = { left: lay.x as number, right: (lay.x + lay.width) as number };
+          found++;
+        }
+      }
+      if (found > 0) { method1Found = found; break; }
+    }
+  } catch (_) { /* ignore — fall through to Method 2 */ }
+
+  // Extract bar half-width from Method 1 results so Method 2 can reuse the measured value.
+  // This avoids gap% guessing: if even one month has a real layout, all fallback months
+  // use the same bar width, just centred on their convertToPixel coordinate.
+  let measuredBarHalfWidth: number | null = null;
+  for (const e of barEdges) {
+    if (e && (e.right - e.left) > 0) {
+      measuredBarHalfWidth = (e.right - e.left) / 2;
+      break;
+    }
+  }
+
+  // Method 2 — fills months still missing from Method 1.
+  // Priority: (a) measured width from Method 1, (b) sm.get('barCategoryGap'),
+  //           (c) empirical 30% fallback (ECharts stacked-bar rendered gap is ~30%).
+  if (barEdges.some((e) => e === null)) {
+    try {
+      const c0 = inst.convertToPixel({ xAxisIndex: 0 }, fmtMonths[0]) as number;
+      const c1 = inst.convertToPixel({ xAxisIndex: 0 }, fmtMonths[1]) as number;
+      const bandWidth = Math.abs(c1 - c0);
+      if (bandWidth > 0) {
+        let barHalfWidth: number;
+        if (measuredBarHalfWidth !== null && measuredBarHalfWidth > 0) {
+          // Best: use the real bar width already measured from Method 1
+          barHalfWidth = measuredBarHalfWidth;
+        } else {
+          // Fallback: read gap% from series model (includes registered defaults).
+          // If that is also unavailable, '30%' is the empirically correct value
+          // for ECharts 5 stacked bar charts (~70% bar / ~30% category gap).
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const barSm = inst.getModel().getSeries().find((s: any) => s.type === "bar");
+          const gapStr: string = barSm?.get?.("barCategoryGap") ?? "30%";
+          barHalfWidth = (bandWidth * (1 - parseFloat(gapStr) / 100)) / 2;
+        }
+        for (let idx = 0; idx < months.length; idx++) {
+          if (barEdges[idx] !== null) continue;
+          const cx = inst.convertToPixel({ xAxisIndex: 0 }, fmtMonths[idx]) as number;
+          if (Number.isFinite(cx)) {
+            barEdges[idx] = { left: cx - barHalfWidth, right: cx + barHalfWidth };
+          }
+        }
+      }
+    } catch (_) { /* ignore */ }
+  }
+
+  // Diagnostic — visible in browser DevTools
+  if (import.meta.env?.DEV) {
+    try {
+      // eslint-disable-next-line no-console
+      console.debug("[ribbon] barEdges", {
+        method1Found,
+        measuredBarHalfWidth: measuredBarHalfWidth && Math.round(measuredBarHalfWidth),
+        edges: barEdges.slice(0, 4).map((e) => e && {
+          left: Math.round(e.left), right: Math.round(e.right), width: Math.round(e.right - e.left),
+        }),
+      });
+    } catch (_) { /* ignore diagnostic errors */ }
+  }
+
+  // Precompute cumulative bottom/top per layer per month (data space values)
+  const cumBot: number[][] = months.map(() => new Array(keys.length).fill(0));
+  const cumTop: number[][] = months.map(() => new Array(keys.length).fill(0));
+  for (let j = 0; j < months.length; j++) {
+    let acc = 0;
+    for (let i = 0; i < keys.length; i++) {
+      cumBot[j][i] = acc;
+      acc += data[months[j]]?.[keys[i]] ?? 0;
+      cumTop[j][i] = acc;
+    }
+  }
+
+  const elements: object[] = [];
+
+  for (let j = 1; j < months.length; j++) {
+    const le = barEdges[j - 1];
+    const re = barEdges[j];
+    if (!le || !re) continue;
+
+    // 2 px overlap into each bar eliminates sub-pixel seams at bar/ribbon boundaries.
+    const leftX  = snap(le.right - 2);
+    const rightX = snap(re.left  + 2);
+    if (rightX <= leftX) continue; // bars touching or overlapping — no gap to fill
+
+    for (let i = 0; i < keys.length; i++) {
+      try {
+        const leftBottomY  = inst.convertToPixel({ yAxisIndex: 0 }, cumBot[j-1][i]) as number;
+        const leftTopY     = inst.convertToPixel({ yAxisIndex: 0 }, cumTop[j-1][i]) as number;
+        const rightBottomY = inst.convertToPixel({ yAxisIndex: 0 }, cumBot[j][i]) as number;
+        const rightTopY    = inst.convertToPixel({ yAxisIndex: 0 }, cumTop[j][i]) as number;
+
+        // Skip invisible (zero-height) layers
+        if (Math.abs(leftTopY - leftBottomY) < 0.5 && Math.abs(rightTopY - rightBottomY) < 0.5) continue;
+
+        elements.push({
+          type: "polygon",
+          z: 1,
+          shape: {
+            points: [
+              [leftX,  snap(leftBottomY)],
+              [leftX,  snap(leftTopY)],
+              [rightX, snap(rightTopY)],
+              [rightX, snap(rightBottomY)],
+            ],
+          },
+          style: {
+            fill: colors[i],
+            opacity: 0.12,
+            lineWidth: 0,
+          },
+          silent: true,
+        });
+      } catch (_) { /* ignore */ }
+    }
+  }
+
+  return { elements };
 }
 
 // ── Main component ────────────────────────────────────────────────
@@ -468,15 +733,21 @@ export default function BudgetStackedBarChart({
   forecastAxisMonths,
   wizardData,
   height = 320,
+  embedded = false,
+  hiddenScIds,
+  sortOrder = "default",
 }: Props) {
   const [mode, setMode] = useState<"historical" | "forecast">("historical");
+  // In embedded mode always show historical data (no forecast toggle)
+  const activeMode = embedded ? "historical" : mode;
   const superCategories = useTaxonomySuperCategories();
   const chartSc = useMemo(
     () =>
-      CHART_SC_ORDER.map((id) => superCategories.find((sc) => sc.id === id)).filter(
-        (sc): sc is SuperCategory => sc !== undefined,
-      ),
-    [superCategories],
+      CHART_SC_ORDER
+        .map((id) => superCategories.find((sc) => sc.id === id))
+        .filter((sc): sc is SuperCategory => sc !== undefined)
+        .filter((sc) => !hiddenScIds?.has(sc.id)),
+    [superCategories, hiddenScIds],
   );
   const resolveTxn = useMemo(
     () => (cat: string) => resolveSuperCategoryFromList(superCategories, cat, false),
@@ -570,20 +841,44 @@ export default function BudgetStackedBarChart({
   }, [wizardData, recurringPatterns, aiForecastSubs]);
 
   // ── Active data for current mode ──────────────────────────────
-  const activeMonths       = mode === "historical" ? historicalCombinedMonths : forecastMonths;
-  const activeByMonth      = mode === "historical" ? historicalCombinedByMonth : forecastByMonth;
-  const activeSubs         = mode === "historical" ? historicalCombinedSubs : forecastSubs;
-  const activeFirstForecastIdx = mode === "historical" ? histFirstForecastIdx : -1;
+  const activeMonths       = activeMode === "historical" ? historicalCombinedMonths : forecastMonths;
+  const activeByMonth      = activeMode === "historical" ? historicalCombinedByMonth : forecastByMonth;
+  const activeSubs         = activeMode === "historical" ? historicalCombinedSubs : forecastSubs;
+  const activeFirstForecastIdx = activeMode === "historical" ? histFirstForecastIdx : -1;
+
+  // Compute layer data (keys/colors/sorted SC order) — shared by option + ribbon injector
+  const layers = useMemo(
+    () => computeLayers(activeMonths, activeByMonth, activeSubs, chartSc, sortOrder),
+    [activeMonths, activeByMonth, activeSubs, chartSc, sortOrder],
+  );
 
   const option = useMemo(
-    () =>
-      buildOption(activeMonths, activeByMonth, activeSubs, chartSc, activeFirstForecastIdx),
-    [activeMonths, activeByMonth, activeSubs, chartSc, activeFirstForecastIdx],
+    () => buildOption(activeMonths, layers, activeSubs, activeFirstForecastIdx),
+    [activeMonths, layers, activeSubs, activeFirstForecastIdx],
   );
+
+  // ── Ribbon polygon injection ───────────────────────────────────
+  // Use canvas renderer so convertToPixel returns correct pixel coords.
+  // After each render cycle, compute trapezoid polygons that fill the gap
+  // between the right edge of bar N and the left edge of bar N+1.
+  const echartsRef = useRef<ReactECharts>(null);
+
+  const injectRibbons = useCallback(() => {
+    const inst = echartsRef.current?.getEchartsInstance();
+    if (!inst) return;
+    const graphic = computeRibbonGraphic(inst, activeMonths, layers);
+    inst.setOption({ graphic }, false);
+  }, [activeMonths, layers]);
+
+  useEffect(() => {
+    // Wait one tick for ECharts to finish painting bars before reading layouts
+    const id = setTimeout(injectRibbons, 0);
+    return () => clearTimeout(id);
+  }, [injectRibbons]);
 
   // Status label under the chart title
   const sourceLabel = useMemo(() => {
-    if (mode === "historical") {
+    if (activeMode === "historical") {
       return histFirstForecastIdx >= 0
         ? "Ist-Daten + Prognose aus wiederkehrenden Zahlungen (Ø 12 Mt.)"
         : "Ist-Daten aus realen Transaktionen";
@@ -592,9 +887,72 @@ export default function BudgetStackedBarChart({
     if (Object.keys(recurringPatterns.monthlyAvg).length > 0)
       return "Wiederkehrende Zahlungen · Ø letzte 12 Monate";
     return "KI-Prognose · Steuern auf histor. Ø begrenzt";
-  }, [mode, histFirstForecastIdx, wizardData, recurringPatterns]);
+  }, [activeMode, histFirstForecastIdx, wizardData, recurringPatterns]);
 
   const hasData = activeMonths.length > 0;
+
+  const modeToggle = embedded ? null : (
+    <div className="flex items-center gap-1 p-0.5 rounded-lg bg-bg-surface2 border border-border">
+      <button
+        type="button"
+        onClick={() => setMode("historical")}
+        className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+          mode === "historical"
+            ? "bg-accent text-white shadow-sm"
+            : "text-text-secondary hover:text-text-primary"
+        }`}
+      >
+        Historisch (Ist)
+      </button>
+      <button
+        type="button"
+        onClick={() => setMode("forecast")}
+        className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+          mode === "forecast"
+            ? "bg-accent text-white shadow-sm"
+            : "text-text-secondary hover:text-text-primary"
+        }`}
+      >
+        Prognose (Empirisch)
+      </button>
+    </div>
+  );
+
+  const chartBody = (
+    <>
+      {!hasData ? (
+        <div
+          className="flex items-center justify-center text-text-tertiary text-sm"
+          style={{ height }}
+        >
+          {activeMode === "historical"
+            ? "Keine historischen Transaktionsdaten verfügbar."
+            : "Keine Prognosedaten — wähle einen Zeithorizont."}
+        </div>
+      ) : (
+        <ReactECharts
+          ref={echartsRef}
+          option={option}
+          style={{ height }}
+          opts={{ renderer: "canvas" }}
+          notMerge
+        />
+      )}
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <div>
+        <div className="px-4 pt-2 pb-1">
+          <p className="text-text-tertiary text-[11px]">{sourceLabel}</p>
+        </div>
+        <div className="px-2 pb-2">
+          {chartBody}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="card">
@@ -605,49 +963,9 @@ export default function BudgetStackedBarChart({
           </h2>
           <p className="text-text-tertiary text-[11px] mt-0.5">{sourceLabel}</p>
         </div>
-        <div className="flex items-center gap-1 p-0.5 rounded-lg bg-bg-surface2 border border-border">
-          <button
-            type="button"
-            onClick={() => setMode("historical")}
-            className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-              mode === "historical"
-                ? "bg-accent text-white shadow-sm"
-                : "text-text-secondary hover:text-text-primary"
-            }`}
-          >
-            Historisch (Ist)
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode("forecast")}
-            className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-              mode === "forecast"
-                ? "bg-accent text-white shadow-sm"
-                : "text-text-secondary hover:text-text-primary"
-            }`}
-          >
-            Prognose (Empirisch)
-          </button>
-        </div>
+        {modeToggle}
       </div>
-
-      {!hasData ? (
-        <div
-          className="flex items-center justify-center text-text-tertiary text-sm"
-          style={{ height }}
-        >
-          {mode === "historical"
-            ? "Keine historischen Transaktionsdaten verfügbar."
-            : "Keine Prognosedaten — wähle einen Zeithorizont."}
-        </div>
-      ) : (
-        <ReactECharts
-          option={option}
-          style={{ height }}
-          opts={{ renderer: "svg" }}
-          notMerge
-        />
-      )}
+      {chartBody}
     </div>
   );
 }

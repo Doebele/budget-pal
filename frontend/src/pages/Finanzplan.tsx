@@ -4,17 +4,18 @@
  * Zeigt:
  *  • Monatlichen Cashflow (Einkommen / Ausgaben / Überschuss)
  *  • Budgetplan nach Superkategorie
- *  • Vorsorge (Säule 1 / 2 / 3a)
  *  • Vermögen (Aktien, Immobilien, Krypto, Sonstiges)
+ *  • Vorsorge (Säule 1 / 2 / 3a)
  *  • Schnell-Links zum Wizard / Rentenprognose / Budget
  */
 import { useMemo } from "react";
+import clsx from "clsx";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   Wand2, TrendingUp, PiggyBank, ArrowRight,
   Landmark, ShieldCheck, Coins, Building2,
-  BarChart3, AlertCircle, RefreshCw,
+  BarChart3, AlertCircle, RefreshCw, AlertTriangle,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatCHF } from "@/lib/theme";
@@ -54,10 +55,41 @@ interface AssetItem {
   notes: string | null;
 }
 
+/** Persistierte Hypothekentranschen (GET /wizard/mortgages). */
+interface MortgageTrancheDto {
+  id: number;
+  sortOrder: number;
+  debtValue: number;
+  mortgageType: string;
+  mortgageRate: number;
+}
+
 // ── Helpers ────────────────────────────────────────────────────
 
 function fmtCHF(v: number) {
   return formatCHF(v, false);
+}
+
+/** Wizard Step 6 mortgage row — tolerates snake_case (API / stored JSON). */
+type WizardMortgageRow = {
+  debtValue: number;
+  mortgageType: string;
+  mortgageRate: number;
+};
+
+function normalizeWizardMortgageRow(raw: unknown): WizardMortgageRow {
+  const r = raw as Record<string, unknown>;
+  const debtValue = Number(r.debtValue ?? r.debt_value ?? 0) || 0;
+  const mtRaw = r.mortgageType ?? r.mortgage_type;
+  const mortgageType = mtRaw === "saron" ? "saron" : "fix";
+  const mortgageRate = Number(r.mortgageRate ?? r.mortgage_rate ?? 0) || 0;
+  return { debtValue, mortgageType, mortgageRate };
+}
+
+function readMortgageEntriesFromWizardState(ws: Record<string, unknown>): WizardMortgageRow[] {
+  const raw = ws.mortgageEntries ?? ws.mortgage_entries;
+  if (!Array.isArray(raw)) return [];
+  return raw.map(normalizeWizardMortgageRow);
 }
 
 /** Latest wizard-run budgets only (max created_at batch). */
@@ -71,32 +103,39 @@ function latestWizardBudgets(budgets: BudgetItem[]): BudgetItem[] {
   return wizard.filter((b) => (b.created_at ?? "") === maxTs);
 }
 
+// API returns pillar as the enum VALUE: "1", "2", "3a", "3b"
 const PILLAR_LABEL: Record<string, string> = {
-  pillar_1: "Säule 1 — AHV/IV",
-  pillar_2: "Säule 2 — Pensionskasse (BVG)",
-  pillar_3a: "Säule 3a — Privat",
+  "1":  "Säule 1 — AHV/IV",
+  "2":  "Säule 2 — Pensionskasse (BVG)",
+  "3a": "Säule 3a — Gebundene Vorsorge",
+  "3b": "Säule 3b — Lebensversicherung",
 };
 
 const PILLAR_COLOR: Record<string, string> = {
-  pillar_1: "#38bdf8",
-  pillar_2: "#a78bfa",
-  pillar_3a: "#10b981",
+  "1":  "#38bdf8",
+  "2":  "#a78bfa",
+  "3a": "#10b981",
+  "3b": "#f59e0b",
 };
 
 const ASSET_LABEL: Record<string, string> = {
   stock: "Aktien & ETFs",
   property: "Immobilien",
   crypto: "Kryptowährungen",
+  savings: "Sparkonto / Bank",
+  bond: "Obligationen",
+  pension: "Pensionskasse",
   other: "Sonstiges",
-  savings: "Sparkonto",
 };
 
 const ASSET_COLOR: Record<string, string> = {
   stock: "#84cc16",
   property: "#f0b429",
   crypto: "#fb923c",
-  other: "#94a3b8",
   savings: "#22d3ee",
+  bond: "#60a5fa",
+  pension: "#a78bfa",
+  other: "#94a3b8",
 };
 
 // ── Component ──────────────────────────────────────────────────
@@ -121,7 +160,21 @@ export default function Finanzplan() {
     staleTime: 60_000,
   });
 
-  const isLoading = budgetsLoading || pensionLoading || assetsLoading;
+  // Wizard state for liability data (mortgages / debt)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: wizardState } = useQuery<Record<string, any> | null>({
+    queryKey: ["wizard-state-finanzplan"],
+    queryFn: () => api.get("/wizard/state").then((r) => r.data),
+    staleTime: 60_000,
+  });
+
+  const { data: mortgageTranches = [], isLoading: mortgagesLoading } = useQuery<MortgageTrancheDto[]>({
+    queryKey: ["finanzplan-mortgages"],
+    queryFn: () => api.get("/wizard/mortgages").then((r) => r.data),
+    staleTime: 60_000,
+  });
+
+  const isLoading = budgetsLoading || pensionLoading || assetsLoading || mortgagesLoading;
 
   // ── Derive wizard budgets + totals ──────────────────────────
   const wizardBudgets = useMemo(() => latestWizardBudgets(budgets), [budgets]);
@@ -163,19 +216,121 @@ export default function Finanzplan() {
     [pension],
   );
 
-  // ── Asset totals ────────────────────────────────────────────
-  const totalAssets = useMemo(
-    () => assets.reduce((s, a) => s + a.current_value, 0),
-    [assets],
-  );
+  // ── Immobilien nur aus Wizard Schritt 6 (Vermögen) — vermeidet Summe mehrerer property-Assets in der DB ──
+  const vermoegenImmobilien = useMemo(() => {
+    const ws = wizardState as Record<string, unknown> | null | undefined;
+    if (!ws) return null;
+    const enabled = Boolean(ws.propertyAssetEnabled ?? ws.property_asset_enabled);
+    if (!enabled) return null;
+
+    const gross = Number(ws.propertyAssetValue ?? ws.property_asset_value) || 0;
+
+    let entries: WizardMortgageRow[];
+    if (mortgageTranches.length > 0) {
+      entries = mortgageTranches.map((t) => ({
+        debtValue: Number(t.debtValue) || 0,
+        mortgageType: t.mortgageType === "saron" ? "saron" : "fix",
+        mortgageRate: Number(t.mortgageRate) || 0,
+      }));
+    } else {
+      entries = readMortgageEntriesFromWizardState(ws);
+      const fromEntries = entries.reduce((s, e) => s + e.debtValue, 0);
+      const debtFallback = Number(ws.propertyAssetDebt ?? ws.property_asset_debt) || 0;
+      const debtProbe = fromEntries > 0 ? fromEntries : debtFallback;
+      const hasPositiveRow = entries.some((e) => e.debtValue > 0);
+      if (debtProbe > 0 && !hasPositiveRow) {
+        const mtRaw = ws.mortgageType ?? ws.mortgage_type;
+        const mortgageType = mtRaw === "saron" ? "saron" : "fix";
+        const mortgageRate = Number(ws.mortgageRate ?? ws.mortgage_rate ?? 0) || 0;
+        entries = [{ debtValue: debtProbe, mortgageType, mortgageRate }];
+      }
+    }
+
+    const fromEntries = entries.reduce((s, e) => s + e.debtValue, 0);
+    const debtFallback = Number(ws.propertyAssetDebt ?? ws.property_asset_debt) || 0;
+    const debt = fromEntries > 0 ? fromEntries : debtFallback;
+
+    if (gross <= 0 && debt <= 0) return null;
+    return {
+      gross,
+      debt,
+      net: Math.max(gross - debt, 0),
+      entries,
+    };
+  }, [wizardState, mortgageTranches]);
+
+  // ── Asset totals (property-Zeile = Wizard-Vermögen, nicht Summe aller Immobilien-DB-Zeilen) ──
+  const totalAssets = useMemo(() => {
+    let sum = 0;
+    for (const a of assets) {
+      if (vermoegenImmobilien && a.asset_type === "property") continue;
+      sum += a.current_value;
+    }
+    if (vermoegenImmobilien) sum += vermoegenImmobilien.net;
+    return sum;
+  }, [assets, vermoegenImmobilien]);
 
   const assetsByType = useMemo(() => {
     const map = new Map<string, number>();
     for (const a of assets) {
+      if (vermoegenImmobilien && a.asset_type === "property") continue;
       map.set(a.asset_type, (map.get(a.asset_type) ?? 0) + a.current_value);
     }
+    if (vermoegenImmobilien) {
+      map.set("property", vermoegenImmobilien.net);
+    }
     return [...map.entries()].sort((a, b) => b[1] - a[1]);
-  }, [assets]);
+  }, [assets, vermoegenImmobilien]);
+
+  // ── Liabilities: Hypotheken wie oben (nur Vermögen / Schritt 6) ──
+  interface LiabilityPosition {
+    label: string;
+    grossValue: number;
+    debt: number;
+    equity: number;
+    showLtv: boolean;
+  }
+
+  const totalLiabilities = vermoegenImmobilien?.debt ?? 0;
+
+  const mortgageTrancheCount = useMemo(() => {
+    if (!vermoegenImmobilien) return 0;
+    const n = vermoegenImmobilien.entries.filter((e) => e.debtValue > 0).length;
+    if (n > 0) return n;
+    return totalLiabilities > 0 ? 1 : 0;
+  }, [vermoegenImmobilien, totalLiabilities]);
+
+  const liabilityPositions = useMemo<LiabilityPosition[]>(() => {
+    if (!vermoegenImmobilien) return [];
+    const { gross, debt: totalDebt, net: equity, entries } = vermoegenImmobilien;
+    const positions: LiabilityPosition[] = [
+      {
+        label: "Immobilien (Vermögen)",
+        grossValue: gross,
+        debt: totalDebt,
+        equity,
+        showLtv: true,
+      },
+    ];
+
+    let trancheNr = 0;
+    entries.forEach((e) => {
+      const d = e.debtValue;
+      if (d <= 0) return;
+      trancheNr += 1;
+      const rateLabel =
+        e.mortgageType === "saron" ? "SARON" : `Fix ${e.mortgageRate}% p.a.`;
+      positions.push({
+        label: `Hypothek ${trancheNr} (${rateLabel})`,
+        grossValue: 0,
+        debt: d,
+        equity: 0,
+        showLtv: false,
+      });
+    });
+
+    return positions;
+  }, [vermoegenImmobilien]);
 
   // ── Empty state (no wizard run yet) ────────────────────────
   const hasData = wizardBudgets.length > 0 || pension.length > 0 || assets.length > 0;
@@ -257,21 +412,32 @@ export default function Finanzplan() {
       </div>
 
       {/* ── Cashflow-Karten ───────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-bg-surface2 rounded-xl border border-border/40 px-5 py-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-bg-surface2 rounded-xl border border-border/40 px-4 py-3">
           <p className="text-text-tertiary text-[11px] uppercase tracking-widest font-semibold mb-1">Ausgaben/Mo</p>
-          <p className="text-text-primary font-mono font-bold text-2xl">{fmtCHF(totalExpenses)}</p>
+          <p className="text-text-primary font-mono font-bold text-xl">{fmtCHF(totalExpenses)}</p>
           <p className="text-text-tertiary text-xs mt-1">{wizardBudgets.length} Budgetposten</p>
         </div>
-        <div className="bg-bg-surface2 rounded-xl border border-border/40 px-5 py-4">
+        <div className="bg-bg-surface2 rounded-xl border border-border/40 px-4 py-3">
           <p className="text-text-tertiary text-[11px] uppercase tracking-widest font-semibold mb-1">Gesamtvermögen</p>
-          <p className="font-mono font-bold text-2xl" style={{ color: "#10b981" }}>{fmtCHF(totalAssets)}</p>
+          <p className="font-mono font-bold text-xl" style={{ color: "#10b981" }}>{fmtCHF(totalAssets)}</p>
           <p className="text-text-tertiary text-xs mt-1">{assets.length} Positionen</p>
         </div>
-        <div className="bg-bg-surface2 rounded-xl border border-border/40 px-5 py-4">
+        <div className="bg-bg-surface2 rounded-xl border border-border/40 px-4 py-3">
           <p className="text-text-tertiary text-[11px] uppercase tracking-widest font-semibold mb-1">Vorsorgekapital</p>
-          <p className="font-mono font-bold text-2xl" style={{ color: "#a78bfa" }}>{fmtCHF(totalPension)}</p>
+          <p className="font-mono font-bold text-xl" style={{ color: "#a78bfa" }}>{fmtCHF(totalPension)}</p>
           <p className="text-text-tertiary text-xs mt-1">{pension.length} Einträge</p>
+        </div>
+        <div className="bg-bg-surface2 rounded-xl border border-border/40 px-4 py-3">
+          <p className="text-text-tertiary text-[11px] uppercase tracking-widest font-semibold mb-1">Verpflichtungen</p>
+          <p className="font-mono font-bold text-xl" style={{ color: totalLiabilities > 0 ? "#f87171" : "#94a3b8" }}>
+            {fmtCHF(totalLiabilities)}
+          </p>
+          <p className="text-text-tertiary text-xs mt-1">
+            {mortgageTrancheCount > 0
+              ? `${mortgageTrancheCount} Hypothek${mortgageTrancheCount !== 1 ? "en" : ""}`
+              : "Keine Schulden"}
+          </p>
         </div>
       </div>
 
@@ -324,6 +490,39 @@ export default function Finanzplan() {
         </section>
       )}
 
+      {/* ── Vermögen ──────────────────────────────────────────── */}
+      {assets.length > 0 && (
+        <section className="bg-bg-surface2 rounded-xl border border-border/40 overflow-hidden">
+          <div className="px-5 py-4 border-b border-border/40 flex items-center justify-between">
+            <h2 className="text-text-primary font-semibold text-sm">Vermögen</h2>
+            <span className="text-text-tertiary text-xs font-mono">{fmtCHF(totalAssets)}</span>
+          </div>
+          <div className="divide-y divide-border/30">
+            {assetsByType.map(([type, value]) => {
+              const pct = totalAssets > 0 ? (value / totalAssets) * 100 : 0;
+              const color = ASSET_COLOR[type] ?? "#94a3b8";
+              const label = ASSET_LABEL[type] ?? type;
+              return (
+                <div key={type} className="px-5 py-3">
+                  <div className="flex items-center gap-3 mb-1.5">
+                    <Coins className="w-4 h-4 flex-shrink-0" style={{ color }} />
+                    <span className="text-text-primary text-sm flex-1">{label}</span>
+                    <span className="text-text-secondary font-mono text-sm">{fmtCHF(value)}</span>
+                    <span className="text-text-tertiary text-xs w-10 text-right">{pct.toFixed(0)}%</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-bg-elevated overflow-hidden ml-7">
+                    <div
+                      className="h-full rounded-full"
+                      style={{ width: `${pct}%`, backgroundColor: color }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       {/* ── Vorsorge ──────────────────────────────────────────── */}
       {pension.length > 0 && (
         <section className="bg-bg-surface2 rounded-xl border border-border/40 overflow-hidden">
@@ -331,8 +530,8 @@ export default function Finanzplan() {
             <h2 className="text-text-primary font-semibold text-sm">Vorsorge</h2>
             <span className="text-text-tertiary text-xs font-mono">{fmtCHF(totalPension)} Kapital</span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border/30">
-            {(["pillar_1", "pillar_2", "pillar_3a"] as const).map((pillar) => {
+          <div className="grid grid-cols-1 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-border/30">
+            {(["1", "2", "3a", "3b"] as const).map((pillar) => {
               const entries = pensionByPillar.get(pillar) ?? [];
               const totalBalance = entries.reduce((s, p) => s + p.current_balance, 0);
               const totalContrib = entries.reduce((s, p) => s + p.annual_contribution, 0);
@@ -372,35 +571,93 @@ export default function Finanzplan() {
         </section>
       )}
 
-      {/* ── Vermögen ──────────────────────────────────────────── */}
-      {assets.length > 0 && (
+      {/* ── Verpflichtungen & Schulden ───────────────────────── */}
+      {liabilityPositions.length > 0 && (
         <section className="bg-bg-surface2 rounded-xl border border-border/40 overflow-hidden">
           <div className="px-5 py-4 border-b border-border/40 flex items-center justify-between">
-            <h2 className="text-text-primary font-semibold text-sm">Vermögen</h2>
-            <span className="text-text-tertiary text-xs font-mono">{fmtCHF(totalAssets)}</span>
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-loss" />
+              <h2 className="text-text-primary font-semibold text-sm">Verpflichtungen & Schulden</h2>
+            </div>
+            <span className="text-loss text-xs font-mono font-semibold">{fmtCHF(totalLiabilities)}</span>
           </div>
+
+          {/* Summary table header */}
+          <div className="px-5 py-2 grid grid-cols-4 gap-2 border-b border-border/20 bg-bg-elevated/40">
+            <span className="text-text-tertiary text-[10px] uppercase tracking-wide font-semibold">Position</span>
+            <span className="text-text-tertiary text-[10px] uppercase tracking-wide font-semibold text-right">Marktwert</span>
+            <span className="text-text-tertiary text-[10px] uppercase tracking-wide font-semibold text-right">Eigenkapital</span>
+            <span className="text-text-tertiary text-[10px] uppercase tracking-wide font-semibold text-right">Hypothek</span>
+          </div>
+
           <div className="divide-y divide-border/30">
-            {assetsByType.map(([type, value]) => {
-              const pct = totalAssets > 0 ? (value / totalAssets) * 100 : 0;
-              const color = ASSET_COLOR[type] ?? "#94a3b8";
-              const label = ASSET_LABEL[type] ?? type;
+            {liabilityPositions.map((pos, idx) => {
+              const ltvRatio = pos.grossValue > 0 ? (pos.debt / pos.grossValue) * 100 : 0;
               return (
-                <div key={type} className="px-5 py-3">
-                  <div className="flex items-center gap-3 mb-1.5">
-                    <Coins className="w-4 h-4 flex-shrink-0" style={{ color }} />
-                    <span className="text-text-primary text-sm flex-1">{label}</span>
-                    <span className="text-text-secondary font-mono text-sm">{fmtCHF(value)}</span>
-                    <span className="text-text-tertiary text-xs w-10 text-right">{pct.toFixed(0)}%</span>
+                <div key={`${pos.label}-${idx}`} className={clsx("px-5 py-4", !pos.showLtv && "bg-bg-elevated/20")}>
+                  <div className="grid grid-cols-4 gap-2 mb-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Building2 className="w-4 h-4 text-text-tertiary flex-shrink-0" />
+                      <span className="text-text-primary text-sm font-medium truncate" title={pos.label}>
+                        {pos.label}
+                      </span>
+                    </div>
+                    <span className="text-text-secondary font-mono text-sm text-right">
+                      {pos.grossValue > 0 ? fmtCHF(pos.grossValue) : "—"}
+                    </span>
+                    <span className="font-mono text-sm font-semibold text-right" style={{ color: "#10b981" }}>
+                      {pos.equity > 0 ? fmtCHF(pos.equity) : "—"}
+                    </span>
+                    <span className="text-loss font-mono text-sm font-semibold text-right">−{fmtCHF(pos.debt)}</span>
                   </div>
-                  <div className="h-1.5 rounded-full bg-bg-elevated overflow-hidden ml-7">
-                    <div
-                      className="h-full rounded-full"
-                      style={{ width: `${pct}%`, backgroundColor: color }}
-                    />
-                  </div>
+                  {pos.showLtv && pos.grossValue > 0 && (
+                    <div className="ml-6">
+                      <div className="flex justify-between text-[10px] text-text-tertiary mb-1">
+                        <span>Belehnungsgrad (LTV)</span>
+                        <span className={ltvRatio > 80 ? "text-loss font-semibold" : ltvRatio > 65 ? "text-amber-400" : "text-gain"}>
+                          {ltvRatio.toFixed(1)}%
+                        </span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-bg-elevated overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{
+                            width: `${Math.min(ltvRatio, 100)}%`,
+                            backgroundColor: ltvRatio > 80 ? "#f87171" : ltvRatio > 65 ? "#f59e0b" : "#10b981",
+                          }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-[9px] text-text-tertiary mt-0.5">
+                        <span>FINMA-Richtwert ≤ 65%</span>
+                        <span>Max. Tragbarkeit ≤ 80%</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
+          </div>
+
+          {/* Totals row */}
+          <div className="px-5 py-3 border-t border-border/40 bg-bg-elevated/40 grid grid-cols-4 gap-2">
+            <span className="text-text-secondary text-xs font-semibold">Total</span>
+            <span className="text-text-secondary font-mono text-xs text-right">
+              {fmtCHF(liabilityPositions.reduce((s, p) => s + p.grossValue, 0))}
+            </span>
+            <span className="font-mono text-xs font-semibold text-right" style={{ color: "#10b981" }}>
+              {fmtCHF(liabilityPositions.reduce((s, p) => s + p.equity, 0))}
+            </span>
+            <span className="text-loss font-mono text-xs font-semibold text-right">
+              −{fmtCHF(totalLiabilities)}
+            </span>
+          </div>
+
+          {/* Info note */}
+          <div className="px-5 py-3 border-t border-border/20">
+            <p className="text-text-tertiary text-[11px]">
+              LTV (Loan-to-Value) = Hypothek ÷ Marktwert. FINMA empfiehlt ≤ 65 % für langfristige Tragbarkeit.
+              Amortisationspflicht: auf ≤ 65 % innerhalb von 15 Jahren.
+            </p>
           </div>
         </section>
       )}

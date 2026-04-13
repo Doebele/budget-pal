@@ -19,11 +19,14 @@ import { format } from "date-fns";
 import { clsx } from "clsx";
 import {
   TrendingDown, TrendingUp, ChevronDown, ChevronUp,
-  Lightbulb, Target, Wallet, BarChart3, Gauge, Eye, EyeOff, ArrowDownUp,
+  Lightbulb, Target, Wallet, BarChart3, Gauge, Eye, EyeOff, ArrowDownUp, Layers,
 } from "lucide-react";
 
 const CategoryGaugeChart = lazy(
   () => import("@/components/charts/CategoryGaugeChart"),
+);
+const BudgetStackedBarChart = lazy(
+  () => import("@/components/charts/BudgetStackedBarChart"),
 );
 
 import { api, budgetsApi, transactionsApi, budgetApi } from "@/lib/api";
@@ -34,6 +37,7 @@ import WizardBudgetSidebar from "@/components/WizardBudgetSidebar";
 import TransactionSidebarEditor from "@/components/TransactionSidebarEditor";
 import SuperCategoryBar from "@/components/budget/SuperCategoryBar";
 import CategoryDrillDown from "@/components/budget/CategoryDrillDown";
+import ExpenseDetailPanel from "@/components/budget/ExpenseDetailPanel";
 import type { SubItem } from "@/components/budget/SuperCategoryBar";
 import type { DrillDownTransaction } from "@/components/budget/CategoryDrillDown";
 import { computeDateRange, TimeGranularity } from "@/lib/granularity";
@@ -51,6 +55,7 @@ interface TxnRow {
   merchant_normalized?: string;
   is_recurring?: boolean;
   periodicity?: string;
+  is_transfer?: boolean;
 }
 
 // ── Wizard peer-config types + SC→key mapping ─────────────────
@@ -139,11 +144,14 @@ export default function Budget() {
   const [showTxnEditor, setShowTxnEditor] = useState(false);
   const [txnEditorRows, setTxnEditorRows] = useState<DrillDownTransaction[]>([]);
   const [showSonstiges, setShowSonstiges] = useState(false);
-  const [gaugeView, setGaugeView] = useState<boolean>(() => {
+  const [view, setView] = useState<"bar" | "gauge" | "stacked">(() => {
     try {
-      return localStorage.getItem("budgetpal_budget_default_view") !== "bar";
-    } catch { return true; }
+      const saved = localStorage.getItem("budgetpal_budget_default_view");
+      if (saved === "bar" || saved === "gauge" || saved === "stacked") return saved;
+      return "gauge";
+    } catch { return "gauge"; }
   });
+  const gaugeView = view === "gauge";
   const [sortOrder, setSortOrder] = useState<"default" | "amount">(() => {
     try {
       return (localStorage.getItem("budgetpal_budget_sort_order") as "default" | "amount") || "default";
@@ -155,6 +163,18 @@ export default function Budget() {
       return saved ? new Set<string>(JSON.parse(saved)) : new Set<string>();
     } catch { return new Set<string>(); }
   });
+  const [showExpenseDetail, setShowExpenseDetail] = useState(false);
+  const [excludeTransfers, setExcludeTransfers] = useState<boolean>(() => {
+    try { return localStorage.getItem("budgetpal_budget_excl_transfers") === "true"; } catch { return false; }
+  });
+
+  function toggleExcludeTransfers() {
+    setExcludeTransfers((v) => {
+      const next = !v;
+      try { localStorage.setItem("budgetpal_budget_excl_transfers", String(next)); } catch {}
+      return next;
+    });
+  }
 
   function toggleHideCategory(scId: string) {
     setHiddenScIds((prev) => {
@@ -165,9 +185,9 @@ export default function Budget() {
     });
   }
 
-  function handleSetGaugeView(v: boolean) {
-    setGaugeView(v);
-    try { localStorage.setItem("budgetpal_budget_default_view", v ? "gauge" : "bar"); } catch {}
+  function handleSetView(v: "bar" | "gauge" | "stacked") {
+    setView(v);
+    try { localStorage.setItem("budgetpal_budget_default_view", v); } catch {}
   }
 
   function handleSetSortOrder(v: "default" | "amount") {
@@ -246,21 +266,61 @@ export default function Budget() {
     [selectedFreqs],
   );
 
+  // Categories that represent inter-account transfers (resolve to "sparen")
+  // and should be excluded from expense totals when the toggle is on.
+  const TRANSFER_CATEGORIES = new Set(["Kontoübertrag", "kontoübertrag"]);
+
   // Subset of periodTransactions matching the selected frequencies.
   // Mapping: "monthly"|"quarterly"|"halfyearly"|"yearly"|"weekly" → is_recurring + periodicity
   //          "einmalig" → not recurring (one-time payments)
+  // When excludeTransfers is on, "Kontoübertrag" category entries are removed.
   const freqFilteredTxns = useMemo((): TxnRow[] => {
-    const txns = periodTransactions as TxnRow[];
+    let txns = periodTransactions as TxnRow[];
+    if (excludeTransfers) txns = txns.filter((t) => !TRANSFER_CATEGORIES.has(t.category ?? ""));
     if (ALL_FREQS_SELECTED) return txns;
     return txns.filter((t) => {
       if (!t.is_recurring) return selectedFreqs.has("einmalig");
       return selectedFreqs.has(t.periodicity ?? "monthly");
     });
-  }, [periodTransactions, selectedFreqs, ALL_FREQS_SELECTED]);
+  }, [periodTransactions, selectedFreqs, ALL_FREQS_SELECTED, excludeTransfers]);
+
+  // Periodicity param string for the stacked chart API (null = all)
+  const stackedPeriodicities = useMemo(
+    () => ALL_FREQS_SELECTED ? undefined : [...selectedFreqs].join(","),
+    [ALL_FREQS_SELECTED, selectedFreqs],
+  );
+
+  // Monthly breakdown for stacked bar chart — from API, respects period + freq filter
+  const { data: stackedChartData = [] } = useQuery({
+    queryKey: ["monthly-category-breakdown", periodStart, periodEnd, stackedPeriodicities],
+    queryFn: () =>
+      transactionsApi
+        .monthlyCategoryBreakdown({ start: periodStart, end: periodEnd, periodicities: stackedPeriodicities })
+        .then((r) => r.data),
+    staleTime: 30_000,
+  });
+
+  // All calendar months in the selected period for the x-axis
+  const periodMonths = useMemo(() => {
+    const ms: string[] = [];
+    const cur = new Date(range.from.getFullYear(), range.from.getMonth(), 1);
+    const endD = new Date(range.to.getFullYear(), range.to.getMonth(), 1);
+    while (cur <= endD) {
+      ms.push(`${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}`);
+      cur.setMonth(cur.getMonth() + 1);
+    }
+    return ms;
+  }, [range]);
+
+  // Use fast stats-API path only when all freq chips are active AND the toggle is off.
+  // stats.total_expenses = all non-transfer negatives, INCLUDING sparen-category txns that
+  // aren't flagged as is_transfer (e.g. Kontoübertrag with wrong flag). When the toggle is on
+  // we must use the slow path so freqFilteredTxns can filter by category = "Kontoübertrag".
+  const USE_FAST_PATH = ALL_FREQS_SELECTED && !excludeTransfers;
 
   // ── KPI: stats-API when all freqs active, computed when filtered ──
   const kpi = useMemo(() => {
-    if (ALL_FREQS_SELECTED) {
+    if (USE_FAST_PATH) {
       return {
         income:   stats?.total_income   ?? 0,
         expenses: stats?.total_expenses ?? 0,
@@ -273,7 +333,7 @@ export default function Budget() {
       else expenses += -t.amount;
     }
     return { income, expenses, net: income - expenses };
-  }, [ALL_FREQS_SELECTED, stats, freqFilteredTxns]);
+  }, [USE_FAST_PATH, stats, freqFilteredTxns]);
 
   // ── Actual by supercategory ───────────────────────────────────
   // Fast path: stats.top_categories (authoritative, no limit) when all freqs active.
@@ -281,7 +341,7 @@ export default function Budget() {
   const actualBySuperCat = useMemo((): Map<string, { total: number; subs: Map<string, number> }> => {
     const m = new Map<string, { total: number; subs: Map<string, number> }>();
 
-    if (ALL_FREQS_SELECTED) {
+    if (USE_FAST_PATH) {
       for (const cat of (stats?.top_categories || [])) {
         if (cat.total <= 0) continue;
         const sc = resolveSuperCategory(cat.category, false);
@@ -307,7 +367,7 @@ export default function Budget() {
       }
     }
     return m;
-  }, [ALL_FREQS_SELECTED, stats, freqFilteredTxns, superCategories, resolveSuperCategory]);
+  }, [USE_FAST_PATH, stats, freqFilteredTxns, superCategories, resolveSuperCategory]);
 
   // ── Wizard planned amounts by label → period CHF ─────────────
   const wizardPlanned = useMemo((): Map<string, number> => {
@@ -382,12 +442,29 @@ export default function Budget() {
     return m;
   }, [peerData, wizardPeerConfig, months, superCategories, resolveSuperCategory]);
 
+  // ── Actual sub-items by SC — always from full transaction list ───
+  // stats.top_categories is capped at 10 — this gives ALL categories.
+  const subsBySuperCat = useMemo((): Map<string, Map<string, number>> => {
+    const m = new Map<string, Map<string, number>>();
+    for (const t of freqFilteredTxns) {
+      if (t.amount >= 0) continue;
+      const sc = resolveSuperCategory(t.category || "");
+      if (sc.id === "sparen") continue;
+      const abs = -t.amount;
+      if (!m.has(sc.id)) m.set(sc.id, new Map());
+      const key = t.category || "Sonstiges";
+      m.get(sc.id)!.set(key, (m.get(sc.id)!.get(key) ?? 0) + abs);
+    }
+    return m;
+  }, [freqFilteredTxns, resolveSuperCategory]);
+
   // ── Transactions per supercategory for drill-down ─────────────
   // Uses freqFilteredTxns so the frequency chips affect drill-down too.
   const txnsBySuperCat = useMemo((): Map<string, DrillDownTransaction[]> => {
     const m = new Map<string, DrillDownTransaction[]>();
     for (const t of freqFilteredTxns) {
       if (t.amount >= 0) continue;
+      // freqFilteredTxns already removes Kontoübertrag when toggle is on
       const sc = resolveSuperCategory(t.category || "");
       if (!m.has(sc.id)) m.set(sc.id, []);
       m.get(sc.id)!.push({
@@ -410,14 +487,21 @@ export default function Budget() {
     for (const sc of superCategories) {
       if (sc.id === "sparen") continue; // income side — never shown as expense
 
-      const actEntry  = actualBySuperCat.get(sc.id);
       const planEntry = plannedBySuperCat.get(sc.id);
-      const actual    = actEntry?.total  ?? 0;
       const planned   = planEntry?.total ?? 0;
 
-      // Merge sub-items from actual and planned
+      // Derive actual by summing subsBySuperCat — always from the full txn list, so even
+      // categories that don't appear in stats.top_categories (top-10 limit) are included.
+      // Fall back to actualBySuperCat.total only while freqFilteredTxns is still loading.
+      const histSubs  = subsBySuperCat.get(sc.id);
+      const histTotal = histSubs
+        ? [...histSubs.values()].reduce((s, v) => s + v, 0)
+        : 0;
+      const actual = histTotal > 0 ? histTotal : (actualBySuperCat.get(sc.id)?.total ?? 0);
+
+      // Merge sub-items: actual from full txn list (all categories), planned from wizard
       const subMap = new Map<string, SubItem>();
-      for (const [label, amt] of actEntry?.subs ?? []) {
+      for (const [label, amt] of subsBySuperCat.get(sc.id) ?? []) {
         subMap.set(label, { label, actual: amt, source: "txn" });
       }
       for (const [label, amt] of planEntry?.subs ?? []) {
@@ -449,7 +533,7 @@ export default function Budget() {
     // "default" keeps SUPER_CATEGORIES insertion order
 
     return rows;
-  }, [actualBySuperCat, plannedBySuperCat, txnsBySuperCat, sortOrder, superCategories]);
+  }, [actualBySuperCat, plannedBySuperCat, subsBySuperCat, txnsBySuperCat, sortOrder, superCategories]);
 
   const mainRows     = superRows.filter((r) => r.sc.id !== "sonstiges");
   const sonstigesRow = superRows.find((r) => r.sc.id === "sonstiges");
@@ -528,6 +612,25 @@ export default function Budget() {
             {label}
           </button>
         ))}
+
+        {/* Separator */}
+        <span className="text-border mx-0.5">|</span>
+
+        {/* Exclude-transfers toggle */}
+        <button
+          type="button"
+          title="Kontoüberträge ein-/ausschließen"
+          onClick={toggleExcludeTransfers}
+          className={clsx(
+            "px-3 py-1.5 rounded-lg text-xs border transition-colors",
+            excludeTransfers
+              ? "bg-amber-500/15 border-amber-500/40 text-amber-400"
+              : "bg-bg-surface2 border-border text-text-tertiary hover:text-text-primary",
+          )}
+        >
+          {excludeTransfers ? "Überträge ausgeblendet" : "Überträge einschließen"}
+        </button>
+
         {!ALL_FREQS_SELECTED ? (
           <span className="text-amber-400 text-xs self-center ml-1 flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
@@ -564,8 +667,12 @@ export default function Budget() {
           </p>
         </div>
 
-        {/* Ausgaben Ist vs Soll */}
-        <div className="card flex flex-col gap-2">
+        {/* Ausgaben Ist vs Soll — clickable for detail breakdown */}
+        <button
+          type="button"
+          onClick={() => setShowExpenseDetail(true)}
+          className="card flex flex-col gap-2 text-left hover:ring-1 hover:ring-accent/30 transition-all cursor-pointer"
+        >
           <div className="flex items-center justify-between">
             <span className="text-text-tertiary text-xs uppercase tracking-wide">Ausgaben</span>
             <div className="w-8 h-8 rounded-lg bg-bg-surface2 flex items-center justify-center">
@@ -578,7 +685,7 @@ export default function Budget() {
           {totalPlanned > 0 ? (
             <div>
               <p className="text-text-tertiary text-xs mb-1">
-                von {fmtRef(totalPlanned)} geplant
+                von {fmtRef(totalPlanned)} geplant · <span className="text-accent/70">Details anzeigen</span>
               </p>
               <div className="h-1.5 bg-bg-surface2 rounded-full overflow-hidden">
                 <div
@@ -592,10 +699,10 @@ export default function Budget() {
             </div>
           ) : (
             <p className="text-text-tertiary text-xs">
-              {capabilities?.wizard_available ? "Empirische Budgets geladen…" : "Kein Soll-Budget definiert"}
+              {capabilities?.wizard_available ? "Empirische Budgets geladen…" : "Details anzeigen →"}
             </p>
           )}
-        </div>
+        </button>
 
         {/* Budget-Ausschöpfung */}
         <div className="card flex flex-col gap-2">
@@ -655,15 +762,15 @@ export default function Budget() {
                 <span className="hidden sm:inline">{sortOrder === "amount" ? "Betrag" : "Standard"}</span>
               </button>
 
-              {/* View toggle: Balken / Gauge */}
+              {/* View toggle: Balken / Gauge / Stacked */}
               <div className="flex items-center rounded-lg border border-border overflow-hidden">
                 <button
                   type="button"
                   title="Balkenansicht"
-                  onClick={() => handleSetGaugeView(false)}
+                  onClick={() => handleSetView("bar")}
                   className={clsx(
                     "px-2 py-1.5 transition-colors",
-                    !gaugeView
+                    view === "bar"
                       ? "bg-accent/20 text-accent"
                       : "text-text-tertiary hover:text-text-secondary",
                   )}
@@ -673,22 +780,35 @@ export default function Budget() {
                 <button
                   type="button"
                   title="Gauge-Ansicht"
-                  onClick={() => handleSetGaugeView(true)}
+                  onClick={() => handleSetView("gauge")}
                   className={clsx(
                     "px-2 py-1.5 border-l border-border transition-colors",
-                    gaugeView
+                    view === "gauge"
                       ? "bg-accent/20 text-accent"
                       : "text-text-tertiary hover:text-text-secondary",
                   )}
                 >
                   <Gauge className="w-3.5 h-3.5" />
                 </button>
+                <button
+                  type="button"
+                  title="Monatlicher Verlauf (Stacked Bar)"
+                  onClick={() => handleSetView("stacked")}
+                  className={clsx(
+                    "px-2 py-1.5 border-l border-border transition-colors",
+                    view === "stacked"
+                      ? "bg-accent/20 text-accent"
+                      : "text-text-tertiary hover:text-text-secondary",
+                  )}
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                </button>
               </div>
             </div>
           </div>
 
           {/* Bar-view legend */}
-          {!gaugeView && totalPlanned > 0 && (
+          {view === "bar" && totalPlanned > 0 && (
             <div className="flex items-center gap-4 mt-2 text-xs text-text-tertiary">
               <span className="flex items-center gap-1.5">
                 <span className="w-3 h-1.5 rounded-full bg-accent/60 inline-block" />
@@ -756,7 +876,7 @@ export default function Budget() {
         )}
 
         {/* ── Gauge view ── */}
-        {gaugeView && hasSomeData && (
+        {view === "gauge" && hasSomeData && (
           <Suspense
             fallback={
               <div className="py-10 flex items-center justify-center text-text-tertiary text-sm">
@@ -768,8 +888,29 @@ export default function Budget() {
           </Suspense>
         )}
 
+        {/* ── Stacked bar view ── */}
+        {view === "stacked" && (
+          <Suspense
+            fallback={
+              <div className="py-10 flex items-center justify-center text-text-tertiary text-sm">
+                Lade Diagramm…
+              </div>
+            }
+          >
+            <BudgetStackedBarChart
+              historicalData={stackedChartData}
+              forecastData={[]}
+              historicalAxisMonths={periodMonths}
+              embedded
+              hiddenScIds={hiddenScIds}
+              sortOrder={sortOrder}
+              height={680}
+            />
+          </Suspense>
+        )}
+
         {/* ── Bar view ── */}
-        {!gaugeView && (
+        {view === "bar" && (
           <div className="divide-y divide-border/40">
             {visibleMainRows.map((row) => (
               <SuperCategoryBar
@@ -927,6 +1068,18 @@ export default function Budget() {
             closeDrillDown();
             setShowTxnEditor(true);
           }}
+        />
+      )}
+
+      {/* ── Expense detail panel ─────────────────── */}
+      {showExpenseDetail && (
+        <ExpenseDetailPanel
+          transactions={freqFilteredTxns}
+          resolveSuperCategory={resolveSuperCategory}
+          statsExpenses={USE_FAST_PATH ? stats?.total_expenses : undefined}
+          periodLabel={range.label}
+          excludeTransfers={excludeTransfers}
+          onClose={() => setShowExpenseDetail(false)}
         />
       )}
 

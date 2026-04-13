@@ -5,10 +5,13 @@ import {
   computeDateRange,
   navigatePeriod,
   isCurrentPeriod,
+  isRollingWindow,
 } from "@/lib/granularity";
 
-/** Left-to-right: YTD → Jahr → Halbjahr → Quartal → Monat */
+/** Left-to-right: Max → 2J → YTD → J → H → Q → M */
 const TABS: { value: TimeGranularity; label: string; title: string }[] = [
+  { value: "max",        label: "Max", title: "Gesamter Zeitraum" },
+  { value: "twoyears",   label: "2J",  title: "Letzte 2 Jahre" },
   { value: "ytd",        label: "YTD", title: "Jahr bis heute" },
   { value: "yearly",     label: "J",   title: "Jährlich" },
   { value: "halfyearly", label: "H",   title: "Halbjährlich" },
@@ -25,6 +28,7 @@ interface Props {
 export default function GranularityNavigator({ granularity, anchor, onChange }: Props) {
   const range = computeDateRange(granularity, anchor);
   const current = isCurrentPeriod(granularity, anchor);
+  const rolling = isRollingWindow(granularity);
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
@@ -48,39 +52,45 @@ export default function GranularityNavigator({ granularity, anchor, onChange }: 
         ))}
       </div>
 
-      {/* Period navigation */}
+      {/* Period navigation — hidden for rolling-window granularities */}
       <div className="flex items-center gap-1">
-        <button
-          onClick={() => onChange(granularity, navigatePeriod(granularity, anchor, -1))}
-          className="p-1.5 rounded hover:bg-bg-surface2 text-text-tertiary hover:text-text-primary transition-colors"
-          title="Vorherige Periode"
-        >
-          <ChevronLeft className="w-4 h-4" />
-        </button>
+        {!rolling && (
+          <button
+            onClick={() => onChange(granularity, navigatePeriod(granularity, anchor, -1))}
+            className="p-1.5 rounded hover:bg-bg-surface2 text-text-tertiary hover:text-text-primary transition-colors"
+            title="Vorherige Periode"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+        )}
 
         <span className="text-sm font-medium text-text-primary min-w-[110px] text-center select-none">
           {range.label}
         </span>
 
-        <button
-          onClick={() => onChange(granularity, navigatePeriod(granularity, anchor, 1))}
-          className="p-1.5 rounded hover:bg-bg-surface2 text-text-tertiary hover:text-text-primary transition-colors"
-          title="Nächste Periode"
-        >
-          <ChevronRight className="w-4 h-4" />
-        </button>
+        {!rolling && (
+          <>
+            <button
+              onClick={() => onChange(granularity, navigatePeriod(granularity, anchor, 1))}
+              className="p-1.5 rounded hover:bg-bg-surface2 text-text-tertiary hover:text-text-primary transition-colors"
+              title="Nächste Periode"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
 
-        <button
-          onClick={() => onChange(granularity, new Date())}
-          className={clsx(
-            "px-2.5 py-1.5 rounded text-xs font-medium transition-colors ml-1",
-            current
-              ? "text-accent bg-accent/10 cursor-default"
-              : "text-text-tertiary hover:text-text-primary hover:bg-bg-surface2"
-          )}
-        >
-          Aktuell
-        </button>
+            <button
+              onClick={() => onChange(granularity, new Date())}
+              className={clsx(
+                "px-2.5 py-1.5 rounded text-xs font-medium transition-colors ml-1",
+                current
+                  ? "text-accent bg-accent/10 cursor-default"
+                  : "text-text-tertiary hover:text-text-primary hover:bg-bg-surface2"
+              )}
+            >
+              Aktuell
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

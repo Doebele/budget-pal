@@ -9,7 +9,7 @@
  *
  * Triggered by clicking any SuperCategoryBar on the Budget page.
  */
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { X, TrendingDown, TrendingUp, Minus } from "lucide-react";
 import { format } from "date-fns";
 import { clsx } from "clsx";
@@ -38,6 +38,8 @@ interface Props {
   onEditTransactions?: () => void;
 }
 
+type SubView = "hist" | "emp" | "both";
+
 export default function CategoryDrillDown({
   superCategory,
   actual,
@@ -49,6 +51,7 @@ export default function CategoryDrillDown({
   onEditWizard,
   onEditTransactions,
 }: Props) {
+  const [subView, setSubView] = useState<SubView>("both");
   const hasActual  = actual  !== undefined && actual  > 0;
   const hasPlanned = planned !== undefined && planned > 0;
   const delta      = hasActual && hasPlanned ? actual! - planned! : undefined;
@@ -170,56 +173,129 @@ export default function CategoryDrillDown({
           {/* ── Subcategories ────────────────────── */}
           {subItems && subItems.length > 0 && (
             <div className="px-5 py-4 border-b border-slate-800">
-              <h3 className="text-text-secondary text-xs font-semibold uppercase tracking-wide mb-3">
-                Unterkategorien
-              </h3>
-              <div className="space-y-2">
-                {subItems.map((sub) => {
-                  const subMax = Math.max(sub.actual ?? 0, sub.planned ?? 0, 1);
-                  const subActPct = sub.actual ? Math.min(100, (sub.actual / subMax) * 100) : 0;
-                  return (
-                    <div key={sub.label}>
-                      <div className="flex items-center justify-between mb-1 gap-2">
-                        <span className="text-text-secondary text-xs truncate flex-1">{sub.label}</span>
-                        <div className="flex items-center gap-2 shrink-0 text-xs font-mono">
-                          {sub.actual !== undefined && (
-                            <span className="text-text-primary">{formatCHF(sub.actual)}</span>
-                          )}
-                          {sub.actual !== undefined && sub.planned !== undefined && (
-                            <span className="text-text-disabled">/</span>
-                          )}
-                          {sub.planned !== undefined && (
-                            <span className="text-text-tertiary">{formatCHF(sub.planned)}</span>
-                          )}
-                          {/* Source badge */}
-                          {sub.source && (
-                            <span className={clsx(
-                              "text-xs px-1.5 py-0.5 rounded-full",
-                              sub.source === "wizard"
-                                ? "bg-violet-500/15 text-violet-400"
-                                : sub.source === "txn"
-                                  ? "bg-sky-500/15 text-sky-400"
-                                  : "bg-emerald-500/15 text-emerald-400",
-                            )}>
-                              {sub.source === "wizard" ? "Emp." : sub.source === "txn" ? "Hist." : "Komb."}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="h-1 bg-slate-700 rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full"
-                          style={{
-                            width: `${subActPct}%`,
-                            backgroundColor: superCategory.color,
-                            opacity: 0.7,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
+              {/* Header + view toggle */}
+              <div className="flex items-center justify-between mb-3 gap-2">
+                <h3 className="text-text-secondary text-xs font-semibold uppercase tracking-wide">
+                  Ausgabenverteilung
+                </h3>
+                <div className="flex items-center rounded-lg border border-slate-700 overflow-hidden text-xs shrink-0">
+                  {(["hist", "emp", "both"] as SubView[]).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setSubView(mode)}
+                      className={clsx(
+                        "px-2.5 py-1 transition-colors border-l border-slate-700 first:border-l-0",
+                        subView === mode
+                          ? "bg-accent/20 text-accent"
+                          : "text-text-tertiary hover:text-text-secondary",
+                      )}
+                    >
+                      {mode === "hist" ? "Hist." : mode === "emp" ? "Emp." : "Komb."}
+                    </button>
+                  ))}
+                </div>
               </div>
+
+              {(() => {
+                // Filter sub-items by view mode
+                const visible = (subItems ?? []).filter((sub) => {
+                  if (subView === "hist") return (sub.actual  ?? 0) > 0;
+                  if (subView === "emp")  return (sub.planned ?? 0) > 0;
+                  return (sub.actual ?? 0) > 0 || (sub.planned ?? 0) > 0;
+                });
+
+                if (visible.length === 0) {
+                  return (
+                    <p className="text-text-disabled text-xs text-center py-4">
+                      {subView === "hist"
+                        ? "Keine historischen Angaben vorhanden."
+                        : subView === "emp"
+                          ? "Keine empirischen Angaben vorhanden."
+                          : "Keine Unterkategorien vorhanden."}
+                    </p>
+                  );
+                }
+
+                // Scale reference: sum of visible primary amounts for proportional bars
+                const primaryTotal = visible.reduce((s, sub) => {
+                  const v = subView === "emp" ? (sub.planned ?? 0) : (sub.actual ?? 0);
+                  return s + v;
+                }, 0);
+                const scRef = Math.max(primaryTotal, 1);
+
+                return (
+                  <div className="space-y-2.5">
+                    {visible.map((sub) => {
+                      const hasAct  = (sub.actual  ?? 0) > 0;
+                      const hasPlan = (sub.planned ?? 0) > 0;
+
+                      // Primary bar (solid): actual in hist/both, planned in emp
+                      const primaryAmt = subView === "emp" ? (sub.planned ?? 0) : (sub.actual ?? 0);
+                      const primaryPct = Math.min(100, (primaryAmt / scRef) * 100);
+
+                      // Ghost bar (planned, only in "both" mode)
+                      const ghostPct = subView === "both" && hasPlan && hasAct
+                        ? Math.min(100, ((sub.planned!) / Math.max(sub.actual!, sub.planned!, 1)) * 100)
+                        : 0;
+
+                      // Share % relative to visible primary total
+                      const sharePct = primaryAmt > 0
+                        ? Math.round((primaryAmt / scRef) * 100)
+                        : null;
+
+                      return (
+                        <div key={sub.label}>
+                          <div className="flex items-center justify-between mb-1 gap-2">
+                            <span className="text-text-secondary text-xs truncate flex-1">{sub.label}</span>
+                            <div className="flex items-center gap-2 shrink-0 text-xs font-mono">
+                              {sharePct !== null && (
+                                <span className="text-text-disabled tabular-nums">{sharePct}%</span>
+                              )}
+                              {/* Show amounts based on view mode */}
+                              {subView !== "emp" && hasAct && (
+                                <span className="text-text-primary">{formatCHF(sub.actual!)}</span>
+                              )}
+                              {subView === "both" && hasAct && hasPlan && (
+                                <span className="text-text-disabled">/</span>
+                              )}
+                              {subView !== "hist" && hasPlan && (
+                                <span className={subView === "emp" ? "text-text-primary" : "text-text-tertiary"}>
+                                  {formatCHF(sub.planned!)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Bar */}
+                          <div className="relative h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                            {/* Ghost planned bar (only in "both" mode when both exist) */}
+                            {subView === "both" && ghostPct > 0 && (
+                              <div
+                                className="absolute inset-y-0 left-0 rounded-full"
+                                style={{
+                                  width: `${ghostPct}%`,
+                                  backgroundColor: superCategory.color,
+                                  opacity: 0.22,
+                                }}
+                              />
+                            )}
+                            {/* Primary bar */}
+                            <div
+                              className="absolute inset-y-0 left-0 rounded-full transition-all duration-500"
+                              style={{
+                                width: `${primaryPct}%`,
+                                backgroundColor: superCategory.color,
+                                opacity: subView === "emp" ? 0.55 : 0.8,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
           )}
 

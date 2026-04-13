@@ -11,7 +11,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -64,6 +64,7 @@ class UserProfileResponse(BaseModel):
     retirement_age: int
     currency: str
     locale: str
+    saron_reference_annual_pct: float
 
 
 class UserUpdateRequest(BaseModel):
@@ -73,6 +74,7 @@ class UserUpdateRequest(BaseModel):
     retirement_age: Optional[int] = None
     currency: Optional[str] = None
     locale: Optional[str] = None
+    saron_reference_annual_pct: Optional[float] = Field(default=None, ge=0.0, le=25.0)
     current_password: Optional[str] = None
     new_password: Optional[str] = None
 
@@ -167,6 +169,7 @@ async def get_me(current_user: User = Depends(get_current_user)):
         retirement_age=current_user.retirement_age,
         currency=current_user.currency,
         locale=current_user.locale,
+        saron_reference_annual_pct=float(current_user.saron_reference_annual_pct),
     )
 
 
@@ -201,6 +204,8 @@ async def update_me(
         current_user.currency = cur
     if payload.locale is not None:
         current_user.locale = payload.locale
+    if payload.saron_reference_annual_pct is not None:
+        current_user.saron_reference_annual_pct = float(payload.saron_reference_annual_pct)
 
     # Handle password change
     if payload.new_password:
@@ -230,4 +235,5 @@ async def update_me(
         retirement_age=current_user.retirement_age,
         currency=current_user.currency,
         locale=current_user.locale,
+        saron_reference_annual_pct=float(current_user.saron_reference_annual_pct),
     )

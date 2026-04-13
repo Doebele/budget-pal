@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal, init_db
-from app.api import auth, transactions, imports, projections, accounts, categories, budgets, pension, assets, wizard, currency, forecasting, budget_multimodal, recurring_plan, taxonomy
+from app.api import auth, transactions, imports, projections, accounts, categories, budgets, pension, assets, wizard, currency, forecasting, budget_multimodal, recurring_plan, taxonomy, backup
 from app.api import settings as settings_api
 from app.services.currency_service import currency_service
 
@@ -121,6 +121,20 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("taxonomy_hidden_json column migration skipped: %s", e)
 
+    try:
+        from app.core.database import engine
+        from sqlalchemy import text
+        async with engine.begin() as conn:
+            await conn.execute(
+                text(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS "
+                    "saron_reference_annual_pct DOUBLE PRECISION NOT NULL DEFAULT 0.5"
+                )
+            )
+        logger.info("users.saron_reference_annual_pct column ensured.")
+    except Exception as e:
+        logger.warning("saron_reference_annual_pct column migration skipped: %s", e)
+
     # Create recurring_plan table (new feature — idempotent)
     try:
         from app.core.database import engine
@@ -146,6 +160,31 @@ async def lifespan(app: FastAPI):
         logger.info("recurring_plan table ensured.")
     except Exception as e:
         logger.warning("recurring_plan table creation skipped: %s", e)
+
+    try:
+        from app.core.database import engine
+        from sqlalchemy import text
+        async with engine.begin() as conn:
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS mortgage_tranches (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    sort_order INTEGER NOT NULL DEFAULT 0,
+                    principal_amount DOUBLE PRECISION NOT NULL,
+                    mortgage_type VARCHAR(16) NOT NULL DEFAULT 'fix',
+                    rate_annual_pct DOUBLE PRECISION NOT NULL DEFAULT 0,
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """))
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_mortgage_tranches_user_sort "
+                    "ON mortgage_tranches (user_id, sort_order)"
+                )
+            )
+        logger.info("mortgage_tranches table ensured.")
+    except Exception as e:
+        logger.warning("mortgage_tranches table creation skipped: %s", e)
 
     # Load currency exchange rates
     try:
@@ -200,6 +239,7 @@ app.include_router(forecasting.router, prefix="/api/forecasting", tags=["forecas
 app.include_router(budget_multimodal.router, prefix="/api/budget", tags=["budget"])
 app.include_router(settings_api.router, prefix="/api/settings", tags=["settings"])
 app.include_router(recurring_plan.router, prefix="/api/recurring-plan", tags=["recurring-plan"])
+app.include_router(backup.router, prefix="/api/backup", tags=["backup"])
 
 
 # ── Health Check ──────────────────────────────────────────────

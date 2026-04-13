@@ -426,7 +426,7 @@ async def list_transactions(
         None,
         description="monthly|quarterly|halfyearly|yearly — recurring with this rhythm",
     ),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=2000),
     offset: int = Query(0),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -764,13 +764,66 @@ class MonthlyCategoryItem(BaseModel):
 
 @router.get("/monthly-category-breakdown", response_model=List[MonthlyCategoryItem])
 async def monthly_category_breakdown(
-    months: int = Query(24, ge=1, le=60),
+    start: Optional[date] = Query(None, description="Start date (inclusive). If omitted, falls back to `months` lookback."),
+    end: Optional[date] = Query(None, description="End date (inclusive)."),
+    months: int = Query(24, ge=1, le=60, description="Lookback months (used only when start/end not provided)."),
+    periodicities: Optional[str] = Query(None, description="Comma-separated filter: monthly,quarterly,halfyearly,yearly,weekly,einmalig. Omit for all."),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Expense breakdown by category for each of the last N months."""
+    """Expense breakdown by category for each calendar month in the requested period."""
     from datetime import timedelta
-    cutoff = datetime.now(timezone.utc) - timedelta(days=months * 31)
+
+    # ── Date range ────────────────────────────────────────────────
+    if start and end:
+        date_filter_start = start
+        date_filter_end = end
+    else:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=months * 31)
+        date_filter_start = cutoff.date()
+        date_filter_end = datetime.now(timezone.utc).date()
+
+    # ── Periodicity / frequency filter ───────────────────────────
+    VALID_PERIODICITIES = {"monthly", "quarterly", "halfyearly", "yearly", "weekly"}
+    freq_clauses = []
+    if periodicities:
+        selected = {p.strip().lower() for p in periodicities.split(",") if p.strip()}
+        include_einmalig = "einmalig" in selected
+        include_recurring = selected & VALID_PERIODICITIES
+
+        if include_einmalig and include_recurring:
+            # Both one-time and some recurring
+            freq_clauses.append(
+                or_(
+                    Transaction.is_recurring.isnot(True),  # non-recurring = einmalig
+                    Transaction.periodicity.in_(include_recurring),
+                )
+            )
+        elif include_einmalig:
+            # Only one-time payments
+            freq_clauses.append(Transaction.is_recurring.isnot(True))
+        elif include_recurring:
+            # Only specific recurring types
+            freq_clauses.append(
+                and_(
+                    Transaction.is_recurring == True,  # noqa: E712
+                    Transaction.periodicity.in_(include_recurring),
+                )
+            )
+        else:
+            # Nothing matched → return empty
+            return []
+
+    base_conditions = [
+        Account.user_id == current_user.id,
+        Transaction.amount < 0,
+        Transaction.is_deleted.isnot(True),
+        Transaction.is_transfer.isnot(True),
+        Transaction.date >= date_filter_start,
+        Transaction.date <= date_filter_end,
+        Transaction.category.isnot(None),
+        *freq_clauses,
+    ]
 
     result = await db.execute(
         select(
@@ -780,16 +833,7 @@ async def monthly_category_breakdown(
             func.sum(func.abs(Transaction.amount)).label("amount"),
         )
         .join(Account)
-        .where(
-            and_(
-                Account.user_id == current_user.id,
-                Transaction.amount < 0,
-                Transaction.is_deleted.isnot(True),
-                Transaction.is_transfer.isnot(True),
-                Transaction.date >= cutoff,
-                Transaction.category.isnot(None),
-            )
-        )
+        .where(and_(*base_conditions))
         .group_by(
             func.extract("year", Transaction.date),
             func.extract("month", Transaction.date),

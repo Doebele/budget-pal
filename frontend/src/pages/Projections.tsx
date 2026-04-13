@@ -57,9 +57,10 @@ export default function Projections() {
   // Pension chart data
   const pensionChartData = projection?.years?.map((year: number, i: number) => ({
     year,
-    ahv: Math.round((projection.pension_ahv?.[i] || 0) / 1000),
-    bvg: Math.round((projection.pension_bvg?.[i] || 0) / 1000),
+    ahv:  Math.round((projection.pension_ahv?.[i] || 0) / 1000),
+    bvg:  Math.round((projection.pension_bvg?.[i] || 0) / 1000),
     "3a": Math.round((projection.pension_3a?.[i] || 0) / 1000),
+    "3b": Math.round((projection.pension_3b?.[i] || 0) / 1000),
   })) || [];
 
   const retirementYear = new Date().getFullYear() + (params.retirement_age - 40);
@@ -222,6 +223,10 @@ export default function Projections() {
                   <stop offset="5%" stopColor={colors.purple} stopOpacity={0.3} />
                   <stop offset="95%" stopColor={colors.purple} stopOpacity={0.0} />
                 </linearGradient>
+                <linearGradient id="p3b-grad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.0} />
+                </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke={colors.borderSubtle} vertical={false} />
               <XAxis
@@ -251,9 +256,10 @@ export default function Projections() {
                 wrapperStyle={{ fontSize: 11, color: colors.textSecondary }}
               />
               {/* Retirement line */}
-              <Area type="monotone" dataKey="ahv" name="AHV (Säule 1)" stroke={colors.accent} fill="url(#ahv-grad)" strokeWidth={2} dot={false} />
-              <Area type="monotone" dataKey="bvg" name="BVG (Säule 2)" stroke={colors.gain} fill="url(#bvg-grad)" strokeWidth={2} dot={false} />
-              <Area type="monotone" dataKey="3a" name="Säule 3a" stroke={colors.purple} fill="url(#p3a-grad)" strokeWidth={2} dot={false} />
+              <Area type="monotone" dataKey="ahv" name="AHV (Säule 1)"              stroke={colors.accent}  fill="url(#ahv-grad)"  strokeWidth={2} dot={false} />
+              <Area type="monotone" dataKey="bvg" name="BVG (Säule 2)"              stroke={colors.gain}    fill="url(#bvg-grad)"  strokeWidth={2} dot={false} />
+              <Area type="monotone" dataKey="3a"  name="Säule 3a (gebunden)"        stroke={colors.purple}  fill="url(#p3a-grad)"  strokeWidth={2} dot={false} />
+              <Area type="monotone" dataKey="3b"  name="Säule 3b / Lebensversich."  stroke="#f59e0b"        fill="url(#p3b-grad)"  strokeWidth={2} dot={false} />
             </AreaChart>
           </ResponsiveContainer>
         )}

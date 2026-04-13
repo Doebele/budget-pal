@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import { clsx } from "clsx";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
-import { api, authApi, settingsApi, taxonomyApi } from "@/lib/api";
-import { Save, ExternalLink, Wand2, RotateCcw, AlertCircle, ChevronDown, ChevronUp, Users, Plus, Pencil, Trash2, X, Check, Tag, Eye } from "lucide-react";
+import { api, authApi, settingsApi, taxonomyApi, backupApi } from "@/lib/api";
+import { DEFAULT_SARON_REFERENCE_ANNUAL_PCT, SARON_INDEX_URL } from "@/lib/saron";
+import { Save, ExternalLink, Wand2, RotateCcw, AlertCircle, ChevronDown, ChevronUp, Users, Plus, Pencil, Trash2, X, Check, Tag, Eye, Download, Upload, ShieldCheck } from "lucide-react";
 import { Link } from "react-router-dom";
 import { differenceInYears, parseISO } from "date-fns";
 import { useTaxonomySuperCategories, type SuperCategory } from "@/lib/categories";
@@ -77,6 +78,9 @@ export default function Settings() {
   const [referenceCurrency, setReferenceCurrency] = useState<"CHF" | "EUR" | "USD">(
     (user?.currency as "CHF" | "EUR" | "USD") || "CHF"
   );
+  const [saronReferenceAnnualPct, setSaronReferenceAnnualPct] = useState<number>(
+    user?.saron_reference_annual_pct ?? DEFAULT_SARON_REFERENCE_ANNUAL_PCT
+  );
   const [saved, setSaved] = useState(false);
   const [expandedSc, setExpandedSc] = useState<string | null>(null);
   const [budgetDefaultView, setBudgetDefaultView] = useState<"bar" | "gauge">(() => {
@@ -88,6 +92,63 @@ export default function Settings() {
   function handleBudgetDefaultView(v: "bar" | "gauge") {
     setBudgetDefaultView(v);
     try { localStorage.setItem("budgetpal_budget_default_view", v); } catch {}
+  }
+
+  // ── Backup / Restore ─────────────────────────────────────────
+  const [backupExporting, setBackupExporting] = useState(false);
+  const [backupExportError, setBackupExportError] = useState<string | null>(null);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importOptions, setImportOptions] = useState({
+    overwrite_profile: false,
+    import_transactions: true,
+    import_recurring_plan: true,
+    import_wizard_config: true,
+    import_pension_assets: true,
+  });
+  const [importResult, setImportResult] = useState<Record<string, unknown> | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importPending, setImportPending] = useState(false);
+
+  async function handleExport() {
+    setBackupExporting(true);
+    setBackupExportError(null);
+    try {
+      const resp = await backupApi.export();
+      const blob = new Blob([resp.data], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const now = new Date();
+      const ts = now.toISOString().replace(/[:.]/g, "-").slice(0, 19);
+      a.href = url;
+      a.download = `budgetpal_backup_${ts}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setBackupExportError("Export fehlgeschlagen. Bitte erneut versuchen.");
+    } finally {
+      setBackupExporting(false);
+    }
+  }
+
+  async function handleImport() {
+    if (!importFile) return;
+    setImportPending(true);
+    setImportError(null);
+    setImportResult(null);
+    try {
+      const text = await importFile.text();
+      const parsed = JSON.parse(text);
+      const resp = await backupApi.import({ backup: parsed, ...importOptions });
+      setImportResult(resp.data as Record<string, unknown>);
+      queryClient.invalidateQueries();
+    } catch (e) {
+      const msg = e instanceof SyntaxError
+        ? "Ungültige JSON-Datei."
+        : "Import fehlgeschlagen. Bitte Backup-Datei überprüfen.";
+      setImportError(msg);
+    } finally {
+      setImportPending(false);
+    }
   }
 
   // Peer config (stored from last wizard run)
@@ -111,6 +172,12 @@ export default function Settings() {
     }
   }, [user?.currency]);
 
+  useEffect(() => {
+    if (user?.saron_reference_annual_pct != null && !Number.isNaN(user.saron_reference_annual_pct)) {
+      setSaronReferenceAnnualPct(user.saron_reference_annual_pct);
+    }
+  }, [user?.saron_reference_annual_pct]);
+
   const mutation = useMutation({
     mutationFn: () =>
       authApi.updateMe({
@@ -118,6 +185,7 @@ export default function Settings() {
         birthdate: birthdate || null,
         retirement_age: retirementAge,
         currency: referenceCurrency,
+        saron_reference_annual_pct: saronReferenceAnnualPct,
       }),
     onSuccess: async () => {
       await refreshUser();
@@ -435,6 +503,39 @@ export default function Settings() {
               <option value="EUR">Euro (EUR)</option>
               <option value="USD">US-Dollar (USD)</option>
             </select>
+          </div>
+
+          <div>
+            <label className="label">
+              SARON-Referenzzins (jährlich, % p.a.)
+              <span className="text-text-tertiary font-normal ml-1 text-xs">
+                (für Hypothekenangaben im Wizard)
+              </span>
+            </label>
+            <div className="flex flex-wrap items-center gap-3 max-w-md">
+              <input
+                type="number"
+                min={0}
+                max={25}
+                step={0.01}
+                className="input w-28 font-mono"
+                value={saronReferenceAnnualPct}
+                onChange={(e) => setSaronReferenceAnnualPct(parseFloat(e.target.value) || 0)}
+              />
+              <span className="text-text-tertiary text-xs">% p.a.</span>
+            </div>
+            <p className="text-text-tertiary text-xs mt-2 leading-relaxed">
+              Referenzwert zur Darstellung von SARON-Hypotheken (kein Live-Tageszins). Quelle und Details:{" "}
+              <a
+                href={SARON_INDEX_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-accent hover:underline inline-flex items-center gap-1"
+              >
+                SIX SARON
+                <ExternalLink className="w-3 h-3 shrink-0" />
+              </a>
+            </p>
           </div>
 
           {/* Birthdate — key for peer group & pension */}
@@ -1371,6 +1472,112 @@ export default function Settings() {
               Wird beim Öffnen der Budgetanalyse als Standard verwendet.
             </p>
           </div>
+        </div>
+      </div>
+
+      {/* ── Datensicherung ──────────────────────────────────────── */}
+      <div className="card space-y-5">
+        <h2 className="text-text-primary font-semibold text-sm flex items-center gap-2">
+          <ShieldCheck className="w-4 h-4 text-accent" />
+          Datensicherung
+        </h2>
+
+        {/* Export */}
+        <div className="space-y-2">
+          <h3 className="text-text-secondary text-xs font-medium uppercase tracking-wide">Export</h3>
+          <p className="text-text-tertiary text-xs">
+            Exportiert alle deine Daten als JSON-Backup: Transaktionen, Konten, Budgets,
+            Wiederkehrende Einträge, Wizard-Konfiguration, Säulen 1–3a und Assets.
+          </p>
+          <button
+            type="button"
+            onClick={handleExport}
+            disabled={backupExporting}
+            className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent/90 disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            {backupExporting ? "Wird exportiert…" : "JSON-Backup herunterladen"}
+          </button>
+          {backupExportError && (
+            <p className="text-loss text-xs flex items-center gap-1">
+              <AlertCircle className="w-3.5 h-3.5" /> {backupExportError}
+            </p>
+          )}
+        </div>
+
+        <div className="border-t border-border/40" />
+
+        {/* Import */}
+        <div className="space-y-3">
+          <h3 className="text-text-secondary text-xs font-medium uppercase tracking-wide">Import / Wiederherstellen</h3>
+          <p className="text-text-tertiary text-xs">
+            Stellt Daten aus einem vorherigen JSON-Backup wieder her. Bestehende Einträge werden
+            nicht überschrieben — nur fehlende Daten werden ergänzt.
+          </p>
+
+          {/* File picker */}
+          <label className="flex items-center gap-2 cursor-pointer w-fit">
+            <span className="flex items-center gap-2 px-3 py-2 bg-bg-surface2 hover:bg-bg-surface border border-border text-text-secondary hover:text-text-primary rounded-lg text-sm transition-colors">
+              <Upload className="w-4 h-4" />
+              {importFile ? importFile.name : "Backup-Datei auswählen (.json)"}
+            </span>
+            <input
+              type="file"
+              accept=".json,application/json"
+              className="hidden"
+              onChange={(e) => { setImportFile(e.target.files?.[0] ?? null); setImportResult(null); setImportError(null); }}
+            />
+          </label>
+
+          {/* Options */}
+          {importFile && (
+            <div className="space-y-2 text-xs text-text-secondary">
+              <p className="text-text-tertiary font-medium">Optionen:</p>
+              {([
+                ["import_transactions", "Transaktionen importieren"],
+                ["import_recurring_plan", "Wiederkehrende Einträge importieren"],
+                ["import_wizard_config", "Wizard-Konfiguration wiederherstellen"],
+                ["import_pension_assets", "Säulen & Assets importieren"],
+                ["overwrite_profile", "Profil-Felder überschreiben (Name, Währung, …)"],
+              ] as [keyof typeof importOptions, string][]).map(([key, label]) => (
+                <label key={key} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={importOptions[key]}
+                    onChange={(e) => setImportOptions((o) => ({ ...o, [key]: e.target.checked }))}
+                    className="accent-accent"
+                  />
+                  {label}
+                </label>
+              ))}
+              <button
+                type="button"
+                onClick={handleImport}
+                disabled={importPending}
+                className="mt-2 flex items-center gap-2 px-4 py-2 bg-gain/80 hover:bg-gain disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                <Upload className="w-4 h-4" />
+                {importPending ? "Wird importiert…" : "Backup importieren"}
+              </button>
+            </div>
+          )}
+
+          {/* Result */}
+          {importResult && (
+            <div className="p-3 rounded-xl bg-gain/10 border border-gain/30 text-xs space-y-1 text-gain">
+              <p className="font-medium flex items-center gap-1"><Check className="w-3.5 h-3.5" /> Import abgeschlossen</p>
+              <p>Konten: +{String(importResult.accounts_created ?? 0)} · Transaktionen: +{String(importResult.transactions_created ?? 0)} übersprungen: {String(importResult.transactions_skipped ?? 0)}</p>
+              <p>Wiederkehrend: +{String(importResult.recurring_plan_created ?? 0)} · Säulen: +{String(importResult.pension_created ?? 0)} · Assets: +{String(importResult.assets_created ?? 0)}</p>
+              {(importResult.warnings as string[] | undefined)?.length ? (
+                <p className="text-amber-400">⚠ {(importResult.warnings as string[]).join("; ")}</p>
+              ) : null}
+            </div>
+          )}
+          {importError && (
+            <p className="text-loss text-xs flex items-center gap-1">
+              <AlertCircle className="w-3.5 h-3.5" /> {importError}
+            </p>
+          )}
         </div>
       </div>
 

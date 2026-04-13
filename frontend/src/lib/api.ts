@@ -104,6 +104,8 @@ export const transactionsApi = {
     api.get("/transactions/monthly-summary", { params }),
   budgetAnalysis: (params?: Record<string, unknown>) =>
     api.get("/transactions/budget-analysis", { params }),
+  monthlyCategoryBreakdown: (params: { start?: string; end?: string; months?: number; periodicities?: string }) =>
+    api.get("/transactions/monthly-category-breakdown", { params }),
 };
 
 // Imports
@@ -250,6 +252,22 @@ export const settingsApi = {
   putCategoryMappings: (mappings: Array<{ wizard_label: string; transaction_category: string }>) =>
     api.put("/settings/category-mappings", { mappings }),
   resetCategoryMappings: () => api.delete("/settings/category-mappings"),
+};
+
+// Backup / Export / Import
+export const backupApi = {
+  /** Download a full JSON backup for the current user. Returns raw blob response. */
+  export: () => api.get("/backup/export", { responseType: "blob" }),
+
+  /** Restore from a parsed backup JSON object. Returns BackupImportResult. */
+  import: (payload: {
+    backup: Record<string, unknown>;
+    overwrite_profile?: boolean;
+    import_transactions?: boolean;
+    import_recurring_plan?: boolean;
+    import_wizard_config?: boolean;
+    import_pension_assets?: boolean;
+  }) => api.post("/backup/import", payload),
 };
 
 export default api;

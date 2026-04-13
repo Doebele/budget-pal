@@ -124,12 +124,17 @@ export default function SuperCategoryBar({
         )}
       </div>
 
-      {/* Sub-items summary (collapsed, shown as dots) */}
+      {/* Sub-items summary */}
       {subItems && subItems.length > 1 && (
         <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5">
           {subItems.slice(0, 4).map((sub) => (
-            <span key={sub.label} className="text-text-disabled text-xs truncate">
-              {sub.label}
+            <span key={sub.label} className="flex items-baseline gap-1 text-xs">
+              <span className="text-text-disabled truncate max-w-[120px]">{sub.label}</span>
+              {sub.actual !== undefined && sub.actual > 0 && (
+                <span className="text-text-disabled/60 font-mono tabular-nums shrink-0">
+                  {formatCHF(sub.actual)}
+                </span>
+              )}
             </span>
           ))}
           {subItems.length > 4 && (

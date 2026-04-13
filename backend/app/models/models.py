@@ -57,6 +57,7 @@ class AssetType(str, enum.Enum):
     crypto = "crypto"
     bond = "bond"
     pension = "pension"
+    savings = "savings"   # bank / savings accounts
     other = "other"
 
 
@@ -88,6 +89,8 @@ class User(Base):
     retirement_age: Mapped[int] = mapped_column(Integer, default=65)
     currency: Mapped[str] = mapped_column(String(3), default="CHF")
     locale: Mapped[str] = mapped_column(String(10), default="de-CH")
+    # Referenz-SARON p.a. (%) für Wizard/Anzeige — Nutzer pflegbar in Einstellungen
+    saron_reference_annual_pct: Mapped[float] = mapped_column(Float, default=0.5, nullable=False)
     # Per-user hidden canonical taxonomy labels (JSON: {"sc_id:txn": [...], "sc_id:wl": [...]})
     taxonomy_hidden_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
@@ -98,6 +101,9 @@ class User(Base):
     budgets: Mapped[List["Budget"]] = relationship("Budget", back_populates="user", cascade="all, delete-orphan")
     pension_data: Mapped[List["PensionData"]] = relationship("PensionData", back_populates="user", cascade="all, delete-orphan")
     assets: Mapped[List["Asset"]] = relationship("Asset", back_populates="user", cascade="all, delete-orphan")
+    mortgage_tranches: Mapped[List["MortgageTranche"]] = relationship(
+        "MortgageTranche", back_populates="user", cascade="all, delete-orphan"
+    )
     scenarios: Mapped[List["Scenario"]] = relationship("Scenario", back_populates="user", cascade="all, delete-orphan")
     import_logs: Mapped[List["ImportLog"]] = relationship("ImportLog", back_populates="user", cascade="all, delete-orphan")
     forecast_scenarios: Mapped[List["ForecastScenario"]] = relationship("ForecastScenario", back_populates="user", cascade="all, delete-orphan")
@@ -361,6 +367,23 @@ class Asset(Base):
     )
 
     user: Mapped["User"] = relationship("User", back_populates="assets")
+
+
+class MortgageTranche(Base):
+    """Einzelne Hypothekentranchnung aus dem Wizard (Schritt Vermögen)."""
+
+    __tablename__ = "mortgage_tranches"
+    __table_args__ = (Index("ix_mortgage_tranches_user_sort", "user_id", "sort_order"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    principal_amount: Mapped[float] = mapped_column(Float, nullable=False)
+    mortgage_type: Mapped[str] = mapped_column(String(16), nullable=False, default="fix")
+    rate_annual_pct: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    user: Mapped["User"] = relationship("User", back_populates="mortgage_tranches")
 
 
 # ── Scenario ──────────────────────────────────────────────────

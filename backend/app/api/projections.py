@@ -51,6 +51,7 @@ class ProjectionResult(BaseModel):
     pension_ahv: List[float]
     pension_bvg: List[float]
     pension_3a: List[float]
+    pension_3b: List[float] = []   # Säule 3b / Lebensversicherung (optional — zero for old cached results)
     inflation_adjusted: bool
     computed_at: str
     runs: int

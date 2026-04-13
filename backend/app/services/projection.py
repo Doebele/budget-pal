@@ -109,7 +109,7 @@ class ProjectionService:
         year_labels = list(range(datetime.now().year, datetime.now().year + years + 1))
 
         # ── Pension Projections ───────────────────────────────
-        pension_ahv, pension_bvg, pension_3a = self._project_pensions(
+        pension_ahv, pension_bvg, pension_3a, pension_3b = self._project_pensions(
             pension_records=pension_records or [],
             years=years,
             annual_income=annual_income,
@@ -128,6 +128,7 @@ class ProjectionService:
             "pension_ahv": pension_ahv,
             "pension_bvg": pension_bvg,
             "pension_3a": pension_3a,
+            "pension_3b": pension_3b,
             "inflation_adjusted": True,
         }
 
@@ -141,9 +142,9 @@ class ProjectionService:
         inflation_rate: float,
     ) -> tuple:
         """
-        Project AHV, BVG, and Pillar 3a pension values per year.
+        Project AHV, BVG, Pillar 3a and Pillar 3b pension values per year.
 
-        Returns three lists (length = years+1) of annual pension income
+        Returns four lists (length = years+1) of annual pension income / capital
         in real CHF. Before retirement: projected balance. After: annual income.
         """
         current_year = datetime.now().year
@@ -163,10 +164,12 @@ class ProjectionService:
         ahv_record = next((r for r in pension_records if r["pillar"] == "1"), None)
         bvg_record = next((r for r in pension_records if r["pillar"] == "2"), None)
         p3a_records = [r for r in pension_records if r["pillar"] == "3a"]
+        p3b_records = [r for r in pension_records if r["pillar"] == "3b"]
 
         pension_ahv_series = []
         pension_bvg_series = []
         pension_3a_series = []
+        pension_3b_series = []
 
         for yr in range(years + 1):
             age_at_year = current_age + yr
@@ -203,7 +206,19 @@ class ProjectionService:
             )
             pension_3a_series.append(p3a_total / inflation_deflator)
 
-        return pension_ahv_series, pension_bvg_series, pension_3a_series
+            # ── Pillar 3b (Lebensversicherung / freie Vorsorge) ────
+            p3b_total = sum(
+                self._project_3b(
+                    age_at_year=age_at_year,
+                    retirement_age=retirement_age,
+                    record=r,
+                    years_elapsed=yr,
+                )
+                for r in p3b_records
+            )
+            pension_3b_series.append(p3b_total / inflation_deflator)
+
+        return pension_ahv_series, pension_bvg_series, pension_3a_series, pension_3b_series
 
     def _project_ahv(
         self,
@@ -299,6 +314,38 @@ class ProjectionService:
             return balance  # return balance as proxy
 
         # Annuitize over ~20 years (simple)
+        return balance / 20.0
+
+    def _project_3b(
+        self,
+        age_at_year: int,
+        retirement_age: int,
+        record: Dict,
+        years_elapsed: int,
+    ) -> float:
+        """
+        Project Pillar 3b (Lebensversicherung / freie Vorsorge).
+
+        For Kapital-/Gemischt-Lebensversicherungen: current_balance holds the
+        guaranteed Ablaufleistung (fixed payout sum). We grow it by the
+        expected_return_rate until retirement, then annuitize over 20 years.
+        For Risiko-LV: current_balance = 0 (no capital component), returns 0.
+        """
+        current_balance = record.get("current_balance", 0.0)
+        annual_contribution = record.get("annual_contribution", 0.0)
+        return_rate = record.get("expected_return_rate", 0.0)
+
+        if current_balance <= 0 and annual_contribution <= 0:
+            return 0.0
+
+        balance = current_balance
+        for _ in range(years_elapsed):
+            balance = balance * (1 + return_rate) + annual_contribution
+
+        if age_at_year < retirement_age:
+            return balance  # proxy: projected capital
+
+        # Annuitize over 20 years (conservative payout estimate)
         return balance / 20.0
 
     def compare_scenarios(

@@ -7,7 +7,7 @@ import {
 } from "date-fns";
 import { de } from "date-fns/locale";
 
-export type TimeGranularity = "monthly" | "quarterly" | "halfyearly" | "yearly" | "ytd";
+export type TimeGranularity = "monthly" | "quarterly" | "halfyearly" | "yearly" | "ytd" | "twoyears" | "max";
 
 export interface DateRange {
   from: Date;
@@ -61,6 +61,20 @@ export function computeDateRange(granularity: TimeGranularity, anchor: Date): Da
         label: `YTD ${year}`,
       };
     }
+
+    case "twoyears":
+      return {
+        from: startOfMonth(addYears(today, -2)),
+        to: today,
+        label: "2 Jahre",
+      };
+
+    case "max":
+      return {
+        from: new Date(2000, 0, 1),
+        to: today,
+        label: "Maximum",
+      };
   }
 }
 
@@ -71,6 +85,8 @@ export function navigatePeriod(granularity: TimeGranularity, anchor: Date, direc
     case "halfyearly": return addMonths(anchor, 6 * direction);
     case "yearly":
     case "ytd":        return addYears(anchor, direction);
+    case "twoyears":
+    case "max":        return anchor; // rolling windows — navigation not applicable
   }
 }
 
@@ -85,6 +101,13 @@ export function isCurrentPeriod(granularity: TimeGranularity, anchor: Date): boo
       return anchor.getFullYear() === today.getFullYear() && anchorH === todayH;
     }
     case "yearly":
-    case "ytd": return isSameYear(anchor, today);
+    case "ytd":       return isSameYear(anchor, today);
+    case "twoyears":
+    case "max":       return true; // always current (rolling windows)
   }
+}
+
+/** True for granularities that are fixed rolling windows — navigation arrows are hidden. */
+export function isRollingWindow(granularity: TimeGranularity): boolean {
+  return granularity === "twoyears" || granularity === "max";
 }

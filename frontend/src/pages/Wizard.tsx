@@ -22,10 +22,12 @@ import {
   ShieldCheck, Plane, ArrowRight, Check,
   User, Users, Users2, UserMinus,
   Briefcase, Globe, TrendingDown, PiggyBank,
-  Landmark, BarChart2, Coins, Wallet,
+  Landmark, BarChart2, Coins, Wallet, Trash2,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { api } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
+import { DEFAULT_SARON_REFERENCE_ANNUAL_PCT } from "@/lib/saron";
 import {
   getPeerGroupDefaults,
   COMMON_SUBSCRIPTIONS,
@@ -45,6 +47,12 @@ interface Pillar3aAccount {
   balance: number;
   annualContribution: number;
   strategy: "interest" | "funds";
+}
+
+interface MortgageEntry {
+  debtValue: number;
+  mortgageType: "fix" | "saron";
+  mortgageRate: number;
 }
 
 interface WizardData {
@@ -107,6 +115,9 @@ interface WizardData {
   stocksEnabled: boolean;
   propertyAssetValue: number;
   propertyAssetDebt: number;
+  mortgageEntries: MortgageEntry[];
+  mortgageType: "fix" | "saron";
+  mortgageRate: number;
   propertyAssetEnabled: boolean;
   cryptoValue: number;
   cryptoEnabled: boolean;
@@ -190,6 +201,9 @@ const DEFAULT_WIZARD_DATA: WizardData = {
   stocksEnabled: false,
   propertyAssetValue: 0,
   propertyAssetDebt: 0,
+  mortgageEntries: [{ debtValue: 0, mortgageType: "fix", mortgageRate: 1.8 }],
+  mortgageType: "fix",
+  mortgageRate: 1.8,
   propertyAssetEnabled: false,
   cryptoValue: 0,
   cryptoEnabled: false,
@@ -728,7 +742,7 @@ function Step4({ data, update }: { data: WizardData; update: (p: Partial<WizardD
               {mode === "miete" ? (
                 <><Home className="w-4 h-4 inline mr-1.5" />Miete</>
               ) : (
-                <><Building2 className="w-4 h-4 inline mr-1.5" />Hypothek</>
+                <><Building2 className="w-4 h-4 inline mr-1.5" />Wohneigentum</>
               )}
             </button>
           ))}
@@ -745,13 +759,10 @@ function Step4({ data, update }: { data: WizardData; update: (p: Partial<WizardD
           </div>
         ) : (
           <div className="space-y-3">
-            <Field label="Marktwert der Immobilie">
-              <ChfInput value={data.propertyValue} onChange={(v) => update({ propertyValue: v })} />
-            </Field>
-            <Field label="Ausstehende Hypothek">
-              <ChfInput value={data.outstandingDebt} onChange={(v) => update({ outstandingDebt: v })} />
-            </Field>
-            <Field label="Monatliche Amortisation">
+            <Field
+              label="Monatliche Immobilienkosten"
+              hint="Enthält Amortisation, Rücklagen für Reparaturen und Hypothekenzahlung."
+            >
               <ChfInput value={data.monthlyAmortization} onChange={(v) => update({ monthlyAmortization: v })} />
             </Field>
           </div>
@@ -1001,12 +1012,51 @@ function Step5({ data, update }: { data: WizardData; update: (p: Partial<WizardD
 // ── Step 6: Vermögen & Anlagen ─────────────────────────────────
 
 function Step6({ data, update }: { data: WizardData; update: (p: Partial<WizardData>) => void }) {
+  const { user } = useAuth();
+  const saronRefPct = user?.saron_reference_annual_pct ?? DEFAULT_SARON_REFERENCE_ANNUAL_PCT;
+
   const totalAssets =
     (data.bankEnabled ? data.bankBalance : 0) +
     (data.stocksEnabled ? data.stocksValue : 0) +
     (data.propertyAssetEnabled ? data.propertyAssetValue : 0) +
     (data.cryptoEnabled ? data.cryptoValue : 0) +
     (data.otherAssetsEnabled ? data.otherAssetsValue : 0);
+
+  const mortgageEntries = data.mortgageEntries.length > 0
+    ? data.mortgageEntries
+    : [{ debtValue: data.propertyAssetDebt, mortgageType: data.mortgageType, mortgageRate: data.mortgageRate }];
+
+  function setMortgageEntries(next: MortgageEntry[]) {
+    const cleaned: MortgageEntry[] = next.map((m) => ({
+      debtValue: Math.max(0, Number(m.debtValue) || 0),
+      mortgageType: m.mortgageType === "saron" ? "saron" : "fix",
+      mortgageRate: Math.max(0, Number(m.mortgageRate) || 0),
+    }));
+    const totalDebt = cleaned.reduce((sum, m) => sum + m.debtValue, 0);
+    update({
+      mortgageEntries: cleaned,
+      propertyAssetDebt: totalDebt,
+      mortgageType: cleaned[0]?.mortgageType ?? data.mortgageType,
+      mortgageRate: cleaned[0]?.mortgageRate ?? data.mortgageRate,
+    });
+  }
+
+  function updateMortgageEntry(index: number, partial: Partial<MortgageEntry>) {
+    const next = mortgageEntries.map((m, i) => (i === index ? { ...m, ...partial } : m));
+    setMortgageEntries(next);
+  }
+
+  function addMortgageEntry() {
+    setMortgageEntries([
+      ...mortgageEntries,
+      { debtValue: 0, mortgageType: "fix", mortgageRate: data.mortgageRate || 0 },
+    ]);
+  }
+
+  function removeMortgageEntry(index: number) {
+    const next = mortgageEntries.filter((_, i) => i !== index);
+    setMortgageEntries(next.length > 0 ? next : [{ debtValue: 0, mortgageType: "fix", mortgageRate: data.mortgageRate || 0 }]);
+  }
 
   const ASSETS = [
     {
@@ -1043,13 +1093,154 @@ function Step6({ data, update }: { data: WizardData; update: (p: Partial<WizardD
       sublabel: "Marktwert abzüglich Hypothek",
       enabledKey: "propertyAssetEnabled" as const,
       children: (
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Marktwert">
-            <ChfInput value={data.propertyAssetValue} onChange={(v) => update({ propertyAssetValue: v })} />
-          </Field>
-          <Field label="Ausstehende Hypothek">
-            <ChfInput value={data.propertyAssetDebt} onChange={(v) => update({ propertyAssetDebt: v })} />
-          </Field>
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Field label="Marktwert">
+              <ChfInput value={data.propertyAssetValue} onChange={(v) => update({ propertyAssetValue: v })} />
+            </Field>
+            <Field label="Total Hypothekenwert">
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary text-sm pointer-events-none">
+                  CHF
+                </span>
+                <input
+                  type="text"
+                  readOnly
+                  tabIndex={-1}
+                  aria-readonly="true"
+                  className="input pl-12 font-mono text-sm bg-white/5 text-text-primary cursor-default pointer-events-none"
+                  value={chf(data.propertyAssetDebt)}
+                />
+              </div>
+            </Field>
+          </div>
+
+          <div className="space-y-2">
+            <p className="label">Hypothekenangaben</p>
+
+            <div className="space-y-2">
+              {mortgageEntries.map((entry, idx) => (
+                <div
+                  key={idx}
+                  className="rounded-md border border-white/10 bg-white/3 px-2 py-2 flex flex-wrap sm:flex-nowrap items-end gap-2"
+                >
+                  <span
+                    className="text-text-tertiary text-[11px] tabular-nums shrink-0 pb-2 w-5 text-center sm:text-left"
+                    title={`Hypothek ${idx + 1}`}
+                  >
+                    {idx + 1}
+                  </span>
+
+                  <div className="shrink-0 w-full sm:w-auto sm:min-w-[9.5rem]">
+                    <label className="label text-[10px] leading-tight">Art</label>
+                    <div className="flex rounded border border-white/10 overflow-hidden">
+                      {(["fix", "saron"] as const).map((kind) => (
+                        <button
+                          key={kind}
+                          type="button"
+                          className={clsx(
+                            "flex-1 py-1.5 px-2 text-xs font-medium transition-all",
+                            entry.mortgageType === kind
+                              ? "bg-accent/15 text-accent"
+                              : "text-text-secondary hover:bg-white/5",
+                          )}
+                          onClick={() => {
+                            if (kind === "saron") {
+                              updateMortgageEntry(idx, {
+                                mortgageType: "saron",
+                                mortgageRate: saronRefPct,
+                              });
+                            } else {
+                              updateMortgageEntry(idx, {
+                                mortgageType: "fix",
+                                mortgageRate:
+                                  entry.mortgageType === "fix"
+                                    ? entry.mortgageRate
+                                    : data.mortgageRate || 1.8,
+                              });
+                            }
+                          }}
+                        >
+                          {kind === "fix" ? "Fix" : "SARON"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="shrink-0 w-full sm:w-24">
+                    <label className="label text-[10px] leading-tight whitespace-nowrap">
+                      Zinssatz % p.a.
+                      {entry.mortgageType === "saron" && (
+                        <span className="text-text-tertiary font-normal normal-case"> (SARON)</span>
+                      )}
+                    </label>
+                    <div className="relative">
+                      {entry.mortgageType === "fix" ? (
+                        <>
+                          <input
+                            type="number"
+                            min={0}
+                            step={0.01}
+                            className="input py-1.5 pr-7 text-sm"
+                            value={entry.mortgageRate || ""}
+                            onChange={(e) =>
+                              updateMortgageEntry(idx, { mortgageRate: parseFloat(e.target.value) || 0 })
+                            }
+                            placeholder="1.8"
+                          />
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-text-tertiary text-xs">%</span>
+                        </>
+                      ) : (
+                        <>
+                          <input
+                            type="text"
+                            readOnly
+                            tabIndex={-1}
+                            aria-readonly="true"
+                            className="input py-1.5 pr-7 text-sm font-mono bg-white/5 text-text-primary cursor-default pointer-events-none"
+                            value={saronRefPct.toFixed(2)}
+                          />
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-text-tertiary text-xs">%</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex-1 min-w-[10rem]">
+                    <label className="label text-[10px] leading-tight">Hypothekenwert</label>
+                    <ChfInput
+                      className="[&_input]:py-1.5 [&_input]:text-sm"
+                      value={entry.debtValue}
+                      onChange={(v) => updateMortgageEntry(idx, { debtValue: v })}
+                    />
+                  </div>
+
+                  {mortgageEntries.length > 1 && (
+                    <div className="flex justify-end sm:justify-start shrink-0 pb-0.5">
+                      <button
+                        type="button"
+                        title="Hypothek entfernen"
+                        onClick={() => removeMortgageEntry(idx)}
+                        className="p-2 rounded-md text-text-tertiary hover:text-loss hover:bg-loss/10 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-end pt-1">
+              <button
+                type="button"
+                onClick={addMortgageEntry}
+                className="text-xs rounded border border-accent/30 text-accent px-2 py-1 hover:bg-accent/10 transition-colors"
+              >
+                + Hypothek hinzufügen
+              </button>
+            </div>
+          </div>
         </div>
       ),
     },
@@ -1565,12 +1756,63 @@ function ReviewScreen({ data }: { data: WizardData }) {
 const TOTAL_STEPS = 8;
 const STORAGE_KEY = "budgetpal_wizard_draft";
 
+function normalizeWizardData(raw: Partial<WizardData> | null | undefined): WizardData {
+  const rawObj = raw as Record<string, unknown> | null | undefined;
+  const pillar3aFromServer = rawObj?.pillar3aAccounts ?? rawObj?.pillar3AAccounts;
+  const merged = {
+    ...DEFAULT_WIZARD_DATA,
+    ...(raw ?? {}),
+    ...(Array.isArray(pillar3aFromServer)
+      ? { pillar3aAccounts: pillar3aFromServer as WizardData["pillar3aAccounts"] }
+      : {}),
+  } as WizardData;
+
+  const incoming = (raw as { mortgageEntries?: unknown } | null)?.mortgageEntries;
+  const parsedEntries = Array.isArray(incoming)
+    ? incoming
+        .map((entry) => {
+          const e = entry as Partial<MortgageEntry>;
+          const mortgageType = e.mortgageType === "saron" ? "saron" : "fix";
+          let mortgageRate = Number(e.mortgageRate) || 0;
+          if (mortgageType === "saron" && mortgageRate <= 0) {
+            mortgageRate = DEFAULT_SARON_REFERENCE_ANNUAL_PCT;
+          }
+          return {
+            debtValue: Number(e.debtValue) || 0,
+            mortgageType,
+            mortgageRate,
+          } as MortgageEntry;
+        })
+        .filter((e) => e.debtValue > 0 || e.mortgageRate > 0 || e.mortgageType === "saron")
+    : [];
+
+  const fallbackEntry: MortgageEntry = {
+    debtValue: Number(merged.propertyAssetDebt) || 0,
+    mortgageType: merged.mortgageType === "saron" ? "saron" : "fix",
+    mortgageRate: Number(merged.mortgageRate) || 0,
+  };
+
+  const mortgageEntries = parsedEntries.length > 0
+    ? parsedEntries
+    : [fallbackEntry];
+
+  const propertyAssetDebt = mortgageEntries.reduce((sum, e) => sum + (e.debtValue || 0), 0);
+
+  return {
+    ...merged,
+    mortgageEntries,
+    propertyAssetDebt,
+    mortgageType: mortgageEntries[0]?.mortgageType ?? merged.mortgageType,
+    mortgageRate: mortgageEntries[0]?.mortgageRate ?? merged.mortgageRate,
+  };
+}
+
 function loadDraft(): WizardData {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) return { ...DEFAULT_WIZARD_DATA, ...JSON.parse(saved) };
+    if (saved) return normalizeWizardData(JSON.parse(saved));
   } catch {}
-  return DEFAULT_WIZARD_DATA;
+  return normalizeWizardData(undefined);
 }
 
 /** Persist full wizard state (called on every „Weiter“ / before submit). */
@@ -1605,7 +1847,7 @@ export default function Wizard() {
   useEffect(() => {
     api.get("/wizard/state").then((res) => {
       if (res.data) {
-        setWizardData({ ...DEFAULT_WIZARD_DATA, ...res.data });
+        setWizardData(normalizeWizardData(res.data));
       }
     }).catch(() => {}).finally(() => setServerStateLoaded(true));
   }, []);
@@ -1673,6 +1915,19 @@ export default function Wizard() {
     setAnimating(false);
   }
 
+  async function goToStep(targetStep: number) {
+    if (targetStep === currentStep || animating) return;
+    // Persist state immediately before jumping
+    persistWizardDraft(wizardData);
+    api.put("/wizard/state", wizardData).catch(() => {});
+    setDirection(targetStep > currentStep ? "forward" : "back");
+    setAnimating(true);
+    await new Promise((r) => setTimeout(r, 180));
+    setCurrentStep(targetStep);
+    if (isReview) setIsReview(false);
+    setAnimating(false);
+  }
+
   async function handleSubmit() {
     persistWizardDraft(wizardData);
     setIsSubmitting(true);
@@ -1681,9 +1936,17 @@ export default function Wizard() {
       const subscriptionTotal = COMMON_SUBSCRIPTIONS
         .filter((s) => wizardData.selectedSubscriptions.includes(s.name))
         .reduce((sum, s) => sum + s.price, 0);
+      const syncedPropertyDebt = wizardData.propertyAssetEnabled
+        ? (wizardData.mortgageEntries ?? []).reduce((sum, e) => sum + (e.debtValue || 0), 0)
+        : 0;
+      const syncedPropertyValue = wizardData.propertyAssetEnabled ? wizardData.propertyAssetValue : 0;
+      const syncedOutstandingDebt = syncedPropertyDebt;
 
       await api.post("/wizard/complete", {
         ...wizardData,
+        propertyAssetDebt: syncedPropertyDebt,
+        propertyValue: syncedPropertyValue,
+        outstandingDebt: syncedOutstandingDebt,
         estimated_netto_monthly: computeNettoEinkommen(wizardData),
         subscription_total: subscriptionTotal,
       });
@@ -1727,7 +1990,7 @@ export default function Wizard() {
               Zusammenfassung — alle Schritte ausgefüllt
             </p>
           ) : (
-            <StepIndicator currentStep={currentStep} totalSteps={TOTAL_STEPS} />
+            <StepIndicator currentStep={currentStep} totalSteps={TOTAL_STEPS} onStepClick={goToStep} />
           )}
 
           {/* Progress bar */}

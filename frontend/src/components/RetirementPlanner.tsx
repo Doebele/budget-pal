@@ -68,10 +68,11 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
   const wealthAtRetirement = projection?.p50?.[retirementIdx] ?? 0;
 
   // Post-retirement: monthly pension income
-  const ahvMonthly = (projection?.pension_ahv?.[retirementIdx] ?? 0) / 12;
-  const bvgMonthly = (projection?.pension_bvg?.[retirementIdx] ?? 0) / 12;
-  const pillar3aMonthly = (projection?.pension_3a?.[retirementIdx] ?? 0) / 12;
-  const totalPensionMonthly = ahvMonthly + bvgMonthly + pillar3aMonthly;
+  const ahvMonthly       = (projection?.pension_ahv?.[retirementIdx] ?? 0) / 12;
+  const bvgMonthly       = (projection?.pension_bvg?.[retirementIdx] ?? 0) / 12;
+  const pillar3aMonthly  = (projection?.pension_3a?.[retirementIdx] ?? 0) / 12;
+  const pillar3bMonthly  = (projection?.pension_3b?.[retirementIdx] ?? 0) / 12;
+  const totalPensionMonthly = ahvMonthly + bvgMonthly + pillar3aMonthly + pillar3bMonthly;
 
   // Estimate monthly expenses at retirement (rough: 80 % of current)
   const estimatedExpenseMonthly = Math.abs(monthlyNetMean) * 0.8 + (annualIncome / 12) * 0.5;
@@ -92,9 +93,10 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
     ?.slice(retirementIdx, retirementIdx + 20)
     ?.map((yr: number, i: number) => ({
       year: yr,
-      ahv: Math.round((projection.pension_ahv?.[retirementIdx + i] ?? 0) / 12),
-      bvg: Math.round((projection.pension_bvg?.[retirementIdx + i] ?? 0) / 12),
+      ahv:  Math.round((projection.pension_ahv?.[retirementIdx + i] ?? 0) / 12),
+      bvg:  Math.round((projection.pension_bvg?.[retirementIdx + i] ?? 0) / 12),
       "3a": Math.round((projection.pension_3a?.[retirementIdx + i] ?? 0) / 12),
+      "3b": Math.round((projection.pension_3b?.[retirementIdx + i] ?? 0) / 12),
     })) ?? [];
 
   return (
@@ -171,7 +173,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
         <KPICard
           label="Rente/Monat"
           value={formatCHF(totalPensionMonthly)}
-          sub="AHV + BVG + 3a"
+          sub="AHV + BVG + 3a + 3b"
           icon={<Coins className="w-4 h-4 text-green-400" />}
           color="text-green-400"
         />
@@ -189,7 +191,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
         <KPICard
           label="Pillar-Struktur"
           value={`${Math.round((ahvMonthly / (totalPensionMonthly || 1)) * 100)}% AHV`}
-          sub={`${Math.round((bvgMonthly / (totalPensionMonthly || 1)) * 100)}% BVG · ${Math.round((pillar3aMonthly / (totalPensionMonthly || 1)) * 100)}% 3a`}
+          sub={`${Math.round((bvgMonthly / (totalPensionMonthly || 1)) * 100)}% BVG · ${Math.round((pillar3aMonthly / (totalPensionMonthly || 1)) * 100)}% 3a · ${Math.round((pillar3bMonthly / (totalPensionMonthly || 1)) * 100)}% 3b`}
           icon={<ShieldCheck className="w-4 h-4 text-violet-400" />}
           color="text-violet-400"
         />

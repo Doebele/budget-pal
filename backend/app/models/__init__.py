@@ -11,6 +11,7 @@ from app.models.models import (  # noqa: F401
     Budget,
     PensionData,
     Asset,
+    MortgageTranche,
     Scenario,
     ProjectionCache,
     ImportLog,

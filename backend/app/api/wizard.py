@@ -32,6 +32,7 @@ from app.models.models import (
     AssetType,
     Budget,
     BudgetPeriod,
+    MortgageTranche,
     PensionData,
     PensionPillar,
     Scenario,
@@ -58,6 +59,13 @@ class PeerGroupProfileIn(BaseModel):
 # ── Pydantic Schemas ───────────────────────────────────────────
 
 class Pillar3aAccountPayload(BaseModel):
+    """Mirrors the frontend Pillar3aAccount interface (camelCase keys from wizard JSON)."""
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,  # also accept snake_case
+    )
+
     provider: str = ""
     balance: float = 0.0
     annual_contribution: float = 7_056.0
@@ -96,6 +104,16 @@ class CustomExpenseEntryPayload(BaseModel):
     first_payment_date: Optional[str] = None
     note: Optional[str] = None
     price: float = 0.0
+
+
+class MortgageEntryPayload(BaseModel):
+    """Step 6 mortgage detail rows (mirrors frontend MortgageEntry)."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    debt_value: float = 0.0
+    mortgage_type: Literal["fix", "saron"] = "fix"
+    mortgage_rate: float = 0.0
 
 
 class WizardCompletePayload(BaseModel):
@@ -177,6 +195,12 @@ class WizardCompletePayload(BaseModel):
     stocks_enabled: bool = False
     property_asset_value: float = 0.0
     property_asset_debt: float = 0.0
+    mortgage_entries: List[MortgageEntryPayload] = Field(
+        default_factory=list,
+        alias="mortgageEntries",
+    )
+    mortgage_type: Literal["fix", "saron"] = "fix"
+    mortgage_rate: float = 1.8
     property_asset_enabled: bool = False
     crypto_value: float = 0.0
     crypto_enabled: bool = False
@@ -189,7 +213,11 @@ class WizardCompletePayload(BaseModel):
     bvg_guthaben: float = 50_000.0
     bvg_jahresbeitrag: float = 8_000.0
     bvg_rentenalter: int = Field(default=65, ge=63, le=70)
-    pillar_3a_accounts: List[Pillar3aAccountPayload] = Field(default_factory=list)
+    # Explicit alias: auto to_camel yields pillar3AAccounts, but the app sends pillar3aAccounts.
+    pillar_3a_accounts: List[Pillar3aAccountPayload] = Field(
+        default_factory=list,
+        alias="pillar3aAccounts",
+    )
     has_life_insurance: bool = False
     life_insurance_type: Literal["kapital", "risiko", "gemischt"] = "kapital"
     life_insurance_ablauf: Optional[str] = None
@@ -235,6 +263,18 @@ class WizardStateSavePayload(BaseModel):
     """Loose payload for draft autosave from frontend wizard state."""
 
     model_config = ConfigDict(extra="allow")
+
+
+class MortgageTrancheResponse(BaseModel):
+    """Einzelhypothek für Finanzplan / API (Felder wie im Wizard)."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    id: int
+    sort_order: int
+    debt_value: float
+    mortgage_type: Literal["fix", "saron"]
+    mortgage_rate: float
 
 
 # ── Helpers ────────────────────────────────────────────────────
@@ -341,6 +381,36 @@ async def get_wizard_state(
     if not wizard_cfg or not wizard_cfg.wizard_data_json:
         return None
     return json.loads(wizard_cfg.wizard_data_json)
+
+
+@router.get(
+    "/mortgages",
+    response_model=List[MortgageTrancheResponse],
+    summary="Gespeicherte Hypothekentranschen (Wizard Vermögen)",
+)
+async def list_mortgage_tranches(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(MortgageTranche)
+        .where(MortgageTranche.user_id == current_user.id)
+        .order_by(MortgageTranche.sort_order.asc(), MortgageTranche.id.asc())
+    )
+    rows = result.scalars().all()
+    out: List[MortgageTrancheResponse] = []
+    for r in rows:
+        mt: Literal["fix", "saron"] = r.mortgage_type if r.mortgage_type in ("fix", "saron") else "fix"
+        out.append(
+            MortgageTrancheResponse(
+                id=r.id,
+                sort_order=r.sort_order,
+                debt_value=r.principal_amount,
+                mortgage_type=mt,
+                mortgage_rate=r.rate_annual_pct,
+            )
+        )
+    return out
 
 
 @router.put(
@@ -458,6 +528,9 @@ async def wizard_complete(
     await db.execute(
         sa_delete(Asset).where(Asset.user_id == current_user.id)
     )
+    await db.execute(
+        sa_delete(MortgageTranche).where(MortgageTranche.user_id == current_user.id)
+    )
     # Flush deletes before inserting new rows to avoid constraint conflicts.
     await db.flush()
 
@@ -574,6 +647,29 @@ async def wizard_complete(
     db.add(bvg)
     pension_entries_created += 1
 
+    # Pillar 3b — Lebensversicherung (Kapital- oder Gemischt-LV only; Risiko-LV hat kein Kapital)
+    if payload.has_life_insurance and payload.life_insurance_leistung > 0:
+        # Risiko-LV has no savings component — only Kapital/Gemischt carry capital
+        if payload.life_insurance_type in ("kapital", "gemischt"):
+            p3b = PensionData(
+                user_id=current_user.id,
+                pillar=PensionPillar.pillar_3b,
+                provider="Lebensversicherung",
+                # Store the guaranteed Ablaufleistung as the capital value
+                current_balance=payload.life_insurance_leistung,
+                annual_contribution=0.0,   # Premium is tracked as budget expense
+                expected_return_rate=0.01, # Conservative: LV credit interest ~1%
+                retirement_age=payload.ziel_rentenalter,
+                notes=(
+                    f"Typ: {payload.life_insurance_type} | "
+                    f"Ablauf: {payload.life_insurance_ablauf or 'offen'} | "
+                    f"Leistung: CHF {payload.life_insurance_leistung:,.0f}"
+                ),
+                as_of_date=_now(),
+            )
+            db.add(p3b)
+            pension_entries_created += 1
+
     # Pillar 3a accounts
     for i, acc_3a in enumerate(payload.pillar_3a_accounts):
         expected_return = 0.04 if acc_3a.strategy == "funds" else 0.01
@@ -592,6 +688,19 @@ async def wizard_complete(
         pension_entries_created += 1
 
     # ── 4. Asset entries ──────────────────────────────────────
+
+    if payload.bank_enabled and payload.bank_balance > 0:
+        db.add(Asset(
+            user_id=current_user.id,
+            asset_type=AssetType.savings,
+            name="Sparkonto / Bankguthaben",
+            current_value=payload.bank_balance,
+            currency="CHF",
+            expected_return_rate=0.01,
+            notes="Import aus empirischen Angaben",
+            as_of_date=_now(),
+        ))
+        assets_created += 1
 
     if payload.stocks_enabled and payload.stocks_value > 0:
         db.add(Asset(
@@ -648,8 +757,12 @@ async def wizard_complete(
         ))
         assets_created += 1
 
-    # Property entered in Step 4 (Hypothek) — also add as asset
-    if payload.housing_mode == "hypothek" and payload.property_value > 0:
+    # Wohneigentum nur, wenn die Immobilie nicht schon unter Vermögen (Schritt 6) erfasst ist.
+    if (
+        payload.housing_mode == "hypothek"
+        and payload.property_value > 0
+        and not (payload.property_asset_enabled and payload.property_asset_value > 0)
+    ):
         net_equity_step4 = max(payload.property_value - payload.outstanding_debt, 0.0)
         db.add(Asset(
             user_id=current_user.id,
@@ -665,6 +778,34 @@ async def wizard_complete(
             as_of_date=_now(),
         ))
         assets_created += 1
+
+    # ── 4b. Hypotheken je Tranche (Wizard Vermögen) ───────────
+    if payload.property_asset_enabled:
+        to_persist: List[MortgageEntryPayload] = list(payload.mortgage_entries)
+        total_from_entries = sum(m.debt_value for m in to_persist)
+        if (not to_persist or total_from_entries <= 0) and payload.property_asset_debt > 0:
+            to_persist = [
+                MortgageEntryPayload(
+                    debt_value=payload.property_asset_debt,
+                    mortgage_type=payload.mortgage_type,
+                    mortgage_rate=payload.mortgage_rate,
+                )
+            ]
+        sort_i = 0
+        for m in to_persist:
+            if m.debt_value <= 0:
+                continue
+            mt = m.mortgage_type if m.mortgage_type in ("fix", "saron") else "fix"
+            db.add(
+                MortgageTranche(
+                    user_id=current_user.id,
+                    sort_order=sort_i,
+                    principal_amount=float(m.debt_value),
+                    mortgage_type=mt,
+                    rate_annual_pct=float(m.mortgage_rate or 0.0),
+                )
+            )
+            sort_i += 1
 
     # ── 5. Initial projection scenario ────────────────────────
 
