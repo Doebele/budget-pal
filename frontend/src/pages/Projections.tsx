@@ -1,12 +1,23 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { projectionsApi, accountsApi } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { formatCHF, colors } from "@/lib/theme";
 import MonteCarloChart from "@/components/charts/MonteCarloChart";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
-import { TrendingUp, RefreshCw, Save } from "lucide-react";
+import { RefreshCw } from "lucide-react";
+
+/** Match backend `projection._project_pensions` fallback age when DOB is missing. */
+function currentAgeFromProfileBirth(iso: string | undefined): number {
+  if (!iso) return 40;
+  const normalized = iso.includes("T") ? iso : `${iso}T12:00:00`;
+  const dob = new Date(normalized);
+  if (Number.isNaN(dob.getTime())) return 40;
+  const days = (Date.now() - dob.getTime()) / (1000 * 60 * 60 * 24);
+  return Math.floor(days / 365.25);
+}
 
 type HorizonKey = "1yr" | "5yr" | "10yr" | "retirement" | "age90";
 
@@ -19,6 +30,7 @@ const HORIZONS: Array<{ key: HorizonKey; label: string; years: number }> = [
 ];
 
 export default function Projections() {
+  const { user } = useAuth();
   const [horizon, setHorizon] = useState<HorizonKey>("10yr");
   const [params, setParams] = useState({
     current_net_worth: 100000,
@@ -33,6 +45,11 @@ export default function Projections() {
 
   const selectedHorizon = HORIZONS.find((h) => h.key === horizon)!;
 
+  const profileBirthIso = user?.birthdate ?? user?.date_of_birth?.slice(0, 10) ?? undefined;
+  const currentAge = useMemo(() => currentAgeFromProfileBirth(profileBirthIso), [profileBirthIso]);
+  const yearsToRetirement = Math.max(0, params.retirement_age - currentAge);
+  const retirementYear = new Date().getFullYear() + yearsToRetirement;
+
   const { data: accounts } = useQuery({
     queryKey: ["accounts"],
     queryFn: () => accountsApi.list().then((r) => r.data),
@@ -42,13 +59,14 @@ export default function Projections() {
   const totalBalance = (accounts || []).reduce((sum: number, a: { balance: number }) => sum + a.balance, 0);
 
   const { data: projection, isLoading, refetch } = useQuery({
-    queryKey: ["projection", horizon, params],
+    queryKey: ["projection", horizon, params, profileBirthIso, totalBalance],
     queryFn: () =>
       projectionsApi
         .run({
           ...params,
           current_net_worth: totalBalance || params.current_net_worth,
           years_to_project: selectedHorizon.years,
+          date_of_birth: profileBirthIso,
         })
         .then((r) => r.data),
     enabled: true,
@@ -63,7 +81,13 @@ export default function Projections() {
     "3b": Math.round((projection.pension_3b?.[i] || 0) / 1000),
   })) || [];
 
-  const retirementYear = new Date().getFullYear() + (params.retirement_age - 40);
+  const retirementInHorizon = yearsToRetirement <= selectedHorizon.years;
+  const retIdx = retirementInHorizon ? yearsToRetirement : null;
+  const ahvAtRet = retIdx != null ? projection?.pension_ahv?.[retIdx] ?? 0 : 0;
+  const bvgAtRet = retIdx != null ? projection?.pension_bvg?.[retIdx] ?? 0 : 0;
+  const p3aAtRet = retIdx != null ? projection?.pension_3a?.[retIdx] ?? 0 : 0;
+  const p3bAtRet = retIdx != null ? projection?.pension_3b?.[retIdx] ?? 0 : 0;
+  const totalPensionAnnual = ahvAtRet + bvgAtRet + p3aAtRet + p3bAtRet;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -204,7 +228,15 @@ export default function Projections() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-text-primary font-semibold text-sm">Schweizer Rente (3-Säulen)</h2>
-            <p className="text-text-tertiary text-xs mt-0.5">AHV (Säule 1) · BVG/Pensionskasse (Säule 2) · Säule 3a</p>
+            <p className="text-text-tertiary text-xs mt-0.5">
+              AHV (Säule 1) · BVG/Pensionskasse (Säule 2) · Säule 3a · 3b/LV — reale CHF (inflationsbereinigt)
+            </p>
+            <p className="text-text-tertiary text-[11px] mt-1 max-w-3xl leading-relaxed">
+              Vor dem Rentenalter ({params.retirement_age}): AHV = 0; BVG, 3a und 3b zeigen das projizierte{" "}
+              <span className="text-text-secondary">Kapital</span>. Ab dann: AHV- und BVG-Rente bzw. bei 3a/3b eine
+              vereinfachte Annahme (Kapital ÷ 20 Jahre pro Jahr). Ohne Geburtsdatum im Profil wird wie in der Simulation{" "}
+              <span className="text-text-secondary">Alter 40</span> angenommen.
+            </p>
           </div>
         </div>
         {pensionChartData.length > 0 && (
@@ -264,12 +296,55 @@ export default function Projections() {
           </ResponsiveContainer>
         )}
 
-        {/* Pension summary */}
+        {/* ── Monthly pension KPIs at retirement ── */}
+        {projection && retirementInHorizon && retIdx != null && (
+          <div className="mt-4 pt-4 border-t border-border/50 space-y-3">
+            <p className="text-text-secondary text-xs font-semibold uppercase tracking-wide">
+              Voraussichtliche Rente bei Pensionierung {projection.years[retIdx]} — Monatliche Beträge
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { label: "AHV (Säule 1)", annual: ahvAtRet, color: colors.accent },
+                { label: "BVG (Säule 2)", annual: bvgAtRet, color: colors.gain },
+                { label: "Säule 3a", annual: p3aAtRet, color: colors.purple },
+                { label: "Säule 3b / LV", annual: p3bAtRet, color: "#f59e0b" },
+              ].map(({ label, annual, color }) => (
+                <div key={label} className="bg-bg-elevated rounded-lg px-4 py-3 border border-border/30">
+                  <p className="text-text-tertiary text-[11px] mb-1">{label}</p>
+                  <p className="font-mono font-bold text-lg" style={{ color }}>
+                    {formatCHF(annual / 12, true)}
+                  </p>
+                  <p className="text-text-tertiary text-[10px] mt-0.5">/ Monat (real CHF)</p>
+                  <p className="text-text-tertiary text-[10px]">{formatCHF(annual, true)} / Jahr</p>
+                </div>
+              ))}
+            </div>
+            {/* Total */}
+            <div className="flex items-center justify-between bg-accent/8 border border-accent/20 rounded-lg px-4 py-3">
+              <div>
+                <p className="text-text-secondary text-xs font-semibold">Gesamtrente (alle Säulen)</p>
+                <p className="text-text-tertiary text-[10px] mt-0.5">Vereinfachtes Modell · reale CHF inflationsbereinigt · keine offizielle BSV-Rechnung</p>
+              </div>
+              <div className="text-right">
+                <p className="font-mono font-bold text-xl text-accent">{formatCHF(totalPensionAnnual / 12, true)}</p>
+                <p className="text-text-tertiary text-[10px]">pro Monat · {formatCHF(totalPensionAnnual, true)} / Jahr</p>
+              </div>
+            </div>
+          </div>
+        )}
+        {projection && !retirementInHorizon && (
+          <p className="text-text-tertiary text-xs mt-3">
+            Rentenbeginn ca. {retirementYear} liegt ausserhalb des gewählten Horizonts ({selectedHorizon.years} J.) —
+            wähle einen längeren Zeithorizont für die Rentenbetragsanzeige.
+          </p>
+        )}
+
+        {/* Reference values */}
         <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-border/50">
           {[
-            { label: "AHV (Säule 1)", value: "bis CHF 30'240/Jahr", desc: "Bei 44 Beitragsjahren", color: "text-accent" },
-            { label: "BVG (Säule 2)", value: "Kapital × 6.8%", desc: "Umwandlungssatz 2024", color: "text-gain" },
-            { label: "Säule 3a", value: `max. CHF 7'056/Jahr`, desc: "Steuerlich abzugsfähig", color: "text-purple" },
+            { label: "AHV (Säule 1)", value: "bis CHF 2'520/Mo", desc: "Max. 2024 bei 44 Vollbeitragsjahren", color: "text-accent" },
+            { label: "BVG (Säule 2)", value: "Kapital × 6.8% ÷ 12", desc: "Umwandlungssatz 2024 im Modell", color: "text-gain" },
+            { label: "Säule 3a", value: `max. CHF 7'056/Jahr`, desc: "Beitragsgrenze (Lohnabhängige, 2024)", color: "text-purple" },
           ].map(({ label, value, desc, color }) => (
             <div key={label} className="card-elevated">
               <p className="text-text-tertiary text-xs">{label}</p>
