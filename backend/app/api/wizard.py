@@ -413,6 +413,59 @@ async def list_mortgage_tranches(
     return out
 
 
+@router.post(
+    "/backfill-mortgages",
+    summary="Hypothekentranschen aus wizard_data_json nachträglich befüllen",
+)
+async def backfill_mortgage_tranches(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """One-time migration: read mortgageEntries from stored wizard_data_json and
+    populate the mortgage_tranches table for users whose wizard was submitted
+    before the table existed."""
+    # Load stored wizard JSON
+    cfg_result = await db.execute(
+        select(UserWizardConfig).where(UserWizardConfig.user_id == current_user.id)
+    )
+    wizard_cfg = cfg_result.scalar_one_or_none()
+    if not wizard_cfg or not wizard_cfg.wizard_data_json:
+        return {"status": "no_data", "created": 0}
+
+    data = json.loads(wizard_cfg.wizard_data_json)
+    mortgage_entries = data.get("mortgageEntries") or []
+
+    if not mortgage_entries:
+        return {"status": "no_entries", "created": 0}
+
+    # Delete existing tranches first (idempotent)
+    await db.execute(
+        sa_delete(MortgageTranche).where(MortgageTranche.user_id == current_user.id)
+    )
+    await db.flush()
+
+    created = 0
+    for i, m in enumerate(mortgage_entries):
+        debt_value = float(m.get("debtValue") or 0.0)
+        if debt_value <= 0:
+            continue
+        mt = m.get("mortgageType", "fix")
+        if mt not in ("fix", "saron"):
+            mt = "fix"
+        rate = float(m.get("mortgageRate") or 0.0)
+        db.add(MortgageTranche(
+            user_id=current_user.id,
+            sort_order=i,
+            principal_amount=debt_value,
+            mortgage_type=mt,
+            rate_annual_pct=rate,
+        ))
+        created += 1
+
+    await db.commit()
+    return {"status": "ok", "created": created}
+
+
 @router.put(
     "/state",
     status_code=status.HTTP_204_NO_CONTENT,

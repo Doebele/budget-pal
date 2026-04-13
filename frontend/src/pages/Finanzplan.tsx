@@ -536,6 +536,24 @@ export default function Finanzplan() {
               const totalBalance = entries.reduce((s, p) => s + p.current_balance, 0);
               const totalContrib = entries.reduce((s, p) => s + p.annual_contribution, 0);
               const color = PILLAR_COLOR[pillar];
+
+              // ── Säule 1: compute estimated monthly AHV pension ──
+              let ahvMonthlyEst: number | null = null;
+              if (pillar === "1" && entries.length > 0) {
+                const e = entries[0];
+                const years = Math.min(e.contribution_years ?? 0, 44);
+                const completeness = 44 > 0 ? years / 44 : 0;
+                // Swiss AHV 2024: min CHF 1260/Mo, max CHF 2520/Mo
+                ahvMonthlyEst = Math.round(1260 + completeness * (2520 - 1260));
+              }
+
+              // ── Säule 2: compute estimated monthly BVG pension ──
+              let bvgMonthlyEst: number | null = null;
+              if (pillar === "2" && entries.length > 0) {
+                // BVG Umwandlungssatz 6.8%: annual = capital × 6.8%, monthly = /12
+                bvgMonthlyEst = Math.round((totalBalance * 0.068) / 12);
+              }
+
               return (
                 <div key={pillar} className="px-5 py-4">
                   <div className="flex items-center gap-2 mb-3">
@@ -545,29 +563,103 @@ export default function Finanzplan() {
                   {entries.length === 0 ? (
                     <p className="text-text-tertiary text-xs">Nicht erfasst</p>
                   ) : (
-                    <div className="space-y-1">
-                      <div className="flex justify-between">
-                        <span className="text-text-tertiary text-xs">Kapital</span>
-                        <span className="font-mono text-xs text-text-primary">{fmtCHF(totalBalance)}</span>
-                      </div>
-                      {totalContrib > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-text-tertiary text-xs">Jahresbeitrag</span>
-                          <span className="font-mono text-xs text-text-secondary">{fmtCHF(totalContrib)}</span>
-                        </div>
+                    <div className="space-y-1.5">
+                      {/* Säule 1: estimated monthly pension */}
+                      {ahvMonthlyEst !== null && (
+                        <>
+                          <div className="flex justify-between">
+                            <span className="text-text-tertiary text-xs">Geschätzte Rente</span>
+                            <span className="font-mono text-xs font-semibold" style={{ color }}>{fmtCHF(ahvMonthlyEst)}/Mo</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-text-tertiary text-xs">Beitragsjahre</span>
+                            <span className="font-mono text-xs text-text-secondary">
+                              {entries[0]?.contribution_years ?? "—"} / 44
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-text-tertiary text-xs">Ø Jahreslohn</span>
+                            <span className="font-mono text-xs text-text-secondary">
+                              {entries[0]?.average_insured_salary ? fmtCHF(entries[0].average_insured_salary) : "—"}
+                            </span>
+                          </div>
+                        </>
                       )}
-                      {entries.map((e) => e.contribution_years != null && (
-                        <div key={e.id} className="flex justify-between">
-                          <span className="text-text-tertiary text-xs">Beitragsjahre</span>
-                          <span className="font-mono text-xs text-text-secondary">{e.contribution_years}</span>
-                        </div>
-                      ))}
+
+                      {/* Säule 2: capital + estimated monthly pension */}
+                      {bvgMonthlyEst !== null && (
+                        <>
+                          <div className="flex justify-between">
+                            <span className="text-text-tertiary text-xs">Kapital</span>
+                            <span className="font-mono text-xs text-text-primary">{fmtCHF(totalBalance)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-text-tertiary text-xs">Gesch. Rente</span>
+                            <span className="font-mono text-xs font-semibold" style={{ color }}>{fmtCHF(bvgMonthlyEst)}/Mo</span>
+                          </div>
+                          {totalContrib > 0 && (
+                            <div className="flex justify-between">
+                              <span className="text-text-tertiary text-xs">Jahresbeitrag</span>
+                              <span className="font-mono text-xs text-text-secondary">{fmtCHF(totalContrib)}</span>
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      {/* Säule 3a / 3b */}
+                      {ahvMonthlyEst === null && bvgMonthlyEst === null && (
+                        <>
+                          <div className="flex justify-between">
+                            <span className="text-text-tertiary text-xs">Kapital</span>
+                            <span className="font-mono text-xs text-text-primary">{fmtCHF(totalBalance)}</span>
+                          </div>
+                          {totalContrib > 0 && (
+                            <div className="flex justify-between">
+                              <span className="text-text-tertiary text-xs">Jahresbeitrag</span>
+                              <span className="font-mono text-xs text-text-secondary">{fmtCHF(totalContrib)}</span>
+                            </div>
+                          )}
+                          {/* Estimated monthly drawdown (÷ 20 years) */}
+                          {totalBalance > 0 && (
+                            <div className="flex justify-between">
+                              <span className="text-text-tertiary text-xs">Gesch. Bezug/Mo</span>
+                              <span className="font-mono text-xs" style={{ color }}>
+                                {fmtCHF(Math.round(totalBalance / 240))}/Mo
+                              </span>
+                            </div>
+                          )}
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
               );
             })}
           </div>
+
+          {/* ── Total monthly pension estimate ── */}
+          {(() => {
+            const ahvE = pensionByPillar.get("1") ?? [];
+            const bvgE = pensionByPillar.get("2") ?? [];
+            const p3aE = pensionByPillar.get("3a") ?? [];
+            const p3bE = pensionByPillar.get("3b") ?? [];
+            const ahvYears = Math.min(ahvE[0]?.contribution_years ?? 0, 44);
+            const ahvMo = ahvE.length > 0 ? Math.round(1260 + (ahvYears / 44) * (2520 - 1260)) : 0;
+            const bvgCap = bvgE.reduce((s, e) => s + e.current_balance, 0);
+            const bvgMo = Math.round((bvgCap * 0.068) / 12);
+            const p3aCap = p3aE.reduce((s, e) => s + e.current_balance, 0);
+            const p3aMo = Math.round(p3aCap / 240);
+            const p3bCap = p3bE.reduce((s, e) => s + e.current_balance, 0);
+            const p3bMo = Math.round(p3bCap / 240);
+            const totalMo = ahvMo + bvgMo + p3aMo + p3bMo;
+            if (totalMo <= 0) return null;
+            return (
+              <div className="px-5 py-3 border-t border-border/40 bg-bg-elevated/40 flex items-center justify-between">
+                <span className="text-text-tertiary text-xs">Geschätzte Gesamtrente bei Pensionierung</span>
+                <span className="font-mono text-sm font-bold text-accent">{fmtCHF(totalMo)} / Monat</span>
+              </div>
+            );
+          })()}
         </section>
       )}
 
