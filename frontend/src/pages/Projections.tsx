@@ -193,36 +193,6 @@ export default function Projections() {
         </div>
       </div>
 
-      {/* Monte Carlo fan chart */}
-      <div className="card">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-text-primary font-semibold text-sm">Nettovermögen Prognose</h2>
-            <p className="text-text-tertiary text-xs mt-0.5">
-              {(10000).toLocaleString()} Monte Carlo Simulationen · Reale CHF (inflationsbereinigt)
-            </p>
-          </div>
-          {projection && (
-            <div className="text-right">
-              <p className="text-text-tertiary text-xs">Median in {selectedHorizon.years} Jahren</p>
-              <p className="text-text-primary font-mono font-semibold text-lg">
-                {formatCHF(projection.p50?.[projection.p50.length - 1] || 0, true)}
-              </p>
-            </div>
-          )}
-        </div>
-        {isLoading ? (
-          <div className="h-80 flex items-center justify-center">
-            <div className="flex items-center gap-3 text-text-tertiary">
-              <RefreshCw className="w-5 h-5 animate-spin" />
-              <span className="text-sm">Simulation läuft...</span>
-            </div>
-          </div>
-        ) : projection ? (
-          <MonteCarloChart data={projection} height={320} />
-        ) : null}
-      </div>
-
       {/* Swiss pension breakdown */}
       <div className="card">
         <div className="flex items-center justify-between mb-4">
@@ -281,7 +251,7 @@ export default function Projections() {
                   color: colors.textPrimary,
                   fontSize: 12,
                 }}
-                formatter={(v: number) => [`${formatCHF(v * 1000, true)}`, undefined]}
+                formatter={(v: number) => [`${formatCHF(v * 1000)}`, undefined]}
               />
               <Legend
                 iconType="line"
@@ -312,10 +282,10 @@ export default function Projections() {
                 <div key={label} className="bg-bg-elevated rounded-lg px-4 py-3 border border-border/30">
                   <p className="text-text-tertiary text-[11px] mb-1">{label}</p>
                   <p className="font-mono font-bold text-lg" style={{ color }}>
-                    {formatCHF(annual / 12, true)}
+                    {formatCHF(annual / 12)}
                   </p>
                   <p className="text-text-tertiary text-[10px] mt-0.5">/ Monat (real CHF)</p>
-                  <p className="text-text-tertiary text-[10px]">{formatCHF(annual, true)} / Jahr</p>
+                  <p className="text-text-tertiary text-[10px]">{formatCHF(annual)} / Jahr</p>
                 </div>
               ))}
             </div>
@@ -326,8 +296,8 @@ export default function Projections() {
                 <p className="text-text-tertiary text-[10px] mt-0.5">Vereinfachtes Modell · reale CHF inflationsbereinigt · keine offizielle BSV-Rechnung</p>
               </div>
               <div className="text-right">
-                <p className="font-mono font-bold text-xl text-accent">{formatCHF(totalPensionAnnual / 12, true)}</p>
-                <p className="text-text-tertiary text-[10px]">pro Monat · {formatCHF(totalPensionAnnual, true)} / Jahr</p>
+                <p className="font-mono font-bold text-xl text-accent">{formatCHF(totalPensionAnnual / 12)}</p>
+                <p className="text-text-tertiary text-[10px]">pro Monat · {formatCHF(totalPensionAnnual)} / Jahr</p>
               </div>
             </div>
           </div>
@@ -353,6 +323,36 @@ export default function Projections() {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Monte Carlo fan chart */}
+      <div className="card">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-text-primary font-semibold text-sm">Nettovermögen Prognose</h2>
+            <p className="text-text-tertiary text-xs mt-0.5">
+              {(10000).toLocaleString()} Monte Carlo Simulationen · Reale CHF (inflationsbereinigt)
+            </p>
+          </div>
+          {projection && (
+            <div className="text-right">
+              <p className="text-text-tertiary text-xs">Median in {selectedHorizon.years} Jahren</p>
+              <p className="text-text-primary font-mono font-semibold text-lg">
+                {formatCHF(projection.p50?.[projection.p50.length - 1] || 0)}
+              </p>
+            </div>
+          )}
+        </div>
+        {isLoading ? (
+          <div className="h-80 flex items-center justify-center">
+            <div className="flex items-center gap-3 text-text-tertiary">
+              <RefreshCw className="w-5 h-5 animate-spin" />
+              <span className="text-sm">Simulation läuft...</span>
+            </div>
+          </div>
+        ) : projection ? (
+          <MonteCarloChart data={projection} height={320} />
+        ) : null}
       </div>
     </div>
   );
