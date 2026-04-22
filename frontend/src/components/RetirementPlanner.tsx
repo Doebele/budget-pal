@@ -34,6 +34,14 @@ interface Props {
 
 const AGES = Array.from({ length: 11 }, (_, i) => 60 + i); // 60–70
 
+// Consistent pillar palette (matches Finanzplan / PILLAR_COLOR)
+const PILLAR_COLORS = {
+  ahv: "#38bdf8",  // sky   — Säule 1
+  bvg: "#a78bfa",  // violet — Säule 2
+  "3a": "#10b981", // emerald — Säule 3a
+  "3b": "#f59e0b", // amber — Säule 3b
+} as const;
+
 export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dateOfBirth }: Props) {
   const [retirementAge, setRetirementAge] = useState(65);
   const [annualIncome, setAnnualIncome] = useState(90_000);
@@ -63,11 +71,14 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
     staleTime: 5 * 60_000,
   });
 
-  // Retirement index in the projection array
-  const retirementIdx = yearsToRetirement > 0 ? Math.min(yearsToRetirement, (projection?.years?.length ?? 0) - 1) : 0;
+  // Retirement index — prefer server-computed value so frontend/backend agree.
+  const serverRetIdx = typeof projection?.retirement_idx === "number" ? projection.retirement_idx : null;
+  const retirementIdx = serverRetIdx !== null
+    ? serverRetIdx
+    : (yearsToRetirement > 0 ? Math.min(yearsToRetirement, (projection?.years?.length ?? 0) - 1) : 0);
   const wealthAtRetirement = projection?.p50?.[retirementIdx] ?? 0;
 
-  // Post-retirement: monthly pension income
+  // Post-retirement: monthly pension income (backend returns annual CHF, real terms).
   const ahvMonthly       = (projection?.pension_ahv?.[retirementIdx] ?? 0) / 12;
   const bvgMonthly       = (projection?.pension_bvg?.[retirementIdx] ?? 0) / 12;
   const pillar3aMonthly  = (projection?.pension_3a?.[retirementIdx] ?? 0) / 12;
@@ -161,21 +172,21 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
         </div>
       </div>
 
-      {/* Summary KPIs */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {/* Summary KPIs — style matches Finanzplan cashflow cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
           label="Vermögen bei Rente"
           value={formatCHF(wealthAtRetirement)}
           sub={`in ${Math.max(yearsToRetirement, 0)} Jahren`}
-          icon={<TrendingUp className="w-4 h-4 text-blue-400" />}
-          color="text-blue-400"
+          icon={<TrendingUp className="w-4 h-4" style={{ color: "#10b981" }} />}
+          valueColor="#10b981"
         />
         <KPICard
           label="Rente/Monat"
           value={formatCHF(totalPensionMonthly)}
           sub="AHV + BVG + 3a + 3b"
-          icon={<Coins className="w-4 h-4 text-green-400" />}
-          color="text-green-400"
+          icon={<Coins className="w-4 h-4" style={{ color: PILLAR_COLORS.bvg }} />}
+          valueColor={PILLAR_COLORS.bvg}
         />
         <KPICard
           label={isSurplus ? "Überschuss/Monat" : "Lücke/Monat"}
@@ -186,16 +197,51 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
               ? <ShieldCheck className="w-4 h-4 text-gain" />
               : <AlertTriangle className="w-4 h-4 text-loss" />
           }
-          color={isSurplus ? "text-gain" : "text-loss"}
+          valueColor={isSurplus ? "#10b981" : "#f87171"}
         />
         <KPICard
-          label="Pillar-Struktur"
+          label="Säulen-Struktur"
           value={`${Math.round((ahvMonthly / (totalPensionMonthly || 1)) * 100)}% AHV`}
           sub={`${Math.round((bvgMonthly / (totalPensionMonthly || 1)) * 100)}% BVG · ${Math.round((pillar3aMonthly / (totalPensionMonthly || 1)) * 100)}% 3a · ${Math.round((pillar3bMonthly / (totalPensionMonthly || 1)) * 100)}% 3b`}
-          icon={<ShieldCheck className="w-4 h-4 text-violet-400" />}
-          color="text-violet-400"
+          icon={<ShieldCheck className="w-4 h-4" style={{ color: PILLAR_COLORS.ahv }} />}
+          valueColor={PILLAR_COLORS.ahv}
         />
       </div>
+
+      {/* Pension income breakdown (post retirement) */}
+      {pensionBarData.length > 0 && (
+        <div className="card">
+          <h3 className="text-text-primary font-semibold text-sm mb-4 flex items-center gap-2">
+            <ArrowRight className="w-4 h-4 text-accent" />
+            Monatliche Rente nach Säule (CHF, real)
+          </h3>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={pensionBarData} margin={{ top: 8, right: 16, bottom: 0, left: 16 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+              <XAxis dataKey="year" tick={{ fill: "#94a3b8", fontSize: 10 }} axisLine={{ stroke: "#334155" }} tickLine={false} interval={3} />
+              <YAxis tickFormatter={(v) => `${v}`} tick={{ fill: "#94a3b8", fontSize: 10 }} axisLine={false} tickLine={false} width={40} />
+              <Tooltip
+                contentStyle={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 8 }}
+                formatter={(v: number) => [formatCHF(v), ""]}
+              />
+              <Bar dataKey="ahv" name="AHV (Säule 1)" stackId="a" fill={PILLAR_COLORS.ahv} radius={[0, 0, 0, 0]} />
+              <Bar dataKey="bvg" name="BVG (Säule 2)" stackId="a" fill={PILLAR_COLORS.bvg} />
+              <Bar dataKey="3a" name="Säule 3a" stackId="a" fill={PILLAR_COLORS["3a"]} />
+              <Bar dataKey="3b" name="Säule 3b" stackId="a" fill={PILLAR_COLORS["3b"]} radius={[4, 4, 0, 0]} />
+              <ReferenceLine
+                y={estimatedExpenseMonthly}
+                stroke="#f87171"
+                strokeDasharray="4 3"
+                label={{ value: "Ausgaben", position: "right", fill: "#f87171", fontSize: 10 }}
+              />
+              <Legend wrapperStyle={{ fontSize: 11 }} formatter={(v) => <span style={{ color: "#94a3b8" }}>{v}</span>} />
+            </BarChart>
+          </ResponsiveContainer>
+          <p className="text-text-tertiary text-[11px] mt-2">
+            Rote Linie = geschätzte monatliche Ausgaben im Ruhestand (80 % des aktuellen Niveaus)
+          </p>
+        </div>
+      )}
 
       {/* Wealth Monte Carlo */}
       <div className="card">
@@ -237,40 +283,6 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
           </ResponsiveContainer>
         )}
       </div>
-
-      {/* Pension income breakdown (post retirement) */}
-      {pensionBarData.length > 0 && (
-        <div className="card">
-          <h3 className="text-text-primary font-semibold text-sm mb-4 flex items-center gap-2">
-            <ArrowRight className="w-4 h-4 text-accent" />
-            Monatliche Rente nach Säule (CHF, real)
-          </h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={pensionBarData} margin={{ top: 8, right: 16, bottom: 0, left: 16 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-              <XAxis dataKey="year" tick={{ fill: "#94a3b8", fontSize: 10 }} axisLine={{ stroke: "#334155" }} tickLine={false} interval={3} />
-              <YAxis tickFormatter={(v) => `${v}`} tick={{ fill: "#94a3b8", fontSize: 10 }} axisLine={false} tickLine={false} width={40} />
-              <Tooltip
-                contentStyle={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 8 }}
-                formatter={(v: number) => [formatCHF(v), ""]}
-              />
-              <Bar dataKey="ahv" name="AHV (Säule 1)" stackId="a" fill="#4ade80" radius={[0, 0, 0, 0]} />
-              <Bar dataKey="bvg" name="BVG (Säule 2)" stackId="a" fill="#60a5fa" />
-              <Bar dataKey="3a" name="Pillar 3a" stackId="a" fill="#a78bfa" radius={[4, 4, 0, 0]} />
-              <ReferenceLine
-                y={estimatedExpenseMonthly}
-                stroke="#f87171"
-                strokeDasharray="4 3"
-                label={{ value: "Ausgaben", position: "right", fill: "#f87171", fontSize: 10 }}
-              />
-              <Legend wrapperStyle={{ fontSize: 11 }} formatter={(v) => <span style={{ color: "#94a3b8" }}>{v}</span>} />
-            </BarChart>
-          </ResponsiveContainer>
-          <p className="text-text-tertiary text-[11px] mt-2">
-            Rote Linie = geschätzte monatliche Ausgaben im Ruhestand (80 % des aktuellen Niveaus)
-          </p>
-        </div>
-      )}
     </div>
   );
 }
@@ -282,22 +294,29 @@ function KPICard({
   value,
   sub,
   icon,
-  color,
+  valueColor,
 }: {
   label: string;
   value: string;
   sub: string;
   icon: React.ReactNode;
-  color: string;
+  valueColor?: string;
 }) {
   return (
-    <div className="card py-3">
+    <div className="bg-bg-surface2 rounded-xl border border-border/40 px-4 py-3">
       <div className="flex items-center gap-2 mb-1">
         {icon}
-        <span className="text-text-tertiary text-[11px]">{label}</span>
+        <p className="text-text-tertiary text-[11px] uppercase tracking-widest font-semibold">
+          {label}
+        </p>
       </div>
-      <p className={`text-lg font-display font-bold ${color}`}>{value}</p>
-      <p className="text-text-tertiary text-[11px] mt-0.5">{sub}</p>
+      <p
+        className="font-mono font-bold text-xl"
+        style={valueColor ? { color: valueColor } : undefined}
+      >
+        {value}
+      </p>
+      <p className="text-text-tertiary text-xs mt-1">{sub}</p>
     </div>
   );
 }

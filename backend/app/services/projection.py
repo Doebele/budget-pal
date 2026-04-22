@@ -33,6 +33,25 @@ AHV_MIN_PENSION = 1260.0
 AHV_FULL_YEARS = 44
 AHV_CONVERSION_RATE = 0.068     # BVG Umwandlungssatz
 BVG_COORD_DEDUCTION = 25725.0   # CHF, 2024
+PAYOUT_YEARS = 20               # 3a/3b annuitization horizon (~age 65→85)
+PAYOUT_RESIDUAL_RATE = 0.02     # conservative yield during payout phase
+
+
+def _annuity_payout(balance: float, years: int = PAYOUT_YEARS, rate: float = PAYOUT_RESIDUAL_RATE) -> float:
+    """
+    Convert a capital balance into an annual pension using a level annuity
+    formula with residual return during payout:
+        annual = balance × r / (1 − (1+r)^−years)
+    At r=0 this reduces to balance/years (simple division). The residual
+    return accounts for capital that keeps earning while being drawn down,
+    which is how Swiss 3a/3b payouts behave in practice (Wertschriftenlösung
+    or mixed life insurance).
+    """
+    if balance <= 0 or years <= 0:
+        return 0.0
+    if rate <= 0:
+        return balance / years
+    return balance * rate / (1 - (1 + rate) ** -years)
 
 
 def _bvg_rate_for_age(age: int) -> float:
@@ -109,7 +128,7 @@ class ProjectionService:
         year_labels = list(range(datetime.now().year, datetime.now().year + years + 1))
 
         # ── Pension Projections ───────────────────────────────
-        pension_ahv, pension_bvg, pension_3a, pension_3b = self._project_pensions(
+        pension_ahv, pension_bvg, pension_3a, pension_3b, retirement_idx = self._project_pensions(
             pension_records=pension_records or [],
             years=years,
             annual_income=annual_income,
@@ -129,6 +148,7 @@ class ProjectionService:
             "pension_bvg": pension_bvg,
             "pension_3a": pension_3a,
             "pension_3b": pension_3b,
+            "retirement_idx": retirement_idx,
             "inflation_adjusted": True,
         }
 
@@ -149,16 +169,20 @@ class ProjectionService:
         """
         current_year = datetime.now().year
 
-        # Determine current age
+        # Determine current age — align with frontend (calendar-year difference).
+        # Using days/365.25 can be off by ±1 year depending on birth month vs. today,
+        # which causes retirement index mismatches between frontend and backend.
         current_age = 40  # fallback
         if date_of_birth:
             try:
                 dob = datetime.fromisoformat(date_of_birth)
-                current_age = int((datetime.now() - dob).days / 365.25)
+                current_age = datetime.now().year - dob.year
             except Exception:
                 pass
 
         years_to_retirement = max(0, retirement_age - current_age)
+        # Index in the series where age first reaches retirement_age.
+        retirement_idx = min(years_to_retirement, years)
 
         # Extract pension records by pillar
         ahv_record = next((r for r in pension_records if r["pillar"] == "1"), None)
@@ -181,6 +205,7 @@ class ProjectionService:
                 retirement_age=retirement_age,
                 record=ahv_record,
                 annual_income=annual_income,
+                current_age=current_age,
             )
             pension_ahv_series.append(ahv_annual / inflation_deflator)
 
@@ -218,7 +243,7 @@ class ProjectionService:
             )
             pension_3b_series.append(p3b_total / inflation_deflator)
 
-        return pension_ahv_series, pension_bvg_series, pension_3a_series, pension_3b_series
+        return pension_ahv_series, pension_bvg_series, pension_3a_series, pension_3b_series, retirement_idx
 
     def _project_ahv(
         self,
@@ -226,16 +251,31 @@ class ProjectionService:
         retirement_age: int,
         record: Optional[Dict],
         annual_income: float,
+        current_age: int,
     ) -> float:
         """
         Calculate projected AHV monthly pension (× 12 for annual).
         Returns annual AHV pension income in nominal CHF.
+
+        The wizard stores the user's **today's** contribution years. For the
+        projection at retirement, we extrapolate by adding the years between
+        "now" and the projected year so the AHV formula reflects the full
+        contribution history at retirement (capped at AHV_FULL_YEARS = 44).
         """
         if age_at_year < retirement_age:
             return 0.0
 
+        # Extrapolate: stored years (as of today) + additional years worked
+        # between today and the projected retirement/year.
+        years_elapsed_since_now = max(0, age_at_year - current_age)
+
         if record:
-            contribution_years = record.get("contribution_years") or max(0, age_at_year - 18)
+            stored_years = record.get("contribution_years")
+            if stored_years is None:
+                # No explicit value → estimate from age (assume work since 18)
+                contribution_years = max(0, age_at_year - 18)
+            else:
+                contribution_years = stored_years + years_elapsed_since_now
             avg_salary = record.get("average_insured_salary") or annual_income
         else:
             contribution_years = max(0, age_at_year - 18)
@@ -304,17 +344,18 @@ class ProjectionService:
         current_balance = record.get("current_balance", 0.0)
         annual_contribution = record.get("annual_contribution", 0.0)
         return_rate = record.get("expected_return_rate", 0.03)
-        rec_retirement = record.get("retirement_age", retirement_age)
+        # Use the UI-level retirement_age consistently, not the record's —
+        # the user's slider is the single source of truth for the projection.
 
         balance = current_balance
         for _ in range(years_elapsed):
             balance = balance * (1 + return_rate) + annual_contribution
 
-        if age_at_year < rec_retirement:
+        if age_at_year < retirement_age:
             return balance  # return balance as proxy
 
-        # Annuitize over ~20 years (simple)
-        return balance / 20.0
+        # Annuitize with residual return during payout phase
+        return _annuity_payout(balance)
 
     def _project_3b(
         self,
@@ -345,8 +386,8 @@ class ProjectionService:
         if age_at_year < retirement_age:
             return balance  # proxy: projected capital
 
-        # Annuitize over 20 years (conservative payout estimate)
-        return balance / 20.0
+        # Annuitize with residual return during payout phase
+        return _annuity_payout(balance)
 
     def compare_scenarios(
         self,

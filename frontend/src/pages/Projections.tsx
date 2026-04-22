@@ -29,6 +29,14 @@ const HORIZONS: Array<{ key: HorizonKey; label: string; years: number }> = [
   { key: "age90", label: "Bis 90", years: 50 },
 ];
 
+// Consistent pillar palette (matches Finanzplan / RetirementPlanner)
+const PILLAR_COLORS = {
+  ahv: "#38bdf8",  // Säule 1 — sky
+  bvg: "#a78bfa",  // Säule 2 — violet
+  "3a": "#10b981", // Säule 3a — emerald
+  "3b": "#f59e0b", // Säule 3b — amber
+} as const;
+
 export default function Projections() {
   const { user } = useAuth();
   const [horizon, setHorizon] = useState<HorizonKey>("10yr");
@@ -204,8 +212,8 @@ export default function Projections() {
             <p className="text-text-tertiary text-[11px] mt-1 max-w-3xl leading-relaxed">
               Vor dem Rentenalter ({params.retirement_age}): AHV = 0; BVG, 3a und 3b zeigen das projizierte{" "}
               <span className="text-text-secondary">Kapital</span>. Ab dann: AHV- und BVG-Rente bzw. bei 3a/3b eine
-              vereinfachte Annahme (Kapital ÷ 20 Jahre pro Jahr). Ohne Geburtsdatum im Profil wird wie in der Simulation{" "}
-              <span className="text-text-secondary">Alter 40</span> angenommen.
+              Rentenformel mit 2 % Restverzinsung über 20 Jahre Auszahlungsdauer. AHV-Beitragsjahre werden
+              bis zum Rentenalter fortgeschrieben (max. 44 Jahre).
             </p>
           </div>
         </div>
@@ -214,20 +222,20 @@ export default function Projections() {
             <AreaChart data={pensionChartData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="ahv-grad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={colors.accent} stopOpacity={0.3} />
-                  <stop offset="95%" stopColor={colors.accent} stopOpacity={0.0} />
+                  <stop offset="5%" stopColor={PILLAR_COLORS.ahv} stopOpacity={0.3} />
+                  <stop offset="95%" stopColor={PILLAR_COLORS.ahv} stopOpacity={0.0} />
                 </linearGradient>
                 <linearGradient id="bvg-grad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={colors.gain} stopOpacity={0.3} />
-                  <stop offset="95%" stopColor={colors.gain} stopOpacity={0.0} />
+                  <stop offset="5%" stopColor={PILLAR_COLORS.bvg} stopOpacity={0.3} />
+                  <stop offset="95%" stopColor={PILLAR_COLORS.bvg} stopOpacity={0.0} />
                 </linearGradient>
                 <linearGradient id="p3a-grad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={colors.purple} stopOpacity={0.3} />
-                  <stop offset="95%" stopColor={colors.purple} stopOpacity={0.0} />
+                  <stop offset="5%" stopColor={PILLAR_COLORS["3a"]} stopOpacity={0.3} />
+                  <stop offset="95%" stopColor={PILLAR_COLORS["3a"]} stopOpacity={0.0} />
                 </linearGradient>
                 <linearGradient id="p3b-grad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.0} />
+                  <stop offset="5%" stopColor={PILLAR_COLORS["3b"]} stopOpacity={0.3} />
+                  <stop offset="95%" stopColor={PILLAR_COLORS["3b"]} stopOpacity={0.0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke={colors.borderSubtle} vertical={false} />
@@ -258,10 +266,10 @@ export default function Projections() {
                 wrapperStyle={{ fontSize: 11, color: colors.textSecondary }}
               />
               {/* Retirement line */}
-              <Area type="monotone" dataKey="ahv" name="AHV (Säule 1)"              stroke={colors.accent}  fill="url(#ahv-grad)"  strokeWidth={2} dot={false} />
-              <Area type="monotone" dataKey="bvg" name="BVG (Säule 2)"              stroke={colors.gain}    fill="url(#bvg-grad)"  strokeWidth={2} dot={false} />
-              <Area type="monotone" dataKey="3a"  name="Säule 3a (gebunden)"        stroke={colors.purple}  fill="url(#p3a-grad)"  strokeWidth={2} dot={false} />
-              <Area type="monotone" dataKey="3b"  name="Säule 3b / Lebensversich."  stroke="#f59e0b"        fill="url(#p3b-grad)"  strokeWidth={2} dot={false} />
+              <Area type="monotone" dataKey="ahv" name="AHV (Säule 1)"              stroke={PILLAR_COLORS.ahv}   fill="url(#ahv-grad)"  strokeWidth={2} dot={false} />
+              <Area type="monotone" dataKey="bvg" name="BVG (Säule 2)"              stroke={PILLAR_COLORS.bvg}   fill="url(#bvg-grad)"  strokeWidth={2} dot={false} />
+              <Area type="monotone" dataKey="3a"  name="Säule 3a (gebunden)"        stroke={PILLAR_COLORS["3a"]} fill="url(#p3a-grad)"  strokeWidth={2} dot={false} />
+              <Area type="monotone" dataKey="3b"  name="Säule 3b / Lebensversich."  stroke={PILLAR_COLORS["3b"]} fill="url(#p3b-grad)"  strokeWidth={2} dot={false} />
             </AreaChart>
           </ResponsiveContainer>
         )}
@@ -274,10 +282,10 @@ export default function Projections() {
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
-                { label: "AHV (Säule 1)", annual: ahvAtRet, color: colors.accent },
-                { label: "BVG (Säule 2)", annual: bvgAtRet, color: colors.gain },
-                { label: "Säule 3a", annual: p3aAtRet, color: colors.purple },
-                { label: "Säule 3b / LV", annual: p3bAtRet, color: "#f59e0b" },
+                { label: "AHV (Säule 1)", annual: ahvAtRet, color: PILLAR_COLORS.ahv },
+                { label: "BVG (Säule 2)", annual: bvgAtRet, color: PILLAR_COLORS.bvg },
+                { label: "Säule 3a", annual: p3aAtRet, color: PILLAR_COLORS["3a"] },
+                { label: "Säule 3b / LV", annual: p3bAtRet, color: PILLAR_COLORS["3b"] },
               ].map(({ label, annual, color }) => (
                 <div key={label} className="bg-bg-elevated rounded-lg px-4 py-3 border border-border/30">
                   <p className="text-text-tertiary text-[11px] mb-1">{label}</p>
@@ -312,13 +320,13 @@ export default function Projections() {
         {/* Reference values */}
         <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-border/50">
           {[
-            { label: "AHV (Säule 1)", value: "bis CHF 2'520/Mo", desc: "Max. 2024 bei 44 Vollbeitragsjahren", color: "text-accent" },
-            { label: "BVG (Säule 2)", value: "Kapital × 6.8% ÷ 12", desc: "Umwandlungssatz 2024 im Modell", color: "text-gain" },
-            { label: "Säule 3a", value: `max. CHF 7'056/Jahr`, desc: "Beitragsgrenze (Lohnabhängige, 2024)", color: "text-purple" },
+            { label: "AHV (Säule 1)", value: "bis CHF 2'520/Mo", desc: "Max. 2024 bei 44 Vollbeitragsjahren", color: PILLAR_COLORS.ahv },
+            { label: "BVG (Säule 2)", value: "Kapital × 6.8% ÷ 12", desc: "Umwandlungssatz 2024 im Modell", color: PILLAR_COLORS.bvg },
+            { label: "Säule 3a", value: `max. CHF 7'056/Jahr`, desc: "Beitragsgrenze (Lohnabhängige, 2024)", color: PILLAR_COLORS["3a"] },
           ].map(({ label, value, desc, color }) => (
             <div key={label} className="card-elevated">
               <p className="text-text-tertiary text-xs">{label}</p>
-              <p className={`text-sm font-semibold mt-1 font-mono ${color}`}>{value}</p>
+              <p className="text-sm font-semibold mt-1 font-mono" style={{ color }}>{value}</p>
               <p className="text-text-tertiary text-xs mt-0.5">{desc}</p>
             </div>
           ))}
