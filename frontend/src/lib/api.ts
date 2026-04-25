@@ -262,6 +262,23 @@ export const settingsApi = {
   resetCategoryMappings: () => api.delete("/settings/category-mappings"),
 };
 
+// Wizard state (raw data blob from wizard onboarding)
+export const wizardApi = {
+  getState: () => api.get<Record<string, unknown>>("/wizard/state"),
+  getPeerConfig: () => api.get<Record<string, number | undefined>>("/wizard/peer-config"),
+};
+
+// Budget Health Score
+export const healthApi = {
+  score: (params?: { start?: string; end?: string }) =>
+    api.get<{
+      score: number;
+      grade: string;
+      components: Array<{ name: string; score: number; weight: number; detail: string }>;
+      top_levers: Array<{ title: string; body: string; potential: number }>;
+    }>("/budget/health-score", { params }),
+};
+
 // Notifications / Anomalies
 export const notificationsApi = {
   list: (params?: { lookback_days?: number; recent_days?: number }) =>

@@ -19,7 +19,7 @@ import { format } from "date-fns";
 import { clsx } from "clsx";
 import {
   TrendingDown, TrendingUp, ChevronDown, ChevronUp,
-  Lightbulb, Target, Wallet, BarChart3, Gauge, Eye, EyeOff, ArrowDownUp, Layers,
+  Lightbulb, Target, Wallet, BarChart3, Gauge, Eye, EyeOff, ArrowDownUp, Layers, TableProperties,
 } from "lucide-react";
 
 const CategoryGaugeChart = lazy(
@@ -144,10 +144,10 @@ export default function Budget() {
   const [showTxnEditor, setShowTxnEditor] = useState(false);
   const [txnEditorRows, setTxnEditorRows] = useState<DrillDownTransaction[]>([]);
   const [showSonstiges, setShowSonstiges] = useState(false);
-  const [view, setView] = useState<"bar" | "gauge" | "stacked">(() => {
+  const [view, setView] = useState<"bar" | "gauge" | "stacked" | "compare">(() => {
     try {
       const saved = localStorage.getItem("budgetpal_budget_default_view");
-      if (saved === "bar" || saved === "gauge" || saved === "stacked") return saved;
+      if (saved === "bar" || saved === "gauge" || saved === "stacked" || saved === "compare") return saved;
       return "gauge";
     } catch { return "gauge"; }
   });
@@ -185,7 +185,7 @@ export default function Budget() {
     });
   }
 
-  function handleSetView(v: "bar" | "gauge" | "stacked") {
+  function handleSetView(v: "bar" | "gauge" | "stacked" | "compare") {
     setView(v);
     try { localStorage.setItem("budgetpal_budget_default_view", v); } catch {}
   }
@@ -247,7 +247,7 @@ export default function Budget() {
       budgetApi
         .multiAnalysis({ mode: "peer", start: periodStart, end: periodEnd })
         .then((r) => r.data),
-    enabled: (showPeer || gaugeView) && capabilities?.peer_data_available === true,
+    enabled: (showPeer || gaugeView || view === "compare") && capabilities?.peer_data_available === true,
     staleTime: 60_000,
   });
 
@@ -256,7 +256,7 @@ export default function Budget() {
     queryKey: ["wizard-peer-config"],
     queryFn: () => api.get("/wizard/peer-config").then((r) => r.data),
     staleTime: 300_000,
-    enabled: showPeer || gaugeView,
+    enabled: showPeer || gaugeView || view === "compare",
   });
 
   // ── Frequency filter helpers ─────────────────────────────────
@@ -803,6 +803,19 @@ export default function Budget() {
                 >
                   <Layers className="w-3.5 h-3.5" />
                 </button>
+                <button
+                  type="button"
+                  title="3-Weg-Vergleich (Ist / Soll / Peer)"
+                  onClick={() => handleSetView("compare")}
+                  className={clsx(
+                    "px-2 py-1.5 border-l border-border transition-colors",
+                    view === "compare"
+                      ? "bg-accent/20 text-accent"
+                      : "text-text-tertiary hover:text-text-secondary",
+                  )}
+                >
+                  <TableProperties className="w-3.5 h-3.5" />
+                </button>
               </div>
             </div>
           </div>
@@ -947,6 +960,167 @@ export default function Budget() {
                 )}
               </>
             )}
+          </div>
+        )}
+
+        {/* ── Compare view (3-Weg: Ist / Soll / Peer-Ø) ── */}
+        {view === "compare" && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[520px]">
+              <thead>
+                <tr className="border-b border-border/60 text-[11px] text-text-tertiary uppercase tracking-wide">
+                  <th className="px-4 py-2.5 text-left font-medium w-40">Kategorie</th>
+                  <th className="px-3 py-2.5 text-right font-medium">Ist</th>
+                  <th className="px-3 py-2.5 text-right font-medium">Soll</th>
+                  <th className="px-3 py-2.5 text-right font-medium">vs. Soll</th>
+                  <th className="px-3 py-2.5 text-right font-medium">Peer-Ø</th>
+                  <th className="px-3 py-2.5 text-right font-medium">vs. Peer</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/30">
+                {superRows
+                  .filter((r) => r.actual > 0 || r.planned > 0 || peerBySuperCat.has(r.sc.id))
+                  .map((row) => {
+                    const peer = peerBySuperCat.get(row.sc.id) ?? 0;
+                    const vsSoll   = row.planned > 0 ? row.actual - row.planned : null;
+                    const vsPeer   = peer > 0 ? row.actual - peer : null;
+                    const vsSollPct = row.planned > 0 ? (row.actual / row.planned - 1) * 100 : null;
+                    const vsPeerPct = peer > 0 ? (row.actual / peer - 1) * 100 : null;
+                    const isHidden = hiddenScIds.has(row.sc.id);
+                    if (isHidden) return null;
+                    return (
+                      <tr
+                        key={row.sc.id}
+                        className="hover:bg-bg-surface2/40 cursor-pointer transition-colors"
+                        onClick={() => openDrillDown(row)}
+                      >
+                        {/* Category */}
+                        <td className="px-4 py-2.5">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="w-5 h-5 rounded flex items-center justify-center shrink-0"
+                              style={{ backgroundColor: row.sc.color + "22" }}
+                            >
+                              <row.sc.icon className="w-3 h-3" style={{ color: row.sc.color }} />
+                            </span>
+                            <span className="text-text-secondary text-xs truncate max-w-[100px]">{row.sc.label}</span>
+                          </div>
+                        </td>
+
+                        {/* Ist */}
+                        <td className="px-3 py-2.5 text-right font-mono text-xs text-text-primary">
+                          {row.actual > 0 ? fmtRef(row.actual) : <span className="text-text-disabled">—</span>}
+                        </td>
+
+                        {/* Soll */}
+                        <td className="px-3 py-2.5 text-right font-mono text-xs text-text-tertiary">
+                          {row.planned > 0 ? fmtRef(row.planned) : <span className="text-text-disabled">—</span>}
+                        </td>
+
+                        {/* Δ vs Soll */}
+                        <td className="px-3 py-2.5 text-right">
+                          {vsSoll !== null ? (
+                            <div className="flex flex-col items-end">
+                              <span className={clsx(
+                                "text-xs font-mono",
+                                vsSoll > 0 ? "text-loss" : "text-gain",
+                              )}>
+                                {vsSoll > 0 ? "+" : ""}{fmtRef(vsSoll)}
+                              </span>
+                              {vsSollPct !== null && (
+                                <span className={clsx(
+                                  "text-[10px]",
+                                  vsSollPct > 0 ? "text-loss/70" : "text-gain/70",
+                                )}>
+                                  {vsSollPct > 0 ? "+" : ""}{vsSollPct.toFixed(0)}%
+                                </span>
+                              )}
+                            </div>
+                          ) : <span className="text-text-disabled text-xs">—</span>}
+                        </td>
+
+                        {/* Peer-Ø */}
+                        <td className="px-3 py-2.5 text-right font-mono text-xs text-text-tertiary">
+                          {peer > 0 ? fmtRef(peer) : <span className="text-text-disabled">—</span>}
+                        </td>
+
+                        {/* Δ vs Peer */}
+                        <td className="px-3 py-2.5 text-right">
+                          {vsPeer !== null ? (
+                            <div className="flex flex-col items-end">
+                              <span className={clsx(
+                                "text-xs font-mono",
+                                vsPeer > 0 ? "text-loss" : "text-gain",
+                              )}>
+                                {vsPeer > 0 ? "+" : ""}{fmtRef(vsPeer)}
+                              </span>
+                              {vsPeerPct !== null && (
+                                <span className={clsx(
+                                  "text-[10px]",
+                                  vsPeerPct > 0 ? "text-loss/70" : "text-gain/70",
+                                )}>
+                                  {vsPeerPct > 0 ? "+" : ""}{vsPeerPct.toFixed(0)}%
+                                </span>
+                              )}
+                            </div>
+                          ) : <span className="text-text-disabled text-xs">—</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+
+              {/* Totals footer */}
+              <tfoot>
+                <tr className="border-t border-border text-xs font-semibold">
+                  <td className="px-4 py-2.5 text-text-secondary">Total</td>
+                  <td className="px-3 py-2.5 text-right font-mono text-text-primary">{fmtRef(kpi.expenses)}</td>
+                  <td className="px-3 py-2.5 text-right font-mono text-text-tertiary">
+                    {totalPlanned > 0 ? fmtRef(totalPlanned) : "—"}
+                  </td>
+                  <td className="px-3 py-2.5 text-right">
+                    {totalPlanned > 0 && (
+                      <span className={clsx("font-mono", kpi.expenses > totalPlanned ? "text-loss" : "text-gain")}>
+                        {kpi.expenses > totalPlanned ? "+" : ""}{fmtRef(kpi.expenses - totalPlanned)}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2.5 text-right font-mono text-text-tertiary">
+                    {peerBySuperCat.size > 0
+                      ? fmtRef([...peerBySuperCat.values()].reduce((s, v) => s + v, 0))
+                      : "—"}
+                  </td>
+                  <td className="px-3 py-2.5 text-right">
+                    {peerBySuperCat.size > 0 && (() => {
+                      const peerTotal = [...peerBySuperCat.values()].reduce((s, v) => s + v, 0);
+                      const delta = kpi.expenses - peerTotal;
+                      return (
+                        <span className={clsx("font-mono", delta > 0 ? "text-loss" : "text-gain")}>
+                          {delta > 0 ? "+" : ""}{fmtRef(delta)}
+                        </span>
+                      );
+                    })()}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+
+            {/* Legend */}
+            <div className="flex flex-wrap gap-4 px-4 py-3 border-t border-border/40 text-[10px] text-text-tertiary">
+              <span>
+                <span className="text-gain">Grün</span> = unter Budget / unter Peer
+              </span>
+              <span>
+                <span className="text-loss">Rot</span> = über Budget / über Peer
+              </span>
+              {peerBySuperCat.size === 0 && (
+                <span className="text-text-disabled">
+                  Keine Peer-Daten: Starte den{" "}
+                  <a href="/wizard" className="text-accent underline">Setup-Wizard</a>{" "}
+                  um Peer-Vergleiche zu aktivieren.
+                </span>
+              )}
+            </div>
           </div>
         )}
       </div>

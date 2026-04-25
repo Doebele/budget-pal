@@ -6,6 +6,8 @@ import {
   Upload, ArrowRight, BarChart3, Target, FileUp, Wand2,
 } from "lucide-react";
 import { transactionsApi, accountsApi, budgetsApi, goalsApi } from "@/lib/api";
+import NetIncomeCard from "@/components/NetIncomeCard";
+import HealthScoreWidget from "@/components/HealthScoreWidget";
 import { formatCHF } from "@/lib/theme";
 import { format } from "date-fns";
 import type { SankeyFlowOrder, SankeyLink } from "@/components/charts/SankeyChart";
@@ -194,6 +196,12 @@ export default function Dashboard() {
           icon={TrendingUp}
           colorClass={(stats?.net || 0) >= 0 ? "text-gain" : "text-loss"}
         />
+      </div>
+
+      {/* Net income + Health Score row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <NetIncomeCard compact />
+        <HealthScoreWidget />
       </div>
 
       {/* Cashflow — Reale vs. Empirische nebeneinander */}

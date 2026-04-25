@@ -19,7 +19,7 @@ from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, extract, func
 
-from app.models.models import Transaction, Account, User
+from app.models.models import Transaction, Account, User, RecurringPlan
 from app.services.currency_service import currency_service, convert_with_eur_rates, normalize_reference_currency
 
 
@@ -92,6 +92,8 @@ async def detect(
     findings += _detect_price_changes(rows, ref, rates, recent_cutoff)
     findings += _detect_missing_salary(rows, ref, rates, today)
     findings += _detect_large_cash(rows, ref, rates, recent_cutoff)
+    findings += await _detect_upcoming_bills(user.id, db, today)
+    findings += await _detect_budget_overrun(user.id, db, rows, ref, rates, today)
 
     # Sort: alert > warning > info
     order = {"alert": 0, "warning": 1, "info": 2}
@@ -274,3 +276,134 @@ def _detect_large_cash(rows, ref, rates, recent_cutoff) -> List[AnomalyFinding]:
                 currency=ref,
             ))
     return findings[:2]
+
+
+# ── Cashflow-specific detectors (async, need DB access) ───────
+
+PERIODICITY_DAYS = {
+    "weekly":     7,
+    "monthly":    30,
+    "quarterly":  91,
+    "halfyearly": 182,
+    "yearly":     365,
+}
+
+
+async def _detect_upcoming_bills(user_id: int, db: AsyncSession, today: date) -> List[AnomalyFinding]:
+    """
+    Find RecurringPlan expense entries whose next occurrence falls within 7 days.
+    For each plan entry the next occurrence is estimated from start_date + N × period.
+    """
+    horizon = today + timedelta(days=7)
+
+    plans = (await db.execute(
+        select(RecurringPlan)
+        .where(
+            RecurringPlan.user_id == user_id,
+            RecurringPlan.amount < 0,          # only expenses
+            RecurringPlan.is_future.is_(True),
+        )
+    )).scalars().all()
+
+    findings: List[AnomalyFinding] = []
+
+    for plan in plans:
+        if plan.end_date and plan.end_date < today:
+            continue
+        period_days = PERIODICITY_DAYS.get(plan.periodicity or "monthly", 30)
+        start = plan.start_date or today
+
+        # Advance start_date by multiples of period until >= today
+        next_occ = start
+        while next_occ < today:
+            next_occ = next_occ + timedelta(days=period_days)
+
+        if today <= next_occ <= horizon:
+            days_away = (next_occ - today).days
+            when_str = "heute" if days_away == 0 else f"in {days_away} Tag{'en' if days_away != 1 else ''}"
+            findings.append(AnomalyFinding(
+                type="upcoming_bill",
+                severity="warning",
+                title=f"Zahlung fällig: {plan.description}",
+                body=f"CHF {abs(plan.amount):,.2f} — {when_str} ({next_occ.strftime('%d.%m.%Y')})",
+                amount=abs(plan.amount),
+                currency="CHF",
+            ))
+
+    return findings[:5]
+
+
+async def _detect_budget_overrun(
+    user_id: int,
+    db: AsyncSession,
+    rows: list,
+    ref: str,
+    rates: dict,
+    today: date,
+) -> List[AnomalyFinding]:
+    """
+    Compare this month's spending per category to the wizard planned budget.
+    Flag categories that exceeded 80% of their monthly plan.
+    """
+    from app.models.models import Budget
+    import json
+
+    # Load wizard budgets (notes field = category label, amount = monthly CHF)
+    budgets = (await db.execute(
+        select(Budget)
+        .where(
+            Budget.user_id == user_id,
+            Budget.notes.isnot(None),
+        )
+        .order_by(Budget.created_at.desc())
+    )).scalars().all()
+
+    if not budgets:
+        return []
+
+    # Deduplicate — keep latest per category label (notes)
+    plan_by_cat: dict[str, float] = {}
+    for b in budgets:
+        key = (b.notes or "").strip().lower()
+        if key and key not in plan_by_cat:
+            plan_by_cat[key] = abs(b.amount)
+
+    # Actual spending this month
+    month_start = today.replace(day=1)
+    actual_by_cat: dict[str, float] = {}
+    for t in rows:
+        if t.date.date() < month_start or t.amount >= 0:
+            continue
+        cat = (t.category or "").strip().lower()
+        if not cat:
+            continue
+        actual_by_cat[cat] = actual_by_cat.get(cat, 0) + abs(_ref_amount(t, ref, rates))
+
+    findings: List[AnomalyFinding] = []
+    for cat_key, planned in plan_by_cat.items():
+        if planned <= 0:
+            continue
+        actual = actual_by_cat.get(cat_key, 0)
+        ratio = actual / planned
+        if ratio >= 1.0:
+            findings.append(AnomalyFinding(
+                type="budget_overrun",
+                severity="alert",
+                title=f"Budget überschritten: {cat_key.title()}",
+                body=f"{ref} {actual:,.2f} von {ref} {planned:,.2f} ({ratio * 100:.0f}%) aufgebraucht.",
+                amount=round(actual, 2),
+                currency=ref,
+            ))
+        elif ratio >= 0.8:
+            findings.append(AnomalyFinding(
+                type="budget_warning",
+                severity="warning",
+                title=f"Budget fast ausgeschöpft: {cat_key.title()}",
+                body=f"{ref} {actual:,.2f} von {ref} {planned:,.2f} ({ratio * 100:.0f}%) verbraucht.",
+                amount=round(actual, 2),
+                currency=ref,
+            ))
+
+    # Sort by ratio desc, cap at 4
+    findings.sort(key=lambda f: -(f.amount or 0))
+    return findings[:4]

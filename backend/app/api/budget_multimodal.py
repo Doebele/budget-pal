@@ -513,3 +513,261 @@ async def multi_analysis(
         opportunities=opportunities,
         reference_currency=ref,
     )
+
+
+# ── Budget Health Score ───────────────────────────────────────
+
+class HealthScoreComponent(BaseModel):
+    name: str
+    score: float        # 0–100
+    weight: float       # 0–1, sum = 1.0
+    detail: str
+
+
+class HealthScoreLever(BaseModel):
+    title: str
+    body: str
+    potential: float    # CHF / month improvement potential
+
+
+class HealthScoreResponse(BaseModel):
+    score: float        # 0–100 weighted composite
+    grade: str          # A / B / C / D / F
+    components: List[HealthScoreComponent]
+    top_levers: List[HealthScoreLever]
+
+
+def _grade(score: float) -> str:
+    if score >= 85: return "A"
+    if score >= 70: return "B"
+    if score >= 55: return "C"
+    if score >= 40: return "D"
+    return "F"
+
+
+@router.get("/health-score", response_model=HealthScoreResponse)
+async def budget_health_score(
+    start: Optional[str] = Query(None),
+    end: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Compute a 0–100 Budget Health Score from five weighted components:
+      • Savings Rate       30%
+      • Budget Adherence   25%
+      • Cashflow Coverage  20%
+      • Pension Progress   15%
+      • Expense Diversity  10%
+    """
+    from datetime import timedelta
+    from collections import defaultdict
+
+    ref = normalize_reference_currency(current_user.currency)
+    rates = await currency_service.get_rates()
+
+    # ── Date range (default: last 3 months) ───────────────────
+    today = date.today()
+    if start and end:
+        period_start = date.fromisoformat(start)
+        period_end   = date.fromisoformat(end)
+    else:
+        period_start = (today.replace(day=1) - timedelta(days=1)).replace(day=1)
+        period_start = (period_start - timedelta(days=1)).replace(day=1)  # 2 months back
+        period_end   = today
+
+    months_covered = max(
+        1,
+        (period_end.year - period_start.year) * 12
+        + (period_end.month - period_start.month) + 1,
+    )
+
+    # ── Load transactions ──────────────────────────────────────
+    rows = (await db.execute(
+        select(Transaction)
+        .join(Account, Transaction.account_id == Account.id)
+        .where(
+            Account.user_id == current_user.id,
+            Transaction.is_deleted.isnot(True),
+            Transaction.is_transfer.isnot(True),
+            Transaction.date >= _utc_start(period_start),
+            Transaction.date <= _utc_end(period_end),
+        )
+    )).scalars().all()
+
+    income = 0.0
+    expenses = 0.0
+    cat_totals: dict[str, float] = defaultdict(float)
+
+    for t in rows:
+        amt = convert_with_eur_rates(rates, t.amount, (t.currency or "CHF").upper(), ref)
+        if amt > 0:
+            income += amt
+        else:
+            abs_amt = -amt
+            expenses += abs_amt
+            cat_totals[(t.category or "Sonstiges").lower()] += abs_amt
+
+    # ── Component 1: Savings Rate (weight 30%) ─────────────────
+    # 25% savings rate → 100 pts (linear)
+    if income > 0:
+        savings_rate_pct = max(0.0, (income - expenses) / income * 100)
+        savings_score = min(100.0, savings_rate_pct * 4.0)
+    else:
+        savings_rate_pct = 0.0
+        savings_score = 0.0
+
+    monthly_net = (income - expenses) / months_covered
+
+    # ── Component 2: Budget Adherence (weight 25%) ─────────────
+    # Load wizard budgets
+    wizard_budgets = (await db.execute(
+        select(Budget)
+        .where(Budget.user_id == current_user.id, Budget.notes.isnot(None))
+        .order_by(Budget.created_at.desc())
+    )).scalars().all()
+
+    planned_total = 0.0
+    plan_by_cat: dict[str, float] = {}
+    for b in wizard_budgets:
+        key = (b.notes or "").strip().lower()
+        if key and key not in plan_by_cat:
+            plan_by_cat[key] = abs(b.amount) * months_covered
+            planned_total += abs(b.amount) * months_covered
+
+    if planned_total > 0:
+        util = expenses / planned_total  # 1.0 = on budget
+        if util <= 1.0:
+            adherence_score = 100.0
+        elif util <= 1.2:
+            adherence_score = max(0.0, 100.0 - (util - 1.0) * 250)
+        else:
+            adherence_score = 0.0
+    else:
+        adherence_score = 50.0   # neutral: no budget defined
+
+    # ── Component 3: Cashflow Coverage (weight 20%) ────────────
+    if income <= 0:
+        cashflow_score = 0.0
+    elif income >= expenses:
+        cashflow_score = 100.0
+    else:
+        ratio = income / expenses  # < 1 means spending more than earning
+        cashflow_score = max(0.0, ratio * 100.0)
+
+    # ── Component 4: Pension Progress (weight 15%) ─────────────
+    # Check for savings-category transactions or pillar 3a wizard entries
+    savings_cats = {"3a", "pillar", "säule", "pension", "sparen", "altersvorsorge", "bvg", "pkk"}
+    has_pension_txn = any(
+        any(k in (t.category or "").lower() for k in savings_cats)
+        for t in rows if t.amount < 0
+    )
+    pillar_budget = any(
+        any(k in (b.notes or "").lower() for k in {"3a", "pillar", "säule", "pension"})
+        for b in wizard_budgets
+    )
+    pension_score = 100.0 if (has_pension_txn or pillar_budget) else 30.0
+
+    # ── Component 5: Expense Diversity (weight 10%) ────────────
+    # Herfindahl–Hirschman Index: HHI = Σ(share²) — lower = more diverse
+    # HHI ranges 0 (fully diverse) to 1 (monopoly)
+    # Score = (1 - HHI) * 100
+    if expenses > 0 and cat_totals:
+        shares = [v / expenses for v in cat_totals.values()]
+        hhi = sum(s ** 2 for s in shares)
+        diversity_score = min(100.0, (1 - hhi) * 100 * 1.3)  # scale up slightly
+    else:
+        diversity_score = 50.0
+
+    # ── Weighted composite ─────────────────────────────────────
+    components = [
+        HealthScoreComponent(
+            name="Sparquote",
+            score=round(savings_score, 1),
+            weight=0.30,
+            detail=(
+                f"{savings_rate_pct:.1f}% Sparquote"
+                if income > 0 else "Keine Einnahmen im Zeitraum"
+            ),
+        ),
+        HealthScoreComponent(
+            name="Budgettreue",
+            score=round(adherence_score, 1),
+            weight=0.25,
+            detail=(
+                f"{round(expenses / planned_total * 100):.0f}% des Budgets ausgeschöpft"
+                if planned_total > 0 else "Kein Soll-Budget erfasst"
+            ),
+        ),
+        HealthScoreComponent(
+            name="Cashflow",
+            score=round(cashflow_score, 1),
+            weight=0.20,
+            detail=(
+                f"Einnahmen decken Ausgaben zu {round(income/expenses*100) if expenses > 0 else 100:.0f}%"
+                if income > 0 else "Keine Einnahmen erfasst"
+            ),
+        ),
+        HealthScoreComponent(
+            name="Altersvorsorge",
+            score=round(pension_score, 1),
+            weight=0.15,
+            detail=(
+                "Vorsorgebeiträge erkannt"
+                if (has_pension_txn or pillar_budget) else "Keine Säule-3a-Beiträge erkannt"
+            ),
+        ),
+        HealthScoreComponent(
+            name="Ausgabendiversität",
+            score=round(diversity_score, 1),
+            weight=0.10,
+            detail=f"{len(cat_totals)} Kategorien im Zeitraum",
+        ),
+    ]
+
+    weighted_score = round(
+        sum(c.score * c.weight for c in components), 1
+    )
+
+    # ── Top improvement levers ──────────────────────────────────
+    levers: List[HealthScoreLever] = []
+
+    if savings_score < 70:
+        gap = max(0, income * 0.20 - (income - expenses))
+        levers.append(HealthScoreLever(
+            title="Sparquote erhöhen",
+            body=f"Ziel: 20% Sparquote. Spare zusätzlich ~{ref} {gap/months_covered:,.0f}/Monat.",
+            potential=round(gap / months_covered, 0),
+        ))
+
+    if adherence_score < 70 and planned_total > 0:
+        overspend = max(0.0, expenses - planned_total) / months_covered
+        levers.append(HealthScoreLever(
+            title="Budgeteinhaltung verbessern",
+            body=f"Ausgaben übersteigen das Budget um ~{ref} {overspend:,.0f}/Monat.",
+            potential=round(overspend, 0),
+        ))
+
+    if pension_score < 70:
+        levers.append(HealthScoreLever(
+            title="Säule 3a einrichten",
+            body="Zahle regelmässig in die Säule 3a ein. Max. CHF 7'056/Jahr (2024, unselbstständig).",
+            potential=588.0,  # 7056 / 12
+        ))
+
+    if cashflow_score < 80 and income > 0:
+        deficit = max(0.0, expenses - income) / months_covered
+        levers.append(HealthScoreLever(
+            title="Ausgaben senken",
+            body=f"Ausgaben übersteigen Einnahmen um ~{ref} {deficit:,.0f}/Monat.",
+            potential=round(deficit, 0),
+        ))
+
+    levers.sort(key=lambda l: -l.potential)
+
+    return HealthScoreResponse(
+        score=weighted_score,
+        grade=_grade(weighted_score),
+        components=components,
+        top_levers=levers[:3],
+    )
