@@ -1,6 +1,7 @@
 import { Fragment, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import type { LucideIcon } from "lucide-react";
+import NotificationBell from "./NotificationBell";
 import {
   LayoutDashboard,
   ArrowLeftRight,
@@ -20,6 +21,7 @@ import {
   Brain,
   FileBarChart2,
   CalendarRange,
+  Target,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { clsx } from "clsx";
@@ -34,6 +36,7 @@ const NAV_ITEMS: {
   { path: "/finanzplan", icon: FileBarChart2, label: "Finanzplan" },
   { path: "/budget", icon: PiggyBank, label: "Budgetanalyse" },
   { path: "/budgetplan", icon: CalendarRange, label: "Budgetplan" },
+  { path: "/goals", icon: Target, label: "Sparziele" },
   { path: "/forecast", icon: Brain, label: "Budgetprognose" },
   { path: "/projections", icon: TrendingUp, label: "Rentenprognose", dividerAfter: true },
   { path: "/wizard", icon: Wand2, label: "Empirische Angaben" },
@@ -67,10 +70,13 @@ export default function Sidebar() {
           <BarChart3 className="w-4 h-4 text-white" />
         </div>
         {!collapsed && (
-          <div>
-            <span className="font-display text-text-primary font-semibold text-base leading-tight">Budget</span>
-            <span className="font-display text-accent font-semibold text-base leading-tight">Pal</span>
-          </div>
+          <>
+            <div className="flex-1 min-w-0">
+              <span className="font-display text-text-primary font-semibold text-base leading-tight">Budget</span>
+              <span className="font-display text-accent font-semibold text-base leading-tight">Pal</span>
+            </div>
+            <NotificationBell />
+          </>
         )}
       </div>
 
@@ -161,12 +167,13 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Mobile hamburger */}
+      {/* Mobile hamburger — secondary nav for less-used routes (Import, Archiv, Wizard…) */}
       <button
-        className="md:hidden fixed top-4 left-4 z-50 p-2 bg-bg-surface rounded-lg border border-border"
+        className="md:hidden fixed top-3 right-3 z-50 p-2 bg-bg-surface/90 backdrop-blur rounded-lg border border-border/60 shadow-sm"
         onClick={() => setMobileOpen(!mobileOpen)}
+        aria-label="Menü öffnen"
       >
-        {mobileOpen ? <X className="w-5 h-5 text-text-primary" /> : <Menu className="w-5 h-5 text-text-primary" />}
+        {mobileOpen ? <X className="w-4 h-4 text-text-primary" /> : <Menu className="w-4 h-4 text-text-primary" />}
       </button>
 
       {/* Mobile overlay */}

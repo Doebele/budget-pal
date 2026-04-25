@@ -108,6 +108,7 @@ class User(Base):
     import_logs: Mapped[List["ImportLog"]] = relationship("ImportLog", back_populates="user", cascade="all, delete-orphan")
     forecast_scenarios: Mapped[List["ForecastScenario"]] = relationship("ForecastScenario", back_populates="user", cascade="all, delete-orphan")
     activity_logs: Mapped[List["ActivityLog"]] = relationship("ActivityLog", back_populates="user")
+    goals: Mapped[List["Goal"]] = relationship("Goal", back_populates="user", cascade="all, delete-orphan")
 
 
 # ── Account ───────────────────────────────────────────────────
@@ -185,6 +186,14 @@ class Transaction(Base):
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # Split-transaction support
+    # parent_id: set on child splits, references the original transaction
+    # is_split:  True on the parent when it has been split into children
+    parent_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("transactions.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    is_split: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -194,6 +203,12 @@ class Transaction(Base):
     category_obj: Mapped[Optional["Category"]] = relationship("Category", back_populates="transactions")
     labels: Mapped[List["Label"]] = relationship(
         "Label", secondary="transaction_labels", back_populates="transactions"
+    )
+    split_children: Mapped[List["Transaction"]] = relationship(
+        "Transaction", foreign_keys="Transaction.parent_id", back_populates="split_parent"
+    )
+    split_parent: Mapped[Optional["Transaction"]] = relationship(
+        "Transaction", foreign_keys="Transaction.parent_id", back_populates="split_children", remote_side="Transaction.id"
     )
 
 
@@ -576,3 +591,41 @@ class PeerGroupBenchmark(Base):
     savings_rate_pct: Mapped[float] = mapped_column(Float, default=15.0)
     peer_count: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# ── Goal ───────────────────────────────────────────────────────
+
+class GoalType(str, enum.Enum):
+    savings = "savings"          # accumulate a target amount
+    debt_payoff = "debt_payoff"  # pay down debt
+    emergency_fund = "emergency_fund"
+    purchase = "purchase"        # e.g. car, holiday
+    retirement = "retirement"
+    other = "other"
+
+
+class Goal(Base):
+    """Financial goal with optional linked account and monthly contribution."""
+
+    __tablename__ = "goals"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    goal_type: Mapped[GoalType] = mapped_column(Enum(GoalType), default=GoalType.savings, nullable=False)
+    target_amount: Mapped[float] = mapped_column(Float, nullable=False)
+    current_amount: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    monthly_contribution: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    deadline: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    linked_account_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True
+    )
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    is_achieved: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    user: Mapped["User"] = relationship("User", back_populates="goals")
+    linked_account: Mapped[Optional["Account"]] = relationship("Account")

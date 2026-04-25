@@ -3,6 +3,7 @@ import { Suspense, lazy } from "react";
 
 import { AuthProvider, useAuth } from "@/lib/auth";
 import Sidebar from "@/components/layout/Sidebar";
+import BottomNav from "@/components/layout/BottomNav";
 import LoadingScreen from "@/components/layout/LoadingScreen";
 
 // ── Lazy loaded pages ─────────────────────────────────────────
@@ -20,6 +21,7 @@ const Wizard = lazy(() => import("@/pages/Wizard"));
 const Forecast = lazy(() => import("@/pages/Forecast"));
 const Finanzplan = lazy(() => import("@/pages/Finanzplan"));
 const Budgetplan = lazy(() => import("@/pages/Budgetplan"));
+const Goals = lazy(() => import("@/pages/Goals"));
 
 // ── Protected Route ───────────────────────────────────────────
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -39,9 +41,10 @@ function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen bg-bg overflow-hidden">
       <Sidebar />
-      <main className="flex-1 overflow-y-auto p-6">
+      <main className="flex-1 overflow-y-auto p-6 pb-20 md:pb-6">
         <Suspense fallback={<LoadingScreen />}>{children}</Suspense>
       </main>
+      <BottomNav />
     </div>
   );
 }
@@ -188,6 +191,17 @@ export default function App() {
             <ProtectedRoute>
               <AppShell>
                 <Budgetplan />
+              </AppShell>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/goals"
+          element={
+            <ProtectedRoute>
+              <AppShell>
+                <Goals />
               </AppShell>
             </ProtectedRoute>
           }

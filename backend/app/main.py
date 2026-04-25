@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal, init_db
-from app.api import auth, transactions, imports, projections, accounts, categories, budgets, pension, assets, wizard, currency, forecasting, budget_multimodal, recurring_plan, taxonomy, backup
+from app.api import auth, transactions, imports, projections, accounts, categories, budgets, pension, assets, wizard, currency, forecasting, budget_multimodal, recurring_plan, taxonomy, backup, goals, notifications
 from app.api import settings as settings_api
 from app.services.currency_service import currency_service
 
@@ -240,6 +240,8 @@ app.include_router(budget_multimodal.router, prefix="/api/budget", tags=["budget
 app.include_router(settings_api.router, prefix="/api/settings", tags=["settings"])
 app.include_router(recurring_plan.router, prefix="/api/recurring-plan", tags=["recurring-plan"])
 app.include_router(backup.router, prefix="/api/backup", tags=["backup"])
+app.include_router(goals.router, prefix="/api/goals", tags=["goals"])
+app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
 
 
 # ── Health Check ──────────────────────────────────────────────

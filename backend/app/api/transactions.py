@@ -12,11 +12,13 @@ GET    /transactions/monthly-summary
 from collections import defaultdict
 from datetime import datetime, date, timezone
 from typing import List, Optional, Dict, Any
+import base64
+import json
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status, BackgroundTasks
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_, desc
+from sqlalchemy import select, func, and_, or_, desc, tuple_
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
@@ -96,9 +98,24 @@ class TransactionResponse(BaseModel):
     is_recurring: bool
     periodicity: Optional[str] = None
     created_at: datetime
+    # Split fields
+    parent_id: Optional[int] = None
+    is_split: bool = False
+    split_count: int = 0  # number of children (only set on parent rows)
 
     class Config:
         from_attributes = True
+
+
+class SplitEntry(BaseModel):
+    description: str
+    amount: float
+    category: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class SplitRequest(BaseModel):
+    splits: List[SplitEntry]
 
 
 class ArchivedTransactionResponse(BaseModel):
@@ -252,6 +269,9 @@ def _transaction_to_response(txn: Transaction, user: User, rates: Dict[str, floa
         is_recurring=txn.is_recurring,
         periodicity=txn.periodicity,
         created_at=txn.created_at,
+        parent_id=txn.parent_id,
+        is_split=txn.is_split,
+        split_count=len(txn.split_children) if txn.split_children else 0,
     )
 
 
@@ -409,8 +429,24 @@ async def purge_archived_transaction(
 
 # ── Routes ────────────────────────────────────────────────────
 
+def _encode_cursor(txn_date: datetime, txn_id: int) -> str:
+    """Encode a keyset cursor as a URL-safe base64 string."""
+    payload = json.dumps({"d": txn_date.isoformat(), "i": txn_id})
+    return base64.urlsafe_b64encode(payload.encode()).decode()
+
+
+def _decode_cursor(cursor: str) -> tuple[datetime, int] | None:
+    """Decode a cursor string; returns None on any error."""
+    try:
+        payload = json.loads(base64.urlsafe_b64decode(cursor.encode()))
+        return datetime.fromisoformat(payload["d"]), int(payload["i"])
+    except Exception:
+        return None
+
+
 @router.get("", response_model=List[TransactionResponse])
 async def list_transactions(
+    response: Response,
     start: Optional[date] = Query(None, description="Filter from date (YYYY-MM-DD)"),
     end: Optional[date] = Query(None, description="Filter to date (YYYY-MM-DD)"),
     category: Optional[str] = Query(None),
@@ -426,17 +462,24 @@ async def list_transactions(
         None,
         description="monthly|quarterly|halfyearly|yearly — recurring with this rhythm",
     ),
-    limit: int = Query(100, le=2000),
-    offset: int = Query(0),
+    limit: int = Query(100, le=500),
+    offset: int = Query(0, description="Legacy offset; ignored when cursor is provided"),
+    cursor: Optional[str] = Query(None, description="Opaque keyset cursor from X-Next-Cursor header"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """List transactions for the current user with optional filters."""
-    # Filter out soft-deleted transactions (is_deleted is False or NULL)
-    # SQLite stores booleans as 0/1, so we check for both False and None/NULL
+    """List transactions with cursor-based keyset pagination.
+
+    Pagination flow:
+      1. First page: omit cursor; receive results + X-Next-Cursor / X-Total-Count headers.
+      2. Next pages: pass cursor=<value from X-Next-Cursor>.
+      3. When X-Next-Cursor is absent the last page has been reached.
+
+    Legacy offset pagination is still accepted (pass offset without cursor).
+    """
     filters = [
         Account.user_id == current_user.id,
-        Transaction.is_deleted.isnot(True)  # Filters out True (1), keeps False (0) and NULL
+        Transaction.is_deleted.isnot(True),
     ]
 
     if start:
@@ -448,10 +491,12 @@ async def list_transactions(
     if account_id:
         filters.append(Transaction.account_id == account_id)
     if q:
+        # PostgreSQL full-text search via ILIKE (fast with pg_trgm index; see migration)
         filters.append(
             or_(
                 Transaction.description.ilike(f"%{q}%"),
                 Transaction.merchant_normalized.ilike(f"%{q}%"),
+                Transaction.notes.ilike(f"%{q}%"),
             )
         )
     if min_amount is not None:
@@ -464,17 +509,50 @@ async def list_transactions(
         filters, is_recurring=is_recurring, periodicity=periodicity
     )
 
-    query = (
-        select(Transaction)
-        .join(Account)
-        .where(and_(*filters))
-        .options(selectinload(Transaction.account))
-        .order_by(desc(Transaction.date))
-        .limit(limit)
-        .offset(offset)
-    )
-    result = await db.execute(query)
+    # ── Total count (for X-Total-Count header) ──────────────────
+    count_q = select(func.count()).select_from(Transaction).join(Account).where(and_(*filters))
+    total: int = (await db.execute(count_q)).scalar_one()
+    response.headers["X-Total-Count"] = str(total)
+    response.headers["Access-Control-Expose-Headers"] = "X-Total-Count, X-Next-Cursor"
+
+    # ── Keyset cursor pagination ─────────────────────────────────
+    decoded = _decode_cursor(cursor) if cursor else None
+    if decoded:
+        cursor_date, cursor_id = decoded
+        # Rows that come *after* the cursor in (date DESC, id DESC) order:
+        # (date < cursor_date) OR (date = cursor_date AND id < cursor_id)
+        filters.append(
+            or_(
+                Transaction.date < cursor_date,
+                and_(Transaction.date == cursor_date, Transaction.id < cursor_id),
+            )
+        )
+        page_query = (
+            select(Transaction)
+            .join(Account)
+            .where(and_(*filters))
+            .options(selectinload(Transaction.account), selectinload(Transaction.split_children))
+            .order_by(desc(Transaction.date), desc(Transaction.id))
+            .limit(limit)
+        )
+    else:
+        page_query = (
+            select(Transaction)
+            .join(Account)
+            .where(and_(*filters))
+            .options(selectinload(Transaction.account), selectinload(Transaction.split_children))
+            .order_by(desc(Transaction.date), desc(Transaction.id))
+            .limit(limit)
+            .offset(offset)
+        )
+
+    result = await db.execute(page_query)
     transactions = result.scalars().all()
+
+    # ── Next-cursor header ───────────────────────────────────────
+    if len(transactions) == limit:
+        last = transactions[-1]
+        response.headers["X-Next-Cursor"] = _encode_cursor(last.date, last.id)
 
     rates = await currency_service.get_rates("EUR")
     return [_transaction_to_response(t, current_user, rates) for t in transactions]
@@ -964,3 +1042,232 @@ async def budget_analysis(
         period_end=period_end,
         reference_currency=ref,
     )
+
+
+# ── CSV Export ───────────────────────────────────────────────
+
+@router.get("/export/csv")
+async def export_transactions_csv(
+    start: Optional[date] = Query(None),
+    end: Optional[date] = Query(None),
+    account_id: Optional[int] = Query(None),
+    category: Optional[str] = Query(None),
+    q: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Export transactions as a CSV file, respecting the same filters as the list endpoint."""
+    import csv, io
+
+    filters = [
+        Account.user_id == current_user.id,
+        Transaction.is_deleted.isnot(True),
+    ]
+    if account_id:
+        filters.append(Transaction.account_id == account_id)
+    if start:
+        filters.append(Transaction.date >= _utc_start_of_day(start))
+    if end:
+        filters.append(Transaction.date <= _utc_end_of_day(end))
+    if category:
+        filters.append(Transaction.category == category)
+    if q:
+        like = f"%{q}%"
+        filters.append(or_(
+            Transaction.description.ilike(like),
+            Transaction.merchant_normalized.ilike(like),
+            Transaction.notes.ilike(like),
+            Transaction.category.ilike(like),
+        ))
+
+    rows = (await db.execute(
+        select(Transaction)
+        .join(Account, Transaction.account_id == Account.id)
+        .options(selectinload(Transaction.account))
+        .where(and_(*filters))
+        .order_by(desc(Transaction.date), desc(Transaction.id))
+        .limit(10_000)
+    )).scalars().all()
+
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=";", quoting=csv.QUOTE_MINIMAL)
+    writer.writerow([
+        "Datum", "Buchungsdatum", "Beschreibung", "Händler",
+        "Konto", "Betrag", "Währung", "Kategorie", "Unterkategorie",
+        "Wiederkehrend", "Rhythmus", "Transfer", "Notizen",
+    ])
+    for t in rows:
+        writer.writerow([
+            t.date.strftime("%Y-%m-%d") if t.date else "",
+            t.booking_date.strftime("%Y-%m-%d") if t.booking_date else "",
+            t.description or "",
+            t.merchant_normalized or "",
+            t.account.name if t.account else "",
+            f"{t.amount:.2f}".replace(".", ","),
+            t.currency or "",
+            t.category or "",
+            t.subcategory or "",
+            "Ja" if t.is_recurring else "Nein",
+            t.periodicity or "",
+            "Ja" if t.is_transfer else "Nein",
+            t.notes or "",
+        ])
+
+    csv_bytes = output.getvalue().encode("utf-8-sig")  # BOM for Excel
+    filename = f"transaktionen_{(start or date.today()).strftime('%Y%m%d')}_{(end or date.today()).strftime('%Y%m%d')}.csv"
+    return Response(
+        content=csv_bytes,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# ── Transaction Splitting ─────────────────────────────────────
+
+@router.post("/{transaction_id}/split", response_model=List[TransactionResponse])
+async def split_transaction(
+    transaction_id: int,
+    payload: SplitRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Split a transaction into multiple child transactions.
+    The parent is marked as is_split=True and its amount becomes the sum of splits.
+    Children each carry parent_id pointing back to parent.
+    """
+    if len(payload.splits) < 2:
+        raise HTTPException(status_code=400, detail="At least 2 split entries required.")
+
+    # Fetch parent transaction
+    result = await db.execute(
+        select(Transaction)
+        .join(Account, Transaction.account_id == Account.id)
+        .options(selectinload(Transaction.account), selectinload(Transaction.split_children))
+        .where(
+            Transaction.id == transaction_id,
+            Account.user_id == current_user.id,
+            Transaction.is_deleted.isnot(True),
+            Transaction.parent_id.is_(None),  # cannot split a child
+        )
+    )
+    parent = result.scalar_one_or_none()
+    if parent is None:
+        raise HTTPException(status_code=404, detail="Transaction not found or already a split child.")
+
+    # Validate split amounts sum to parent amount (within 0.01 tolerance)
+    total = round(sum(s.amount for s in payload.splits), 10)
+    if abs(total - parent.amount) > 0.01:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Split amounts must sum to {parent.amount:.2f} (got {total:.2f}).",
+        )
+
+    # If already split, remove old children first
+    if parent.is_split:
+        await db.execute(
+            select(Transaction).where(Transaction.parent_id == parent.id)
+        )
+        old_children = (await db.execute(
+            select(Transaction).where(Transaction.parent_id == parent.id)
+        )).scalars().all()
+        for child in old_children:
+            await db.delete(child)
+
+    # Mark parent as split
+    parent.is_split = True
+
+    # Create children
+    children: List[Transaction] = []
+    for s in payload.splits:
+        child = Transaction(
+            account_id=parent.account_id,
+            date=parent.date,
+            booking_date=parent.booking_date,
+            description=s.description,
+            merchant_normalized=parent.merchant_normalized,
+            amount=s.amount,
+            currency=parent.currency,
+            category=s.category or parent.category,
+            subcategory=None,
+            notes=s.notes,
+            is_transfer=parent.is_transfer,
+            is_recurring=False,
+            user_verified=parent.user_verified,
+            parent_id=parent.id,
+            is_split=False,
+        )
+        db.add(child)
+        children.append(child)
+
+    await db.commit()
+    await db.refresh(parent)
+    for child in children:
+        await db.refresh(child)
+
+    rates = await currency_service.get_rates()
+
+    # Return parent + children
+    all_txns = [parent] + children
+    # Re-fetch with accounts loaded
+    ids = [t.id for t in all_txns]
+    rows = (await db.execute(
+        select(Transaction)
+        .options(selectinload(Transaction.account), selectinload(Transaction.split_children))
+        .where(Transaction.id.in_(ids))
+    )).scalars().all()
+    rows.sort(key=lambda t: (0 if t.id == parent.id else 1))
+    return [_transaction_to_response(t, current_user, rates) for t in rows]
+
+
+@router.delete("/{transaction_id}/split", status_code=204)
+async def unsplit_transaction(
+    transaction_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Remove all split children and restore parent to non-split state."""
+    result = await db.execute(
+        select(Transaction)
+        .join(Account, Transaction.account_id == Account.id)
+        .where(
+            Transaction.id == transaction_id,
+            Account.user_id == current_user.id,
+            Transaction.is_deleted.isnot(True),
+        )
+    )
+    parent = result.scalar_one_or_none()
+    if parent is None:
+        raise HTTPException(status_code=404, detail="Transaction not found.")
+    if not parent.is_split:
+        raise HTTPException(status_code=400, detail="Transaction is not split.")
+
+    old_children = (await db.execute(
+        select(Transaction).where(Transaction.parent_id == parent.id)
+    )).scalars().all()
+    for child in old_children:
+        await db.delete(child)
+
+    parent.is_split = False
+    await db.commit()
+
+
+@router.get("/{transaction_id}/splits", response_model=List[TransactionResponse])
+async def get_split_children(
+    transaction_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return split children for a given parent transaction."""
+    children = (await db.execute(
+        select(Transaction)
+        .join(Account, Transaction.account_id == Account.id)
+        .options(selectinload(Transaction.account), selectinload(Transaction.split_children))
+        .where(
+            Transaction.parent_id == transaction_id,
+            Account.user_id == current_user.id,
+            Transaction.is_deleted.isnot(True),
+        )
+    )).scalars().all()
+    rates = await currency_service.get_rates()
+    return [_transaction_to_response(c, current_user, rates) for c in children]
