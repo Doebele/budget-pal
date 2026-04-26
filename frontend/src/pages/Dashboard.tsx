@@ -199,9 +199,13 @@ export default function Dashboard() {
       </div>
 
       {/* Net income + Health Score row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        <NetIncomeCard compact />
-        <HealthScoreWidget />
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="md:col-span-1">
+          <NetIncomeCard compact />
+        </div>
+        <div className="md:col-span-3">
+          <HealthScoreWidget />
+        </div>
       </div>
 
       {/* Cashflow — Reale vs. Empirische nebeneinander */}

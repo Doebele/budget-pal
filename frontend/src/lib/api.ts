@@ -270,7 +270,7 @@ export const wizardApi = {
 
 // Budget Health Score
 export const healthApi = {
-  score: (params?: { start?: string; end?: string }) =>
+  score: (params?: { start?: string; end?: string; mode?: string }) =>
     api.get<{
       score: number;
       grade: string;

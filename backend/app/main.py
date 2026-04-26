@@ -165,6 +165,17 @@ async def lifespan(app: FastAPI):
         from app.core.database import engine
         from sqlalchemy import text
         async with engine.begin() as conn:
+            await conn.execute(
+                text("ALTER TABLE recurring_plan ADD COLUMN IF NOT EXISTS currency VARCHAR(8)")
+            )
+        logger.info("recurring_plan.currency column ensured.")
+    except Exception as e:
+        logger.warning("recurring_plan.currency column migration skipped: %s", e)
+
+    try:
+        from app.core.database import engine
+        from sqlalchemy import text
+        async with engine.begin() as conn:
             await conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS mortgage_tranches (
                     id SERIAL PRIMARY KEY,

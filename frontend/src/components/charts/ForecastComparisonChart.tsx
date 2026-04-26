@@ -41,6 +41,13 @@ export interface ForecastPoint {
   peer_calibrated: boolean;
 }
 
+export interface BudgetPlanPoint {
+  month: string; // "2026-01"
+  income: number;  // positive
+  expense: number; // negative
+  net: number;
+}
+
 // Which series are visible — controlled externally or via internal toggles
 export interface LineVisibility {
   historical: boolean;
@@ -49,11 +56,14 @@ export interface LineVisibility {
   peer: boolean;
   empirical: boolean;
   breakdown: boolean;
+  budgetPlan: boolean;
 }
 
 interface Props {
   historical: HistoricalPoint[];
   forecast: ForecastPoint[];
+  /** Monthly income/expense/net from the recurring plan (Budgetplan) */
+  budgetPlanPoints?: BudgetPlanPoint[];
   /** Flat reference value for peer-group monthly net (CHF) */
   peerNetMonthly?: number;
   /** Flat reference value for empirical Swiss median net (CHF) */
@@ -69,6 +79,7 @@ const COLORS = {
   confidence:  "#7c3aed", // violet-700
   peer:        "#34d399", // emerald-400
   empirical:   "#fbbf24", // amber-400
+  budgetPlan:  "#f97316", // orange-500
   zero:        "#6b7280", // gray-500
 };
 
@@ -79,6 +90,7 @@ const DEFAULT_VISIBILITY: LineVisibility = {
   peer:        true,
   empirical:   true,
   breakdown:   false,
+  budgetPlan:  true,
 };
 
 const LINE_LABELS: Record<keyof LineVisibility, string> = {
@@ -88,6 +100,7 @@ const LINE_LABELS: Record<keyof LineVisibility, string> = {
   peer:        "Peer-Ø",
   empirical:   "Empirisch",
   breakdown:   "Einnahmen/Ausgaben",
+  budgetPlan:  "Budgetplan",
 };
 
 const LINE_COLORS: Record<keyof LineVisibility, string> = {
@@ -97,6 +110,7 @@ const LINE_COLORS: Record<keyof LineVisibility, string> = {
   peer:        COLORS.peer,
   empirical:   COLORS.empirical,
   breakdown:   COLORS.income,
+  budgetPlan:  COLORS.budgetPlan,
 };
 
 function formatMonth(m: string): string {
@@ -115,6 +129,7 @@ function CustomTooltip({ active, payload, label, peerNet, empiricalNet }: any) {
   const NAME_MAP: Record<string, string> = {
     net:               "Historisch (Netto)",
     predicted_net:     "Prognose (Netto)",
+    budgetPlan_net:    "Budgetplan (Netto)",
     income:            "Einnahmen",
     expense:           "Ausgaben",
     predicted_income:  "Progn. Einnahmen",
@@ -227,6 +242,7 @@ function LinePill({
 export default function ForecastComparisonChart({
   historical,
   forecast,
+  budgetPlanPoints = [],
   peerNetMonthly = 0,
   empiricalNetMonthly = 0,
   height = 320,
@@ -257,6 +273,9 @@ export default function ForecastComparisonChart({
     isForecast: true,
   }));
 
+  // Map budget plan points by month for fast lookup
+  const budgetPlanMap = new Map(budgetPlanPoints.map((p) => [p.month, p]));
+
   const bridgeMonth = histData.slice(-1)[0];
   const mergedData = [
     ...histData,
@@ -264,14 +283,18 @@ export default function ForecastComparisonChart({
       ...f,
       net: bridgeMonth && f.month === forecastData[0]?.month ? bridgeMonth.net : undefined,
     })),
-  ];
+  ].map((d) => ({
+    ...d,
+    budgetPlan_net: budgetPlanMap.get(d.month)?.net,
+  }));
 
-  // Determine y-domain so peer/empirical lines are always visible
+  // Determine y-domain so peer/empirical/budgetPlan lines are always visible
   const allNets = [
     ...histData.map((d) => d.net),
     ...forecastData.map((d) => d.predicted_net ?? 0),
     ...forecastData.map((d) => d.confidence_low ?? 0),
     ...forecastData.map((d) => d.confidence_high ?? 0),
+    ...budgetPlanPoints.map((p) => p.net),
     peerNetMonthly,
     empiricalNetMonthly,
   ].filter((v) => v !== undefined && !isNaN(v));
@@ -400,6 +423,20 @@ export default function ForecastComparisonChart({
               strokeDasharray="6 4"
               dot={false}
               activeDot={{ r: 4, fill: COLORS.forecast }}
+              connectNulls
+            />
+          )}
+
+          {/* ── Budgetplan net (orange dashed) ── */}
+          {vis.budgetPlan && budgetPlanPoints.length > 0 && (
+            <Line
+              dataKey="budgetPlan_net"
+              name="budgetPlan_net"
+              stroke={COLORS.budgetPlan}
+              strokeWidth={2}
+              strokeDasharray="9 4"
+              dot={false}
+              activeDot={{ r: 4, fill: COLORS.budgetPlan }}
               connectNulls
             />
           )}

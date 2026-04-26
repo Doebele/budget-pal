@@ -26,6 +26,8 @@ import {
   Square,
   Library,
   GripVertical,
+  ArrowUpDown,
+  Search,
 } from "lucide-react";
 import { clsx } from "clsx";
 
@@ -60,6 +62,7 @@ interface RecurringPlanEntry {
 interface Account {
   id: number;
   name: string;
+  currency?: string;
 }
 
 interface Category {
@@ -322,34 +325,49 @@ function BudgetplanCategoryPicker({
   categories,
   isExpense,
 }: CategoryPickerProps) {
-  const { resolveSuperCategoryForRow, categoryIsIncomeOriented, categoryIsExpenseOriented } =
-    useTaxonomy();
+  const { resolveSuperCategoryForRow } = useTaxonomy();
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setSearch("");
+      }
     }
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
 
+  // Focus search when dropdown opens
+  useEffect(() => {
+    if (open && totalCount > 10) setTimeout(() => searchRef.current?.focus(), 30);
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const totalCount = groupedCategoryOptions.reduce((s, g) => s + g.items.length, 0);
+  const showSearch = totalCount > 10;
+
+  const filteredOptions = useMemo(() => {
+    if (!search.trim()) return groupedCategoryOptions;
+    const q = search.trim().toLowerCase();
+    return groupedCategoryOptions
+      .map((g) => ({ ...g, items: g.items.filter((c) => c.name.toLowerCase().includes(q)) }))
+      .filter((g) => g.items.length > 0);
+  }, [groupedCategoryOptions, search]);
+
   const selectedId = value ? parseInt(value, 10) : NaN;
   const selectedCat = !Number.isNaN(selectedId) ? categories.find((c) => c.id === selectedId) : undefined;
   const selectedSc = selectedCat ? resolveSuperCategoryForRow(selectedCat) : null;
   const SelectedIcon = selectedSc?.icon;
-  const selectedMatchesFlow = selectedCat
-    ? isExpense
-      ? categoryIsExpenseOriented(selectedCat)
-      : categoryIsIncomeOriented(selectedCat)
-    : true;
-  const showOrphanAssigned =
-    selectedCat && (!groupedCategoryIds.has(selectedCat.id) || !selectedMatchesFlow);
+  const showOrphanAssigned = selectedCat && !groupedCategoryIds.has(selectedCat.id);
 
   function selectRow(id: string) {
     onChange(id);
     setOpen(false);
+    setSearch("");
   }
 
   return (
@@ -370,71 +388,91 @@ function BudgetplanCategoryPicker({
         <ChevronDown className={clsx("w-4 h-4 shrink-0 text-text-tertiary transition-transform", open && "rotate-180")} />
       </button>
       {open && (
-        <div className="absolute left-0 right-0 top-full z-[60] mt-1 max-h-[min(70vh,22rem)] overflow-y-auto rounded-lg border border-border bg-bg-surface shadow-xl py-1">
-          <button
-            type="button"
-            onClick={() => selectRow("")}
-            className={clsx(
-              "w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-bg-surface2 transition-colors",
-              !value && "bg-accent/10"
+        <div className="absolute left-0 right-0 top-full z-[60] mt-1 rounded-lg border border-border bg-bg-surface shadow-xl flex flex-col" style={{ maxHeight: "min(70vh, 24rem)" }}>
+          {/* Search bar — shown when > 10 entries */}
+          {showSearch && (
+            <div className="flex items-center gap-2 px-3 py-2 border-b border-border/40 shrink-0">
+              <Search className="w-3.5 h-3.5 text-text-tertiary shrink-0" />
+              <input
+                ref={searchRef}
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Kategorie suchen…"
+                className="flex-1 bg-transparent text-sm text-text-primary placeholder-text-tertiary focus:outline-none"
+              />
+              {search && (
+                <button type="button" onClick={() => setSearch("")} className="text-text-tertiary hover:text-text-primary">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          )}
+          {/* Scrollable list */}
+          <div className="overflow-y-auto flex-1 py-1">
+            {!search && (
+              <button
+                type="button"
+                onClick={() => selectRow("")}
+                className={clsx(
+                  "w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-bg-surface2 transition-colors",
+                  !value && "bg-accent/10"
+                )}
+              >
+                <span className="text-text-tertiary text-xs flex-1">Keine Kategorie</span>
+              </button>
             )}
-          >
-            <span className="text-text-tertiary text-xs flex-1">Keine Kategorie</span>
-          </button>
-          {showOrphanAssigned && (
-            <div className="border-t border-border/40 pt-1 mt-1">
-              <p className="px-3 py-1 text-[10px] font-medium uppercase tracking-wide text-text-tertiary">
-                Aktuell zugewiesen
-              </p>
-              {(() => {
-                const sc = resolveSuperCategoryForRow(selectedCat);
-                const Icon = sc.icon;
-                return (
-                  <button
-                    type="button"
-                    onClick={() => selectRow(String(selectedCat.id))}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-bg-surface2"
-                  >
-                    <Icon className="w-4 h-4 shrink-0" style={{ color: sc.color }} />
-                    <span className="truncate">{plainCategoryLabel(selectedCat.name)}</span>
-                  </button>
-                );
-              })()}
-            </div>
-          )}
-          {groupedCategoryOptions.length === 0 && (
-            <p className="px-3 py-2 text-xs text-text-tertiary">
-              {isExpense
-                ? "Keine passenden Kategorien geladen."
-                : "Keine Einnahmen-Kategorien in der Superkategorie «Sparen». Unter Einstellungen → Taxonomie eigene Kategorien mit Superkategorie «Sparen» anlegen oder Server neu starten."}
-            </p>
-          )}
-          {groupedCategoryOptions.map((group) => (
-            <div key={group.label} className="border-t border-border/40 first:border-t-0">
-              <p className="sticky top-0 z-[1] px-3 py-1.5 text-[10px] font-medium uppercase tracking-wide text-text-tertiary bg-bg-surface/95 backdrop-blur-sm">
-                {group.label}
-              </p>
-              {group.items.map((c) => {
-                const sc = resolveSuperCategoryForRow(c);
-                const Icon = sc.icon;
-                const active = value === String(c.id);
-                return (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => selectRow(String(c.id))}
-                    className={clsx(
-                      "w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-bg-surface2 transition-colors",
-                      active && "bg-accent/15"
-                    )}
-                  >
-                    <Icon className="w-4 h-4 shrink-0" style={{ color: sc.color }} />
-                    <span className="truncate text-text-primary">{plainCategoryLabel(c.name)}</span>
-                  </button>
-                );
-              })}
-            </div>
-          ))}
+            {showOrphanAssigned && !search && selectedCat && (
+              <div className="border-t border-border/40 pt-1 mt-1">
+                <p className="px-3 py-1 text-[10px] font-medium uppercase tracking-wide text-text-tertiary">
+                  Aktuell zugewiesen
+                </p>
+                {(() => {
+                  const sc = resolveSuperCategoryForRow(selectedCat);
+                  const Icon = sc.icon;
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => selectRow(String(selectedCat.id))}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-bg-surface2"
+                    >
+                      <Icon className="w-4 h-4 shrink-0" style={{ color: sc.color }} />
+                      <span className="truncate">{plainCategoryLabel(selectedCat.name)}</span>
+                    </button>
+                  );
+                })()}
+              </div>
+            )}
+            {filteredOptions.length === 0 && (
+              <p className="px-3 py-2 text-xs text-text-tertiary">Keine Kategorien gefunden.</p>
+            )}
+            {filteredOptions.map((group) => (
+              <div key={group.label} className="border-t border-border/40 first:border-t-0">
+                <p className="sticky top-0 z-[1] px-3 py-1.5 text-[10px] font-medium uppercase tracking-wide text-text-tertiary bg-bg-surface/95 backdrop-blur-sm">
+                  {group.label}
+                </p>
+                {group.items.map((c) => {
+                  const sc = resolveSuperCategoryForRow(c);
+                  const Icon = sc.icon;
+                  const active = value === String(c.id);
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => selectRow(String(c.id))}
+                      className={clsx(
+                        "w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-bg-surface2 transition-colors",
+                        active && "bg-accent/15"
+                      )}
+                    >
+                      <Icon className="w-4 h-4 shrink-0" style={{ color: sc.color }} />
+                      <span className="truncate text-text-primary">{plainCategoryLabel(c.name)}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -447,6 +485,7 @@ interface FormState {
   description: string;
   amountAbs: string;
   isExpense: boolean;
+  currency: string;
   periodicity: string;
   category_id: string;
   account_id: string;
@@ -465,6 +504,7 @@ function emptyForm(defaultMonth?: number | null): FormState {
     description: "",
     amountAbs: "",
     isExpense: true,
+    currency: "CHF",
     periodicity: "monthly",
     category_id: "",
     account_id: "",
@@ -480,6 +520,7 @@ function entryToForm(e: RecurringPlanEntry): FormState {
     description: e.description,
     amountAbs: String(Math.abs(e.amount)),
     isExpense: e.amount < 0,
+    currency: e.plan_currency ?? "CHF",
     periodicity: e.periodicity,
     category_id: e.category_id != null ? String(e.category_id) : "",
     account_id: e.account_id != null ? String(e.account_id) : "",
@@ -517,6 +558,11 @@ export default function Budgetplan() {
   );
   const [filter, setFilter] = useState<"all" | "income" | "expense">(
     () => (localStorage.getItem("budgetplan_filter") as "all" | "income" | "expense") ?? "all"
+  );
+  const [catFilter, setCatFilter] = useState<Set<string>>(new Set());
+  type SortOrder = "manual" | "amount_desc" | "amount_asc" | "category";
+  const [sortOrder, setSortOrder] = useState<SortOrder>(
+    () => (localStorage.getItem("budgetplan_sort") as SortOrder) ?? "manual"
   );
 
   // UI state
@@ -593,24 +639,80 @@ export default function Budgetplan() {
     staleTime: 60_000,
   });
 
+  // Unique supercategories that appear in this year's entries (for chips)
+  const availableCatChips = useMemo(() => {
+    const seen = new Map<string, string>(); // scId → label
+    for (const e of entries) {
+      const cat = e.category_id != null ? categories.find((c) => c.id === e.category_id) : null;
+      const sc = cat
+        ? resolveSuperCategoryForRow(cat)
+        : resolveSuperCategory(e.description, e.amount < 0);
+      if (!seen.has(sc.id)) seen.set(sc.id, sc.label);
+    }
+    return Array.from(seen.entries())
+      .map(([scId, label]) => ({ scId, label }))
+      .sort((a, b) => a.label.localeCompare(b.label, "de"));
+  }, [entries, categories, resolveSuperCategoryForRow, resolveSuperCategory]);
+
+  function toggleCatFilter(scId: string) {
+    setCatFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(scId)) next.delete(scId); else next.add(scId);
+      return next;
+    });
+  }
+
   const filteredEntries = useMemo(
     () =>
-      entries.filter((e) =>
-        filter === "all" ? true : filter === "income" ? e.amount > 0 : e.amount < 0
-      ),
-    [entries, filter]
+      entries.filter((e) => {
+        const typeOk = filter === "all" ? true : filter === "income" ? e.amount > 0 : e.amount < 0;
+        if (catFilter.size === 0) return typeOk;
+        const cat = e.category_id != null ? categories.find((c) => c.id === e.category_id) : null;
+        const sc = cat
+          ? resolveSuperCategoryForRow(cat)
+          : resolveSuperCategory(e.description, e.amount < 0);
+        return typeOk && catFilter.has(sc.id);
+      }),
+    [entries, filter, catFilter, categories, resolveSuperCategoryForRow, resolveSuperCategory]
   );
+
+  const sortedEntries = useMemo(() => {
+    const copy = [...filteredEntries];
+    // Income always before expenses — primary sort for all modes
+    const incomeFirst = (a: RecurringPlanEntry, b: RecurringPlanEntry) =>
+      (b.amount > 0 ? 1 : 0) - (a.amount > 0 ? 1 : 0);
+
+    if (sortOrder === "manual") return copy.sort(incomeFirst);
+
+    const secondary = (a: RecurringPlanEntry, b: RecurringPlanEntry): number => {
+      if (sortOrder === "amount_desc") return Math.abs(b.amount) - Math.abs(a.amount);
+      if (sortOrder === "amount_asc")  return Math.abs(a.amount) - Math.abs(b.amount);
+      if (sortOrder === "category") {
+        const catA = a.category_id ? categories.find(c => c.id === a.category_id) : null;
+        const catB = b.category_id ? categories.find(c => c.id === b.category_id) : null;
+        const scA = catA ? resolveSuperCategoryForRow(catA) : resolveSuperCategory(a.description, a.amount < 0);
+        const scB = catB ? resolveSuperCategoryForRow(catB) : resolveSuperCategory(b.description, b.amount < 0);
+        return (
+          scA.label.localeCompare(scB.label, "de") ||
+          (catA?.name ?? "").localeCompare(catB?.name ?? "", "de") ||
+          a.description.localeCompare(b.description, "de")
+        );
+      }
+      return 0;
+    };
+    return copy.sort((a, b) => incomeFirst(a, b) || secondary(a, b));
+  }, [filteredEntries, sortOrder, categories, resolveSuperCategoryForRow, resolveSuperCategory]);
 
   const monthEntries = useMemo(() => {
     const map: Record<number, RecurringPlanEntry[]> = {};
     for (let m = 1; m <= 12; m++) map[m] = [];
-    for (const entry of filteredEntries) {
+    for (const entry of sortedEntries) {
       for (const m of getApplicableMonths(entry, year)) {
         map[m].push(entry);
       }
     }
     return map;
-  }, [filteredEntries, year]);
+  }, [sortedEntries, year]);
 
   // Reset selection to all-checked when suggestions change
   useEffect(() => {
@@ -741,6 +843,7 @@ export default function Budgetplan() {
     const payload: Record<string, unknown> = {
       description: form.description.trim(),
       amount: form.isExpense ? -absVal : absVal,
+      currency: form.currency || "CHF",
       periodicity: form.periodicity,
       start_date: form.start_date,
       end_date: form.end_date || null,
@@ -815,10 +918,13 @@ export default function Budgetplan() {
 
     // Blätter + Eltern mit icon «sparen» (System-Einnahmen), damit nicht nur Unterkategorien
     // erscheinen, wenn die DB Hierarchie mit Zwischenknoten modelliert ist.
-    const leaves = categories.filter(
-      (c) =>
-        !parentIds.has(c.id) || String(c.icon ?? "").trim().toLowerCase() === "sparen",
-    );
+    // Wizard-Label-Kategorien (icon startet mit "wl:") werden explizit ausgeschlossen —
+    // das Dropdown zeigt nur reale Transaktionskategorien.
+    const leaves = categories.filter((c) => {
+      const icon = String(c.icon ?? "").trim().toLowerCase();
+      if (icon.startsWith("wl:")) return false;          // ← wizard labels: nie im Dropdown
+      return !parentIds.has(c.id) || icon === "sparen";  // ← Blätter oder Sparen-Eltern
+    });
 
     type Bucket = { label: string; items: Category[] };
     const buckets = new Map<string, Bucket>();
@@ -860,14 +966,7 @@ export default function Budgetplan() {
       bucket.items.sort((a, b) => a.name.localeCompare(b.name, "de-CH"));
     }
 
-    const flowExpense = form.isExpense;
     return Array.from(buckets.values())
-      .map((bucket) => ({
-        ...bucket,
-        items: bucket.items.filter((c) =>
-          flowExpense ? categoryIsExpenseOriented(c) : categoryIsIncomeOriented(c),
-        ),
-      }))
       .filter((bucket) => bucket.items.length > 0)
       .sort((a, b) => {
         const ai = superCategoryGroupOrder.indexOf(a.label);
@@ -879,12 +978,9 @@ export default function Budgetplan() {
       });
   }, [
     categories,
-    form.isExpense,
     superCategories,
     superCategoryGroupLabel,
     resolveSuperCategoryForRow,
-    categoryIsIncomeOriented,
-    categoryIsExpenseOriented,
   ]);
 
   const groupedCategoryIds = useMemo(
@@ -911,6 +1007,7 @@ export default function Budgetplan() {
   }
   function setFilterPersist(f: "all" | "income" | "expense") {
     setFilter(f);
+    setCatFilter(new Set()); // reset category chips on type-switch
     localStorage.setItem("budgetplan_filter", f);
   }
 
@@ -999,8 +1096,9 @@ export default function Budgetplan() {
           </button>
         </div>
 
-        {/* Filter pills */}
-        <div className="flex gap-1">
+        {/* Filter: type pills + category chips */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {/* Type pills */}
           {(["all", "expense", "income"] as const).map((f) => (
             <button
               key={f}
@@ -1015,10 +1113,59 @@ export default function Budgetplan() {
               {f === "all" ? "Alle" : f === "expense" ? "Nur Ausgaben" : "Nur Einnahmen"}
             </button>
           ))}
+
+          {/* Category chips (multi-select) — only shown when entries have categories */}
+          {availableCatChips.length > 0 && (
+            <>
+              <span className="w-px h-4 bg-border/60 mx-0.5 shrink-0" />
+              {availableCatChips.map((chip) => (
+                <button
+                  key={chip.scId}
+                  onClick={() => toggleCatFilter(chip.scId)}
+                  className={clsx(
+                    "px-2.5 py-1 rounded-full text-xs font-medium border transition-colors",
+                    catFilter.has(chip.scId)
+                      ? "bg-accent/20 border-accent text-accent"
+                      : "bg-bg-surface2 border-border text-text-tertiary hover:text-text-secondary hover:border-border/80"
+                  )}
+                >
+                  {chip.label}
+                </button>
+              ))}
+              {catFilter.size > 0 && (
+                <button
+                  onClick={() => setCatFilter(new Set())}
+                  className="px-2 py-1 rounded-full text-[11px] text-text-disabled hover:text-text-tertiary transition-colors"
+                  title="Filter zurücksetzen"
+                >
+                  ✕ Filter
+                </button>
+              )}
+            </>
+          )}
         </div>
 
         {/* Spacer */}
         <div className="flex-1" />
+
+        {/* Sort control */}
+        <div className="flex items-center gap-1.5 bg-bg-surface2 border border-border rounded-lg px-2.5 py-1.5">
+          <ArrowUpDown className="w-3.5 h-3.5 text-text-tertiary shrink-0" />
+          <select
+            className="bg-transparent text-xs text-text-secondary focus:outline-none cursor-pointer"
+            value={sortOrder}
+            onChange={(e) => {
+              const v = e.target.value as SortOrder;
+              setSortOrder(v);
+              localStorage.setItem("budgetplan_sort", v);
+            }}
+          >
+            <option value="manual">Individuell</option>
+            <option value="amount_desc">Betrag ↓</option>
+            <option value="amount_asc">Betrag ↑</option>
+            <option value="category">Kategorie A–Z</option>
+          </select>
+        </div>
 
         {/* Vorbefüllen button */}
         <button
@@ -1483,9 +1630,11 @@ export default function Budgetplan() {
                               : "Keine wiederkehrenden Transaktionen im Quelljahr."}
                           </p>
                         )}
-                        <div className="max-h-44 overflow-y-auto space-y-1 pr-0.5">
-                          {!editorSuggestLoading &&
-                            editorSuggestions.map((s) => {
+                        <div className="max-h-72 overflow-y-auto space-y-1 pr-0.5">
+                          {!editorSuggestLoading && (() => {
+                            const selected = editorSuggestions.filter((s) => s.notes === "wizard-selected");
+                            const rest = editorSuggestions.filter((s) => s.notes !== "wizard-selected");
+                            const renderBtn = (s: PrefillSuggestion, dimmed = false) => {
                               const key = `${s.description}::${s.periodicity}`;
                               return (
                                 <button
@@ -1494,27 +1643,31 @@ export default function Budgetplan() {
                                   onClick={() => applySuggestionToForm(s)}
                                   className={clsx(
                                     "w-full flex items-center gap-2 px-2.5 py-2 rounded-lg border text-left text-xs transition-colors",
-                                    s.amount < 0
-                                      ? "bg-loss/5 border-loss/20 hover:border-loss/40"
-                                      : "bg-gain/5 border-gain/20 hover:border-gain/40"
+                                    dimmed
+                                      ? "bg-bg-surface2 border-border/40 hover:border-border text-text-tertiary"
+                                      : s.amount < 0
+                                        ? "bg-loss/5 border-loss/20 hover:border-loss/40"
+                                        : "bg-gain/5 border-gain/20 hover:border-gain/40"
                                   )}
                                 >
-                                  <span className="flex-1 text-text-primary font-medium truncate">{s.description}</span>
-                                  <span
-                                    className={clsx(
-                                      "font-semibold tabular-nums shrink-0",
-                                      s.amount < 0 ? "text-loss" : "text-gain"
-                                    )}
-                                  >
-                                    {s.amount < 0 ? "−" : "+"}
-                                    {formatCurrencyCompact(Math.abs(s.amount), refCcy)}
+                                  <span className={clsx("flex-1 font-medium truncate", dimmed ? "text-text-tertiary" : "text-text-primary")}>{s.description}</span>
+                                  <span className={clsx("font-semibold tabular-nums shrink-0", dimmed ? "text-text-disabled" : s.amount < 0 ? "text-loss" : "text-gain")}>
+                                    {s.amount < 0 ? "−" : "+"}{formatCurrencyCompact(Math.abs(s.amount), refCcy)}
                                   </span>
-                                  <span className="text-text-tertiary shrink-0 text-[10px]">
-                                    {periodicityLabel(s.periodicity)}
-                                  </span>
+                                  <span className="text-text-tertiary shrink-0 text-[10px]">{periodicityLabel(s.periodicity)}</span>
                                 </button>
                               );
-                            })}
+                            };
+                            return (
+                              <>
+                                {selected.map((s) => renderBtn(s, false))}
+                                {rest.length > 0 && selected.length > 0 && (
+                                  <p className="text-[10px] text-text-disabled px-1 pt-1">Weitere verfügbare Abonnements</p>
+                                )}
+                                {rest.map((s) => renderBtn(s, true))}
+                              </>
+                            );
+                          })()}
                         </div>
                       </div>
                     </div>
@@ -1534,76 +1687,85 @@ export default function Budgetplan() {
                 />
               </div>
 
-              {/* Amount + sign */}
+              {/* Sign toggle */}
               <div>
-                <label className="block text-xs text-text-tertiary mb-1">Betrag (CHF)</label>
+                <label className="block text-xs text-text-tertiary mb-1">Typ</label>
+                <div className="flex rounded-lg border border-border overflow-hidden text-xs font-medium">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setForm((f) => {
+                        if (f.isExpense) return f;
+                        let category_id = f.category_id;
+                        if (category_id) {
+                          const cat = categories.find((c) => c.id === parseInt(category_id, 10));
+                          if (cat && categoryIsIncomeOriented(cat)) category_id = "";
+                        }
+                        return { ...f, isExpense: true, category_id };
+                      })
+                    }
+                    className={clsx(
+                      "flex-1 px-3 py-2 transition-colors",
+                      form.isExpense ? "bg-loss text-white" : "bg-bg-surface2 text-text-secondary hover:text-text-primary"
+                    )}
+                  >
+                    − Ausgabe
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setForm((f) => {
+                        if (!f.isExpense) return f;
+                        let category_id = f.category_id;
+                        if (category_id) {
+                          const cat = categories.find((c) => c.id === parseInt(category_id, 10));
+                          if (cat && categoryIsExpenseOriented(cat)) category_id = "";
+                        }
+                        return { ...f, isExpense: false, category_id };
+                      })
+                    }
+                    className={clsx(
+                      "flex-1 px-3 py-2 transition-colors",
+                      !form.isExpense ? "bg-gain text-white" : "bg-bg-surface2 text-text-secondary hover:text-text-primary"
+                    )}
+                  >
+                    + Einnahme
+                  </button>
+                </div>
+              </div>
+
+              {/* Amount + currency + periodicity in one row */}
+              <div>
+                <label className="block text-xs text-text-tertiary mb-1">Betrag &amp; Periodizität</label>
                 <div className="flex gap-2">
-                  <div className="flex rounded-lg border border-border overflow-hidden text-xs font-medium">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setForm((f) => {
-                          if (f.isExpense) return f;
-                          let category_id = f.category_id;
-                          if (category_id) {
-                            const cat = categories.find((c) => c.id === parseInt(category_id, 10));
-                            if (cat && categoryIsIncomeOriented(cat)) category_id = "";
-                          }
-                          return { ...f, isExpense: true, category_id };
-                        })
-                      }
-                      className={clsx(
-                        "px-3 py-2 transition-colors",
-                        form.isExpense ? "bg-loss text-white" : "bg-bg-surface2 text-text-secondary hover:text-text-primary"
-                      )}
-                    >
-                      − Ausgabe
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setForm((f) => {
-                          if (!f.isExpense) return f;
-                          let category_id = f.category_id;
-                          if (category_id) {
-                            const cat = categories.find((c) => c.id === parseInt(category_id, 10));
-                            if (cat && categoryIsExpenseOriented(cat)) category_id = "";
-                          }
-                          return { ...f, isExpense: false, category_id };
-                        })
-                      }
-                      className={clsx(
-                        "px-3 py-2 transition-colors",
-                        !form.isExpense ? "bg-gain text-white" : "bg-bg-surface2 text-text-secondary hover:text-text-primary"
-                      )}
-                    >
-                      + Einnahme
-                    </button>
-                  </div>
                   <input
                     type="number"
                     min="0"
                     step="0.01"
-                    className="flex-1 bg-bg-surface2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent"
+                    className="flex-1 min-w-0 bg-bg-surface2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent"
                     placeholder="0.00"
                     value={form.amountAbs}
                     onChange={(e) => setForm((f) => ({ ...f, amountAbs: e.target.value }))}
                   />
+                  <select
+                    className="bg-bg-surface2 border border-border rounded-lg px-1.5 py-2 text-xs text-text-primary font-mono font-medium focus:outline-none focus:ring-1 focus:ring-accent shrink-0 w-16"
+                    value={form.currency}
+                    onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))}
+                  >
+                    {["CHF", "EUR", "USD", "GBP", "SEK", "NOK", "DKK", "JPY", "CAD", "AUD"].map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                  <select
+                    className="bg-bg-surface2 border border-border rounded-lg px-2 py-2 text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-accent shrink-0"
+                    value={form.periodicity}
+                    onChange={(e) => setForm((f) => ({ ...f, periodicity: e.target.value }))}
+                  >
+                    {PERIODICITIES.map((p) => (
+                      <option key={p.value} value={p.value}>{p.label}</option>
+                    ))}
+                  </select>
                 </div>
-              </div>
-
-              {/* Periodicity */}
-              <div>
-                <label className="block text-xs text-text-tertiary mb-1">Periodizität</label>
-                <select
-                  className="w-full bg-bg-surface2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-accent"
-                  value={form.periodicity}
-                  onChange={(e) => setForm((f) => ({ ...f, periodicity: e.target.value }))}
-                >
-                  {PERIODICITIES.map((p) => (
-                    <option key={p.value} value={p.value}>{p.label}</option>
-                  ))}
-                </select>
               </div>
 
               {/* Dates */}
@@ -1631,11 +1793,6 @@ export default function Budgetplan() {
               {/* Category */}
               <div>
                 <label className="block text-xs text-text-tertiary mb-1">Kategorie (optional)</label>
-                <p className="text-[11px] text-text-tertiary mb-1.5">
-                  {form.isExpense
-                    ? "Alle Kategorien außer Super «Sparen» (Ausgaben), gruppiert nach Superkategorie — bei Bedarf nach unten scrollen."
-                    : "Nur Kategorien der Superkategorie «Sparen» (Einnahmen / Finanzprodukte)."}
-                </p>
                 <BudgetplanCategoryPicker
                   value={form.category_id}
                   onChange={(category_id) => setForm((f) => ({ ...f, category_id }))}
@@ -1652,11 +1809,22 @@ export default function Budgetplan() {
                 <select
                   className="w-full bg-bg-surface2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-accent"
                   value={form.account_id}
-                  onChange={(e) => setForm((f) => ({ ...f, account_id: e.target.value }))}
+                  onChange={(e) => {
+                    const acctId = e.target.value;
+                    const acct = accounts.find((a) => String(a.id) === acctId);
+                    setForm((f) => ({
+                      ...f,
+                      account_id: acctId,
+                      // Auto-switch currency to match account; revert to CHF when deselected
+                      currency: acct?.currency?.toUpperCase() ?? "CHF",
+                    }));
+                  }}
                 >
                   <option value="">Kein Konto</option>
                   {accounts.map((a) => (
-                    <option key={a.id} value={String(a.id)}>{a.name}</option>
+                    <option key={a.id} value={String(a.id)}>
+                      {a.name}{a.currency && a.currency.toUpperCase() !== "CHF" ? ` (${a.currency.toUpperCase()})` : ""}
+                    </option>
                   ))}
                 </select>
               </div>

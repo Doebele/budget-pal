@@ -16,11 +16,12 @@ import {
   BarChart3, CalendarDays, Table2, Landmark,
 } from "lucide-react";
 
-import { api, accountsApi, transactionsApi } from "@/lib/api";
+import { api, accountsApi, transactionsApi, recurringPlanApi } from "@/lib/api";
 import { formatAmount } from "@/lib/theme";
 import ForecastComparisonChart, {
   type HistoricalPoint,
   type ForecastPoint,
+  type BudgetPlanPoint,
 } from "@/components/charts/ForecastComparisonChart";
 import BudgetStackedBarChart, {
   type HistoricalCategoryItem,
@@ -113,6 +114,39 @@ function formatMonthShort(m: string): string {
   const names = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun",
                   "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
   return `${names[parseInt(month, 10) - 1]} ${year}`;
+}
+
+// ── Recurring plan month helper (mirrors Budgetplan.tsx logic) ──
+
+interface PlanEntry {
+  id: number;
+  amount: number;
+  periodicity: string;
+  start_date: string;
+  end_date: string | null;
+}
+
+function getPlanApplicableMonths(entry: PlanEntry, year: number): number[] {
+  const sd = new Date(entry.start_date + "T00:00:00");
+  const ed = entry.end_date ? new Date(entry.end_date + "T00:00:00") : null;
+  const startM = sd.getFullYear() < year ? 1 : sd.getFullYear() === year ? sd.getMonth() + 1 : null;
+  if (startM === null) return [];
+  const endM = ed
+    ? ed.getFullYear() > year ? 12 : ed.getFullYear() === year ? ed.getMonth() + 1 : null
+    : 12;
+  if (endM === null) return [];
+  const anchor = sd.getMonth() + 1;
+  const months: number[] = [];
+  for (let m = startM; m <= endM; m++) {
+    switch (entry.periodicity) {
+      case "weekly":
+      case "monthly": months.push(m); break;
+      case "quarterly": if (((m - anchor) % 3 + 3) % 3 === 0) months.push(m); break;
+      case "halfyearly": if (((m - anchor) % 6 + 6) % 6 === 0) months.push(m); break;
+      case "yearly": if (m === anchor) months.push(m); break;
+    }
+  }
+  return months;
 }
 
 function categoryColor(name: string): string {
@@ -274,6 +308,60 @@ export default function Forecast() {
     const d = peerBaseline.defaults as Record<string, number>;
     return (d.incomeMedian ?? 0) * ((d.savings_rate ?? 0) / 100);
   }, [peerBaseline]);
+
+  // ── Budgetplan recurring plan — fetch for current + next 2 years ──
+  const currentYear = new Date().getFullYear();
+
+  const { data: planY0 = [] } = useQuery<PlanEntry[]>({
+    queryKey: ["recurring-plan", currentYear],
+    queryFn: () => recurringPlanApi.list({ year: currentYear }).then((r) => r.data as PlanEntry[]),
+    staleTime: 5 * 60_000,
+  });
+  const { data: planY1 = [] } = useQuery<PlanEntry[]>({
+    queryKey: ["recurring-plan", currentYear + 1],
+    queryFn: () => recurringPlanApi.list({ year: currentYear + 1 }).then((r) => r.data as PlanEntry[]),
+    staleTime: 5 * 60_000,
+  });
+  const { data: planY2 = [] } = useQuery<PlanEntry[]>({
+    queryKey: ["recurring-plan", currentYear + 2],
+    queryFn: () => recurringPlanApi.list({ year: currentYear + 2 }).then((r) => r.data as PlanEntry[]),
+    staleTime: 5 * 60_000,
+  });
+
+  // Compute monthly budget plan points for the full forecast horizon
+  const budgetPlanPoints = useMemo((): BudgetPlanPoint[] => {
+    const planByYear: Record<number, PlanEntry[]> = {
+      [currentYear]:     planY0,
+      [currentYear + 1]: planY1,
+      [currentYear + 2]: planY2,
+    };
+    const today = new Date();
+    const points: BudgetPlanPoint[] = [];
+
+    for (let i = 0; i < selectedHorizon.months; i++) {
+      const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
+      const year = d.getFullYear();
+      const month = d.getMonth() + 1; // 1–12
+      const monthKey = `${year}-${String(month).padStart(2, "0")}`;
+
+      // For years beyond our fetched range, repeat the last available year's entries
+      const entries = planByYear[year] ?? planY2;
+      let income = 0;
+      let expense = 0;
+
+      for (const entry of entries) {
+        if (getPlanApplicableMonths(entry, year).includes(month)) {
+          if (entry.amount > 0) income += entry.amount;
+          else expense += entry.amount; // already negative
+        }
+      }
+      // Only add point if there's actual plan data
+      if (income !== 0 || expense !== 0) {
+        points.push({ month: monthKey, income, expense, net: income + expense });
+      }
+    }
+    return points;
+  }, [planY0, planY1, planY2, selectedHorizon, currentYear]);
 
   // Save scenario mutation
   const saveMutation = useMutation({
@@ -556,6 +644,7 @@ export default function Forecast() {
               <ForecastComparisonChart
                 historical={historicalPoints}
                 forecast={forecastPoints}
+                budgetPlanPoints={budgetPlanPoints}
                 peerNetMonthly={peerNetMonthly}
                 empiricalNetMonthly={empiricalNetMonthly}
                 height={300}
