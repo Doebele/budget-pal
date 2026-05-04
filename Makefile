@@ -1,7 +1,8 @@
 .PHONY: dev build stop restart logs logs-backend logs-frontend \
         db-migrate db-migrate-create db-downgrade backup restore \
         shell-backend shell-db shell-frontend \
-        test lint format clean prune
+        test lint format clean prune \
+        feature pr sync
 
 # Load .env if it exists
 ifneq (,$(wildcard ./.env))
@@ -17,6 +18,34 @@ POSTGRES_USER ?= budgetpal
 POSTGRES_DB ?= budgetpal
 BACKUP_DIR = ./data/backups
 TIMESTAMP := $(shell date +%Y%m%d_%H%M%S)
+
+# ── Feature-Branch-Workflow ───────────────────────────────────
+
+## Neuen Feature-Branch erstellen  (make feature name=mein-feature)
+feature:
+	@test -n "$(name)" || (echo "Fehler: make feature name=<branch-name>" && exit 1)
+	@git checkout main
+	@git pull origin main
+	@git checkout -b feat/$(name)
+	@echo ""
+	@echo "  Branch 'feat/$(name)' erstellt."
+	@echo "  Entwickeln, dann: make pr msg=\"feat: beschreibung\""
+	@echo ""
+
+## Commit + Push + GitHub PR erstellen  (make pr msg="feat: ...")
+pr:
+	@test -n "$(msg)" || (echo "Fehler: make pr msg=\"feat: beschreibung\"" && exit 1)
+	@git add -A
+	@git diff --cached --quiet && echo "  Keine Änderungen zum Commiten." || \
+	  git commit -m "$(msg)" -m "" -m "Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
+	@git push -u origin HEAD
+	@gh pr create --fill || echo "  gh CLI nicht eingerichtet — PR manuell auf GitHub erstellen."
+
+## Aktuellen Branch mit main synchronisieren (rebase)
+sync:
+	@git fetch origin
+	@git rebase origin/main
+	@echo "  Branch ist jetzt aktuell."
 
 # ── Development ───────────────────────────────────────────────
 

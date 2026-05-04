@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# ────────────────────────────────────────────────────────────────
+# Pre-push hook: blockiert direkte Pushes auf main.
+# Nutze stattdessen: make feature name=<name>  →  make pr
+# ────────────────────────────────────────────────────────────────
+
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+if [ "$BRANCH" = "main" ]; then
+  echo ""
+  echo "  ✗  Direkter Push auf main ist gesperrt."
+  echo ""
+  echo "  Workflow:"
+  echo "    make feature name=mein-feature   # neuen Branch erstellen"
+  echo "    # ... Änderungen ..."
+  echo "    make pr msg=\"feat: beschreibung\" # commit + push + PR"
+  echo ""
+  exit 1
+fi
+
+exit 0
