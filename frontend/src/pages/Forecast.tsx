@@ -16,7 +16,7 @@ import {
   BarChart3, CalendarDays, Table2, Landmark,
 } from "lucide-react";
 
-import { api, accountsApi, transactionsApi, recurringPlanApi } from "@/lib/api";
+import { api, accountsApi, transactionsApi, recurringPlanApi, categoriesApi } from "@/lib/api";
 import { formatAmount } from "@/lib/theme";
 import ForecastComparisonChart, {
   type HistoricalPoint,
@@ -26,7 +26,9 @@ import ForecastComparisonChart, {
 import BudgetStackedBarChart, {
   type HistoricalCategoryItem,
   type WizardSnapshot,
+  CHART_SC_ORDER,
 } from "@/components/charts/BudgetStackedBarChart";
+import { useTaxonomySuperCategories, resolveSuperCategoryFromList } from "@/lib/categories";
 import ForecastCard from "@/components/ForecastCard";
 import RetirementPlanner from "@/components/RetirementPlanner";
 import { useAuth } from "@/lib/auth";
@@ -124,6 +126,8 @@ interface PlanEntry {
   periodicity: string;
   start_date: string;
   end_date: string | null;
+  description: string;
+  category_id: number | null;
 }
 
 function getPlanApplicableMonths(entry: PlanEntry, year: number): number[] {
@@ -164,6 +168,7 @@ function categoryColor(name: string): string {
 
 export default function Forecast() {
   const { user } = useAuth();
+  const superCategories = useTaxonomySuperCategories();
   const [tab, setTab] = useState<TabKey>("overview");
   const [horizon, setHorizon] = useState<HorizonKey>("12m");
   // showBreakdown is now managed internally by ForecastComparisonChart toggles
@@ -191,40 +196,14 @@ export default function Forecast() {
     0
   );
 
-  // Fetch raw transactions for the last 24 months → compute category breakdown client-side.
-  // This uses the existing /transactions endpoint (always available) instead of the new
-  // /transactions/monthly-category-breakdown endpoint which requires a Docker rebuild.
-  const cutoff24m = useMemo(() => {
-    const d = new Date();
-    d.setMonth(d.getMonth() - 24);
-    return d.toISOString().split("T")[0];
-  }, []);
-
-  const { data: rawTxnsForChart } = useQuery<Array<{
-    date: string; amount: number; category: string | null; is_transfer: boolean | null;
-  }>>({
-    queryKey: ["transactions-chart-24m", cutoff24m],
+  // Fetch category breakdown for the last 24 months directly from the dedicated endpoint
+  const { data: categorySummary = [] } = useQuery<HistoricalCategoryItem[]>({
+    queryKey: ["monthly-category-breakdown-24m"],
     queryFn: () =>
-      api.get("/transactions", {
-        params: { start: cutoff24m, end: new Date().toISOString().split("T")[0], limit: 1000 },
-      }).then((r) => r.data),
+      api.get("/transactions/monthly-category-breakdown", { params: { months: 24 } })
+        .then((r) => r.data),
     staleTime: 15 * 60_000,
   });
-
-  // Group raw debit transactions by (month, category) for the stacked bar chart
-  const categorySummary = useMemo((): HistoricalCategoryItem[] => {
-    if (!rawTxnsForChart?.length) return [];
-    const map: Record<string, Record<string, number>> = {};
-    for (const t of rawTxnsForChart) {
-      if (t.amount >= 0 || t.is_transfer || !t.category) continue;
-      const month = t.date.slice(0, 7); // "YYYY-MM"
-      if (!map[month]) map[month] = {};
-      map[month][t.category] = (map[month][t.category] ?? 0) + Math.abs(t.amount);
-    }
-    return Object.entries(map).flatMap(([month, cats]) =>
-      Object.entries(cats).map(([category, amount]) => ({ month, category, amount })),
-    );
-  }, [rawTxnsForChart]);
 
   // Fetch historical monthly summary (for overlay chart) — last 2 years
   const { data: historicalSummary } = useQuery({
@@ -362,6 +341,66 @@ export default function Forecast() {
     }
     return points;
   }, [planY0, planY1, planY2, selectedHorizon, currentYear]);
+
+  // Categories for supercategory resolution of budget plan entries
+  const { data: categories = [] } = useQuery({
+    queryKey: ["categories"],
+    queryFn: () => categoriesApi.list().then((r) => r.data),
+    staleTime: 10 * 60_000,
+  });
+
+  const catById = useMemo(() =>
+    new Map((categories as Array<{ id: number; name: string; icon?: string }>).map((c) => [c.id, c])),
+    [categories]
+  );
+
+  const VALID_SC_ID_SET = useMemo(() => new Set(CHART_SC_ORDER), []);
+
+  // Per-supercategory expense breakdown for the BudgetStackedBarChart "Budgetplan" mode
+  const budgetPlanByMonth = useMemo((): Record<string, Record<string, number>> => {
+    const planByYear: Record<number, PlanEntry[]> = {
+      [currentYear]:     planY0,
+      [currentYear + 1]: planY1,
+      [currentYear + 2]: planY2,
+    };
+    const today = new Date();
+    const result: Record<string, Record<string, number>> = {};
+
+    for (let i = 0; i < selectedHorizon.months; i++) {
+      const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
+      const year = d.getFullYear();
+      const month = d.getMonth() + 1;
+      const monthKey = `${year}-${String(month).padStart(2, "0")}`;
+      const entries = planByYear[year] ?? planY2;
+
+      for (const entry of entries) {
+        // Only expense entries (negative amount)
+        if (entry.amount >= 0) continue;
+        if (!getPlanApplicableMonths(entry, year).includes(month)) continue;
+
+        const amt = Math.abs(entry.amount);
+        let scId = "sonstiges";
+
+        const cat = entry.category_id != null ? catById.get(entry.category_id) : null;
+        if (cat) {
+          const icon = String((cat as any).icon ?? "").trim().toLowerCase();
+          if (VALID_SC_ID_SET.has(icon)) {
+            scId = icon;
+          } else {
+            const sc = resolveSuperCategoryFromList(superCategories, (cat as any).name, false);
+            if (sc && sc.id !== "sparen") scId = sc.id;
+          }
+        } else {
+          const sc = resolveSuperCategoryFromList(superCategories, entry.description, false);
+          if (sc && sc.id !== "sparen") scId = sc.id;
+        }
+
+        if (!result[monthKey]) result[monthKey] = {};
+        result[monthKey][scId] = (result[monthKey][scId] ?? 0) + amt;
+      }
+    }
+    return result;
+  }, [planY0, planY1, planY2, selectedHorizon, currentYear, catById, superCategories, VALID_SC_ID_SET]);
 
   // Save scenario mutation
   const saveMutation = useMutation({
@@ -659,6 +698,8 @@ export default function Forecast() {
             historicalAxisMonths={historicalPoints.map((p) => p.month)}
             forecastAxisMonths={forecastPoints.map((p) => p.month)}
             wizardData={wizardState}
+            budgetPlanByMonth={budgetPlanByMonth}
+            budgetPlanMonths={budgetPlanPoints.map((p) => p.month)}
             height={320}
           />
         </div>
