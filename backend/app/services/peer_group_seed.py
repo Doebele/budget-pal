@@ -78,6 +78,14 @@ PEER_SYSTEM_CATEGORIES: List[Dict[str, Any]] = [
     {"slug": "abo-fitness", "name": "Fitness", "icon": "💪", "color": "#DC2626", "sort_order": 290},
     {"slug": "abo-beruflich", "name": "Beruflich", "icon": "💼", "color": "#4F46E5", "sort_order": 300},
     {"slug": "abo-shopping", "name": "Shopping & Lieferdienste", "icon": "📦", "color": "#BE185D", "sort_order": 310},
+    # ── Steuern & Abgaben (icon = "steuern" → resolves to SuperCategory "steuern") ──
+    {"slug": "steuern-direkte",      "name": "Steuern",         "icon": "steuern", "color": "#f43f5e", "sort_order": 400},
+    {"slug": "steuern-abgaben",      "name": "Abgaben",         "icon": "steuern", "color": "#f43f5e", "sort_order": 401},
+    {"slug": "steuern-gebuehren",    "name": "Gebühren",        "icon": "steuern", "color": "#f43f5e", "sort_order": 402},
+    {"slug": "steuern-finanzen",     "name": "Finanzen",        "icon": "steuern", "color": "#f43f5e", "sort_order": 403},
+    {"slug": "steuern-dienstleist",  "name": "Dienstleistungen","icon": "steuern", "color": "#f43f5e", "sort_order": 404},
+    # ── Sonstiges (icon = "sonstiges" → resolves to SuperCategory "sonstiges") ───
+    {"slug": "sonstiges-allgemein",  "name": "Sonstiges",       "icon": "sonstiges", "color": "#94a3b8", "sort_order": 500},
 ]
 
 

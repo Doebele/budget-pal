@@ -5,7 +5,9 @@ import {
   ArrowUpRight, ArrowDownRight, Wallet, TrendingUp,
   Upload, ArrowRight, BarChart3, Target, FileUp, Wand2,
 } from "lucide-react";
-import { transactionsApi, accountsApi, budgetsApi } from "@/lib/api";
+import { transactionsApi, accountsApi, budgetsApi, goalsApi } from "@/lib/api";
+import NetIncomeCard from "@/components/NetIncomeCard";
+import HealthScoreWidget from "@/components/HealthScoreWidget";
 import { formatCHF } from "@/lib/theme";
 import { format } from "date-fns";
 import type { SankeyFlowOrder, SankeyLink } from "@/components/charts/SankeyChart";
@@ -101,6 +103,16 @@ export default function Dashboard() {
     staleTime: 60_000,
   });
 
+  const { data: goals } = useQuery({
+    queryKey: ["goals"],
+    queryFn: () => goalsApi.list().then((r) => r.data as Array<{
+      id: number; name: string; goal_type: string;
+      target_amount: number; current_amount: number; progress_pct: number;
+      months_to_target?: number | null; is_achieved: boolean;
+    }>),
+    staleTime: 60_000,
+  });
+
   const totalBalance = (accounts || []).reduce(
     (sum: number, a: { balance: number }) => sum + a.balance, 0
   );
@@ -184,6 +196,16 @@ export default function Dashboard() {
           icon={TrendingUp}
           colorClass={(stats?.net || 0) >= 0 ? "text-gain" : "text-loss"}
         />
+      </div>
+
+      {/* Net income + Health Score row */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="md:col-span-1">
+          <NetIncomeCard compact />
+        </div>
+        <div className="md:col-span-3">
+          <HealthScoreWidget />
+        </div>
       </div>
 
       {/* Cashflow — Reale vs. Empirische nebeneinander */}
@@ -384,12 +406,59 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Goals widget */}
+      {goals && goals.length > 0 && (
+        <div className="card">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-text-primary font-semibold text-sm flex items-center gap-2">
+              <Target className="w-4 h-4 text-accent" />
+              Sparziele
+            </h2>
+            <Link to="/goals" className="text-accent text-xs flex items-center gap-1 hover:text-accent-light">
+              Alle <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {goals.filter(g => !g.is_achieved).slice(0, 3).map((g) => {
+              const COLORS: Record<string, string> = {
+                savings: "#10b981", debt_payoff: "#f43f5e",
+                emergency_fund: "#3b82f6", purchase: "#f59e0b",
+                retirement: "#a78bfa", other: "#6b7280",
+              };
+              const color = COLORS[g.goal_type] ?? "#6b7280";
+              return (
+                <div key={g.id} className="bg-bg-surface2 rounded-xl p-3 border border-border/50">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-text-primary text-xs font-medium truncate">{g.name}</p>
+                    <span className="text-xs font-mono text-text-tertiary shrink-0 ml-2">
+                      {g.progress_pct.toFixed(0)}%
+                    </span>
+                  </div>
+                  <div className="h-1.5 bg-bg-surface rounded-full overflow-hidden mb-1.5">
+                    <div
+                      className="h-full rounded-full"
+                      style={{ width: `${Math.min(100, g.progress_pct)}%`, backgroundColor: color }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[10px] text-text-tertiary">
+                    <span>{formatCHF(g.current_amount)}</span>
+                    {g.months_to_target != null && g.months_to_target > 0 && (
+                      <span>~{g.months_to_target} Monate</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Quick nav */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         {[
           { to: "/transactions", label: "Reale Angaben",     desc: "Alle ansehen & filtern", Icon: BarChart3  },
           { to: "/wizard",       label: "Empirische Angaben", desc: "Profil & Planungsdaten", Icon: Wand2      },
-          { to: "/budget",       label: "Budgetanalyse",     desc: "Ziele verwalten",         Icon: Target     },
+          { to: "/goals",        label: "Sparziele",          desc: "Ziele verwalten",         Icon: Target     },
           { to: "/projections",  label: "Prognosen",         desc: "Monte Carlo & Rente",     Icon: TrendingUp },
           { to: "/import",       label: "Import",            desc: "CSV / PDF hochladen",     Icon: FileUp     },
         ].map(({ to, label, desc, Icon }) => (

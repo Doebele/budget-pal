@@ -864,6 +864,100 @@ export default function Settings() {
 
                     {/* Mapping columns — interactive */}
                     <div className="grid grid-cols-2 gap-4">
+                      {/* ── Empirische Labels (Wizard) ── */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <p className="text-text-tertiary font-semibold uppercase tracking-wide text-[11px]">
+                            Empirische Labels (Wizard)
+                          </p>
+                          <button
+                            type="button"
+                            title="Neues Label hinzufügen"
+                            onClick={() => setTaxoAdd({ scId: sc.id, type: "wizard", value: "" })}
+                            className="w-5 h-5 flex items-center justify-center rounded text-text-tertiary hover:text-accent hover:bg-accent/10 transition-colors"
+                          >
+                            <Plus className="w-3 h-3" />
+                          </button>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {sc.wizardLabels.filter((l) => !isLabelHidden(sc.id, l, "wl") && !ownCats.some((oc) => oc.icon === "wl:" + sc.id && oc.name.toLowerCase() === l.toLowerCase())).length === 0 && ownCats.filter((cat) => cat.icon === "wl:" + sc.id).length === 0 ? (
+                            <span className="text-text-disabled italic text-[11px]">Keine</span>
+                          ) : (
+                            <>
+                              {sc.wizardLabels.filter((l) => !isLabelHidden(sc.id, l, "wl") && !ownCats.some((oc) => oc.icon === "wl:" + sc.id && oc.name.toLowerCase() === l.toLowerCase())).map((l) => (
+                                taxoDelete?.label === l && taxoDelete.scId === sc.id && taxoDelete.type === "wizard" ? (
+                                  <div key={l} className="w-full mt-1 p-2 rounded-lg border border-loss/30 bg-loss/5 space-y-1.5 text-[11px]">
+                                    <p className="text-text-secondary">
+                                      <span className="font-semibold text-loss">«{l}»</span> ausblenden?
+                                      {taxoDelete.txnCount > 0 && (
+                                        <span className="text-text-tertiary ml-1">
+                                          {taxoDelete.txnCount} Transaktion{taxoDelete.txnCount !== 1 ? "en" : ""} betroffen.
+                                        </span>
+                                      )}
+                                    </p>
+                                    {taxoDelete.txnCount > 0 && (
+                                      <select
+                                        className="input-field text-[11px] w-full"
+                                        value={taxoDeleteTarget}
+                                        onChange={(e) => setTaxoDeleteTarget(e.target.value)}
+                                      >
+                                        <option value="">— Neu zuweisen zu —</option>
+                                        {allTxnLabels.filter((tl) => tl !== l).map((tl) => <option key={tl} value={tl}>{tl}</option>)}
+                                      </select>
+                                    )}
+                                    <div className="flex gap-2">
+                                      <button
+                                        type="button"
+                                        disabled={(taxoDelete.txnCount > 0 && !taxoDeleteTarget) || migrateLabelMutation.isPending || hideLabelMutation.isPending}
+                                        onClick={handleConfirmTaxoDelete}
+                                        className="px-2 py-0.5 rounded bg-loss/20 text-loss border border-loss/30 hover:bg-loss/30 disabled:opacity-40 transition-colors"
+                                      >
+                                        {taxoDelete.txnCount > 0 ? "Migrieren & Ausblenden" : "Ausblenden"}
+                                      </button>
+                                      <button type="button" onClick={() => setTaxoDelete(null)} className="text-text-tertiary hover:text-text-primary">Abbrechen</button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                <span
+                                  key={l}
+                                  className="group flex items-center gap-0.5 px-1.5 py-0.5 rounded text-text-secondary text-[11px]"
+                                  style={{ backgroundColor: sc.color + "18" }}
+                                >
+                                  {l}
+                                  <button
+                                    type="button"
+                                    title="Ausblenden / Migrieren"
+                                    onClick={() => openTaxoDelete(sc.id, l, "wizard")}
+                                    className="opacity-0 group-hover:opacity-100 ml-0.5 w-3.5 h-3.5 flex items-center justify-center rounded-full hover:bg-loss/20 text-text-tertiary hover:text-loss transition-all"
+                                  >
+                                    <X className="w-2.5 h-2.5" />
+                                  </button>
+                                </span>
+                                )
+                              ))}
+                              {/* User-added wizard labels */}
+                              {ownCats.filter((cat) => cat.icon === "wl:" + sc.id).map((cat) => (
+                                <span
+                                  key={cat.id}
+                                  className="group flex items-center gap-0.5 px-1.5 py-0.5 rounded border text-text-secondary text-[11px]"
+                                  style={{ backgroundColor: sc.color + "18", borderColor: sc.color + "44" }}
+                                >
+                                  {cat.name}
+                                  <button
+                                    type="button"
+                                    onClick={() => { setCatDeleteId(cat.id); setCatReassignTo(""); }}
+                                    className="opacity-0 group-hover:opacity-100 ml-0.5 w-3.5 h-3.5 flex items-center justify-center rounded-full hover:bg-loss/20 text-text-tertiary hover:text-loss transition-all"
+                                  >
+                                    <X className="w-2.5 h-2.5" />
+                                  </button>
+                                </span>
+                              ))}
+                            </>
+                          )}
+                        </div>
+                        {renderTaxonomyAddForm(sc, "wizard")}
+                      </div>
+
                       {/* ── Transaktionskategorien ── */}
                       <div>
                         <div className="flex items-center justify-between mb-1.5">
@@ -963,99 +1057,6 @@ export default function Settings() {
                         {renderTaxonomyAddForm(sc, "txn")}
                       </div>
 
-                      {/* ── Empirische Labels (Wizard) ── */}
-                      <div>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <p className="text-text-tertiary font-semibold uppercase tracking-wide text-[11px]">
-                            Empirische Labels (Wizard)
-                          </p>
-                          <button
-                            type="button"
-                            title="Neues Label hinzufügen"
-                            onClick={() => setTaxoAdd({ scId: sc.id, type: "wizard", value: "" })}
-                            className="w-5 h-5 flex items-center justify-center rounded text-text-tertiary hover:text-accent hover:bg-accent/10 transition-colors"
-                          >
-                            <Plus className="w-3 h-3" />
-                          </button>
-                        </div>
-                        <div className="flex flex-wrap gap-1">
-                          {sc.wizardLabels.filter((l) => !isLabelHidden(sc.id, l, "wl") && !ownCats.some((oc) => oc.icon === "wl:" + sc.id && oc.name.toLowerCase() === l.toLowerCase())).length === 0 && ownCats.filter((cat) => cat.icon === "wl:" + sc.id).length === 0 ? (
-                            <span className="text-text-disabled italic text-[11px]">Keine</span>
-                          ) : (
-                            <>
-                              {sc.wizardLabels.filter((l) => !isLabelHidden(sc.id, l, "wl") && !ownCats.some((oc) => oc.icon === "wl:" + sc.id && oc.name.toLowerCase() === l.toLowerCase())).map((l) => (
-                                taxoDelete?.label === l && taxoDelete.scId === sc.id && taxoDelete.type === "wizard" ? (
-                                  <div key={l} className="w-full mt-1 p-2 rounded-lg border border-loss/30 bg-loss/5 space-y-1.5 text-[11px]">
-                                    <p className="text-text-secondary">
-                                      <span className="font-semibold text-loss">«{l}»</span> ausblenden?
-                                      {taxoDelete.txnCount > 0 && (
-                                        <span className="text-text-tertiary ml-1">
-                                          {taxoDelete.txnCount} Transaktion{taxoDelete.txnCount !== 1 ? "en" : ""} betroffen.
-                                        </span>
-                                      )}
-                                    </p>
-                                    {taxoDelete.txnCount > 0 && (
-                                      <select
-                                        className="input-field text-[11px] w-full"
-                                        value={taxoDeleteTarget}
-                                        onChange={(e) => setTaxoDeleteTarget(e.target.value)}
-                                      >
-                                        <option value="">— Neu zuweisen zu —</option>
-                                        {allTxnLabels.filter((tl) => tl !== l).map((tl) => <option key={tl} value={tl}>{tl}</option>)}
-                                      </select>
-                                    )}
-                                    <div className="flex gap-2">
-                                      <button
-                                        type="button"
-                                        disabled={(taxoDelete.txnCount > 0 && !taxoDeleteTarget) || migrateLabelMutation.isPending || hideLabelMutation.isPending}
-                                        onClick={handleConfirmTaxoDelete}
-                                        className="px-2 py-0.5 rounded bg-loss/20 text-loss border border-loss/30 hover:bg-loss/30 disabled:opacity-40 transition-colors"
-                                      >
-                                        {taxoDelete.txnCount > 0 ? "Migrieren & Ausblenden" : "Ausblenden"}
-                                      </button>
-                                      <button type="button" onClick={() => setTaxoDelete(null)} className="text-text-tertiary hover:text-text-primary">Abbrechen</button>
-                                    </div>
-                                  </div>
-                                ) : (
-                                <span
-                                  key={l}
-                                  className="group flex items-center gap-0.5 px-1.5 py-0.5 rounded text-text-secondary text-[11px]"
-                                  style={{ backgroundColor: sc.color + "18" }}
-                                >
-                                  {l}
-                                  <button
-                                    type="button"
-                                    title="Ausblenden / Migrieren"
-                                    onClick={() => openTaxoDelete(sc.id, l, "wizard")}
-                                    className="opacity-0 group-hover:opacity-100 ml-0.5 w-3.5 h-3.5 flex items-center justify-center rounded-full hover:bg-loss/20 text-text-tertiary hover:text-loss transition-all"
-                                  >
-                                    <X className="w-2.5 h-2.5" />
-                                  </button>
-                                </span>
-                                )
-                              ))}
-                              {/* User-added wizard labels */}
-                              {ownCats.filter((cat) => cat.icon === "wl:" + sc.id).map((cat) => (
-                                <span
-                                  key={cat.id}
-                                  className="group flex items-center gap-0.5 px-1.5 py-0.5 rounded border text-text-secondary text-[11px]"
-                                  style={{ backgroundColor: sc.color + "18", borderColor: sc.color + "44" }}
-                                >
-                                  {cat.name}
-                                  <button
-                                    type="button"
-                                    onClick={() => { setCatDeleteId(cat.id); setCatReassignTo(""); }}
-                                    className="opacity-0 group-hover:opacity-100 ml-0.5 w-3.5 h-3.5 flex items-center justify-center rounded-full hover:bg-loss/20 text-text-tertiary hover:text-loss transition-all"
-                                  >
-                                    <X className="w-2.5 h-2.5" />
-                                  </button>
-                                </span>
-                              ))}
-                            </>
-                          )}
-                        </div>
-                        {renderTaxonomyAddForm(sc, "wizard")}
-                      </div>
                     </div>
 
                     {/* Hidden canonical labels — restore option */}

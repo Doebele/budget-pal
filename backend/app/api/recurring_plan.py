@@ -67,6 +67,7 @@ _SUBSCRIPTION_PRICES: dict[str, float] = {
 class RecurringPlanCreate(BaseModel):
     description: str = Field(..., min_length=1, max_length=255)
     amount: float  # positive = income, negative = expense
+    currency: Optional[str] = None   # explicit currency; None → derive from account or default CHF
     periodicity: str = "monthly"
     start_date: date
     end_date: Optional[date] = None
@@ -95,6 +96,7 @@ class RecurringPlanCreate(BaseModel):
 class RecurringPlanUpdate(BaseModel):
     description: Optional[str] = Field(None, min_length=1, max_length=255)
     amount: Optional[float] = None
+    currency: Optional[str] = None
     periodicity: Optional[str] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
@@ -164,7 +166,9 @@ def _now() -> datetime:
 def recurring_plan_to_response(entry: RecurringPlan, user: User, rates: dict) -> RecurringPlanResponse:
     ref = normalize_reference_currency(user.currency)
     acct = entry.account
-    plan_cur = (acct.currency if acct else "CHF").strip().upper()
+    # Priority: explicit currency stored on entry → account currency → CHF
+    stored_cur = getattr(entry, "currency", None)
+    plan_cur = (stored_cur or (acct.currency if acct else None) or "CHF").strip().upper()
     amt_ref = convert_with_eur_rates(rates, float(entry.amount), plan_cur, ref)
     return RecurringPlanResponse(
         id=entry.id,
@@ -471,17 +475,66 @@ async def _suggest_empirical(
             wizard_hint="auto-amortisation",
         )
 
-    # ── Subscriptions ─────────────────────────────────────────
-    selected_subs = data.get("selectedSubscriptions") or []
+    # ── Subscriptions & Kommunikation ─────────────────────────
+    # SBB passes (stored as boolean flags, not just in selectedSubscriptions)
+    if data.get("hasSbbHalbtax"):
+        _expense("SBB Halbtax", 19.0, wizard_hint="abonnements")
+    if data.get("hasSbbGa"):
+        _expense("SBB GA 2. Kl.", 345.0, wizard_hint="abonnements")
+
+    # Serafe (Swiss TV/radio fee — always applicable)
+    serafe = data.get("serafe") or 0
+    if serafe > 0:
+        _expense("Serafe (TV/Radio)", round(float(serafe), 2), wizard_hint="abonnements")
+
+    # Subscriptions — show ALL known subscriptions; wizard-selected ones first.
+    # Unknown selected names (not in _SUBSCRIPTION_PRICES) get a distributed fallback price.
+    selected_subs: list[str] = data.get("selectedSubscriptions") or []
+    selected_set = set(selected_subs)
+    subscription_total = data.get("subscriptionTotal") or 0
+
+    def _add_sub(name: str, price: float, selected: bool) -> None:
+        wl = name.strip().lower()
+        cat = _txn_from_wizard(wl) or _txn_from_wizard("abonnements") or None
+        if cat:
+            suggestions.append(RecurringPlanSuggestion(
+                description=name, amount=-round(price, 2), periodicity="monthly",
+                category=cat,
+                notes="wizard-selected" if selected else None,
+                source="empirical",
+            ))
+        else:
+            suggestions.append(RecurringPlanSuggestion(
+                description=name, amount=-round(price, 2), periodicity="monthly",
+                notes="wizard-selected" if selected else None,
+                source="empirical",
+            ))
+
+    # 1. Wizard-selected first (preserves user's own choices at top of list)
     for name in selected_subs:
-        price = _SUBSCRIPTION_PRICES.get(name, 0)
-        if price > 0:
-            wl = str(name).strip().lower()
-            cat = _txn_from_wizard(wl) or _txn_from_wizard("abonnements") or None
-            if cat:
-                _expense(name, price, category=cat)
-            else:
-                _expense(name, price, wizard_hint="abonnements")
+        price = _SUBSCRIPTION_PRICES.get(name)
+        if price is None:
+            known_total = sum(_SUBSCRIPTION_PRICES.get(n, 0) for n in selected_subs if _SUBSCRIPTION_PRICES.get(n))
+            unknown_count = sum(1 for n in selected_subs if not _SUBSCRIPTION_PRICES.get(n))
+            price = (subscription_total - known_total) / unknown_count if unknown_count > 0 and subscription_total > known_total else 0.0
+        if price and price > 0:
+            _add_sub(name, price, selected=True)
+
+    # 2. All other known subscriptions (not selected by user) — so they can still pick them
+    for name, price in _SUBSCRIPTION_PRICES.items():
+        if name in selected_set:
+            continue  # already added above
+        if not price or price <= 0:
+            continue
+        _add_sub(name, price, selected=False)
+
+    # customExpenseEntries — user-defined one-off or recurring expenses from wizard
+    for entry in (data.get("customExpenseEntries") or []):
+        desc = entry.get("description") or entry.get("name") or "Sonstige Ausgabe"
+        amount = entry.get("amount") or entry.get("monthlyAmount") or 0
+        period = entry.get("periodicity") or entry.get("frequency") or "monthly"
+        if amount > 0 and period in VALID_PERIODICITIES:
+            _expense(str(desc), float(amount), period, wizard_hint=entry.get("category"))
 
     # ── Pillar 3a (Ausgabe; keine Sparen-Txn im Ausgaben-Picker) ──
     pillar3a = data.get("pillar3aAccounts") or []
@@ -609,6 +662,7 @@ async def create_recurring_plan(
         end_date=payload.end_date,
         is_future=payload.is_future,
         notes=payload.notes,
+        **({ "currency": payload.currency.strip().upper() } if payload.currency else {}),
     )
     db.add(entry)
     await db.commit()

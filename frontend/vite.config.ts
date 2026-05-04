@@ -1,10 +1,59 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { VitePWA } from "vite-plugin-pwa";
 import path from "path";
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    VitePWA({
+      registerType: "autoUpdate",
+      includeAssets: ["favicon.svg", "pwa-192.svg", "pwa-512.svg"],
+      manifest: {
+        name: "Budget-Pal",
+        short_name: "BudgetPal",
+        description: "Persönliche Finanzplanung mit Schweizer Rentenrechner, Monte Carlo und KI-Kategorisierung.",
+        theme_color: "#0d0e12",
+        background_color: "#0d0e12",
+        display: "standalone",
+        orientation: "portrait-primary",
+        scope: "/",
+        start_url: "/",
+        lang: "de-CH",
+        icons: [
+          { src: "/pwa-192.svg", sizes: "192x192", type: "image/svg+xml" },
+          { src: "/pwa-512.svg", sizes: "512x512", type: "image/svg+xml" },
+          { src: "/pwa-512.svg", sizes: "512x512", type: "image/svg+xml", purpose: "any maskable" },
+        ],
+        categories: ["finance", "productivity"],
+        shortcuts: [
+          { name: "Transaktionen", url: "/transactions", description: "Transaktionen anzeigen" },
+          { name: "Budget", url: "/budget", description: "Budgetanalyse öffnen" },
+          { name: "Import", url: "/import", description: "Bankauszug importieren" },
+        ],
+      },
+      workbox: {
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "google-fonts",
+              expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 },
+            },
+          },
+          {
+            urlPattern: /\/api\/.*/,
+            handler: "NetworkOnly", // API-Antworten nie cachen
+          },
+        ],
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
+      },
+    }),
+  ],
 
   resolve: {
     alias: {

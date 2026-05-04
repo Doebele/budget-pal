@@ -1,18 +1,19 @@
-import { useState, useMemo, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { transactionsApi, accountsApi } from "@/lib/api";
 import { formatAmount, getFrequencyBadgeStyle, PERIODICITY_LABELS } from "@/lib/theme";
 import { useAuth } from "@/lib/auth";
 import { useTaxonomy, useTaxonomySuperCategories } from "@/lib/categories";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
-import { Search, Upload, ChevronDown, Check, X, LayoutGrid, Building2, Repeat, Wallet, TrendingUp, PieChart, Trash2 } from "lucide-react";
+import { Search, Upload, ChevronDown, Check, X, LayoutGrid, Building2, Repeat, Wallet, TrendingUp, PieChart, Trash2, Scissors, Download } from "lucide-react";
 import GranularityNavigator from "@/components/GranularityNavigator";
 import { computeDateRange, TimeGranularity } from "@/lib/granularity";
 import { Link } from "react-router-dom";
 import { clsx } from "clsx";
 import { getBankByName } from "@/data/banks-with-logos";
 import { TransactionOverviewHeader } from "@/components/transactions/TransactionOverviewHeader";
+import SplitTransactionModal from "@/components/transactions/SplitTransactionModal";
 import {
   RECURRENCE_FILTER_OPTIONS,
   recurrenceFilterToApiParams,
@@ -39,6 +40,9 @@ interface Transaction {
   notes?: string;
   is_recurring?: boolean;
   periodicity?: RecurrenceType;
+  parent_id?: number | null;
+  is_split?: boolean;
+  split_count?: number;
 }
 
 interface RecurringCostItem {
@@ -72,6 +76,7 @@ export default function Transactions() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editCategory, setEditCategory] = useState("");
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<number | null>(null);
+  const [splittingTxn, setSplittingTxn] = useState<Transaction | null>(null);
   const [granularity, setGranularity] = useState<TimeGranularity>("ytd");
   const [anchor, setAnchor] = useState<Date>(new Date());
   const queryClient = useQueryClient();
@@ -117,29 +122,65 @@ export default function Transactions() {
   const periodStart = format(range.from, "yyyy-MM-dd");
   const periodEnd   = format(range.to,   "yyyy-MM-dd");
 
-  const { data: transactions, isLoading } = useQuery({
-    queryKey: [
-      "transactions",
-      search,
-      categoryFilter,
-      recurrenceFilter,
-      granularity,
-      anchor.toISOString(),
-      viewMode,
-    ],
-    queryFn: () =>
-      transactionsApi
-        .list({
-          q: search || undefined,
-          category: categoryFilter || undefined,
-          ...recurrenceFilterToApiParams(recurrenceFilter),
-          account_id: viewMode === "all" ? undefined : Number(viewMode),
-          start: periodStart,
-          end: periodEnd,
-          limit: 500,
-        })
-        .then((r) => r.data),
+  // ── Infinite-scroll transaction list ──────────────────────────
+  const txnQueryParams = {
+    q: search || undefined,
+    category: categoryFilter || undefined,
+    ...recurrenceFilterToApiParams(recurrenceFilter),
+    account_id: viewMode === "all" ? undefined : Number(viewMode),
+    start: periodStart,
+    end: periodEnd,
+  };
+
+  const {
+    data: txnPages,
+    isLoading,
+    isFetchingNextPage,
+    fetchNextPage,
+    hasNextPage,
+  } = useInfiniteQuery({
+    queryKey: ["transactions", txnQueryParams],
+    queryFn: ({ pageParam }) =>
+      transactionsApi.listPage(txnQueryParams, pageParam as string | undefined),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (_lastPage, _pages, _lastParam, allPagesParam) => {
+      // next cursor comes from the X-Next-Cursor response header
+      const lastRes = allPagesParam[allPagesParam.length - 1] as unknown as { nextCursor?: string };
+      return lastRes?.nextCursor ?? undefined;
+    },
+    select: (data) => ({
+      ...data,
+      pages: data.pages.map((page, i) => ({
+        data: (page as { data: Transaction[] }).data,
+        nextCursor: (page as { headers: Record<string, string> }).headers?.["x-next-cursor"],
+        _pageIdx: i,
+      })),
+    }),
   });
+
+  // Flatten all pages into a single list
+  const transactions = useMemo(
+    () => txnPages?.pages.flatMap((p) => p.data) ?? [],
+    [txnPages]
+  );
+
+  // IntersectionObserver sentinel for infinite scroll
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const onIntersect = useCallback(
+    (entries: IntersectionObserverEntry[]) => {
+      if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+        fetchNextPage();
+      }
+    },
+    [fetchNextPage, hasNextPage, isFetchingNextPage]
+  );
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(onIntersect, { threshold: 0.1 });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [onIntersect]);
 
   const taxonomyCatLower = useMemo(() => {
     const s = new Set<string>();
@@ -192,6 +233,25 @@ export default function Transactions() {
     },
   });
 
+  const handleExportCsv = () => {
+    const params: Record<string, unknown> = {
+      start: periodStart,
+      end: periodEnd,
+    };
+    if (viewMode !== "all") params.account_id = Number(viewMode);
+    if (categoryFilter) params.category = categoryFilter;
+    if (search) params.q = search;
+
+    transactionsApi.exportCsv(params).then((res) => {
+      const url = URL.createObjectURL(res.data as Blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `transaktionen_${periodStart}_${periodEnd}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  };
+
   const handleCategoryEdit = (txn: Transaction) => {
     setEditingId(txn.id);
     setEditCategory(txn.category || "");
@@ -219,10 +279,20 @@ export default function Transactions() {
             {range.label} · {transactions?.length || 0} Einträge
           </p>
         </div>
-        <Link to="/import" className="btn-primary flex items-center gap-2">
-          <Upload className="w-4 h-4" />
-          Import
-        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportCsv}
+            className="btn-secondary flex items-center gap-2"
+            title="Als CSV exportieren"
+          >
+            <Download className="w-4 h-4" />
+            <span className="hidden sm:inline">Export</span>
+          </button>
+          <Link to="/import" className="btn-primary flex items-center gap-2">
+            <Upload className="w-4 h-4" />
+            Import
+          </Link>
+        </div>
       </div>
 
       {/* TransactionFilterBar - Account Selection */}
@@ -618,12 +688,25 @@ export default function Transactions() {
                           : (txn.merchant_normalized || txn.description || undefined)
                       }
                     >
-                      <p
-                        className="text-text-primary text-sm truncate"
-                        title={txn.merchant_normalized || txn.description || undefined}
-                      >
-                        {txn.merchant_normalized || txn.description}
-                      </p>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p
+                          className="text-text-primary text-sm truncate"
+                          title={txn.merchant_normalized || txn.description || undefined}
+                        >
+                          {txn.merchant_normalized || txn.description}
+                        </p>
+                        {txn.is_split && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-accent/15 text-accent border border-accent/25 shrink-0">
+                            <Scissors className="w-2.5 h-2.5" />
+                            {txn.split_count ?? ""}
+                          </span>
+                        )}
+                        {txn.parent_id && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-text-tertiary/10 text-text-tertiary border border-border/40 shrink-0">
+                            Teil
+                          </span>
+                        )}
+                      </div>
                       {txn.merchant_normalized && txn.description !== txn.merchant_normalized && (
                         <p className="text-text-tertiary text-xs truncate" title={txn.description}>
                           {txn.description}
@@ -738,7 +821,7 @@ export default function Transactions() {
                         )}
                       </span>
                     </td>
-                    <td className="px-2 py-3 w-16">
+                    <td className="px-2 py-3 w-20">
                       {confirmingDeleteId === txn.id ? (
                         <div className="flex items-center gap-1">
                           <button
@@ -756,13 +839,24 @@ export default function Transactions() {
                           </button>
                         </div>
                       ) : (
-                        <button
-                          onClick={() => setConfirmingDeleteId(txn.id)}
-                          className="opacity-0 group-hover:opacity-100 text-text-tertiary hover:text-loss transition-all"
-                          title="Eintrag löschen"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                          {!txn.parent_id && (
+                            <button
+                              onClick={() => setSplittingTxn(txn)}
+                              className="text-text-tertiary hover:text-accent transition-colors"
+                              title="Transaktion aufteilen"
+                            >
+                              <Scissors className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setConfirmingDeleteId(txn.id)}
+                            className="text-text-tertiary hover:text-loss transition-colors"
+                            title="Eintrag löschen"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -782,6 +876,21 @@ export default function Transactions() {
         </div>
       </div>
 
+      {/* Infinite-scroll sentinel */}
+      <div ref={sentinelRef} className="h-4" />
+      {isFetchingNextPage && (
+        <div className="flex justify-center py-4 text-text-tertiary text-sm animate-pulse">
+          Weitere Transaktionen laden…
+        </div>
+      )}
+
+      {/* Split modal */}
+      {splittingTxn && (
+        <SplitTransactionModal
+          transaction={splittingTxn}
+          onClose={() => setSplittingTxn(null)}
+        />
+      )}
     </div>
   );
 }

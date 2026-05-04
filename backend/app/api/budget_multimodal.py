@@ -513,3 +513,400 @@ async def multi_analysis(
         opportunities=opportunities,
         reference_currency=ref,
     )
+
+
+# ── Budget Health Score ───────────────────────────────────────
+
+class HealthScoreComponent(BaseModel):
+    name: str
+    score: float        # 0–100
+    weight: float       # 0–1, sum = 1.0
+    detail: str
+
+
+class HealthScoreLever(BaseModel):
+    title: str
+    body: str
+    potential: float    # CHF / month improvement potential
+
+
+class HealthScoreResponse(BaseModel):
+    score: float        # 0–100 weighted composite
+    grade: str          # A / B / C / D / F
+    components: List[HealthScoreComponent]
+    top_levers: List[HealthScoreLever]
+
+
+def _grade(score: float) -> str:
+    if score >= 85: return "A"
+    if score >= 70: return "B"
+    if score >= 55: return "C"
+    if score >= 40: return "D"
+    return "F"
+
+
+def _compute_health_score(
+    *,
+    income: float,
+    expenses: float,
+    cat_totals: "dict[str, float]",
+    planned_total: float,
+    has_pension: bool,
+    months_covered: int,
+    ref: str,
+) -> HealthScoreResponse:
+    """Shared scoring logic — called with data from any mode."""
+
+    # Component 1: Savings Rate (30%)
+    if income > 0:
+        savings_rate_pct = max(0.0, (income - expenses) / income * 100)
+        savings_score = min(100.0, savings_rate_pct * 4.0)
+    else:
+        savings_rate_pct = 0.0
+        savings_score = 0.0
+
+    # Component 2: Budget Adherence (25%)
+    if planned_total > 0:
+        util = expenses / planned_total
+        if util <= 1.0:
+            adherence_score = 100.0
+        elif util <= 1.2:
+            adherence_score = max(0.0, 100.0 - (util - 1.0) * 250)
+        else:
+            adherence_score = 0.0
+    else:
+        adherence_score = 50.0
+
+    # Component 3: Cashflow Coverage (20%)
+    if income <= 0:
+        cashflow_score = 0.0
+    elif income >= expenses:
+        cashflow_score = 100.0
+    else:
+        cashflow_score = max(0.0, (income / expenses) * 100.0)
+
+    # Component 4: Pension Progress (15%)
+    pension_score = 100.0 if has_pension else 30.0
+
+    # Component 5: Expense Diversity (10%)
+    if expenses > 0 and cat_totals:
+        shares = [v / expenses for v in cat_totals.values()]
+        hhi = sum(s ** 2 for s in shares)
+        diversity_score = min(100.0, (1 - hhi) * 100 * 1.3)
+    else:
+        diversity_score = 50.0
+
+    components = [
+        HealthScoreComponent(
+            name="Sparquote", score=round(savings_score, 1), weight=0.30,
+            detail=f"{savings_rate_pct:.1f}% Sparquote" if income > 0 else "Keine Einnahmen im Zeitraum",
+        ),
+        HealthScoreComponent(
+            name="Budgettreue", score=round(adherence_score, 1), weight=0.25,
+            detail=(
+                f"{round(expenses / planned_total * 100):.0f}% des Budgets ausgeschöpft"
+                if planned_total > 0 else "Kein Soll-Budget erfasst"
+            ),
+        ),
+        HealthScoreComponent(
+            name="Cashflow", score=round(cashflow_score, 1), weight=0.20,
+            detail=(
+                f"Einnahmen decken Ausgaben zu {round(income/expenses*100) if expenses > 0 else 100:.0f}%"
+                if income > 0 else "Keine Einnahmen erfasst"
+            ),
+        ),
+        HealthScoreComponent(
+            name="Altersvorsorge", score=round(pension_score, 1), weight=0.15,
+            detail="Vorsorgebeiträge erkannt" if has_pension else "Keine Säule-3a-Beiträge erkannt",
+        ),
+        HealthScoreComponent(
+            name="Ausgabendiversität", score=round(diversity_score, 1), weight=0.10,
+            detail=f"{len(cat_totals)} Kategorien im Zeitraum",
+        ),
+    ]
+
+    weighted_score = round(sum(c.score * c.weight for c in components), 1)
+
+    levers: List[HealthScoreLever] = []
+    if savings_score < 70:
+        gap = max(0, income * 0.20 - (income - expenses))
+        levers.append(HealthScoreLever(
+            title="Sparquote erhöhen",
+            body=f"Ziel: 20% Sparquote. Spare zusätzlich ~{ref} {gap/months_covered:,.0f}/Monat.",
+            potential=round(gap / months_covered, 0),
+        ))
+    if adherence_score < 70 and planned_total > 0:
+        overspend = max(0.0, expenses - planned_total) / months_covered
+        levers.append(HealthScoreLever(
+            title="Budgeteinhaltung verbessern",
+            body=f"Ausgaben übersteigen das Budget um ~{ref} {overspend:,.0f}/Monat.",
+            potential=round(overspend, 0),
+        ))
+    if pension_score < 70:
+        levers.append(HealthScoreLever(
+            title="Säule 3a einrichten",
+            body="Zahle regelmässig in die Säule 3a ein. Max. CHF 7'056/Jahr (2024, unselbstständig).",
+            potential=588.0,
+        ))
+    if cashflow_score < 80 and income > 0:
+        deficit = max(0.0, expenses - income) / months_covered
+        levers.append(HealthScoreLever(
+            title="Ausgaben senken",
+            body=f"Ausgaben übersteigen Einnahmen um ~{ref} {deficit:,.0f}/Monat.",
+            potential=round(deficit, 0),
+        ))
+    levers.sort(key=lambda l: -l.potential)
+
+    return HealthScoreResponse(
+        score=weighted_score,
+        grade=_grade(weighted_score),
+        components=components,
+        top_levers=levers[:3],
+    )
+
+
+@router.get("/health-score", response_model=HealthScoreResponse)
+async def budget_health_score(
+    start: Optional[str] = Query(None),
+    end: Optional[str] = Query(None),
+    mode: str = Query("historical"),   # historical | empirical | plan
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Budget Health Score — five weighted components, three data-source modes:
+      historical  Real bank transactions
+      empirical   Wizard-configured monthly amounts
+      plan        Recurring-plan (Budgetplan) entries
+    """
+    import json as _json
+    from datetime import timedelta
+    from collections import defaultdict
+
+    ref = normalize_reference_currency(current_user.currency)
+    rates = await currency_service.get_rates()
+    today = date.today()
+
+    # ── Date range ─────────────────────────────────────────────
+    if start and end:
+        period_start = date.fromisoformat(start)
+        period_end   = date.fromisoformat(end)
+    else:
+        period_start = (today.replace(day=1) - timedelta(days=1)).replace(day=1)
+        period_start = (period_start - timedelta(days=1)).replace(day=1)
+        period_end   = today
+
+    months_covered = max(
+        1,
+        (period_end.year - period_start.year) * 12
+        + (period_end.month - period_start.month) + 1,
+    )
+
+    # ── Common wizard budget loader (used by historical + plan) ──
+    wizard_budgets = (await db.execute(
+        select(Budget)
+        .where(Budget.user_id == current_user.id, Budget.notes.isnot(None))
+        .order_by(Budget.created_at.desc())
+    )).scalars().all()
+
+    # ══════════════════════════════════════════════════════════
+    # MODE: historical — real transaction data
+    # ══════════════════════════════════════════════════════════
+    if mode == "historical":
+        rows = (await db.execute(
+            select(Transaction)
+            .join(Account, Transaction.account_id == Account.id)
+            .where(
+                Account.user_id == current_user.id,
+                Transaction.is_deleted.isnot(True),
+                Transaction.is_transfer.isnot(True),
+                Transaction.date >= _utc_start(period_start),
+                Transaction.date <= _utc_end(period_end),
+            )
+        )).scalars().all()
+
+        income = 0.0; expenses = 0.0
+        cat_totals: dict[str, float] = defaultdict(float)
+        for t in rows:
+            amt = convert_with_eur_rates(rates, t.amount, (t.currency or "CHF").upper(), ref)
+            if amt > 0:
+                income += amt
+            else:
+                abs_amt = -amt
+                expenses += abs_amt
+                cat_totals[(t.category or "Sonstiges").lower()] += abs_amt
+
+        planned_total = 0.0
+        seen: set[str] = set()
+        for b in wizard_budgets:
+            k = (b.notes or "").strip().lower()
+            if k and k not in seen:
+                seen.add(k)
+                planned_total += abs(b.amount) * months_covered
+
+        savings_cats = {"3a", "pillar", "säule", "pension", "sparen", "altersvorsorge", "bvg", "pkk"}
+        has_pension = any(
+            any(k in (t.category or "").lower() for k in savings_cats)
+            for t in rows if t.amount < 0
+        ) or any(
+            any(k in (b.notes or "").lower() for k in {"3a", "pillar", "säule", "pension"})
+            for b in wizard_budgets
+        )
+
+    # ══════════════════════════════════════════════════════════
+    # MODE: empirical — wizard configuration
+    # ══════════════════════════════════════════════════════════
+    elif mode == "empirical":
+        from app.models.models import UserWizardConfig
+        cfg_row = (await db.execute(
+            select(UserWizardConfig).where(UserWizardConfig.user_id == current_user.id)
+        )).scalar_one_or_none()
+
+        income = 0.0; expenses = 0.0
+        cat_totals = defaultdict(float)
+
+        if cfg_row and cfg_row.wizard_data_json:
+            d: dict = _json.loads(cfg_row.wizard_data_json)
+
+            # Income (monthly)
+            if d.get("lohnEnabled") and (d.get("lohn") or 0) > 0:
+                income += d["lohn"]
+            if d.get("selbstaendigEnabled") and (d.get("selbstaendig") or 0) > 0:
+                income += d["selbstaendig"]
+            if d.get("ahvRenteEnabled") and (d.get("ahvRente") or 0) > 0:
+                income += d["ahvRente"]
+            if d.get("dividendenEnabled") and (d.get("dividenden") or 0) > 0:
+                income += d["dividenden"]
+            if d.get("mieteinnahmenEnabled") and (d.get("mieteinnahmen") or 0) > 0:
+                income += d["mieteinnahmen"]
+
+            # Expenses per category (monthly)
+            def _add(cat: str, amt: float) -> None:
+                if amt > 0:
+                    expenses_box[0] += amt
+                    cat_totals[cat] += amt
+
+            expenses_box = [0.0]
+
+            if d.get("housingMode") == "miete":
+                _add("wohnen", (d.get("monthlyRent") or 0) + (d.get("nebenkosten") or 0))
+            else:
+                _add("wohnen", d.get("monthlyAmortization") or 0)
+            _add("krankenkasse", d.get("healthInsurancePerPerson") or 0)
+            _add("zusatzversicherung", d.get("zusatzversicherung") or 0)
+            _add("hausrat", d.get("hausrat") or 0)
+            if d.get("hasAutoInsurance"):
+                _add("autoversicherung", d.get("autoversicherung") or 0)
+            _add("lebensmittel", d.get("groceries") or 0)
+            _add("freizeit", d.get("freizeit") or 0)
+            _add("kleidung", d.get("kleidung") or 0)
+            _add("unterhaltung", d.get("unterhaltung") or 0)
+            _add("weiterbildung", d.get("weiterbildung") or 0)
+            if d.get("transportMode") in ("car", "both"):
+                _add("transport", (d.get("monthlyFuel") or 0) + (d.get("parking") or 0) + (d.get("carAmortization") or 0))
+            # Subscriptions
+            sub_total = d.get("subscriptionTotal") or 0
+            if sub_total > 0:
+                _add("abonnements", sub_total)
+            # Serafe
+            if (d.get("serafe") or 0) > 0:
+                _add("serafe", d["serafe"])
+
+            expenses = expenses_box[0]
+            # Scale to period
+            income   *= months_covered
+            expenses *= months_covered
+            for k in cat_totals:
+                cat_totals[k] *= months_covered
+
+        # For empirical: the wizard IS the plan, so adherence is perfect by definition
+        # We use the empirical expenses as planned (shows 100% unless wizard has no data)
+        planned_total = expenses
+
+        # Pension: pillar 3a contributions in wizard
+        has_pension = (
+            len(cfg_row.wizard_data_json and _json.loads(cfg_row.wizard_data_json).get("pillar3aAccounts") or []) > 0
+            if cfg_row and cfg_row.wizard_data_json else False
+        )
+
+    # ══════════════════════════════════════════════════════════
+    # MODE: plan — recurring_plan entries
+    # ══════════════════════════════════════════════════════════
+    else:  # plan
+        from app.models.models import RecurringPlan as RPlan
+        PERIOD_MONTHS = {"weekly": 1/4.33, "monthly": 1, "quarterly": 3, "halfyearly": 6, "yearly": 12}
+        target_year = period_start.year
+
+        plan_entries = (await db.execute(
+            select(RPlan)
+            .where(
+                RPlan.user_id == current_user.id,
+                RPlan.start_date <= date(target_year, 12, 31),
+            )
+            .filter(
+                (RPlan.end_date == None) | (RPlan.end_date >= date(target_year, 1, 1))  # noqa: E711
+            )
+        )).scalars().all()
+
+        income = 0.0; expenses = 0.0
+        cat_totals = defaultdict(float)
+
+        for e in plan_entries:
+            pm = PERIOD_MONTHS.get(e.periodicity or "monthly", 1)
+            monthly = float(e.amount) / pm  # amount per month equivalent
+            period_total = monthly * months_covered
+            plan_cur = (getattr(e, "currency", None) or "CHF").strip().upper()
+            period_ref = convert_with_eur_rates(rates, period_total, plan_cur, ref)
+            if period_ref > 0:
+                income += period_ref
+            else:
+                abs_total = -period_ref
+                expenses += abs_total
+                cat_label = (e.description or "sonstiges").lower()[:20]
+                cat_totals[cat_label] += abs_total
+
+        # Budget adherence: plan vs actual transactions
+        rows_actual = (await db.execute(
+            select(Transaction)
+            .join(Account, Transaction.account_id == Account.id)
+            .where(
+                Account.user_id == current_user.id,
+                Transaction.is_deleted.isnot(True),
+                Transaction.is_transfer.isnot(True),
+                Transaction.date >= _utc_start(period_start),
+                Transaction.date <= _utc_end(period_end),
+            )
+        )).scalars().all()
+
+        actual_expenses = sum(
+            -convert_with_eur_rates(rates, t.amount, (t.currency or "CHF").upper(), ref)
+            for t in rows_actual if t.amount < 0
+        )
+        # planned_total = projected expenses from plan; compare to actual
+        planned_total = expenses if expenses > 0 else 0.0
+        # Override expenses with actual for honest budget-adherence comparison
+        expenses_for_adherence = actual_expenses
+        # But keep plan expenses for income/cashflow scoring
+        # Recalculate: use actual for adherence, plan for cashflow/savings
+        income_for_savings = income  # plan income
+        expenses_for_savings = actual_expenses if actual_expenses > 0 else expenses
+
+        savings_cats = {"3a", "pillar", "säule", "pension", "sparen", "altersvorsorge", "bvg", "pkk"}
+        has_pension = any(
+            any(k in (e.description or "").lower() for k in savings_cats)
+            for e in plan_entries if e.amount < 0
+        )
+
+        # Rewrite income/expenses to be what the scorer will use
+        income = income_for_savings
+        expenses = expenses_for_savings
+
+    return _compute_health_score(
+        income=income,
+        expenses=expenses,
+        cat_totals=cat_totals,
+        planned_total=planned_total,
+        has_pension=has_pension,
+        months_covered=months_covered,
+        ref=ref,
+    )

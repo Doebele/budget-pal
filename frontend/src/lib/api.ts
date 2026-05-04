@@ -89,6 +89,8 @@ export const accountsApi = {
 // Transactions
 export const transactionsApi = {
   list: (params?: Record<string, unknown>) => api.get("/transactions", { params }),
+  listPage: (params?: Record<string, unknown>, cursor?: string) =>
+    api.get("/transactions", { params: { ...params, cursor, limit: 100 } }),
   listArchived: (params?: Record<string, unknown>) =>
     api.get("/transactions/archived", { params }),
   restore: (id: number) => api.post(`/transactions/${id}/restore`),
@@ -99,6 +101,12 @@ export const transactionsApi = {
     api.delete(`/transactions/${id}`, { params: { hard } }),
   bulkCategorize: (ids: number[], force = false) =>
     api.post("/transactions/bulk-categorize", { transaction_ids: ids, force_recategorize: force }),
+  split: (id: number, splits: Array<{ description: string; amount: number; category?: string | null; notes?: string | null }>) =>
+    api.post(`/transactions/${id}/split`, { splits }),
+  unsplit: (id: number) => api.delete(`/transactions/${id}/split`),
+  getSplits: (id: number) => api.get(`/transactions/${id}/splits`),
+  exportCsv: (params?: Record<string, unknown>) =>
+    api.get("/transactions/export/csv", { params, responseType: "blob" }),
   stats: (params?: Record<string, unknown>) => api.get("/transactions/stats", { params }),
   monthlySummary: (params?: Record<string, unknown>) =>
     api.get("/transactions/monthly-summary", { params }),
@@ -252,6 +260,38 @@ export const settingsApi = {
   putCategoryMappings: (mappings: Array<{ wizard_label: string; transaction_category: string }>) =>
     api.put("/settings/category-mappings", { mappings }),
   resetCategoryMappings: () => api.delete("/settings/category-mappings"),
+};
+
+// Wizard state (raw data blob from wizard onboarding)
+export const wizardApi = {
+  getState: () => api.get<Record<string, unknown>>("/wizard/state"),
+  getPeerConfig: () => api.get<Record<string, number | undefined>>("/wizard/peer-config"),
+};
+
+// Budget Health Score
+export const healthApi = {
+  score: (params?: { start?: string; end?: string; mode?: string }) =>
+    api.get<{
+      score: number;
+      grade: string;
+      components: Array<{ name: string; score: number; weight: number; detail: string }>;
+      top_levers: Array<{ title: string; body: string; potential: number }>;
+    }>("/budget/health-score", { params }),
+};
+
+// Notifications / Anomalies
+export const notificationsApi = {
+  list: (params?: { lookback_days?: number; recent_days?: number }) =>
+    api.get("/notifications", { params }),
+  count: () => api.get<{ total: number; alerts: number; warnings: number }>("/notifications/count"),
+};
+
+// Goals
+export const goalsApi = {
+  list: () => api.get("/goals"),
+  create: (data: Record<string, unknown>) => api.post("/goals", data),
+  update: (id: number, data: Record<string, unknown>) => api.put(`/goals/${id}`, data),
+  delete: (id: number) => api.delete(`/goals/${id}`),
 };
 
 // Backup / Export / Import
