@@ -6,26 +6,32 @@ POST /auth/login     — returns JWT
 GET  /auth/me        — current user profile
 PUT  /auth/me        — update profile
 """
-from datetime import datetime, date
+
+from datetime import date, datetime
 from typing import Optional
 
+from app.core.database import get_db
+from app.core.rate_limit import SlidingWindowRateLimiter
+from app.core.security import (
+    create_access_token,
+    get_current_user,
+    hash_password,
+    verify_password,
+)
+from app.models.models import User
+from app.services.currency_service import REFERENCE_CURRENCIES
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr, Field, field_validator
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-
-from app.core.database import get_db
-from app.core.security import hash_password, verify_password, create_access_token, get_current_user
-from app.core.rate_limit import SlidingWindowRateLimiter
-from app.models.models import User
-from app.services.currency_service import REFERENCE_CURRENCIES
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
 login_rate_limiter = SlidingWindowRateLimiter(max_requests=8, window_seconds=60)
 
 
 # ── Schemas ───────────────────────────────────────────────────
+
 
 class UserRegisterRequest(BaseModel):
     email: EmailStr
@@ -70,7 +76,9 @@ class UserProfileResponse(BaseModel):
 class UserUpdateRequest(BaseModel):
     name: Optional[str] = None
     date_of_birth: Optional[datetime] = None
-    birthdate: Optional[str] = None  # ISO date string YYYY-MM-DD from frontend datepicker
+    birthdate: Optional[str] = (
+        None  # ISO date string YYYY-MM-DD from frontend datepicker
+    )
     retirement_age: Optional[int] = None
     currency: Optional[str] = None
     locale: Optional[str] = None
@@ -88,7 +96,10 @@ class UserUpdateRequest(BaseModel):
 
 # ── Routes ────────────────────────────────────────────────────
 
-@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+
+@router.post(
+    "/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED
+)
 async def register(payload: UserRegisterRequest, db: AsyncSession = Depends(get_db)):
     """Register a new user account."""
     existing = await db.execute(select(User).where(User.email == payload.email))
@@ -105,7 +116,8 @@ async def register(payload: UserRegisterRequest, db: AsyncSession = Depends(get_
         is_active=True,
     )
     db.add(user)
-    await db.flush()  # get the generated ID before commit
+    await db.flush()
+    await db.commit()
     await db.refresh(user)
 
     token = create_access_token(str(user.id))
@@ -118,7 +130,9 @@ async def register(payload: UserRegisterRequest, db: AsyncSession = Depends(get_
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(payload: UserLoginRequest, request: Request, db: AsyncSession = Depends(get_db)):
+async def login(
+    payload: UserLoginRequest, request: Request, db: AsyncSession = Depends(get_db)
+):
     """Authenticate and receive a JWT access token."""
     # Basic brute-force protection: limit attempts per client+email.
     client_ip = request.client.host if request.client else "unknown"
@@ -165,7 +179,9 @@ async def get_me(current_user: User = Depends(get_current_user)):
         is_active=current_user.is_active,
         created_at=current_user.created_at,
         date_of_birth=current_user.date_of_birth,
-        birthdate=current_user.date_of_birth.strftime("%Y-%m-%d") if current_user.date_of_birth else None,
+        birthdate=current_user.date_of_birth.strftime("%Y-%m-%d")
+        if current_user.date_of_birth
+        else None,
         retirement_age=current_user.retirement_age,
         currency=current_user.currency,
         locale=current_user.locale,
@@ -187,9 +203,13 @@ async def update_me(
     if payload.birthdate is not None:
         # Accept ISO date string "YYYY-MM-DD" from frontend datepicker
         try:
-            current_user.date_of_birth = datetime.strptime(payload.birthdate, "%Y-%m-%d")
+            current_user.date_of_birth = datetime.strptime(
+                payload.birthdate, "%Y-%m-%d"
+            )
         except ValueError:
-            raise HTTPException(status_code=400, detail="birthdate must be in YYYY-MM-DD format.")
+            raise HTTPException(
+                status_code=400, detail="birthdate must be in YYYY-MM-DD format."
+            )
     elif payload.birthdate == "":
         current_user.date_of_birth = None
     if payload.retirement_age is not None:
@@ -205,7 +225,9 @@ async def update_me(
     if payload.locale is not None:
         current_user.locale = payload.locale
     if payload.saron_reference_annual_pct is not None:
-        current_user.saron_reference_annual_pct = float(payload.saron_reference_annual_pct)
+        current_user.saron_reference_annual_pct = float(
+            payload.saron_reference_annual_pct
+        )
 
     # Handle password change
     if payload.new_password:
@@ -222,6 +244,7 @@ async def update_me(
         current_user.hashed_password = hash_password(payload.new_password)
 
     await db.flush()
+    await db.commit()
     await db.refresh(current_user)
 
     return UserProfileResponse(
@@ -231,7 +254,9 @@ async def update_me(
         is_active=current_user.is_active,
         created_at=current_user.created_at,
         date_of_birth=current_user.date_of_birth,
-        birthdate=current_user.date_of_birth.strftime("%Y-%m-%d") if current_user.date_of_birth else None,
+        birthdate=current_user.date_of_birth.strftime("%Y-%m-%d")
+        if current_user.date_of_birth
+        else None,
         retirement_age=current_user.retirement_age,
         currency=current_user.currency,
         locale=current_user.locale,

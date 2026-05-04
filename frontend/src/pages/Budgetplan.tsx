@@ -35,6 +35,7 @@ import { matchPlanEntryProviderId } from "@/lib/planEntryProviderMatch";
 import { formatAmount, formatCurrencyCompact } from "@/lib/theme";
 import { useAuth } from "@/lib/auth";
 import ProviderBrandIcon from "@/components/wizard/ProviderBrandIcon";
+import EntryTooltip from "@/components/EntryTooltip";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -60,6 +61,8 @@ interface RecurringPlanEntry {
 interface Account {
   id: number;
   name: string;
+  bank: string;
+  color?: string | null;
 }
 
 interface Category {
@@ -85,8 +88,18 @@ const DND_ENTRY_MIME = "application/x-budgetplan-recurring-entry";
 // ── Constants ─────────────────────────────────────────────────
 
 const MONTH_NAMES = [
-  "Januar", "Februar", "März", "April", "Mai", "Juni",
-  "Juli", "August", "September", "Oktober", "November", "Dezember",
+  "Januar",
+  "Februar",
+  "März",
+  "April",
+  "Mai",
+  "Juni",
+  "Juli",
+  "August",
+  "September",
+  "Oktober",
+  "November",
+  "Dezember",
 ];
 
 const PERIODICITIES = [
@@ -107,17 +120,25 @@ const PERIOD_FACTOR: Record<string, number> = {
 
 // ── Helpers ───────────────────────────────────────────────────
 
-function getApplicableMonths(entry: RecurringPlanEntry, year: number): number[] {
+function getApplicableMonths(
+  entry: RecurringPlanEntry,
+  year: number,
+): number[] {
   const sd = new Date(entry.start_date + "T00:00:00");
   const ed = entry.end_date ? new Date(entry.end_date + "T00:00:00") : null;
-  const startM = sd.getFullYear() < year ? 1 : sd.getFullYear() === year ? sd.getMonth() + 1 : null;
+  const startM =
+    sd.getFullYear() < year
+      ? 1
+      : sd.getFullYear() === year
+        ? sd.getMonth() + 1
+        : null;
   if (startM === null) return [];
   const endM = ed
     ? ed.getFullYear() > year
       ? 12
       : ed.getFullYear() === year
-      ? ed.getMonth() + 1
-      : null
+        ? ed.getMonth() + 1
+        : null
     : 12;
   if (endM === null) return [];
   const anchor = sd.getMonth() + 1;
@@ -129,10 +150,10 @@ function getApplicableMonths(entry: RecurringPlanEntry, year: number): number[] 
         months.push(m);
         break;
       case "quarterly":
-        if (((m - anchor) % 3 + 3) % 3 === 0) months.push(m);
+        if ((((m - anchor) % 3) + 3) % 3 === 0) months.push(m);
         break;
       case "halfyearly":
-        if (((m - anchor) % 6 + 6) % 6 === 0) months.push(m);
+        if ((((m - anchor) % 6) + 6) % 6 === 0) months.push(m);
         break;
       case "yearly":
         if (m === anchor) months.push(m);
@@ -215,7 +236,9 @@ function planRemoveMonthFromEntry(
   if (!inYear.includes(removeMonth)) {
     return { creates: [], deleteId: null };
   }
-  const remaining = inYear.filter((x) => x !== removeMonth).sort((a, b) => a - b);
+  const remaining = inYear
+    .filter((x) => x !== removeMonth)
+    .sort((a, b) => a - b);
   if (remaining.length === 0) {
     return { creates: [], deleteId: entry.id };
   }
@@ -224,7 +247,10 @@ function planRemoveMonthFromEntry(
 
   if (entry.periodicity === "monthly" || entry.periodicity === "weekly") {
     const coversAllMonthsInYear =
-      inYear.length === 12 && [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].every((mm) => inYear.includes(mm));
+      inYear.length === 12 &&
+      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].every((mm) =>
+        inYear.includes(mm),
+      );
     if (!entry.end_date && coversAllMonthsInYear && remaining.length === 11) {
       const gap = inYear.find((mm) => !remaining.includes(mm));
       if (gap != null) {
@@ -235,13 +261,17 @@ function planRemoveMonthFromEntry(
           const ns = isoMax(entry.start_date, y0);
           const ne = hi;
           if (isoCmp(ns, ne) <= 0) {
-            creates.push(entryToCreatePayload(entry, ns, ne, entry.periodicity));
+            creates.push(
+              entryToCreatePayload(entry, ns, ne, entry.periodicity),
+            );
           }
         }
         if (gap < 12) {
           const segLo = `${planYear}-${String(gap + 1).padStart(2, "0")}-01`;
           const ns = isoMax(entry.start_date, segLo);
-          creates.push(entryToCreatePayload(entry, ns, null, entry.periodicity));
+          creates.push(
+            entryToCreatePayload(entry, ns, null, entry.periodicity),
+          );
         }
         if (creates.length > 0) {
           return { creates, deleteId: entry.id };
@@ -264,7 +294,9 @@ function planRemoveMonthFromEntry(
       }
       const endBound = newEnd ?? ISO_FAR;
       if (isoCmp(newStart, endBound) > 0) continue;
-      creates.push(entryToCreatePayload(entry, newStart, newEnd, entry.periodicity));
+      creates.push(
+        entryToCreatePayload(entry, newStart, newEnd, entry.periodicity),
+      );
     }
     if (creates.length === 0) {
       return { creates: [], deleteId: null };
@@ -285,7 +317,9 @@ function planRemoveMonthFromEntry(
 function plainCategoryLabel(name: string): string {
   let s = name;
   for (let i = 0; i < 6; i++) {
-    const next = s.replace(/^[\p{Extended_Pictographic}\uFE0F\u200D]+/u, "").replace(/^\s+/, "");
+    const next = s
+      .replace(/^[\p{Extended_Pictographic}\uFE0F\u200D]+/u, "")
+      .replace(/^\s+/, "");
     if (next === s) break;
     s = next;
   }
@@ -299,7 +333,9 @@ function matchCategoryId(categories: Category[], hint: string | null): string {
   const exact = categories.find((c) => c.name.trim().toLowerCase() === lower);
   if (exact) return String(exact.id);
   const plain = plainCategoryLabel(hint).toLowerCase();
-  const byPlain = categories.find((c) => plainCategoryLabel(c.name).toLowerCase() === plain);
+  const byPlain = categories.find(
+    (c) => plainCategoryLabel(c.name).toLowerCase() === plain,
+  );
   if (byPlain) return String(byPlain.id);
   return "";
 }
@@ -322,22 +358,30 @@ function BudgetplanCategoryPicker({
   categories,
   isExpense,
 }: CategoryPickerProps) {
-  const { resolveSuperCategoryForRow, categoryIsIncomeOriented, categoryIsExpenseOriented } =
-    useTaxonomy();
+  const {
+    resolveSuperCategoryForRow,
+    categoryIsIncomeOriented,
+    categoryIsExpenseOriented,
+  } = useTaxonomy();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+      if (rootRef.current && !rootRef.current.contains(e.target as Node))
+        setOpen(false);
     }
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
 
   const selectedId = value ? parseInt(value, 10) : NaN;
-  const selectedCat = !Number.isNaN(selectedId) ? categories.find((c) => c.id === selectedId) : undefined;
-  const selectedSc = selectedCat ? resolveSuperCategoryForRow(selectedCat) : null;
+  const selectedCat = !Number.isNaN(selectedId)
+    ? categories.find((c) => c.id === selectedId)
+    : undefined;
+  const selectedSc = selectedCat
+    ? resolveSuperCategoryForRow(selectedCat)
+    : null;
   const SelectedIcon = selectedSc?.icon;
   const selectedMatchesFlow = selectedCat
     ? isExpense
@@ -345,7 +389,8 @@ function BudgetplanCategoryPicker({
       : categoryIsIncomeOriented(selectedCat)
     : true;
   const showOrphanAssigned =
-    selectedCat && (!groupedCategoryIds.has(selectedCat.id) || !selectedMatchesFlow);
+    selectedCat &&
+    (!groupedCategoryIds.has(selectedCat.id) || !selectedMatchesFlow);
 
   function selectRow(id: string) {
     onChange(id);
@@ -361,13 +406,23 @@ function BudgetplanCategoryPicker({
       >
         {selectedCat && SelectedIcon ? (
           <>
-            <SelectedIcon className="w-4 h-4 shrink-0" style={{ color: selectedSc!.color }} />
-            <span className="flex-1 truncate">{plainCategoryLabel(selectedCat.name)}</span>
+            <SelectedIcon
+              className="w-4 h-4 shrink-0"
+              style={{ color: selectedSc!.color }}
+            />
+            <span className="flex-1 truncate">
+              {plainCategoryLabel(selectedCat.name)}
+            </span>
           </>
         ) : (
           <span className="flex-1 text-text-tertiary">Keine Kategorie</span>
         )}
-        <ChevronDown className={clsx("w-4 h-4 shrink-0 text-text-tertiary transition-transform", open && "rotate-180")} />
+        <ChevronDown
+          className={clsx(
+            "w-4 h-4 shrink-0 text-text-tertiary transition-transform",
+            open && "rotate-180",
+          )}
+        />
       </button>
       {open && (
         <div className="absolute left-0 right-0 top-full z-[60] mt-1 max-h-[min(70vh,22rem)] overflow-y-auto rounded-lg border border-border bg-bg-surface shadow-xl py-1">
@@ -376,10 +431,12 @@ function BudgetplanCategoryPicker({
             onClick={() => selectRow("")}
             className={clsx(
               "w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-bg-surface2 transition-colors",
-              !value && "bg-accent/10"
+              !value && "bg-accent/10",
             )}
           >
-            <span className="text-text-tertiary text-xs flex-1">Keine Kategorie</span>
+            <span className="text-text-tertiary text-xs flex-1">
+              Keine Kategorie
+            </span>
           </button>
           {showOrphanAssigned && (
             <div className="border-t border-border/40 pt-1 mt-1">
@@ -395,8 +452,13 @@ function BudgetplanCategoryPicker({
                     onClick={() => selectRow(String(selectedCat.id))}
                     className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-bg-surface2"
                   >
-                    <Icon className="w-4 h-4 shrink-0" style={{ color: sc.color }} />
-                    <span className="truncate">{plainCategoryLabel(selectedCat.name)}</span>
+                    <Icon
+                      className="w-4 h-4 shrink-0"
+                      style={{ color: sc.color }}
+                    />
+                    <span className="truncate">
+                      {plainCategoryLabel(selectedCat.name)}
+                    </span>
                   </button>
                 );
               })()}
@@ -410,7 +472,10 @@ function BudgetplanCategoryPicker({
             </p>
           )}
           {groupedCategoryOptions.map((group) => (
-            <div key={group.label} className="border-t border-border/40 first:border-t-0">
+            <div
+              key={group.label}
+              className="border-t border-border/40 first:border-t-0"
+            >
               <p className="sticky top-0 z-[1] px-3 py-1.5 text-[10px] font-medium uppercase tracking-wide text-text-tertiary bg-bg-surface/95 backdrop-blur-sm">
                 {group.label}
               </p>
@@ -425,11 +490,16 @@ function BudgetplanCategoryPicker({
                     onClick={() => selectRow(String(c.id))}
                     className={clsx(
                       "w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-bg-surface2 transition-colors",
-                      active && "bg-accent/15"
+                      active && "bg-accent/15",
                     )}
                   >
-                    <Icon className="w-4 h-4 shrink-0" style={{ color: sc.color }} />
-                    <span className="truncate text-text-primary">{plainCategoryLabel(c.name)}</span>
+                    <Icon
+                      className="w-4 h-4 shrink-0"
+                      style={{ color: sc.color }}
+                    />
+                    <span className="truncate text-text-primary">
+                      {plainCategoryLabel(c.name)}
+                    </span>
                   </button>
                 );
               })}
@@ -513,10 +583,16 @@ export default function Budgetplan() {
   // Persisted state
   const [year, setYear] = useState(new Date().getFullYear());
   const [view, setView] = useState<"calendar" | "accordion">(
-    () => (localStorage.getItem("budgetplan_view") as "calendar" | "accordion") ?? "calendar"
+    () =>
+      (localStorage.getItem("budgetplan_view") as "calendar" | "accordion") ??
+      "calendar",
   );
   const [filter, setFilter] = useState<"all" | "income" | "expense">(
-    () => (localStorage.getItem("budgetplan_filter") as "all" | "income" | "expense") ?? "all"
+    () =>
+      (localStorage.getItem("budgetplan_filter") as
+        | "all"
+        | "income"
+        | "expense") ?? "all",
   );
 
   // UI state
@@ -531,15 +607,28 @@ export default function Budgetplan() {
 
   // Prefill panel
   const [prefillOpen, setPrefillOpen] = useState(false);
-  const [prefillSource, setPrefillSource] = useState<"historical" | "empirical">("empirical");
-  const [prefillSourceYear, setPrefillSourceYear] = useState(new Date().getFullYear() - 1);
-  const [prefillSelected, setPrefillSelected] = useState<Set<string>>(new Set());
-  const [prefillResult, setPrefillResult] = useState<{ created: number; skipped: number } | null>(null);
+  const [prefillSource, setPrefillSource] = useState<
+    "historical" | "empirical"
+  >("empirical");
+  const [prefillSourceYear, setPrefillSourceYear] = useState(
+    new Date().getFullYear() - 1,
+  );
+  const [prefillSelected, setPrefillSelected] = useState<Set<string>>(
+    new Set(),
+  );
+  const [prefillResult, setPrefillResult] = useState<{
+    created: number;
+    skipped: number;
+  } | null>(null);
 
   // Neuer Eintrag: Vorlage aus historisch / empirisch
   const [editorTemplateOpen, setEditorTemplateOpen] = useState(false);
-  const [editorTplSource, setEditorTplSource] = useState<"historical" | "empirical">("empirical");
-  const [editorTplYear, setEditorTplYear] = useState(new Date().getFullYear() - 1);
+  const [editorTplSource, setEditorTplSource] = useState<
+    "historical" | "empirical"
+  >("empirical");
+  const [editorTplYear, setEditorTplYear] = useState(
+    new Date().getFullYear() - 1,
+  );
 
   /** Monat leeren — Bestätigungsdialog (Monatsindex 1–12 oder null) */
   const [clearMonthDialog, setClearMonthDialog] = useState<number | null>(null);
@@ -551,7 +640,10 @@ export default function Budgetplan() {
   // Queries
   const { data: entries = [], isLoading } = useQuery({
     queryKey: ["recurring-plan", year],
-    queryFn: () => recurringPlanApi.list({ year }).then((r) => r.data as RecurringPlanEntry[]),
+    queryFn: () =>
+      recurringPlanApi
+        .list({ year })
+        .then((r) => r.data as RecurringPlanEntry[]),
   });
   const { data: accounts = [] } = useQuery({
     queryKey: ["accounts"],
@@ -580,25 +672,39 @@ export default function Budgetplan() {
   const { data: suggestions = [], isLoading: suggestLoading } = useQuery({
     queryKey: ["recurring-plan-suggest", prefillSource, prefillSourceYear],
     queryFn: () =>
-      recurringPlanApi.suggest(prefillSource, prefillSourceYear).then((r) => r.data as PrefillSuggestion[]),
+      recurringPlanApi
+        .suggest(prefillSource, prefillSourceYear)
+        .then((r) => r.data as PrefillSuggestion[]),
     enabled: prefillOpen,
     staleTime: 60_000,
   });
 
-  const { data: editorSuggestions = [], isLoading: editorSuggestLoading } = useQuery({
-    queryKey: ["recurring-plan-suggest", editorTplSource, editorTplYear, "editor"],
-    queryFn: () =>
-      recurringPlanApi.suggest(editorTplSource, editorTplYear).then((r) => r.data as PrefillSuggestion[]),
-    enabled: sidebarOpen && editEntry === null && editorTemplateOpen,
-    staleTime: 60_000,
-  });
+  const { data: editorSuggestions = [], isLoading: editorSuggestLoading } =
+    useQuery({
+      queryKey: [
+        "recurring-plan-suggest",
+        editorTplSource,
+        editorTplYear,
+        "editor",
+      ],
+      queryFn: () =>
+        recurringPlanApi
+          .suggest(editorTplSource, editorTplYear)
+          .then((r) => r.data as PrefillSuggestion[]),
+      enabled: sidebarOpen && editEntry === null && editorTemplateOpen,
+      staleTime: 60_000,
+    });
 
   const filteredEntries = useMemo(
     () =>
       entries.filter((e) =>
-        filter === "all" ? true : filter === "income" ? e.amount > 0 : e.amount < 0
+        filter === "all"
+          ? true
+          : filter === "income"
+            ? e.amount > 0
+            : e.amount < 0,
       ),
-    [entries, filter]
+    [entries, filter],
   );
 
   const monthEntries = useMemo(() => {
@@ -615,27 +721,46 @@ export default function Budgetplan() {
   // Reset selection to all-checked when suggestions change
   useEffect(() => {
     if (suggestions.length > 0) {
-      setPrefillSelected(new Set(suggestions.map((s) => `${s.description}::${s.periodicity}`)));
+      setPrefillSelected(
+        new Set(suggestions.map((s) => `${s.description}::${s.periodicity}`)),
+      );
     }
   }, [suggestions]);
 
   // Mutations
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["recurring-plan", year] });
+  const invalidate = () =>
+    qc.invalidateQueries({ queryKey: ["recurring-plan", year] });
 
   const createMut = useMutation({
-    mutationFn: (data: Record<string, unknown>) => recurringPlanApi.create(data),
-    onSuccess: () => { invalidate(); closeEditor(); },
-    onError: (e: unknown) => setFormError(String((e as { message?: string })?.message ?? "Fehler beim Speichern")),
+    mutationFn: (data: Record<string, unknown>) =>
+      recurringPlanApi.create(data),
+    onSuccess: () => {
+      invalidate();
+      closeEditor();
+    },
+    onError: (e: unknown) =>
+      setFormError(
+        String((e as { message?: string })?.message ?? "Fehler beim Speichern"),
+      ),
   });
   const updateMut = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Record<string, unknown> }) =>
       recurringPlanApi.update(id, data),
-    onSuccess: () => { invalidate(); closeEditor(); },
-    onError: (e: unknown) => setFormError(String((e as { message?: string })?.message ?? "Fehler beim Speichern")),
+    onSuccess: () => {
+      invalidate();
+      closeEditor();
+    },
+    onError: (e: unknown) =>
+      setFormError(
+        String((e as { message?: string })?.message ?? "Fehler beim Speichern"),
+      ),
   });
   const deleteMut = useMutation({
     mutationFn: (id: number) => recurringPlanApi.delete(id),
-    onSuccess: () => { invalidate(); closeEditor(); },
+    onSuccess: () => {
+      invalidate();
+      closeEditor();
+    },
   });
 
   const dndMoveMut = useMutation({
@@ -652,16 +777,24 @@ export default function Budgetplan() {
   });
 
   const dndCopyMut = useMutation({
-    mutationFn: (payload: Record<string, unknown>) => recurringPlanApi.create(payload),
+    mutationFn: (payload: Record<string, unknown>) =>
+      recurringPlanApi.create(payload),
     onSuccess: () => invalidate(),
   });
 
   const clearMonthMut = useMutation({
-    mutationFn: async (payload: { month: number; rows: RecurringPlanEntry[] }) => {
+    mutationFn: async (payload: {
+      month: number;
+      rows: RecurringPlanEntry[];
+    }) => {
       const { month: targetMonth, rows } = payload;
       const unique = [...new Map(rows.map((e) => [e.id, e])).values()];
       for (const entry of unique) {
-        const { creates, deleteId } = planRemoveMonthFromEntry(entry, year, targetMonth);
+        const { creates, deleteId } = planRemoveMonthFromEntry(
+          entry,
+          year,
+          targetMonth,
+        );
         if (!deleteId) continue;
         for (const body of creates) {
           await recurringPlanApi.create(body);
@@ -678,7 +811,12 @@ export default function Budgetplan() {
   const prefillMut = useMutation({
     mutationFn: (entries: PrefillSuggestion[]) =>
       recurringPlanApi
-        .prefill({ source: prefillSource, year: prefillSourceYear, target_year: year, entries })
+        .prefill({
+          source: prefillSource,
+          year: prefillSourceYear,
+          target_year: year,
+          entries,
+        })
         .then((r) => r.data as { created: number; skipped: number }),
     onSuccess: (result) => {
       invalidate();
@@ -689,7 +827,7 @@ export default function Budgetplan() {
 
   function handlePrefillSubmit() {
     const selected = suggestions.filter((s) =>
-      prefillSelected.has(`${s.description}::${s.periodicity}`)
+      prefillSelected.has(`${s.description}::${s.periodicity}`),
     );
     prefillMut.mutate(selected);
   }
@@ -734,9 +872,18 @@ export default function Budgetplan() {
 
   function handleSave() {
     const absVal = parseFloat(form.amountAbs);
-    if (!form.description.trim()) { setFormError("Bezeichnung erforderlich"); return; }
-    if (isNaN(absVal) || absVal <= 0) { setFormError("Gültiger Betrag erforderlich"); return; }
-    if (!form.start_date) { setFormError("Startdatum erforderlich"); return; }
+    if (!form.description.trim()) {
+      setFormError("Bezeichnung erforderlich");
+      return;
+    }
+    if (isNaN(absVal) || absVal <= 0) {
+      setFormError("Gültiger Betrag erforderlich");
+      return;
+    }
+    if (!form.start_date) {
+      setFormError("Startdatum erforderlich");
+      return;
+    }
 
     const payload: Record<string, unknown> = {
       description: form.description.trim(),
@@ -796,13 +943,18 @@ export default function Budgetplan() {
 
     const newStart = `${year}-${String(targetMonth).padStart(2, "0")}-01`;
     const newEnd =
-      entry.end_date == null || entry.end_date >= newStart ? entry.end_date ?? null : null;
+      entry.end_date == null || entry.end_date >= newStart
+        ? (entry.end_date ?? null)
+        : null;
 
     if (!e.altKey) {
-      if (entry.start_date === newStart && (entry.end_date ?? null) === newEnd) return;
+      if (entry.start_date === newStart && (entry.end_date ?? null) === newEnd)
+        return;
       dndMoveMut.mutate({ id, start_date: newStart, end_date: newEnd });
     } else {
-      dndCopyMut.mutate(entryToCreatePayload(entry, newStart, newEnd, entry.periodicity));
+      dndCopyMut.mutate(
+        entryToCreatePayload(entry, newStart, newEnd, entry.periodicity),
+      );
     }
   }
 
@@ -817,7 +969,10 @@ export default function Budgetplan() {
     // erscheinen, wenn die DB Hierarchie mit Zwischenknoten modelliert ist.
     const leaves = categories.filter(
       (c) =>
-        !parentIds.has(c.id) || String(c.icon ?? "").trim().toLowerCase() === "sparen",
+        !parentIds.has(c.id) ||
+        String(c.icon ?? "")
+          .trim()
+          .toLowerCase() === "sparen",
     );
 
     type Bucket = { label: string; items: Category[] };
@@ -844,10 +999,16 @@ export default function Budgetplan() {
       const sid = resolveSuperCategoryForRow(cat).id;
       const dedupKey = `${sid}::${cat.name.trim().toLowerCase()}`;
       const existing = optionByKey.get(dedupKey);
-      optionByKey.set(dedupKey, existing ? pickPreferredCategory(existing, cat) : cat);
+      optionByKey.set(
+        dedupKey,
+        existing ? pickPreferredCategory(existing, cat) : cat,
+      );
     }
 
-    const superCategoryGroupOrder = [...superCategories.map((sc) => sc.label), "Weitere Kategorien"];
+    const superCategoryGroupOrder = [
+      ...superCategories.map((sc) => sc.label),
+      "Weitere Kategorien",
+    ];
 
     for (const cat of optionByKey.values()) {
       const label = superCategoryGroupLabel(cat);
@@ -865,7 +1026,9 @@ export default function Budgetplan() {
       .map((bucket) => ({
         ...bucket,
         items: bucket.items.filter((c) =>
-          flowExpense ? categoryIsExpenseOriented(c) : categoryIsIncomeOriented(c),
+          flowExpense
+            ? categoryIsExpenseOriented(c)
+            : categoryIsIncomeOriented(c),
         ),
       }))
       .filter((bucket) => bucket.items.length > 0)
@@ -888,8 +1051,9 @@ export default function Budgetplan() {
   ]);
 
   const groupedCategoryIds = useMemo(
-    () => new Set(groupedCategoryOptions.flatMap((g) => g.items.map((i) => i.id))),
-    [groupedCategoryOptions]
+    () =>
+      new Set(groupedCategoryOptions.flatMap((g) => g.items.map((i) => i.id))),
+    [groupedCategoryOptions],
   );
 
   // Summary per month
@@ -932,13 +1096,20 @@ export default function Budgetplan() {
             aria-labelledby="clear-month-title"
             className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md mx-4 bg-bg-surface border border-border rounded-xl shadow-2xl z-[80] p-5"
           >
-            <h3 id="clear-month-title" className="text-text-primary font-semibold text-base mb-2">
+            <h3
+              id="clear-month-title"
+              className="text-text-primary font-semibold text-base mb-2"
+            >
               {MONTH_NAMES[clearMonthDialog - 1]} {year} leeren?
             </h3>
             <p className="text-sm text-text-secondary mb-3">
-              Die Posten werden in diesem Monat nicht mehr angezeigt. Wiederkehrende Einträge werden, soweit möglich,{" "}
-              <span className="text-text-primary font-medium">aufgeteilt oder begrenzt</span>, damit sie in den anderen
-              Monaten bestehen bleiben. Komplett nur in diesem Monat vorkommende Zeilen werden entfernt.
+              Die Posten werden in diesem Monat nicht mehr angezeigt.
+              Wiederkehrende Einträge werden, soweit möglich,{" "}
+              <span className="text-text-primary font-medium">
+                aufgeteilt oder begrenzt
+              </span>
+              , damit sie in den anderen Monaten bestehen bleiben. Komplett nur
+              in diesem Monat vorkommende Zeilen werden entfernt.
             </p>
             <p className="text-xs text-text-tertiary mb-4">
               Betroffene Planzeilen:{" "}
@@ -977,7 +1148,9 @@ export default function Budgetplan() {
       <div className="flex flex-wrap items-center gap-3 mb-5">
         <div className="flex items-center gap-2">
           <CalendarRange className="w-5 h-5 text-accent" />
-          <h1 className="text-text-primary font-semibold text-lg">Budgetplan</h1>
+          <h1 className="text-text-primary font-semibold text-lg">
+            Budgetplan
+          </h1>
         </div>
 
         {/* Year nav */}
@@ -1009,10 +1182,14 @@ export default function Budgetplan() {
                 "px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
                 filter === f
                   ? "bg-accent text-white"
-                  : "bg-bg-surface2 text-text-secondary hover:text-text-primary"
+                  : "bg-bg-surface2 text-text-secondary hover:text-text-primary",
               )}
             >
-              {f === "all" ? "Alle" : f === "expense" ? "Nur Ausgaben" : "Nur Einnahmen"}
+              {f === "all"
+                ? "Alle"
+                : f === "expense"
+                  ? "Nur Ausgaben"
+                  : "Nur Einnahmen"}
             </button>
           ))}
         </div>
@@ -1022,7 +1199,10 @@ export default function Budgetplan() {
 
         {/* Vorbefüllen button */}
         <button
-          onClick={() => { closeEditor(); setPrefillOpen(true); }}
+          onClick={() => {
+            closeEditor();
+            setPrefillOpen(true);
+          }}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-bg-surface2 hover:bg-bg-surface border border-border text-text-secondary hover:text-text-primary rounded-lg text-sm font-medium transition-colors"
         >
           <Sparkles className="w-4 h-4" />
@@ -1037,7 +1217,7 @@ export default function Budgetplan() {
               "px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
               view === "calendar"
                 ? "bg-accent text-white"
-                : "text-text-secondary hover:text-text-primary"
+                : "text-text-secondary hover:text-text-primary",
             )}
           >
             Kalender
@@ -1048,7 +1228,7 @@ export default function Budgetplan() {
               "px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
               view === "accordion"
                 ? "bg-accent text-white"
-                : "text-text-secondary hover:text-text-primary"
+                : "text-text-secondary hover:text-text-primary",
             )}
           >
             Monate
@@ -1069,8 +1249,17 @@ export default function Budgetplan() {
       {prefillResult && (
         <div className="flex items-center gap-3 mb-3 px-4 py-3 bg-gain/10 border border-gain/30 rounded-xl text-sm text-gain">
           <Sparkles className="w-4 h-4 flex-shrink-0" />
-          <span>{prefillResult.created} Einträge erstellt{prefillResult.skipped > 0 ? `, ${prefillResult.skipped} bereits vorhanden übersprungen` : ""}.</span>
-          <button onClick={() => setPrefillResult(null)} className="ml-auto text-text-tertiary hover:text-text-primary transition-colors">
+          <span>
+            {prefillResult.created} Einträge erstellt
+            {prefillResult.skipped > 0
+              ? `, ${prefillResult.skipped} bereits vorhanden übersprungen`
+              : ""}
+            .
+          </span>
+          <button
+            onClick={() => setPrefillResult(null)}
+            className="ml-auto text-text-tertiary hover:text-text-primary transition-colors"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -1097,7 +1286,9 @@ export default function Budgetplan() {
                   key={m}
                   className={clsx(
                     "flex flex-col w-52 flex-shrink-0 bg-bg-surface rounded-xl border overflow-hidden transition-shadow",
-                    dndOverMonth === m ? "border-accent ring-2 ring-accent/40" : "border-border/50"
+                    dndOverMonth === m
+                      ? "border-accent ring-2 ring-accent/40"
+                      : "border-border/50",
                   )}
                   onDragOver={(e) => handleMonthColumnDragOver(e, m)}
                   onDrop={(e) => handleMonthColumnDrop(e, m)}
@@ -1105,7 +1296,9 @@ export default function Budgetplan() {
                   {/* Month header */}
                   <div className="px-3 pt-3 pb-2 border-b border-border/30">
                     <div className="flex items-start justify-between gap-2">
-                      <p className="text-text-primary text-sm font-semibold">{name}</p>
+                      <p className="text-text-primary text-sm font-semibold">
+                        {name}
+                      </p>
                       {list.length > 0 && (
                         <button
                           type="button"
@@ -1145,7 +1338,7 @@ export default function Budgetplan() {
                               <p
                                 className={clsx(
                                   "text-base font-semibold leading-tight",
-                                  net >= 0 ? "text-gain" : "text-loss"
+                                  net >= 0 ? "text-gain" : "text-loss",
                                 )}
                               >
                                 {net >= 0 ? "+" : "−"}
@@ -1161,14 +1354,24 @@ export default function Budgetplan() {
                   {/* Entry chips */}
                   <div className="flex-1 overflow-y-auto scrollbar-hide p-2 space-y-1.5">
                     {list.length === 0 && (
-                      <p className="text-text-tertiary text-xs text-center py-2">Keine Einträge</p>
+                      <p className="text-text-tertiary text-xs text-center py-2">
+                        Keine Einträge
+                      </p>
                     )}
                     {list.map((entry) => {
-                      const cat = categories.find((c) => c.id === entry.category_id);
+                      const account = entry.account_id
+                        ? (accounts.find((a) => a.id === entry.account_id) ??
+                          null)
+                        : null;
+                      const cat = categories.find(
+                        (c) => c.id === entry.category_id,
+                      );
                       const sc = cat
                         ? resolveSuperCategoryForRow(cat)
                         : resolveSuperCategory(entry.description, true);
-                      const providerId = matchPlanEntryProviderId(entry.description);
+                      const providerId = matchPlanEntryProviderId(
+                        entry.description,
+                      );
                       const ScIcon = sc.icon;
                       return (
                         <div
@@ -1178,68 +1381,89 @@ export default function Budgetplan() {
                             entry.amount < 0
                               ? "bg-loss/5 border-loss/20"
                               : "bg-gain/5 border-gain/20",
-                            dndDraggingId === entry.id && "opacity-50"
+                            dndDraggingId === entry.id && "opacity-50",
                           )}
                         >
                           <button
                             type="button"
                             draggable={!dndBusy}
-                            onDragStart={(e) => handleRecurringDragStart(e, entry)}
+                            onDragStart={(e) =>
+                              handleRecurringDragStart(e, entry)
+                            }
                             onDragEnd={handleRecurringDragEnd}
                             className={clsx(
                               "flex items-center px-1 shrink-0 cursor-grab active:cursor-grabbing touch-none",
                               "text-text-tertiary hover:text-text-primary border-r border-border/30 bg-transparent",
-                              dndBusy && "opacity-40 pointer-events-none cursor-not-allowed"
+                              dndBusy &&
+                                "opacity-40 pointer-events-none cursor-not-allowed",
                             )}
                             title="In anderen Monat ziehen. Mit Wahltaste (⌥) beim Loslassen kopieren."
                             aria-label="Eintrag in anderen Monat ziehen; mit Wahltaste kopieren"
                           >
                             <GripVertical className="w-3.5 h-3.5" aria-hidden />
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => openEdit(entry)}
-                            title={entry.description}
-                            className={clsx(
-                              "flex flex-1 min-w-0 flex-col gap-1.5 text-left px-2 py-2 rounded-r-lg transition-colors",
-                              entry.amount < 0 ? "hover:border-loss/40" : "hover:border-gain/40"
-                            )}
-                          >
-                            <div className="flex w-full min-w-0 items-center justify-between gap-2">
-                              <div className="shrink-0 flex items-center">
-                                {providerId ? (
-                                  <ProviderBrandIcon providerId={providerId} size={22} className="rounded-md" />
-                                ) : (
-                                  <div
-                                    className="flex items-center justify-center rounded-md shrink-0 border border-border/40 bg-bg-surface2"
-                                    style={{ width: 22, height: 22 }}
-                                    aria-hidden
-                                  >
-                                    <ScIcon className="w-[13px] h-[13px] text-text-secondary" strokeWidth={2.4} />
-                                  </div>
-                                )}
-                              </div>
-                              <span
+                          <EntryTooltip entry={entry} account={account}>
+                            <div className="cursor-default">
+                              <button
+                                type="button"
+                                onClick={() => openEdit(entry)}
+                                title={entry.description}
                                 className={clsx(
-                                  "font-semibold tabular-nums text-right min-w-0 shrink-0",
-                                  entry.amount < 0 ? "text-loss" : "text-gain"
+                                  "flex flex-1 min-w-0 flex-col gap-1.5 text-left px-2 py-2 rounded-r-lg transition-colors",
+                                  entry.amount < 0
+                                    ? "hover:border-loss/40"
+                                    : "hover:border-gain/40",
                                 )}
                               >
-                                {entry.amount < 0 ? "−" : "+"}
-                                {formatAmount(Math.abs(planDisplayAmt(entry)), refCcy)}
-                              </span>
+                                <div className="flex w-full min-w-0 items-center justify-between gap-2">
+                                  <div className="shrink-0 flex items-center">
+                                    {providerId ? (
+                                      <ProviderBrandIcon
+                                        providerId={providerId}
+                                        size={22}
+                                        className="rounded-md"
+                                      />
+                                    ) : (
+                                      <div
+                                        className="flex items-center justify-center rounded-md shrink-0 border border-border/40 bg-bg-surface2"
+                                        style={{ width: 22, height: 22 }}
+                                        aria-hidden
+                                      >
+                                        <ScIcon
+                                          className="w-[13px] h-[13px] text-text-secondary"
+                                          strokeWidth={2.4}
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                  <span
+                                    className={clsx(
+                                      "font-semibold tabular-nums text-right min-w-0 shrink-0",
+                                      entry.amount < 0
+                                        ? "text-loss"
+                                        : "text-gain",
+                                    )}
+                                  >
+                                    {entry.amount < 0 ? "−" : "+"}
+                                    {formatAmount(
+                                      Math.abs(planDisplayAmt(entry)),
+                                      refCcy,
+                                    )}
+                                  </span>
+                                </div>
+                                <span
+                                  className="inline-flex self-start max-w-full rounded-full px-2 py-0.5 text-[10px] font-semibold truncate border"
+                                  style={{
+                                    backgroundColor: `${sc.color}28`,
+                                    color: sc.color,
+                                    borderColor: `${sc.color}55`,
+                                  }}
+                                >
+                                  {sc.label}
+                                </span>
+                              </button>
                             </div>
-                            <span
-                              className="inline-flex self-start max-w-full rounded-full px-2 py-0.5 text-[10px] font-semibold truncate border"
-                              style={{
-                                backgroundColor: `${sc.color}28`,
-                                color: sc.color,
-                                borderColor: `${sc.color}55`,
-                              }}
-                            >
-                              {sc.label}
-                            </span>
-                          </button>
+                          </EntryTooltip>
                         </div>
                       );
                     })}
@@ -1272,7 +1496,10 @@ export default function Budgetplan() {
             const isOpen = openMonths.has(m);
             const net = income - expense;
             return (
-              <div key={m} className="bg-bg-surface rounded-xl border border-border/50 overflow-hidden">
+              <div
+                key={m}
+                className="bg-bg-surface rounded-xl border border-border/50 overflow-hidden"
+              >
                 {/* Row header */}
                 <div className="flex items-center gap-1 px-2 sm:px-3 py-2 hover:bg-bg-surface2 transition-colors">
                   <button
@@ -1286,23 +1513,39 @@ export default function Budgetplan() {
                       })
                     }
                   >
-                    <span className="text-text-primary font-semibold text-sm w-20 sm:w-24 shrink-0">{name}</span>
+                    <span className="text-text-primary font-semibold text-sm w-20 sm:w-24 shrink-0">
+                      {name}
+                    </span>
                     <span className="text-text-tertiary text-xs shrink-0 hidden sm:inline">
                       {count} {count === 1 ? "Eintrag" : "Einträge"}
                     </span>
                     <div className="flex flex-wrap gap-2 sm:gap-3 ml-auto text-xs justify-end">
-                      {income > 0 && <span className="text-gain font-medium">+{formatCurrencyCompact(income, refCcy)}</span>}
-                      {expense > 0 && <span className="text-loss font-medium">−{formatCurrencyCompact(expense, refCcy)}</span>}
+                      {income > 0 && (
+                        <span className="text-gain font-medium">
+                          +{formatCurrencyCompact(income, refCcy)}
+                        </span>
+                      )}
+                      {expense > 0 && (
+                        <span className="text-loss font-medium">
+                          −{formatCurrencyCompact(expense, refCcy)}
+                        </span>
+                      )}
                       {count > 0 && (
-                        <span className={clsx("font-semibold", net >= 0 ? "text-gain" : "text-loss")}>
-                          = {net >= 0 ? "+" : "−"}{formatCurrencyCompact(Math.abs(net), refCcy)}
+                        <span
+                          className={clsx(
+                            "font-semibold",
+                            net >= 0 ? "text-gain" : "text-loss",
+                          )}
+                        >
+                          = {net >= 0 ? "+" : "−"}
+                          {formatCurrencyCompact(Math.abs(net), refCcy)}
                         </span>
                       )}
                     </div>
                     <ChevronDown
                       className={clsx(
                         "w-4 h-4 text-text-tertiary transition-transform flex-shrink-0",
-                        isOpen && "rotate-180"
+                        isOpen && "rotate-180",
                       )}
                     />
                   </button>
@@ -1327,35 +1570,68 @@ export default function Budgetplan() {
                 {isOpen && (
                   <div className="border-t border-border/30 px-4 py-3">
                     {list.length === 0 ? (
-                      <p className="text-text-tertiary text-sm py-2">Keine Einträge in diesem Monat.</p>
+                      <p className="text-text-tertiary text-sm py-2">
+                        Keine Einträge in diesem Monat.
+                      </p>
                     ) : (
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="text-text-tertiary text-xs uppercase tracking-wide">
-                            <th className="text-left pb-2 font-medium">Bezeichnung</th>
-                            <th className="text-right pb-2 font-medium">Betrag</th>
-                            <th className="text-left pb-2 font-medium pl-4">Periodizität</th>
-                            <th className="text-left pb-2 font-medium pl-4 hidden sm:table-cell">Kategorie</th>
+                            <th className="text-left pb-2 font-medium">
+                              Bezeichnung
+                            </th>
+                            <th className="text-right pb-2 font-medium">
+                              Betrag
+                            </th>
+                            <th className="text-left pb-2 font-medium pl-4">
+                              Periodizität
+                            </th>
+                            <th className="text-left pb-2 font-medium pl-4 hidden sm:table-cell">
+                              Kategorie
+                            </th>
                             <th className="w-8" />
                           </tr>
                         </thead>
                         <tbody>
                           {list.map((entry) => {
-                            const cat = categories.find((c) => c.id === entry.category_id);
+                            const account = entry.account_id
+                              ? (accounts.find(
+                                  (a) => a.id === entry.account_id,
+                                ) ?? null)
+                              : null;
+                            const cat = categories.find(
+                              (c) => c.id === entry.category_id,
+                            );
                             return (
                               <tr
                                 key={entry.id}
                                 className="border-t border-border/20 hover:bg-bg-surface2 cursor-pointer transition-colors"
                                 onClick={() => openEdit(entry)}
                               >
-                                <td className="py-2 text-text-primary font-medium">{entry.description}</td>
-                                <td className={clsx(
-                                  "py-2 text-right font-semibold tabular-nums",
-                                  entry.amount < 0 ? "text-loss" : "text-gain"
-                                )}>
-                                  {entry.amount < 0 ? "−" : "+"}{formatCurrencyCompact(Math.abs(planDisplayAmt(entry)), refCcy)}
+                                <td className="py-2 text-text-primary font-medium">
+                                  <EntryTooltip entry={entry} account={account}>
+                                    <div className="cursor-default">
+                                      {entry.description}
+                                    </div>
+                                  </EntryTooltip>
                                 </td>
-                                <td className="py-2 pl-4 text-text-secondary text-xs">{periodicityLabel(entry.periodicity)}</td>
+                                <td
+                                  className={clsx(
+                                    "py-2 text-right font-semibold tabular-nums",
+                                    entry.amount < 0
+                                      ? "text-loss"
+                                      : "text-gain",
+                                  )}
+                                >
+                                  {entry.amount < 0 ? "−" : "+"}
+                                  {formatCurrencyCompact(
+                                    Math.abs(planDisplayAmt(entry)),
+                                    refCcy,
+                                  )}
+                                </td>
+                                <td className="py-2 pl-4 text-text-secondary text-xs">
+                                  {periodicityLabel(entry.periodicity)}
+                                </td>
                                 <td className="py-2 pl-4 text-text-secondary text-xs hidden sm:table-cell">
                                   {cat?.name ?? "—"}
                                 </td>
@@ -1396,14 +1672,16 @@ export default function Budgetplan() {
               <h2 className="text-text-primary font-semibold text-base">
                 {editEntry ? "Eintrag bearbeiten" : "Neuer Eintrag"}
               </h2>
-              <button onClick={closeEditor} className="text-text-tertiary hover:text-text-primary transition-colors">
+              <button
+                onClick={closeEditor}
+                className="text-text-tertiary hover:text-text-primary transition-colors"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Form body */}
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-
               {!editEntry && (
                 <div className="rounded-xl border border-border/50 overflow-hidden">
                   <button
@@ -1416,13 +1694,18 @@ export default function Budgetplan() {
                       Aus Vorlage (historisch / empirisch)
                     </span>
                     <ChevronDown
-                      className={clsx("w-4 h-4 text-text-tertiary shrink-0 transition-transform", editorTemplateOpen && "rotate-180")}
+                      className={clsx(
+                        "w-4 h-4 text-text-tertiary shrink-0 transition-transform",
+                        editorTemplateOpen && "rotate-180",
+                      )}
                     />
                   </button>
                   {editorTemplateOpen && (
                     <div className="px-3 py-3 space-y-3 border-t border-border/40 bg-bg-surface">
                       <div>
-                        <label className="block text-xs text-text-tertiary mb-1.5">Datenquelle</label>
+                        <label className="block text-xs text-text-tertiary mb-1.5">
+                          Datenquelle
+                        </label>
                         <div className="flex rounded-lg border border-border overflow-hidden text-xs font-medium">
                           {(["empirical", "historical"] as const).map((src) => (
                             <button
@@ -1433,16 +1716,20 @@ export default function Budgetplan() {
                                 "flex-1 px-2 py-2 transition-colors",
                                 editorTplSource === src
                                   ? "bg-accent text-white"
-                                  : "bg-bg-surface2 text-text-secondary hover:text-text-primary"
+                                  : "bg-bg-surface2 text-text-secondary hover:text-text-primary",
                               )}
                             >
-                              {src === "historical" ? "Historisch" : "Empirisch"}
+                              {src === "historical"
+                                ? "Historisch"
+                                : "Empirisch"}
                             </button>
                           ))}
                         </div>
                       </div>
                       <div>
-                        <label className="block text-xs text-text-tertiary mb-1">Quelljahr</label>
+                        <label className="block text-xs text-text-tertiary mb-1">
+                          Quelljahr
+                        </label>
                         <div className="flex items-center gap-1 bg-bg-surface2 rounded-lg px-2 py-1 w-fit">
                           <button
                             type="button"
@@ -1463,26 +1750,36 @@ export default function Budgetplan() {
                           </button>
                         </div>
                         <p className="text-[11px] text-text-tertiary mt-1.5">
-                          Vorschlag übernehmen, Werte anpassen und als neuen Eintrag für{" "}
-                          <span className="font-semibold text-text-primary">{year}</span> speichern.
+                          Vorschlag übernehmen, Werte anpassen und als neuen
+                          Eintrag für{" "}
+                          <span className="font-semibold text-text-primary">
+                            {year}
+                          </span>{" "}
+                          speichern.
                         </p>
                       </div>
                       <div>
-                        <label className="block text-xs text-text-tertiary mb-1.5">Vorschläge</label>
+                        <label className="block text-xs text-text-tertiary mb-1.5">
+                          Vorschläge
+                        </label>
                         {editorSuggestLoading && (
                           <div className="space-y-1.5">
                             {[1, 2, 3].map((i) => (
-                              <div key={i} className="h-9 bg-bg-surface2 rounded-lg animate-pulse" />
+                              <div
+                                key={i}
+                                className="h-9 bg-bg-surface2 rounded-lg animate-pulse"
+                              />
                             ))}
                           </div>
                         )}
-                        {!editorSuggestLoading && editorSuggestions.length === 0 && (
-                          <p className="text-xs text-text-tertiary py-2 px-2 rounded-lg border border-border/30">
-                            {editorTplSource === "empirical"
-                              ? "Keine Wizard-Daten gefunden."
-                              : "Keine wiederkehrenden Transaktionen im Quelljahr."}
-                          </p>
-                        )}
+                        {!editorSuggestLoading &&
+                          editorSuggestions.length === 0 && (
+                            <p className="text-xs text-text-tertiary py-2 px-2 rounded-lg border border-border/30">
+                              {editorTplSource === "empirical"
+                                ? "Keine Wizard-Daten gefunden."
+                                : "Keine wiederkehrenden Transaktionen im Quelljahr."}
+                            </p>
+                          )}
                         <div className="max-h-44 overflow-y-auto space-y-1 pr-0.5">
                           {!editorSuggestLoading &&
                             editorSuggestions.map((s) => {
@@ -1496,18 +1793,23 @@ export default function Budgetplan() {
                                     "w-full flex items-center gap-2 px-2.5 py-2 rounded-lg border text-left text-xs transition-colors",
                                     s.amount < 0
                                       ? "bg-loss/5 border-loss/20 hover:border-loss/40"
-                                      : "bg-gain/5 border-gain/20 hover:border-gain/40"
+                                      : "bg-gain/5 border-gain/20 hover:border-gain/40",
                                   )}
                                 >
-                                  <span className="flex-1 text-text-primary font-medium truncate">{s.description}</span>
+                                  <span className="flex-1 text-text-primary font-medium truncate">
+                                    {s.description}
+                                  </span>
                                   <span
                                     className={clsx(
                                       "font-semibold tabular-nums shrink-0",
-                                      s.amount < 0 ? "text-loss" : "text-gain"
+                                      s.amount < 0 ? "text-loss" : "text-gain",
                                     )}
                                   >
                                     {s.amount < 0 ? "−" : "+"}
-                                    {formatCurrencyCompact(Math.abs(s.amount), refCcy)}
+                                    {formatCurrencyCompact(
+                                      Math.abs(s.amount),
+                                      refCcy,
+                                    )}
                                   </span>
                                   <span className="text-text-tertiary shrink-0 text-[10px]">
                                     {periodicityLabel(s.periodicity)}
@@ -1524,19 +1826,25 @@ export default function Budgetplan() {
 
               {/* Description */}
               <div>
-                <label className="block text-xs text-text-tertiary mb-1">Bezeichnung</label>
+                <label className="block text-xs text-text-tertiary mb-1">
+                  Bezeichnung
+                </label>
                 <input
                   type="text"
                   className="w-full bg-bg-surface2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent"
                   placeholder="z. B. Miete, Lohn, Netflix…"
                   value={form.description}
-                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, description: e.target.value }))
+                  }
                 />
               </div>
 
               {/* Amount + sign */}
               <div>
-                <label className="block text-xs text-text-tertiary mb-1">Betrag (CHF)</label>
+                <label className="block text-xs text-text-tertiary mb-1">
+                  Betrag (CHF)
+                </label>
                 <div className="flex gap-2">
                   <div className="flex rounded-lg border border-border overflow-hidden text-xs font-medium">
                     <button
@@ -1546,15 +1854,20 @@ export default function Budgetplan() {
                           if (f.isExpense) return f;
                           let category_id = f.category_id;
                           if (category_id) {
-                            const cat = categories.find((c) => c.id === parseInt(category_id, 10));
-                            if (cat && categoryIsIncomeOriented(cat)) category_id = "";
+                            const cat = categories.find(
+                              (c) => c.id === parseInt(category_id, 10),
+                            );
+                            if (cat && categoryIsIncomeOriented(cat))
+                              category_id = "";
                           }
                           return { ...f, isExpense: true, category_id };
                         })
                       }
                       className={clsx(
                         "px-3 py-2 transition-colors",
-                        form.isExpense ? "bg-loss text-white" : "bg-bg-surface2 text-text-secondary hover:text-text-primary"
+                        form.isExpense
+                          ? "bg-loss text-white"
+                          : "bg-bg-surface2 text-text-secondary hover:text-text-primary",
                       )}
                     >
                       − Ausgabe
@@ -1566,15 +1879,20 @@ export default function Budgetplan() {
                           if (!f.isExpense) return f;
                           let category_id = f.category_id;
                           if (category_id) {
-                            const cat = categories.find((c) => c.id === parseInt(category_id, 10));
-                            if (cat && categoryIsExpenseOriented(cat)) category_id = "";
+                            const cat = categories.find(
+                              (c) => c.id === parseInt(category_id, 10),
+                            );
+                            if (cat && categoryIsExpenseOriented(cat))
+                              category_id = "";
                           }
                           return { ...f, isExpense: false, category_id };
                         })
                       }
                       className={clsx(
                         "px-3 py-2 transition-colors",
-                        !form.isExpense ? "bg-gain text-white" : "bg-bg-surface2 text-text-secondary hover:text-text-primary"
+                        !form.isExpense
+                          ? "bg-gain text-white"
+                          : "bg-bg-surface2 text-text-secondary hover:text-text-primary",
                       )}
                     >
                       + Einnahme
@@ -1587,21 +1905,29 @@ export default function Budgetplan() {
                     className="flex-1 bg-bg-surface2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent"
                     placeholder="0.00"
                     value={form.amountAbs}
-                    onChange={(e) => setForm((f) => ({ ...f, amountAbs: e.target.value }))}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, amountAbs: e.target.value }))
+                    }
                   />
                 </div>
               </div>
 
               {/* Periodicity */}
               <div>
-                <label className="block text-xs text-text-tertiary mb-1">Periodizität</label>
+                <label className="block text-xs text-text-tertiary mb-1">
+                  Periodizität
+                </label>
                 <select
                   className="w-full bg-bg-surface2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-accent"
                   value={form.periodicity}
-                  onChange={(e) => setForm((f) => ({ ...f, periodicity: e.target.value }))}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, periodicity: e.target.value }))
+                  }
                 >
                   {PERIODICITIES.map((p) => (
-                    <option key={p.value} value={p.value}>{p.label}</option>
+                    <option key={p.value} value={p.value}>
+                      {p.label}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -1609,28 +1935,38 @@ export default function Budgetplan() {
               {/* Dates */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-text-tertiary mb-1">Startdatum</label>
+                  <label className="block text-xs text-text-tertiary mb-1">
+                    Startdatum
+                  </label>
                   <input
                     type="date"
                     className="w-full bg-bg-surface2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-accent"
                     value={form.start_date}
-                    onChange={(e) => setForm((f) => ({ ...f, start_date: e.target.value }))}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, start_date: e.target.value }))
+                    }
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-text-tertiary mb-1">Enddatum (optional)</label>
+                  <label className="block text-xs text-text-tertiary mb-1">
+                    Enddatum (optional)
+                  </label>
                   <input
                     type="date"
                     className="w-full bg-bg-surface2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-accent"
                     value={form.end_date}
-                    onChange={(e) => setForm((f) => ({ ...f, end_date: e.target.value }))}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, end_date: e.target.value }))
+                    }
                   />
                 </div>
               </div>
 
               {/* Category */}
               <div>
-                <label className="block text-xs text-text-tertiary mb-1">Kategorie (optional)</label>
+                <label className="block text-xs text-text-tertiary mb-1">
+                  Kategorie (optional)
+                </label>
                 <p className="text-[11px] text-text-tertiary mb-1.5">
                   {form.isExpense
                     ? "Alle Kategorien außer Super «Sparen» (Ausgaben), gruppiert nach Superkategorie — bei Bedarf nach unten scrollen."
@@ -1638,7 +1974,9 @@ export default function Budgetplan() {
                 </p>
                 <BudgetplanCategoryPicker
                   value={form.category_id}
-                  onChange={(category_id) => setForm((f) => ({ ...f, category_id }))}
+                  onChange={(category_id) =>
+                    setForm((f) => ({ ...f, category_id }))
+                  }
                   groupedCategoryOptions={groupedCategoryOptions}
                   groupedCategoryIds={groupedCategoryIds}
                   categories={categories}
@@ -1648,15 +1986,21 @@ export default function Budgetplan() {
 
               {/* Account */}
               <div>
-                <label className="block text-xs text-text-tertiary mb-1">Konto (optional)</label>
+                <label className="block text-xs text-text-tertiary mb-1">
+                  Konto (optional)
+                </label>
                 <select
                   className="w-full bg-bg-surface2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-accent"
                   value={form.account_id}
-                  onChange={(e) => setForm((f) => ({ ...f, account_id: e.target.value }))}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, account_id: e.target.value }))
+                  }
                 >
                   <option value="">Kein Konto</option>
                   {accounts.map((a) => (
-                    <option key={a.id} value={String(a.id)}>{a.name}</option>
+                    <option key={a.id} value={String(a.id)}>
+                      {a.name}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -1665,20 +2009,26 @@ export default function Budgetplan() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-text-primary">Geplanter Eintrag</p>
-                  <p className="text-xs text-text-tertiary">Deaktivieren für historische/empirische Einträge</p>
+                  <p className="text-xs text-text-tertiary">
+                    Deaktivieren für historische/empirische Einträge
+                  </p>
                 </div>
                 <button
                   type="button"
-                  onClick={() => setForm((f) => ({ ...f, is_future: !f.is_future }))}
+                  onClick={() =>
+                    setForm((f) => ({ ...f, is_future: !f.is_future }))
+                  }
                   className={clsx(
                     "relative w-10 h-5 rounded-full transition-colors flex-shrink-0",
-                    form.is_future ? "bg-accent" : "bg-bg-surface2 border border-border"
+                    form.is_future
+                      ? "bg-accent"
+                      : "bg-bg-surface2 border border-border",
                   )}
                 >
                   <span
                     className={clsx(
                       "absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform",
-                      form.is_future ? "left-5" : "left-0.5"
+                      form.is_future ? "left-5" : "left-0.5",
                     )}
                   />
                 </button>
@@ -1686,19 +2036,21 @@ export default function Budgetplan() {
 
               {/* Notes */}
               <div>
-                <label className="block text-xs text-text-tertiary mb-1">Notizen (optional)</label>
+                <label className="block text-xs text-text-tertiary mb-1">
+                  Notizen (optional)
+                </label>
                 <textarea
                   rows={2}
                   className="w-full bg-bg-surface2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent resize-none"
                   placeholder="Beliebige Notizen…"
                   value={form.notes}
-                  onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, notes: e.target.value }))
+                  }
                 />
               </div>
 
-              {formError && (
-                <p className="text-loss text-sm">{formError}</p>
-              )}
+              {formError && <p className="text-loss text-sm">{formError}</p>}
             </div>
 
             {/* Footer */}
@@ -1725,7 +2077,9 @@ export default function Budgetplan() {
                 disabled={createMut.isPending || updateMut.isPending}
                 className="px-4 py-2 text-sm font-medium bg-accent hover:bg-accent/90 text-white rounded-lg transition-colors disabled:opacity-60"
               >
-                {createMut.isPending || updateMut.isPending ? "Speichern…" : "Speichern"}
+                {createMut.isPending || updateMut.isPending
+                  ? "Speichern…"
+                  : "Speichern"}
               </button>
             </div>
           </div>
@@ -1745,7 +2099,10 @@ export default function Budgetplan() {
                 <Sparkles className="w-4 h-4 text-accent" />
                 Budgetplan vorbefüllen
               </h2>
-              <button onClick={() => setPrefillOpen(false)} className="text-text-tertiary hover:text-text-primary transition-colors">
+              <button
+                onClick={() => setPrefillOpen(false)}
+                className="text-text-tertiary hover:text-text-primary transition-colors"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1754,7 +2111,9 @@ export default function Budgetplan() {
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
               {/* Source toggle */}
               <div>
-                <label className="block text-xs text-text-tertiary mb-2">Datenquelle</label>
+                <label className="block text-xs text-text-tertiary mb-2">
+                  Datenquelle
+                </label>
                 <div className="flex rounded-lg border border-border overflow-hidden text-xs font-medium">
                   {(["empirical", "historical"] as const).map((src) => (
                     <button
@@ -1764,10 +2123,12 @@ export default function Budgetplan() {
                         "flex-1 px-3 py-2 transition-colors",
                         prefillSource === src
                           ? "bg-accent text-white"
-                          : "bg-bg-surface2 text-text-secondary hover:text-text-primary"
+                          : "bg-bg-surface2 text-text-secondary hover:text-text-primary",
                       )}
                     >
-                      {src === "historical" ? "Historische Transaktionen" : "Empirische Angaben"}
+                      {src === "historical"
+                        ? "Historische Transaktionen"
+                        : "Empirische Angaben"}
                     </button>
                   ))}
                 </div>
@@ -1775,7 +2136,9 @@ export default function Budgetplan() {
 
               {/* Source year */}
               <div>
-                <label className="block text-xs text-text-tertiary mb-1">Quelljahr</label>
+                <label className="block text-xs text-text-tertiary mb-1">
+                  Quelljahr
+                </label>
                 <div className="flex items-center gap-1 bg-bg-surface2 rounded-lg px-2 py-1 w-fit">
                   <button
                     onClick={() => setPrefillSourceYear((y) => y - 1)}
@@ -1794,20 +2157,30 @@ export default function Budgetplan() {
                   </button>
                 </div>
                 <p className="text-xs text-text-tertiary mt-1.5">
-                  Einträge werden in <span className="font-semibold text-text-primary">{year}</span> erstellt.
+                  Einträge werden in{" "}
+                  <span className="font-semibold text-text-primary">
+                    {year}
+                  </span>{" "}
+                  erstellt.
                 </p>
               </div>
 
               {/* Preview list */}
               <div>
                 <label className="block text-xs text-text-tertiary mb-2">
-                  Vorschau — {suggestLoading ? "wird geladen…" : `${prefillSelected.size} von ${suggestions.length} ausgewählt`}
+                  Vorschau —{" "}
+                  {suggestLoading
+                    ? "wird geladen…"
+                    : `${prefillSelected.size} von ${suggestions.length} ausgewählt`}
                 </label>
 
                 {suggestLoading && (
                   <div className="space-y-1.5">
                     {[1, 2, 3, 4].map((i) => (
-                      <div key={i} className="h-10 bg-bg-surface2 rounded-lg animate-pulse" />
+                      <div
+                        key={i}
+                        className="h-10 bg-bg-surface2 rounded-lg animate-pulse"
+                      />
                     ))}
                   </div>
                 )}
@@ -1840,17 +2213,29 @@ export default function Budgetplan() {
                             ? s.amount < 0
                               ? "bg-loss/5 border-loss/20 hover:border-loss/40"
                               : "bg-gain/5 border-gain/20 hover:border-gain/40"
-                            : "bg-bg-surface2 border-border/30 opacity-50 hover:opacity-70"
+                            : "bg-bg-surface2 border-border/30 opacity-50 hover:opacity-70",
                         )}
                       >
-                        {checked
-                          ? <CheckSquare className="w-3.5 h-3.5 flex-shrink-0 text-accent" />
-                          : <Square className="w-3.5 h-3.5 flex-shrink-0 text-text-tertiary" />}
-                        <span className="flex-1 text-text-primary font-medium truncate">{s.description}</span>
-                        <span className={clsx("font-semibold tabular-nums flex-shrink-0", s.amount < 0 ? "text-loss" : "text-gain")}>
-                          {s.amount < 0 ? "−" : "+"}{formatCurrencyCompact(Math.abs(s.amount), refCcy)}
+                        {checked ? (
+                          <CheckSquare className="w-3.5 h-3.5 flex-shrink-0 text-accent" />
+                        ) : (
+                          <Square className="w-3.5 h-3.5 flex-shrink-0 text-text-tertiary" />
+                        )}
+                        <span className="flex-1 text-text-primary font-medium truncate">
+                          {s.description}
                         </span>
-                        <span className="text-text-tertiary flex-shrink-0">{periodicityLabel(s.periodicity)}</span>
+                        <span
+                          className={clsx(
+                            "font-semibold tabular-nums flex-shrink-0",
+                            s.amount < 0 ? "text-loss" : "text-gain",
+                          )}
+                        >
+                          {s.amount < 0 ? "−" : "+"}
+                          {formatCurrencyCompact(Math.abs(s.amount), refCcy)}
+                        </span>
+                        <span className="text-text-tertiary flex-shrink-0">
+                          {periodicityLabel(s.periodicity)}
+                        </span>
                       </button>
                     );
                   })}
@@ -1858,7 +2243,9 @@ export default function Budgetplan() {
               </div>
 
               {prefillMut.isError && (
-                <p className="text-loss text-sm">Fehler beim Erstellen der Einträge.</p>
+                <p className="text-loss text-sm">
+                  Fehler beim Erstellen der Einträge.
+                </p>
               )}
             </div>
 
@@ -1873,7 +2260,11 @@ export default function Budgetplan() {
               <div className="flex-1" />
               <button
                 onClick={handlePrefillSubmit}
-                disabled={prefillMut.isPending || prefillSelected.size === 0 || suggestLoading}
+                disabled={
+                  prefillMut.isPending ||
+                  prefillSelected.size === 0 ||
+                  suggestLoading
+                }
                 className="px-4 py-2 text-sm font-medium bg-accent hover:bg-accent/90 text-white rounded-lg transition-colors disabled:opacity-60"
               >
                 {prefillMut.isPending

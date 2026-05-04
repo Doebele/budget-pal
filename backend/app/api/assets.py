@@ -1,13 +1,15 @@
 """Assets API — property, stocks, crypto, etc."""
-from typing import List, Optional
+
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from typing import List, Optional
+
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.models import Asset, AssetType, User
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
 
@@ -42,11 +44,16 @@ async def list_assets(
     assets = result.scalars().all()
     return [
         AssetResponse(
-            id=a.id, asset_type=a.asset_type.value, name=a.name,
-            current_value=a.current_value, currency=a.currency,
-            as_of_date=a.as_of_date, expected_return_rate=a.expected_return_rate,
+            id=a.id,
+            asset_type=a.asset_type.value,
+            name=a.name,
+            current_value=a.current_value,
+            currency=a.currency,
+            as_of_date=a.as_of_date,
+            expected_return_rate=a.expected_return_rate,
             notes=a.notes,
-        ) for a in assets
+        )
+        for a in assets
     ]
 
 
@@ -59,11 +66,16 @@ async def create_asset(
     asset = Asset(user_id=current_user.id, **payload.model_dump())
     db.add(asset)
     await db.flush()
+    await db.commit()
     await db.refresh(asset)
     return AssetResponse(
-        id=asset.id, asset_type=asset.asset_type.value, name=asset.name,
-        current_value=asset.current_value, currency=asset.currency,
-        as_of_date=asset.as_of_date, expected_return_rate=asset.expected_return_rate,
+        id=asset.id,
+        asset_type=asset.asset_type.value,
+        name=asset.name,
+        current_value=asset.current_value,
+        currency=asset.currency,
+        as_of_date=asset.as_of_date,
+        expected_return_rate=asset.expected_return_rate,
         notes=asset.notes,
     )
 
@@ -84,11 +96,16 @@ async def update_asset(
     for k, v in payload.model_dump().items():
         setattr(asset, k, v)
     await db.flush()
+    await db.commit()
     await db.refresh(asset)
     return AssetResponse(
-        id=asset.id, asset_type=asset.asset_type.value, name=asset.name,
-        current_value=asset.current_value, currency=asset.currency,
-        as_of_date=asset.as_of_date, expected_return_rate=asset.expected_return_rate,
+        id=asset.id,
+        asset_type=asset.asset_type.value,
+        name=asset.name,
+        current_value=asset.current_value,
+        currency=asset.currency,
+        as_of_date=asset.as_of_date,
+        expected_return_rate=asset.expected_return_rate,
         notes=asset.notes,
     )
 

@@ -2,15 +2,15 @@
 SQLAlchemy async database setup.
 Provides engine, session factory, and base model class.
 """
+
 import os
 from typing import AsyncGenerator
 
+from app.core.config import settings
 from sqlalchemy import DateTime, func
 from sqlalchemy.engine.url import make_url
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-
-from app.core.config import settings
 
 
 def _build_async_engine():
@@ -46,13 +46,16 @@ AsyncSessionLocal = async_sessionmaker(
 
 # ── Base Model ────────────────────────────────────────────────
 
+
 class Base(DeclarativeBase):
     """Base class for all SQLAlchemy ORM models."""
+
     pass
 
 
 class TimestampMixin:
     """Mixin that adds created_at and updated_at columns."""
+
     created_at: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -68,12 +71,19 @@ class TimestampMixin:
 
 # ── Session Dependency ────────────────────────────────────────
 
+
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """FastAPI dependency — yields an async database session."""
+    """FastAPI dependency — yields an async database session.
+
+    IMPORTANT: This session does NOT auto-commit. Routers must explicitly call
+    ``await db.commit()`` or ``await db.flush()`` as appropriate. This prevents
+    the dangerous "commit in the wrong place" anti-pattern where a router's
+    ``flush()`` is silently committed by the middleware even if an error occurs
+    later in the request pipeline.
+    """
     async with AsyncSessionLocal() as session:
         try:
             yield session
-            await session.commit()
         except Exception:
             await session.rollback()
             raise
@@ -82,6 +92,7 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 
 # ── DB Init ───────────────────────────────────────────────────
+
 
 def _ensure_app_data_subdirs() -> None:
     """Ensure upload and FX cache directories exist (empty Docker volume may hide image paths)."""
@@ -115,6 +126,7 @@ async def init_db() -> None:
     In production, use Alembic migrations instead.
     """
     import logging
+
     from sqlalchemy.exc import ProgrammingError
 
     logger = logging.getLogger(__name__)
@@ -139,6 +151,8 @@ async def init_db() -> None:
         logger.info("Database schema ready via create_all (AUTO_CREATE_SCHEMA=true).")
     except ProgrammingError as exc:
         if "already exists" in str(exc).lower():
-            logger.warning("DB objects already exist — schema is up to date. Use Alembic for migrations.")
+            logger.warning(
+                "DB objects already exist — schema is up to date. Use Alembic for migrations."
+            )
         else:
             raise

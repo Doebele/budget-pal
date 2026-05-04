@@ -1,13 +1,15 @@
 """Categories API."""
+
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_, func, update, distinct
+
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.models import Category, Transaction, User
 from app.services.peer_group_seed import seed_peer_group_system_categories
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
+from sqlalchemy import distinct, func, or_, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
 
@@ -41,7 +43,8 @@ async def list_categories(
         select(Category, func.count(Transaction.id).label("txn_count"))
         .outerjoin(
             Transaction,
-            (Transaction.category_id == Category.id) & (Transaction.is_deleted == False),
+            (Transaction.category_id == Category.id)
+            & (Transaction.is_deleted == False),
         )
         .where(or_(Category.user_id == current_user.id, Category.is_system == True))
         .group_by(Category.id)
@@ -83,6 +86,7 @@ async def create_category(
     cat = Category(user_id=current_user.id, **payload.model_dump())
     db.add(cat)
     await db.flush()
+    await db.commit()
     await db.refresh(cat)
     return CategoryResponse(
         id=cat.id,
@@ -127,6 +131,7 @@ async def update_category(
         )
 
     await db.flush()
+    await db.commit()
     await db.refresh(cat)
 
     txn_count = await db.scalar(
@@ -229,18 +234,23 @@ async def migrate_label(
     if not payload.old_label.strip() or not payload.new_label.strip():
         raise HTTPException(status_code=400, detail="Labels must not be empty.")
     if payload.old_label.strip() == payload.new_label.strip():
-        raise HTTPException(status_code=400, detail="old_label and new_label are identical.")
+        raise HTTPException(
+            status_code=400, detail="old_label and new_label are identical."
+        )
 
     old_lower = payload.old_label.strip().lower()
     new_name = payload.new_label.strip()
 
     # Count before update
-    affected = await db.scalar(
-        select(func.count(Transaction.id)).where(
-            func.lower(Transaction.category) == old_lower,
-            Transaction.is_deleted == False,
+    affected = (
+        await db.scalar(
+            select(func.count(Transaction.id)).where(
+                func.lower(Transaction.category) == old_lower,
+                Transaction.is_deleted == False,
+            )
         )
-    ) or 0
+        or 0
+    )
 
     # Migrate category string on transactions
     await db.execute(

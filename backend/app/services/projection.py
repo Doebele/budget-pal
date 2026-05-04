@@ -10,11 +10,13 @@ Features:
 - Inflation adjustment (real CHF values)
 - Scenario support
 """
+
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
 import numpy as np
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -28,16 +30,19 @@ BVG_CONTRIBUTION_RATES = {
     (55, 65): 0.18,
 }
 
-AHV_MAX_PENSION = 2520.0        # CHF/month, 2024 value
-AHV_MIN_PENSION = 1260.0
-AHV_FULL_YEARS = 44
-AHV_CONVERSION_RATE = 0.068     # BVG Umwandlungssatz
-BVG_COORD_DEDUCTION = 25725.0   # CHF, 2024
-PAYOUT_YEARS = 20               # 3a/3b annuitization horizon (~age 65→85)
-PAYOUT_RESIDUAL_RATE = 0.02     # conservative yield during payout phase
+# Swiss financial constants — loaded from settings (env / .env)
+AHV_MAX_PENSION: float = settings.ahv_max_pension_chf
+AHV_MIN_PENSION: float = settings.ahv_min_pension_chf
+AHV_FULL_YEARS: int = settings.ahv_full_contribution_years
+AHV_CONVERSION_RATE: float = settings.ahv_conversion_rate_bvg
+BVG_COORD_DEDUCTION: float = settings.bvg_coordination_deduction
+PAYOUT_YEARS: int = 20  # 3a/3b annuitization horizon (~age 65→85)
+PAYOUT_RESIDUAL_RATE: float = 0.02  # conservative yield during payout phase
 
 
-def _annuity_payout(balance: float, years: int = PAYOUT_YEARS, rate: float = PAYOUT_RESIDUAL_RATE) -> float:
+def _annuity_payout(
+    balance: float, years: int = PAYOUT_YEARS, rate: float = PAYOUT_RESIDUAL_RATE
+) -> float:
     """
     Convert a capital balance into an annual pension using a level annuity
     formula with residual return during payout:
@@ -128,13 +133,15 @@ class ProjectionService:
         year_labels = list(range(datetime.now().year, datetime.now().year + years + 1))
 
         # ── Pension Projections ───────────────────────────────
-        pension_ahv, pension_bvg, pension_3a, pension_3b, retirement_idx = self._project_pensions(
-            pension_records=pension_records or [],
-            years=years,
-            annual_income=annual_income,
-            date_of_birth=date_of_birth,
-            retirement_age=retirement_age,
-            inflation_rate=inflation_rate,
+        pension_ahv, pension_bvg, pension_3a, pension_3b, retirement_idx = (
+            self._project_pensions(
+                pension_records=pension_records or [],
+                years=years,
+                annual_income=annual_income,
+                date_of_birth=date_of_birth,
+                retirement_age=retirement_age,
+                inflation_rate=inflation_rate,
+            )
         )
 
         return {
@@ -243,7 +250,13 @@ class ProjectionService:
             )
             pension_3b_series.append(p3b_total / inflation_deflator)
 
-        return pension_ahv_series, pension_bvg_series, pension_3a_series, pension_3b_series, retirement_idx
+        return (
+            pension_ahv_series,
+            pension_bvg_series,
+            pension_3a_series,
+            pension_3b_series,
+            retirement_idx,
+        )
 
     def _project_ahv(
         self,
@@ -285,9 +298,14 @@ class ProjectionService:
         completeness = contribution_years / AHV_FULL_YEARS
 
         # Simplified AHV formula: between min and max pension based on completeness
-        pension_monthly = AHV_MIN_PENSION + completeness * (AHV_MAX_PENSION - AHV_MIN_PENSION)
+        pension_monthly = AHV_MIN_PENSION + completeness * (
+            AHV_MAX_PENSION - AHV_MIN_PENSION
+        )
         pension_monthly = min(pension_monthly, AHV_MAX_PENSION)
         pension_monthly = max(pension_monthly, AHV_MIN_PENSION * completeness)
+
+        # Enforce configured maximum
+        pension_monthly = min(pension_monthly, settings.ahv_max_pension_chf)
 
         return pension_monthly * 12
 
@@ -309,7 +327,7 @@ class ProjectionService:
             annual_contribution = record.get("annual_contribution", 0.0)
             return_rate = record.get("expected_return_rate", 0.01)
         else:
-            # Estimate from salary
+            # Estimate from salary — use configured coordination deduction
             insured_salary = max(0, annual_income - BVG_COORD_DEDUCTION)
             bvg_rate = _bvg_rate_for_age(age_at_year)
             current_balance = 0.0
@@ -321,13 +339,15 @@ class ProjectionService:
         for yr in range(years_elapsed):
             age_in_sim = (age_at_year - years_elapsed) + yr
             insured_salary = max(0, annual_income - BVG_COORD_DEDUCTION)
-            contrib = annual_contribution or insured_salary * _bvg_rate_for_age(age_in_sim)
+            contrib = annual_contribution or insured_salary * _bvg_rate_for_age(
+                age_in_sim
+            )
             balance = balance * (1 + return_rate) + contrib
 
         if age_at_year < retirement_age:
             return balance  # return balance as proxy before retirement
 
-        # At/after retirement: convert capital to annual pension
+        # At/after retirement: convert capital to annual pension using configured conversion rate
         return balance * AHV_CONVERSION_RATE
 
     def _project_3a(

@@ -8,32 +8,33 @@ DELETE /api/forecasting/scenarios/{id} — delete a saved scenario
 GET  /api/forecasting/analysis      — raw time-series analysis (no forecast)
 GET  /api/forecasting/peer-baseline — peer-group CHF defaults for a profile
 """
+
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
-
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc
 
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.models import ForecastScenario, User
-from app.services.prediction_engine import prediction_engine
 from app.services.currency_service import normalize_reference_currency
 from app.services.peer_group import (
     PeerGroupProfile,
     get_peer_group_defaults,
     swiss_cantons_list,
 )
+from app.services.prediction_engine import prediction_engine
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field
+from sqlalchemy import desc, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # ── Schemas ───────────────────────────────────────────────────
+
 
 class PeerProfileInput(BaseModel):
     age_group: str = "35-44"
@@ -46,11 +47,11 @@ class PeerProfileInput(BaseModel):
 class ForecastRequest(BaseModel):
     account_ids: Optional[List[int]] = None
     horizon_months: int = Field(default=12, ge=1, le=240)
-    time_horizon: str = "monthly"          # monthly | yearly | retirement | lifecycle
+    time_horizon: str = "monthly"  # monthly | yearly | retirement | lifecycle
     include_peer_baseline: bool = True
     peer_profile: Optional[PeerProfileInput] = None
     lookback_months: int = Field(default=24, ge=3, le=60)
-    save_as: Optional[str] = None          # if set, save result under this name
+    save_as: Optional[str] = None  # if set, save result under this name
     description: Optional[str] = None
 
 
@@ -81,8 +82,8 @@ class ForecastResponse(BaseModel):
     total_monthly_expense_mean: float
     scenario_id: Optional[int] = None
     # Reference lines for chart overlay
-    peer_net_monthly: float = 0.0        # peer-group monthly net (income − expenses)
-    empirical_net_monthly: float = 0.0   # empirical Swiss median savings (income × rate)
+    peer_net_monthly: float = 0.0  # peer-group monthly net (income − expenses)
+    empirical_net_monthly: float = 0.0  # empirical Swiss median savings (income × rate)
     reference_currency: str = "CHF"
 
 
@@ -102,6 +103,7 @@ class ScenarioResponse(BaseModel):
 
 
 # ── Routes ────────────────────────────────────────────────────
+
 
 @router.post("/scenario", response_model=ForecastResponse)
 async def generate_forecast(
@@ -158,13 +160,16 @@ async def generate_forecast(
                     "first_date": analysis["first_date"],
                     "last_date": analysis["last_date"],
                     "total_monthly_income_mean": analysis["total_monthly_income_mean"],
-                    "total_monthly_expense_mean": analysis["total_monthly_expense_mean"],
+                    "total_monthly_expense_mean": analysis[
+                        "total_monthly_expense_mean"
+                    ],
                 },
             },
             expires_at=datetime.now(timezone.utc) + timedelta(hours=24),
         )
         db.add(scenario)
         await db.flush()
+        await db.commit()
         await db.refresh(scenario)
         scenario_id = scenario.id
 
@@ -237,7 +242,7 @@ async def get_peer_baseline(
     """Return peer-group monthly expense defaults (CHF) for the given profile."""
     try:
         profile = PeerGroupProfile(
-            age_group=age_group,        # type: ignore[arg-type]
+            age_group=age_group,  # type: ignore[arg-type]
             canton=canton,
             household_type=household_type,  # type: ignore[arg-type]
             employment_status=employment_status,  # type: ignore[arg-type]
@@ -246,7 +251,11 @@ async def get_peer_baseline(
         defaults = get_peer_group_defaults(profile)
     except Exception as exc:
         raise HTTPException(status_code=422, detail=f"Invalid profile: {exc}") from exc
-    return {"profile": profile.__dict__, "defaults": defaults, "cantons": swiss_cantons_list()}
+    return {
+        "profile": profile.__dict__,
+        "defaults": defaults,
+        "cantons": swiss_cantons_list(),
+    }
 
 
 @router.get("/scenarios", response_model=List[ScenarioResponse])
@@ -275,7 +284,9 @@ async def list_scenarios(
     ]
 
 
-@router.post("/scenarios", response_model=ScenarioResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/scenarios", response_model=ScenarioResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_scenario(
     payload: ScenarioCreate,
     current_user: User = Depends(get_current_user),
@@ -291,6 +302,7 @@ async def create_scenario(
     )
     db.add(scenario)
     await db.flush()
+    await db.commit()
     await db.refresh(scenario)
     return ScenarioResponse(
         id=scenario.id,

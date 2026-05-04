@@ -9,26 +9,26 @@ POST   /transactions/bulk-categorize
 GET    /transactions/stats
 GET    /transactions/monthly-summary
 """
-from collections import defaultdict
-from datetime import datetime, date, timezone
-from typing import List, Optional, Dict, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status, BackgroundTasks
-from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_, desc
-from sqlalchemy.orm import selectinload
+from collections import defaultdict
+from datetime import date, datetime, timezone
+from typing import Any, Dict, List, Optional
 
 from app.core.database import get_db
 from app.core.security import get_current_user
-from app.models.models import Transaction, Account, User, Category
-from app.services.categorization import CategorizationService
+from app.models.models import Account, Category, Transaction, User
 from app.services.audit_log import record_activity
+from app.services.categorization import CategorizationService
 from app.services.currency_service import (
+    convert_with_eur_rates,
     currency_service,
     normalize_reference_currency,
-    convert_with_eur_rates,
 )
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from pydantic import BaseModel
+from sqlalchemy import and_, desc, func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 router = APIRouter()
 categorization_service = CategorizationService()
@@ -63,7 +63,10 @@ def _merge_stats_category_totals(rows: list, *, limit: int) -> List[dict]:
             prev = merged[key]["category"]
             if raw and prev and raw[0].isupper() and not prev[0].isupper():
                 merged[key]["category"] = raw
-    out = [{"category": m["category"], "total": round(m["total"], 2)} for m in merged.values()]
+    out = [
+        {"category": m["category"], "total": round(m["total"], 2)}
+        for m in merged.values()
+    ]
     out.sort(key=lambda x: -x["total"])
     return out[:limit]
 
@@ -73,6 +76,7 @@ def _merge_stats_top_categories(rows: list) -> List[dict]:
 
 
 # ── Schemas ───────────────────────────────────────────────────
+
 
 class TransactionResponse(BaseModel):
     id: int
@@ -131,7 +135,9 @@ class TransactionCreate(BaseModel):
     notes: Optional[str] = None
     is_transfer: bool = False
     is_recurring: bool = False
-    periodicity: Optional[str] = None  # 'weekly', 'monthly', 'quarterly', 'halfyearly', 'yearly'
+    periodicity: Optional[str] = (
+        None  # 'weekly', 'monthly', 'quarterly', 'halfyearly', 'yearly'
+    )
 
 
 class TransactionUpdate(BaseModel):
@@ -182,7 +188,9 @@ class RecurringCostItem(BaseModel):
 
 class BudgetAnalysisResponse(BaseModel):
     total_monthly_income: float
-    fixed_recurring_costs: float  # Sum of all recurring transactions * periodicity factor
+    fixed_recurring_costs: (
+        float  # Sum of all recurring transactions * periodicity factor
+    )
     variable_costs: float  # Sum of all non-recurring transactions
     monthly_budget_limit: float  # Configurable or calculated
     variance: float  # Limit - (Fixed + Variable)
@@ -196,14 +204,16 @@ class BudgetAnalysisResponse(BaseModel):
 
 # Periodicity factors to convert to monthly equivalent
 PERIODICITY_MONTHLY_FACTOR = {
-    "weekly": 4.33,      # ~52 weeks / 12 months
+    "weekly": 4.33,  # ~52 weeks / 12 months
     "monthly": 1.0,
     "quarterly": 1.0 / 3,  # 4 times per year
     "halfyearly": 1.0 / 6,  # 2 times per year
-    "yearly": 1.0 / 12,    # 1 time per year
+    "yearly": 1.0 / 12,  # 1 time per year
 }
 
-_PERIODICITY_LIST_FILTER = frozenset({"weekly", "monthly", "quarterly", "halfyearly", "yearly"})
+_PERIODICITY_LIST_FILTER = frozenset(
+    {"weekly", "monthly", "quarterly", "halfyearly", "yearly"}
+)
 
 
 def _apply_recurrence_list_filters(
@@ -224,7 +234,10 @@ def _apply_recurrence_list_filters(
     elif is_recurring is not None:
         filters.append(Transaction.is_recurring == is_recurring)
 
-def _transaction_to_response(txn: Transaction, user: User, rates: Dict[str, float]) -> TransactionResponse:
+
+def _transaction_to_response(
+    txn: Transaction, user: User, rates: Dict[str, float]
+) -> TransactionResponse:
     ref = normalize_reference_currency(user.currency)
     acct = txn.account
     acct_cur = (acct.currency if acct else txn.currency or "CHF").strip().upper()
@@ -277,7 +290,9 @@ async def get_user_transaction(
     )
     txn = result.scalar_one_or_none()
     if not txn:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found."
+        )
     return txn
 
 
@@ -323,6 +338,7 @@ def _to_archived_response(t: Transaction) -> ArchivedTransactionResponse:
 
 
 # ── Routes (specific paths before `/{id}`) ────────────────────
+
 
 @router.get("/archived", response_model=List[ArchivedTransactionResponse])
 async def list_archived_transactions(
@@ -409,6 +425,7 @@ async def purge_archived_transaction(
 
 # ── Routes ────────────────────────────────────────────────────
 
+
 @router.get("", response_model=List[TransactionResponse])
 async def list_transactions(
     start: Optional[date] = Query(None, description="Filter from date (YYYY-MM-DD)"),
@@ -436,7 +453,9 @@ async def list_transactions(
     # SQLite stores booleans as 0/1, so we check for both False and None/NULL
     filters = [
         Account.user_id == current_user.id,
-        Transaction.is_deleted.isnot(True)  # Filters out True (1), keeps False (0) and NULL
+        Transaction.is_deleted.isnot(
+            True
+        ),  # Filters out True (1), keeps False (0) and NULL
     ]
 
     if start:
@@ -480,7 +499,9 @@ async def list_transactions(
     return [_transaction_to_response(t, current_user, rates) for t in transactions]
 
 
-@router.post("", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_transaction(
     payload: TransactionCreate,
     current_user: User = Depends(get_current_user),
@@ -489,11 +510,15 @@ async def create_transaction(
     """Manually create a transaction."""
     # Verify account belongs to user
     acct_result = await db.execute(
-        select(Account).where(Account.id == payload.account_id, Account.user_id == current_user.id)
+        select(Account).where(
+            Account.id == payload.account_id, Account.user_id == current_user.id
+        )
     )
     account = acct_result.scalar_one_or_none()
     if not account:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Account not found."
+        )
 
     cat = payload.category
     subcat = payload.subcategory
@@ -526,6 +551,7 @@ async def create_transaction(
     )
     db.add(txn)
     await db.flush()
+    await db.commit()
     await db.refresh(txn)
     txn.account = account
 
@@ -551,6 +577,7 @@ async def update_transaction(
         setattr(txn, field, value)
 
     await db.flush()
+    await db.commit()
     await db.refresh(txn)
 
     rates = await currency_service.get_rates("EUR")
@@ -593,6 +620,7 @@ async def delete_transaction(
             affected_rows=1,
             detail={"transaction_id": transaction_id, "account_id": txn.account_id},
         )
+    await db.commit()
 
 
 @router.post("/bulk-categorize")
@@ -626,6 +654,7 @@ async def bulk_categorize(
         updated += 1
 
     await db.flush()
+    await db.commit()
     return {"updated": updated, "skipped": len(transactions) - updated}
 
 
@@ -641,7 +670,7 @@ async def get_stats(
     filters = [
         Account.user_id == current_user.id,
         Transaction.is_transfer == False,
-        Transaction.is_deleted.isnot(True)
+        Transaction.is_deleted.isnot(True),
     ]
     if start:
         filters.append(Transaction.date >= _utc_start_of_day(start))
@@ -711,7 +740,7 @@ async def monthly_summary(
     filters = [
         Account.user_id == current_user.id,
         Transaction.is_transfer == False,
-        Transaction.is_deleted.isnot(True)
+        Transaction.is_deleted.isnot(True),
     ]
     if year:
         filters.append(func.extract("year", Transaction.date) == year)
@@ -757,17 +786,28 @@ async def monthly_summary(
 
 
 class MonthlyCategoryItem(BaseModel):
-    month: str        # "2025-01"
+    month: str  # "2025-01"
     category: str
-    amount: float     # positive (absolute value of expenses)
+    amount: float  # positive (absolute value of expenses)
 
 
 @router.get("/monthly-category-breakdown", response_model=List[MonthlyCategoryItem])
 async def monthly_category_breakdown(
-    start: Optional[date] = Query(None, description="Start date (inclusive). If omitted, falls back to `months` lookback."),
+    start: Optional[date] = Query(
+        None,
+        description="Start date (inclusive). If omitted, falls back to `months` lookback.",
+    ),
     end: Optional[date] = Query(None, description="End date (inclusive)."),
-    months: int = Query(24, ge=1, le=60, description="Lookback months (used only when start/end not provided)."),
-    periodicities: Optional[str] = Query(None, description="Comma-separated filter: monthly,quarterly,halfyearly,yearly,weekly,einmalig. Omit for all."),
+    months: int = Query(
+        24,
+        ge=1,
+        le=60,
+        description="Lookback months (used only when start/end not provided).",
+    ),
+    periodicities: Optional[str] = Query(
+        None,
+        description="Comma-separated filter: monthly,quarterly,halfyearly,yearly,weekly,einmalig. Omit for all.",
+    ),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -858,7 +898,9 @@ async def monthly_category_breakdown(
 
 @router.get("/budget-analysis", response_model=BudgetAnalysisResponse)
 async def budget_analysis(
-    start: Optional[date] = Query(None, description="Analysis period start (YYYY-MM-DD)"),
+    start: Optional[date] = Query(
+        None, description="Analysis period start (YYYY-MM-DD)"
+    ),
     end: Optional[date] = Query(None, description="Analysis period end (YYYY-MM-DD)"),
     account_id: Optional[int] = Query(None),
     current_user: User = Depends(get_current_user),
@@ -876,7 +918,7 @@ async def budget_analysis(
     filters = [
         Account.user_id == current_user.id,
         Transaction.is_transfer == False,
-        Transaction.is_deleted.isnot(True)
+        Transaction.is_deleted.isnot(True),
     ]
     if account_id:
         filters.append(Transaction.account_id == account_id)
@@ -938,7 +980,9 @@ async def budget_analysis(
     # In a multi-month view, we average the variable costs
     months_in_period = max(
         1,
-        (period_end.year - period_start.year) * 12 + (period_end.month - period_start.month) + 1
+        (period_end.year - period_start.year) * 12
+        + (period_end.month - period_start.month)
+        + 1,
     )
     avg_monthly_variable = variable_total / months_in_period
 
@@ -948,7 +992,9 @@ async def budget_analysis(
 
     # Budget limit could be user's configured limit or income-based calculation
     # For now, use 90% of income as suggested budget limit
-    monthly_budget_limit = total_income / months_in_period * 0.9 if total_income > 0 else 0
+    monthly_budget_limit = (
+        total_income / months_in_period * 0.9 if total_income > 0 else 0
+    )
 
     # Variance = how much room left in budget
     variance = monthly_budget_limit - monthly_fixed - monthly_variable

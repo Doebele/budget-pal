@@ -1,14 +1,16 @@
 """Accounts API — CRUD for bank accounts."""
-from typing import List, Optional
+
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, desc, update, delete
+from typing import List, Optional
+
 from app.core.database import get_db
 from app.core.security import get_current_user
-from app.models.models import Account, AccountType, User, Transaction
+from app.models.models import Account, AccountType, Transaction, User
 from app.services.audit_log import record_activity
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
+from sqlalchemy import delete, desc, func, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
 
@@ -46,17 +48,26 @@ async def list_accounts(
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
-        select(Account).where(Account.user_id == current_user.id, Account.is_active == True)
+        select(Account).where(
+            Account.user_id == current_user.id, Account.is_active == True
+        )
     )
     accounts = result.scalars().all()
     return [
         AccountResponse(
-            id=a.id, name=a.name, bank=a.bank,
-            account_number=a.account_number, iban=a.iban,
-            currency=a.currency, balance=a.balance,
+            id=a.id,
+            name=a.name,
+            bank=a.bank,
+            account_number=a.account_number,
+            iban=a.iban,
+            currency=a.currency,
+            balance=a.balance,
             account_type=a.account_type.value,
-            is_active=a.is_active, color=a.color, notes=a.notes,
-        ) for a in accounts
+            is_active=a.is_active,
+            color=a.color,
+            notes=a.notes,
+        )
+        for a in accounts
     ]
 
 
@@ -69,13 +80,20 @@ async def create_account(
     account = Account(user_id=current_user.id, **payload.model_dump())
     db.add(account)
     await db.flush()
+    await db.commit()
     await db.refresh(account)
     return AccountResponse(
-        id=account.id, name=account.name, bank=account.bank,
-        account_number=account.account_number, iban=account.iban,
-        currency=account.currency, balance=account.balance,
+        id=account.id,
+        name=account.name,
+        bank=account.bank,
+        account_number=account.account_number,
+        iban=account.iban,
+        currency=account.currency,
+        balance=account.balance,
         account_type=account.account_type.value,
-        is_active=account.is_active, color=account.color, notes=account.notes,
+        is_active=account.is_active,
+        color=account.color,
+        notes=account.notes,
     )
 
 
@@ -87,7 +105,9 @@ async def update_account(
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
-        select(Account).where(Account.id == account_id, Account.user_id == current_user.id)
+        select(Account).where(
+            Account.id == account_id, Account.user_id == current_user.id
+        )
     )
     account = result.scalar_one_or_none()
     if not account:
@@ -95,13 +115,20 @@ async def update_account(
     for k, v in payload.model_dump().items():
         setattr(account, k, v)
     await db.flush()
+    await db.commit()
     await db.refresh(account)
     return AccountResponse(
-        id=account.id, name=account.name, bank=account.bank,
-        account_number=account.account_number, iban=account.iban,
-        currency=account.currency, balance=account.balance,
+        id=account.id,
+        name=account.name,
+        bank=account.bank,
+        account_number=account.account_number,
+        iban=account.iban,
+        currency=account.currency,
+        balance=account.balance,
         account_type=account.account_type.value,
-        is_active=account.is_active, color=account.color, notes=account.notes,
+        is_active=account.is_active,
+        color=account.color,
+        notes=account.notes,
     )
 
 
@@ -112,13 +139,16 @@ async def delete_account(
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
-        select(Account).where(Account.id == account_id, Account.user_id == current_user.id)
+        select(Account).where(
+            Account.id == account_id, Account.user_id == current_user.id
+        )
     )
     account = result.scalar_one_or_none()
     if not account:
         raise HTTPException(status_code=404, detail="Account not found.")
     account.is_active = False  # Soft delete
     await db.flush()
+    await db.commit()
 
 
 class BulkDeletePreviewResponse(BaseModel):
@@ -140,15 +170,16 @@ async def _build_bulk_delete_preview(
     account_id: int,
 ) -> BulkDeletePreviewResponse:
     acct_result = await db.execute(
-        select(Account).where(Account.id == account_id, Account.user_id == current_user.id)
+        select(Account).where(
+            Account.id == account_id, Account.user_id == current_user.id
+        )
     )
     account = acct_result.scalar_one_or_none()
     if not account:
         raise HTTPException(status_code=404, detail="Account not found.")
 
     count_result = await db.execute(
-        select(func.count(Transaction.id))
-        .where(
+        select(func.count(Transaction.id)).where(
             Transaction.account_id == account_id,
             Transaction.is_deleted.isnot(True),
         )
@@ -160,8 +191,7 @@ async def _build_bulk_delete_preview(
             func.coalesce(func.sum(Transaction.amount), 0.0),
             func.min(Transaction.date),
             func.max(Transaction.date),
-        )
-        .where(
+        ).where(
             Transaction.account_id == account_id,
             Transaction.is_deleted.isnot(True),
         )
@@ -209,15 +239,16 @@ async def _execute_bulk_delete_transactions(
     hard: bool,
 ) -> BulkDeleteResponse:
     acct_result = await db.execute(
-        select(Account).where(Account.id == account_id, Account.user_id == current_user.id)
+        select(Account).where(
+            Account.id == account_id, Account.user_id == current_user.id
+        )
     )
     account = acct_result.scalar_one_or_none()
     if not account:
         raise HTTPException(status_code=404, detail="Account not found.")
 
     count_result = await db.execute(
-        select(func.count(Transaction.id))
-        .where(
+        select(func.count(Transaction.id)).where(
             Transaction.account_id == account_id,
             Transaction.is_deleted.isnot(True),
         )
@@ -252,10 +283,13 @@ async def _execute_bulk_delete_transactions(
         )
 
     await db.flush()
+    await db.commit()
     await record_activity(
         db,
         user_id=current_user.id,
-        action="account_transactions_hard_delete" if hard else "account_transactions_archive",
+        action="account_transactions_hard_delete"
+        if hard
+        else "account_transactions_archive",
         method="bulk",
         affected_rows=delete_count,
         detail={"account_id": account_id, "hard": hard},
@@ -295,7 +329,9 @@ async def delete_all_transactions_by_query(
     return await _execute_bulk_delete_transactions(db, current_user, account_id, hard)
 
 
-@router.get("/{account_id}/transactions/preview", response_model=BulkDeletePreviewResponse)
+@router.get(
+    "/{account_id}/transactions/preview", response_model=BulkDeletePreviewResponse
+)
 async def preview_transactions_for_deletion(
     account_id: int,
     current_user: User = Depends(get_current_user),

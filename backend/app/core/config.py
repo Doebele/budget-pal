@@ -1,9 +1,11 @@
 """
 Application configuration — loaded from environment variables via Pydantic Settings.
 """
+
 from typing import List
-from pydantic_settings import BaseSettings, SettingsConfigDict
+
 from pydantic import field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -16,7 +18,9 @@ class Settings(BaseSettings):
 
     # ── Database ─────────────────────────────────────────────
     # PostgreSQL (default) or SQLite file, e.g. sqlite+aiosqlite:////app/data/budget-pal.db
-    database_url: str = "postgresql+asyncpg://budgetpal:budgetpal@localhost:5432/budgetpal"
+    database_url: str = (
+        "postgresql+asyncpg://budgetpal:budgetpal@localhost:5432/budgetpal"
+    )
     # Documented default path for Docker volume + SQLite (use with DATABASE_URL).
     sqlite_database_path: str = "/app/data/budget-pal.db"
     postgres_db: str = "budgetpal"
@@ -26,12 +30,24 @@ class Settings(BaseSettings):
     postgres_port: int = 5432
 
     # ── Auth / JWT ────────────────────────────────────────────
-    jwt_secret_key: str = "CHANGE_ME_in_production"
+    jwt_secret_key: str = ""
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
 
+    @field_validator("jwt_secret_key")
+    @classmethod
+    def validate_jwt_secret_key(cls, v: str) -> str:
+        if not v or len(v) < 32:
+            raise ValueError(
+                "JWT_SECRET_KEY must be set and at least 32 characters long. "
+                "Use: openssl rand -hex 32"
+            )
+        return v
+
     # ── CORS ─────────────────────────────────────────────────
-    allowed_origins: str = "http://localhost:5173,http://localhost:8011,https://budgetpal.doebele12.de"
+    allowed_origins: str = (
+        "http://localhost:5173,http://localhost:8011,https://budgetpal.doebele12.de"
+    )
 
     @property
     def allowed_origins_list(self) -> List[str]:

@@ -6,6 +6,7 @@ POST /imports/pdf         — upload PDF, OCR, parse, categorize
 GET  /imports/history     — list past imports
 GET  /imports/{id}/preview — preview a past import result
 """
+
 import base64
 import hashlib
 import io
@@ -13,28 +14,30 @@ import logging
 import os
 import re
 import tempfile
-from uuid import uuid4
 from datetime import datetime, timezone
 from typing import List, Optional, Tuple
+from uuid import uuid4
 
 logger = logging.getLogger(__name__)
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc
-
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import get_current_user
-from app.core.config import settings
-from app.models.models import Transaction, Account, ImportLog, ImportStatus, User
+from app.models.models import Account, ImportLog, ImportStatus, Transaction, User
 from app.services.categorization import CategorizationService
-from app.services.import_parsers.ubs import UBSParser
+from app.services.import_parsers.comdirect import ComdirectParser
 from app.services.import_parsers.n26 import N26Parser
 from app.services.import_parsers.revolut import RevolutParser
-from app.services.import_parsers.comdirect import ComdirectParser
+from app.services.import_parsers.ubs import UBSParser
 from app.services.pdf_duplicate_detection import find_database_duplicate_transaction_id
-from app.services.pdf_import_row_match import find_pdf_internal_duplicate_of, normalize_preview_date_str
+from app.services.pdf_import_row_match import (
+    find_pdf_internal_duplicate_of,
+    normalize_preview_date_str,
+)
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from pydantic import BaseModel, Field
+from sqlalchemy import desc, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
 categorization_service = CategorizationService()
@@ -48,6 +51,7 @@ PARSERS = {
 
 
 # ── Schemas ───────────────────────────────────────────────────
+
 
 class ColumnMapping(BaseModel):
     date_col: Optional[str] = None
@@ -133,7 +137,9 @@ class PdfPreviewTransaction(BaseModel):
     merge_action: str = "import"
     # Recurring detection
     is_recurring: bool = False
-    periodicity: Optional[str] = None  # 'monthly' | 'quarterly' | 'halfyearly' | 'yearly'
+    periodicity: Optional[str] = (
+        None  # 'monthly' | 'quarterly' | 'halfyearly' | 'yearly'
+    )
 
 
 class PdfPreviewResponse(BaseModel):
@@ -153,6 +159,7 @@ class PdfImportConfirmRequest(BaseModel):
 
 
 # ── Helper: detect bank format from CSV content ────────────────
+
 
 def detect_bank_format(content: bytes) -> str:
     """Heuristic detection of bank CSV format from first few lines."""
@@ -197,13 +204,16 @@ def _date_str_for_import_hash(date_val: object) -> str:
     return s[:10] if len(s) >= 10 else s
 
 
-def compute_import_hash(account_id: int, date: str, amount: float, description: str) -> str:
+def compute_import_hash(
+    account_id: int, date: str, amount: float, description: str
+) -> str:
     """SHA-256 fingerprint for deduplication."""
     raw = f"{account_id}|{date}|{amount:.2f}|{description.strip()}"
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
 # ── Routes ────────────────────────────────────────────────────
+
 
 @router.post("/preview", response_model=PreviewResponse)
 async def preview_import(
@@ -245,7 +255,19 @@ async def preview_import(
         if not line.strip():
             continue
         lower_line = line.lower()
-        if any(keyword in lower_line for keyword in ["date", "datum", "valuta", "buchung", "amount", "betrag", "description", "text"]):
+        if any(
+            keyword in lower_line
+            for keyword in [
+                "date",
+                "datum",
+                "valuta",
+                "buchung",
+                "amount",
+                "betrag",
+                "description",
+                "text",
+            ]
+        ):
             header_idx = idx
             break
 
@@ -262,7 +284,7 @@ async def preview_import(
     preview_rows: List[ImportPreviewTransaction] = []
     sample_raw = []
 
-    data_lines = lines[header_idx + 1:header_idx + 51]  # First 50 data rows
+    data_lines = lines[header_idx + 1 : header_idx + 51]  # First 50 data rows
 
     for row_idx, line in enumerate(data_lines):
         if not line.strip():
@@ -274,7 +296,9 @@ async def preview_import(
         if len(parts) < 2:
             continue
 
-        raw_data = {header[i]: parts[i] if i < len(parts) else "" for i in range(len(header))}
+        raw_data = {
+            header[i]: parts[i] if i < len(parts) else "" for i in range(len(header))
+        }
 
         if row_idx < 3:
             sample_raw.append(raw_data)
@@ -290,7 +314,7 @@ async def preview_import(
         detected_columns=detected_columns,
         column_mapping=None,
         rows=preview_rows[:20],  # Return first 20 parsed rows
-        total_rows=len([l for l in lines[header_idx+1:] if l.strip()]),
+        total_rows=len([l for l in lines[header_idx + 1 :] if l.strip()]),
         parsed_rows=sum(1 for r in preview_rows if r.parsed),
         error_rows=sum(1 for r in preview_rows if not r.parsed),
         sample_raw=sample_raw,
@@ -303,14 +327,29 @@ def detect_columns(header: List[str], bank: str) -> dict:
     header_lower = [h.lower() for h in header]
 
     # Date columns
-    date_keywords = ["date", "datum", "valuta", "buchungsdatum", "buchungstag", "wertstellung"]
+    date_keywords = [
+        "date",
+        "datum",
+        "valuta",
+        "buchungsdatum",
+        "buchungstag",
+        "wertstellung",
+    ]
     for i, h in enumerate(header_lower):
         if any(kw in h for kw in date_keywords):
             result["date"] = header[i]
             break
 
     # Description columns
-    desc_keywords = ["description", "text", "buchungstext", "vorgang", "zweck", "verwendungszweck", "beschreibung"]
+    desc_keywords = [
+        "description",
+        "text",
+        "buchungstext",
+        "vorgang",
+        "zweck",
+        "verwendungszweck",
+        "beschreibung",
+    ]
     for i, h in enumerate(header_lower):
         if any(kw in h for kw in desc_keywords):
             result["description"] = header[i]
@@ -349,7 +388,9 @@ def parse_preview_row(
 ) -> ImportPreviewTransaction:
     """Parse a single CSV row for preview."""
     errors = []
-    raw_data = {header[i]: parts[i] if i < len(parts) else "" for i in range(len(header))}
+    raw_data = {
+        header[i]: parts[i] if i < len(parts) else "" for i in range(len(header))
+    }
 
     # Parse date
     date_str = None
@@ -471,7 +512,9 @@ def parse_amount(value: str, bank: str) -> float:
     return -result if negative else result
 
 
-@router.post("/csv", response_model=ImportResultResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/csv", response_model=ImportResultResponse, status_code=status.HTTP_201_CREATED
+)
 async def import_csv(
     file: UploadFile = File(...),
     account_id: int = Form(...),
@@ -482,7 +525,9 @@ async def import_csv(
     """Upload a CSV bank export, detect format, parse transactions, and save."""
     # Verify account ownership
     acct_result = await db.execute(
-        select(Account).where(Account.id == account_id, Account.user_id == current_user.id)
+        select(Account).where(
+            Account.id == account_id, Account.user_id == current_user.id
+        )
     )
     account = acct_result.scalar_one_or_none()
     if not account:
@@ -504,7 +549,9 @@ async def import_csv(
     try:
         raw_transactions = parser.parse(content)
     except Exception as e:
-        logger.error("CSV parse error for bank=%s file=%s: %s", detected_bank, file.filename, e)
+        logger.error(
+            "CSV parse error for bank=%s file=%s: %s", detected_bank, file.filename, e
+        )
         log = ImportLog(
             user_id=current_user.id,
             account_id=account_id,
@@ -563,17 +610,23 @@ async def import_csv(
                 continue
 
             # Categorize
-            cat_result = await categorization_service.categorize(raw.get("description", ""))
+            cat_result = await categorization_service.categorize(
+                raw.get("description", "")
+            )
 
             raw_dt = raw["date"]
             txn_dt = (
                 _transaction_date_utc(raw_dt)
                 if isinstance(raw_dt, datetime)
-                else datetime.strptime(str(raw_dt)[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                else datetime.strptime(str(raw_dt)[:10], "%Y-%m-%d").replace(
+                    tzinfo=timezone.utc
+                )
             )
 
             bd = raw.get("booking_date")
-            booking_utc = _transaction_date_utc(bd) if isinstance(bd, datetime) else None
+            booking_utc = (
+                _transaction_date_utc(bd) if isinstance(bd, datetime) else None
+            )
 
             txn = Transaction(
                 account_id=account_id,
@@ -609,7 +662,9 @@ async def import_csv(
                 )
 
         except Exception as e:
-            logger.warning("CSV row processing failed (row_index=%d): %s", len(preview_items), e)
+            logger.warning(
+                "CSV row processing failed (row_index=%d): %s", len(preview_items), e
+            )
             failed += 1
 
     # Determine import status
@@ -638,6 +693,7 @@ async def import_csv(
     )
     db.add(log)
     await db.flush()
+    await db.commit()
     await db.refresh(log)
 
     return ImportResultResponse(
@@ -669,6 +725,7 @@ async def _ocr_pdf_to_text(tmp_path: str) -> str:
     _parse_pdf_text().
     """
     import asyncio
+
     import pytesseract
     from pdf2image import convert_from_path
 
@@ -689,7 +746,9 @@ async def _ocr_pdf_to_text(tmp_path: str) -> str:
         logger.info("OCR: pytesseract succeeded (%d chars).", len(full_text))
         return full_text
 
-    logger.info("OCR: pytesseract sparse (%d chars), trying Mistral fallback.", len(full_text))
+    logger.info(
+        "OCR: pytesseract sparse (%d chars), trying Mistral fallback.", len(full_text)
+    )
 
     # ── Stage 2: Mistral OCR fallback ─────────────────────────
     if not settings.mistral_ocr_enabled:
@@ -735,7 +794,9 @@ async def preview_pdf_import(
     """Extract PDF transactions and return editable preview rows."""
     if account_id is not None:
         acct_result = await db.execute(
-            select(Account).where(Account.id == account_id, Account.user_id == current_user.id)
+            select(Account).where(
+                Account.id == account_id, Account.user_id == current_user.id
+            )
         )
         if not acct_result.scalar_one_or_none():
             raise HTTPException(status_code=404, detail="Account not found.")
@@ -750,8 +811,8 @@ async def preview_pdf_import(
         from app.services.import_parsers.comdirect_pdf import (
             is_comdirect_pdf,
             parse_comdirect_pdf_tables,
-            parse_comdirect_pdf_words,
             parse_comdirect_pdf_text,
+            parse_comdirect_pdf_words,
         )
         from app.services.import_parsers.n26_pdf import (
             is_n26_web_pdf,
@@ -770,34 +831,40 @@ async def preview_pdf_import(
                 not bank and is_n26_web_pdf(full_text)
             )
             _is_comdirect = not _is_n26_web and (
-                (bank or "").lower() == "comdirect" or (
-                    not bank and is_comdirect_pdf(full_text)
-                )
+                (bank or "").lower() == "comdirect"
+                or (not bank and is_comdirect_pdf(full_text))
             )
-            _is_ubs_cc = not _is_n26_web and not _is_comdirect and (
-                (bank or "").lower() == "ubs_cc" or (
-                    not bank and is_ubs_creditcard_pdf(full_text)
+            _is_ubs_cc = (
+                not _is_n26_web
+                and not _is_comdirect
+                and (
+                    (bank or "").lower() == "ubs_cc"
+                    or (not bank and is_ubs_creditcard_pdf(full_text))
                 )
             )
 
             if _is_n26_web:
                 detected_bank = "n26"
                 raw_transactions = parse_n26_web_pdf(pdf)
-                logger.info("N26 web PDF: parser yielded %d rows.", len(raw_transactions))
+                logger.info(
+                    "N26 web PDF: parser yielded %d rows.", len(raw_transactions)
+                )
             elif _is_comdirect:
                 detected_bank = "comdirect"
                 # 1st choice: pdfplumber table extraction (precise column mapping)
                 raw_transactions = parse_comdirect_pdf_tables(pdf)
                 if raw_transactions:
                     logger.info(
-                        "comdirect PDF: table extraction yielded %d rows.", len(raw_transactions)
+                        "comdirect PDF: table extraction yielded %d rows.",
+                        len(raw_transactions),
                     )
                 else:
                     # 2nd choice: word-position-based extraction (column-aware, handles +amounts)
                     raw_transactions = parse_comdirect_pdf_words(pdf)
                     if raw_transactions:
                         logger.info(
-                            "comdirect PDF: word-position parser yielded %d rows.", len(raw_transactions)
+                            "comdirect PDF: word-position parser yielded %d rows.",
+                            len(raw_transactions),
                         )
                     else:
                         # 3rd choice: text-based regex extraction (last resort)
@@ -805,12 +872,16 @@ async def preview_pdf_import(
                             full_text = await _ocr_pdf_to_text(tmp_path)
                         raw_transactions = parse_comdirect_pdf_text(full_text)
                         logger.info(
-                            "comdirect PDF: text fallback yielded %d rows.", len(raw_transactions)
+                            "comdirect PDF: text fallback yielded %d rows.",
+                            len(raw_transactions),
                         )
             elif _is_ubs_cc:
                 detected_bank = "ubs_cc"
                 raw_transactions = parse_ubs_creditcard_pdf(pdf)
-                logger.info("UBS credit card PDF: parser yielded %d rows.", len(raw_transactions))
+                logger.info(
+                    "UBS credit card PDF: parser yielded %d rows.",
+                    len(raw_transactions),
+                )
             else:
                 detected_bank = bank or "ubs"
                 # 1st choice: structured UBS table extraction
@@ -848,7 +919,9 @@ async def preview_pdf_import(
         is_duplicate = False
 
         if parsed and account_id and date_str and description_val:
-            import_hash = compute_import_hash(account_id, date_str, amount_val, description_val)
+            import_hash = compute_import_hash(
+                account_id, date_str, amount_val, description_val
+            )
             existing_transaction_id = await find_database_duplicate_transaction_id(
                 db,
                 account_id,
@@ -882,7 +955,9 @@ async def preview_pdf_import(
 
         row_id = str(uuid4())
         display_date = date_str or (
-            date_val.strftime("%Y-%m-%d") if isinstance(date_val, datetime) else str(date_val or "")
+            date_val.strftime("%Y-%m-%d")
+            if isinstance(date_val, datetime)
+            else str(date_val or "")
         )
 
         # AI category suggestion for preview
@@ -891,7 +966,11 @@ async def preview_pdf_import(
         if parsed and description_val:
             try:
                 notes_val = str(row.get("notes", "")).strip()
-                cat_hint = f"{description_val} {notes_val}".strip() if notes_val else description_val
+                cat_hint = (
+                    f"{description_val} {notes_val}".strip()
+                    if notes_val
+                    else description_val
+                )
                 cat_result = await categorization_service.categorize(cat_hint)
                 preview_category = cat_result.get("category") or None
             except Exception:
@@ -931,7 +1010,11 @@ async def preview_pdf_import(
     )
 
 
-@router.post("/pdf/confirm", response_model=ImportResultResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/pdf/confirm",
+    response_model=ImportResultResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def confirm_pdf_import(
     payload: PdfImportConfirmRequest,
     current_user: User = Depends(get_current_user),
@@ -939,7 +1022,9 @@ async def confirm_pdf_import(
 ):
     """Persist user-reviewed PDF preview rows."""
     acct_result = await db.execute(
-        select(Account).where(Account.id == payload.account_id, Account.user_id == current_user.id)
+        select(Account).where(
+            Account.id == payload.account_id, Account.user_id == current_user.id
+        )
     )
     account = acct_result.scalar_one_or_none()
     if not account:
@@ -951,7 +1036,9 @@ async def confirm_pdf_import(
     preview_items: List[ImportPreviewTransaction] = []
     imported_hashes: List[str] = []
     bank_name = payload.bank or "ubs"
-    allowed_merge = frozenset({"import", "skip", "overwrite", "keep_existing", "delete_both"})
+    allowed_merge = frozenset(
+        {"import", "skip", "overwrite", "keep_existing", "delete_both"}
+    )
 
     def append_preview_sample(
         *,
@@ -1001,7 +1088,9 @@ async def confirm_pdf_import(
 
         description = row.description.strip()
         amount = float(row.amount)
-        import_hash = compute_import_hash(payload.account_id, date_norm, amount, description)
+        import_hash = compute_import_hash(
+            payload.account_id, date_norm, amount, description
+        )
         cur = row.currency or "CHF"
 
         if row.duplicate_kind == "database":
@@ -1022,7 +1111,11 @@ async def confirm_pdf_import(
                         if ex:
                             await db.delete(ex)
                 except Exception as del_err:
-                    logger.warning("delete_both failed for txn_id=%s: %s", row.existing_transaction_id, del_err)
+                    logger.warning(
+                        "delete_both failed for txn_id=%s: %s",
+                        row.existing_transaction_id,
+                        del_err,
+                    )
                 skipped += 1
                 continue
             if action == "overwrite":
@@ -1143,6 +1236,7 @@ async def confirm_pdf_import(
     )
     db.add(log)
     await db.flush()
+    await db.commit()
     await db.refresh(log)
 
     return ImportResultResponse(
@@ -1156,7 +1250,9 @@ async def confirm_pdf_import(
     )
 
 
-@router.post("/pdf", response_model=ImportResultResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/pdf", response_model=ImportResultResponse, status_code=status.HTTP_201_CREATED
+)
 async def import_pdf(
     file: UploadFile = File(...),
     account_id: int = Form(...),
@@ -1167,7 +1263,9 @@ async def import_pdf(
     """Upload a PDF bank statement, extract text via OCR, parse, and save."""
     # Verify account ownership
     acct_result = await db.execute(
-        select(Account).where(Account.id == account_id, Account.user_id == current_user.id)
+        select(Account).where(
+            Account.id == account_id, Account.user_id == current_user.id
+        )
     )
     account = acct_result.scalar_one_or_none()
     if not account:
@@ -1186,8 +1284,8 @@ async def import_pdf(
         from app.services.import_parsers.comdirect_pdf import (
             is_comdirect_pdf,
             parse_comdirect_pdf_tables,
-            parse_comdirect_pdf_words,
             parse_comdirect_pdf_text,
+            parse_comdirect_pdf_words,
         )
         from app.services.import_parsers.n26_pdf import (
             is_n26_web_pdf,
@@ -1205,19 +1303,23 @@ async def import_pdf(
                 not bank and is_n26_web_pdf(full_text)
             )
             _is_comdirect = not _is_n26_web and (
-                (bank or "").lower() == "comdirect" or (
-                    not bank and is_comdirect_pdf(full_text)
-                )
+                (bank or "").lower() == "comdirect"
+                or (not bank and is_comdirect_pdf(full_text))
             )
-            _is_ubs_cc = not _is_n26_web and not _is_comdirect and (
-                (bank or "").lower() == "ubs_cc" or (
-                    not bank and is_ubs_creditcard_pdf(full_text)
+            _is_ubs_cc = (
+                not _is_n26_web
+                and not _is_comdirect
+                and (
+                    (bank or "").lower() == "ubs_cc"
+                    or (not bank and is_ubs_creditcard_pdf(full_text))
                 )
             )
 
             if _is_n26_web:
                 raw_transactions = parse_n26_web_pdf(pdf)
-                logger.info("N26 web PDF: parser yielded %d rows.", len(raw_transactions))
+                logger.info(
+                    "N26 web PDF: parser yielded %d rows.", len(raw_transactions)
+                )
             elif _is_comdirect:
                 raw_transactions = parse_comdirect_pdf_tables(pdf)
                 if not raw_transactions:
@@ -1226,7 +1328,10 @@ async def import_pdf(
                     raw_transactions = parse_comdirect_pdf_text(full_text)
             elif _is_ubs_cc:
                 raw_transactions = parse_ubs_creditcard_pdf(pdf)
-                logger.info("UBS credit card PDF: parser yielded %d rows.", len(raw_transactions))
+                logger.info(
+                    "UBS credit card PDF: parser yielded %d rows.",
+                    len(raw_transactions),
+                )
             else:
                 # UBS (default)
                 raw_transactions = _parse_ubs_pdf_tables(pdf)
@@ -1270,14 +1375,20 @@ async def import_pdf(
 
             # Use MCC notes (credit card PDFs) to improve AI categorization
             _cat_notes = str(raw.get("notes", "")).strip()
-            _cat_text = f"{raw.get('description', '')} {_cat_notes}".strip() if _cat_notes else raw.get("description", "")
+            _cat_text = (
+                f"{raw.get('description', '')} {_cat_notes}".strip()
+                if _cat_notes
+                else raw.get("description", "")
+            )
             cat_result = await categorization_service.categorize(_cat_text)
 
             raw_dt = raw["date"]
             txn_dt = (
                 _transaction_date_utc(raw_dt)
                 if isinstance(raw_dt, datetime)
-                else datetime.strptime(str(raw_dt)[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                else datetime.strptime(str(raw_dt)[:10], "%Y-%m-%d").replace(
+                    tzinfo=timezone.utc
+                )
             )
 
             txn = Transaction(
@@ -1338,6 +1449,7 @@ async def import_pdf(
     )
     db.add(log)
     await db.flush()
+    await db.commit()
     await db.refresh(log)
 
     return ImportResultResponse(
@@ -1351,7 +1463,9 @@ async def import_pdf(
     )
 
 
-def _detect_recurring_periodicity(rows: List[PdfPreviewTransaction]) -> List[PdfPreviewTransaction]:
+def _detect_recurring_periodicity(
+    rows: List[PdfPreviewTransaction],
+) -> List[PdfPreviewTransaction]:
     """
     Detect recurring transactions and annotate with is_recurring + periodicity.
 
@@ -1397,7 +1511,9 @@ def _detect_recurring_periodicity(rows: List[PdfPreviewTransaction]) -> List[Pdf
         gaps = []
         for i in range(1, len(sorted_group)):
             try:
-                d1 = datetime.strptime(sorted_group[i - 1].original_date[:10], "%Y-%m-%d")
+                d1 = datetime.strptime(
+                    sorted_group[i - 1].original_date[:10], "%Y-%m-%d"
+                )
                 d2 = datetime.strptime(sorted_group[i].original_date[:10], "%Y-%m-%d")
                 gaps.append(abs((d2 - d1).days))
             except ValueError:
@@ -1425,7 +1541,14 @@ def _detect_recurring_periodicity(rows: List[PdfPreviewTransaction]) -> List[Pdf
     result = []
     for row in rows:
         if row.id in row_periodicity:
-            result.append(row.model_copy(update={"is_recurring": True, "periodicity": row_periodicity[row.id]}))
+            result.append(
+                row.model_copy(
+                    update={
+                        "is_recurring": True,
+                        "periodicity": row_periodicity[row.id],
+                    }
+                )
+            )
         else:
             result.append(row)
     return result
@@ -1454,7 +1577,7 @@ def _parse_pdf_text(text: str, bank: str) -> List[dict]:
     from datetime import datetime
 
     _DATE_RE = re.compile(r"\d{2}\.\d{2}\.\d{4}")
-    _AMT_RE  = re.compile(r"[+-]?[\d']+[.,]\d{2}")
+    _AMT_RE = re.compile(r"[+-]?[\d']+[.,]\d{2}")
 
     _SKIP_RE = re.compile(
         r"^(Seite\s+\d|Saldo\s|Datum\s|Buchungsdatum|Valuta|IBAN\s|BIC\s|"
@@ -1480,16 +1603,16 @@ def _parse_pdf_text(text: str, bank: str) -> List[dict]:
         if len(dates) < 2:
             return None
 
-        buch_m  = dates[0]
+        buch_m = dates[0]
         valuta_m = dates[-1]  # last date = ValutaDatum (most robust anchor)
 
         # Tail: after ValutaDatum → should be the Saldo
-        tail = line[valuta_m.end():].strip()
+        tail = line[valuta_m.end() :].strip()
         tail_amounts = list(_AMT_RE.finditer(tail))
         saldo = _parse_num(tail_amounts[-1].group()) if tail_amounts else None
 
         # Middle: between Buchungsdatum and ValutaDatum → Description + Betrag
-        middle = line[buch_m.end(): valuta_m.start()].strip()
+        middle = line[buch_m.end() : valuta_m.start()].strip()
         mid_amounts = list(_AMT_RE.finditer(middle))
         betrag: Optional[float] = None
         desc_end = len(middle)
@@ -1525,7 +1648,11 @@ def _parse_pdf_text(text: str, bank: str) -> List[dict]:
             continue
 
         # Continuation line: append to pending description
-        if pending is not None and not _DATE_RE.fullmatch(line) and not _SKIP_RE.match(line):
+        if (
+            pending is not None
+            and not _DATE_RE.fullmatch(line)
+            and not _SKIP_RE.match(line)
+        ):
             dt, desc, saldo, betrag = pending
             pending = (dt, (desc + " " + line).strip(), saldo, betrag)
 
@@ -1550,12 +1677,14 @@ def _parse_pdf_text(text: str, bank: str) -> List[dict]:
         else:
             amount = 0.0
 
-        rows.append({
-            "date": dt,
-            "description": desc,
-            "amount": amount,
-            "currency": "CHF",
-        })
+        rows.append(
+            {
+                "date": dt,
+                "description": desc,
+                "amount": amount,
+                "currency": "CHF",
+            }
+        )
 
     return rows
 
@@ -1578,12 +1707,24 @@ def _parse_ubs_pdf_tables(pdf) -> List[dict]:
     DATE_FMT = "%d.%m.%Y"
     rows: List[dict] = []
 
-    AMOUNT_HEADERS = {"betrag", "amount", "umsatz", "belastung/gutschrift", "betrag chf"}
-    DEBIT_HEADERS  = {"belastung", "debit", "ausgabe", "belastung chf"}
+    AMOUNT_HEADERS = {
+        "betrag",
+        "amount",
+        "umsatz",
+        "belastung/gutschrift",
+        "betrag chf",
+    }
+    DEBIT_HEADERS = {"belastung", "debit", "ausgabe", "belastung chf"}
     CREDIT_HEADERS = {"gutschrift", "kredit", "einnahme", "gutschrift chf"}
-    DATE_HEADERS   = {"buchungsdatum", "datum", "buchungsdate", "buchungs-\ndatum"}
-    DESC_HEADERS   = {"buchungstext", "text", "beschreibung", "verwendungszweck", "buchungstext/\ngläubiger-id"}
-    SALDO_HEADERS  = {"saldo", "balance", "saldo chf"}
+    DATE_HEADERS = {"buchungsdatum", "datum", "buchungsdate", "buchungs-\ndatum"}
+    DESC_HEADERS = {
+        "buchungstext",
+        "text",
+        "beschreibung",
+        "verwendungszweck",
+        "buchungstext/\ngläubiger-id",
+    }
+    SALDO_HEADERS = {"saldo", "balance", "saldo chf"}
 
     for page in pdf.pages:
         tables = page.extract_tables()
@@ -1598,7 +1739,7 @@ def _parse_ubs_pdf_tables(pdf) -> List[dict]:
                 if not row:
                     continue
                 normalized = [str(c or "").lower().strip() for c in row]
-                has_date   = any(h in DATE_HEADERS for h in normalized)
+                has_date = any(h in DATE_HEADERS for h in normalized)
                 has_amount = any(
                     h in AMOUNT_HEADERS | DEBIT_HEADERS | CREDIT_HEADERS
                     for h in normalized
@@ -1625,10 +1766,10 @@ def _parse_ubs_pdf_tables(pdf) -> List[dict]:
                 except ValueError:
                     return None
 
-            date_col   = _find(DATE_HEADERS)
-            desc_col   = _find(DESC_HEADERS)
+            date_col = _find(DATE_HEADERS)
+            desc_col = _find(DESC_HEADERS)
             amount_col = _find(AMOUNT_HEADERS)
-            debit_col  = _find(DEBIT_HEADERS)
+            debit_col = _find(DEBIT_HEADERS)
             credit_col = _find(CREDIT_HEADERS)
 
             if date_col is None:
@@ -1636,7 +1777,7 @@ def _parse_ubs_pdf_tables(pdf) -> List[dict]:
             if amount_col is None and debit_col is None and credit_col is None:
                 continue
 
-            for data_row in table[header_row_idx + 1:]:
+            for data_row in table[header_row_idx + 1 :]:
                 if not data_row:
                     continue
                 date_str = str(data_row[date_col] or "").strip()
@@ -1645,15 +1786,27 @@ def _parse_ubs_pdf_tables(pdf) -> List[dict]:
                 except ValueError:
                     continue
 
-                desc = str(data_row[desc_col] or "").strip() if desc_col is not None else ""
+                desc = (
+                    str(data_row[desc_col] or "").strip()
+                    if desc_col is not None
+                    else ""
+                )
                 if not desc:
                     continue
 
                 # Prefer explicit Belastung/Gutschrift columns (UBS standard)
                 if debit_col is not None or credit_col is not None:
-                    debit_str  = str(data_row[debit_col]  or "").strip() if debit_col  is not None else ""
-                    credit_str = str(data_row[credit_col] or "").strip() if credit_col is not None else ""
-                    debit_val  = _parse_amt(debit_str)
+                    debit_str = (
+                        str(data_row[debit_col] or "").strip()
+                        if debit_col is not None
+                        else ""
+                    )
+                    credit_str = (
+                        str(data_row[credit_col] or "").strip()
+                        if credit_col is not None
+                        else ""
+                    )
+                    debit_val = _parse_amt(debit_str)
                     credit_val = _parse_amt(credit_str)
                     if debit_val:
                         amount = -abs(debit_val)
@@ -1670,12 +1823,14 @@ def _parse_ubs_pdf_tables(pdf) -> List[dict]:
                 else:
                     continue
 
-                rows.append({
-                    "date": dt,
-                    "description": desc,
-                    "amount": amount,
-                    "currency": "CHF",
-                })
+                rows.append(
+                    {
+                        "date": dt,
+                        "description": desc,
+                        "amount": amount,
+                        "currency": "CHF",
+                    }
+                )
 
     return rows
 
@@ -1789,5 +1944,7 @@ async def delete_import(
         "success": True,
         "import_id": import_id,
         "deleted_transactions": deleted_count,
-        "message": f"Import gelöscht. {deleted_count} Transaktionen wurden entfernt." if delete_transactions else f"Import {import_id} Log gelöscht."
+        "message": f"Import gelöscht. {deleted_count} Transaktionen wurden entfernt."
+        if delete_transactions
+        else f"Import {import_id} Log gelöscht.",
     }
