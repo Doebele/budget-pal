@@ -68,6 +68,10 @@ interface Props {
   historicalAxisMonths?: string[];
   forecastAxisMonths?: string[];
   wizardData?: WizardSnapshot | null;
+  /** Pre-computed Budgetplan supercategory breakdown: month → scId → expense CHF */
+  budgetPlanByMonth?: Record<string, Record<string, number>>;
+  /** Ordered list of months for the budgetplan mode axis */
+  budgetPlanMonths?: string[];
   height?: number;
   /** When true: skip the outer card div + title row (embed inside a parent card) */
   embedded?: boolean;
@@ -81,7 +85,7 @@ type SubCatDetail = Record<string, Record<string, Record<string, number>>>;
 
 // ── Supercategory order (bottom → top of stacked bar) ────────────
 // Matches the taxonomy order used in filter chips; excludes "sparen" (income).
-const CHART_SC_ORDER = [
+export const CHART_SC_ORDER = [
   "wohnen", "essen", "mobilitaet", "versicherungen",
   "freizeit", "abos", "shopping", "bildung", "steuern", "sonstiges",
 ];
@@ -732,14 +736,17 @@ export default function BudgetStackedBarChart({
   historicalAxisMonths,
   forecastAxisMonths,
   wizardData,
+  budgetPlanByMonth,
+  budgetPlanMonths,
   height = 320,
   embedded = false,
   hiddenScIds,
   sortOrder = "default",
 }: Props) {
-  const [mode, setMode] = useState<"historical" | "forecast">("historical");
+  const [mode, setMode] = useState<"historical" | "forecast" | "budgetplan">("historical");
   // In embedded mode always show historical data (no forecast toggle)
   const activeMode = embedded ? "historical" : mode;
+  const hasBudgetPlan = (budgetPlanMonths?.length ?? 0) > 0 && budgetPlanByMonth != null;
   const superCategories = useTaxonomySuperCategories();
   const chartSc = useMemo(
     () =>
@@ -841,9 +848,19 @@ export default function BudgetStackedBarChart({
   }, [wizardData, recurringPatterns, aiForecastSubs]);
 
   // ── Active data for current mode ──────────────────────────────
-  const activeMonths       = activeMode === "historical" ? historicalCombinedMonths : forecastMonths;
-  const activeByMonth      = activeMode === "historical" ? historicalCombinedByMonth : forecastByMonth;
-  const activeSubs         = activeMode === "historical" ? historicalCombinedSubs : forecastSubs;
+  const activeMonths = activeMode === "historical"
+    ? historicalCombinedMonths
+    : activeMode === "budgetplan"
+      ? (budgetPlanMonths ?? forecastMonths)
+      : forecastMonths;
+  const activeByMonth = activeMode === "historical"
+    ? historicalCombinedByMonth
+    : activeMode === "budgetplan"
+      ? (budgetPlanByMonth ?? {})
+      : forecastByMonth;
+  const activeSubs = activeMode === "historical"
+    ? historicalCombinedSubs
+    : (activeMode === "budgetplan" ? {} : forecastSubs) as SubCatDetail;
   const activeFirstForecastIdx = activeMode === "historical" ? histFirstForecastIdx : -1;
 
   // Compute layer data (keys/colors/sorted SC order) — shared by option + ribbon injector
@@ -878,6 +895,7 @@ export default function BudgetStackedBarChart({
 
   // Status label under the chart title
   const sourceLabel = useMemo(() => {
+    if (activeMode === "budgetplan") return "Budgetplan · Wiederkehrende Einträge nach Superkategorie";
     if (activeMode === "historical") {
       return histFirstForecastIdx >= 0
         ? "Ist-Daten + Prognose aus wiederkehrenden Zahlungen (Ø 12 Mt.)"
@@ -915,6 +933,19 @@ export default function BudgetStackedBarChart({
       >
         Prognose (Empirisch)
       </button>
+      {hasBudgetPlan && (
+        <button
+          type="button"
+          onClick={() => setMode("budgetplan")}
+          className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+            mode === "budgetplan"
+              ? "bg-accent text-white shadow-sm"
+              : "text-text-secondary hover:text-text-primary"
+          }`}
+        >
+          Budgetplan
+        </button>
+      )}
     </div>
   );
 
@@ -927,7 +958,9 @@ export default function BudgetStackedBarChart({
         >
           {activeMode === "historical"
             ? "Keine historischen Transaktionsdaten verfügbar."
-            : "Keine Prognosedaten — wähle einen Zeithorizont."}
+            : activeMode === "budgetplan"
+              ? "Keine Budgetplan-Einträge vorhanden."
+              : "Keine Prognosedaten — wähle einen Zeithorizont."}
         </div>
       ) : (
         <ReactECharts

@@ -10,7 +10,8 @@
  * Filter: Alle | Nur Ausgaben | Nur Einnahmen (localStorage persisted)
  * Year navigation: prev/next buttons.
  */
-import { useState, useMemo, useEffect, useRef, type DragEvent } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback, type DragEvent } from "react";
+import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   CalendarRange,
@@ -28,6 +29,10 @@ import {
   GripVertical,
   ArrowUpDown,
   Search,
+  CalendarDays,
+  RefreshCw,
+  FileText,
+  Building2,
 } from "lucide-react";
 import { clsx } from "clsx";
 
@@ -37,6 +42,7 @@ import { matchPlanEntryProviderId } from "@/lib/planEntryProviderMatch";
 import { formatAmount, formatCurrencyCompact } from "@/lib/theme";
 import { useAuth } from "@/lib/auth";
 import ProviderBrandIcon from "@/components/wizard/ProviderBrandIcon";
+import { getBankByName } from "@/data/banks-with-logos";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -305,6 +311,259 @@ function matchCategoryId(categories: Category[], hint: string | null): string {
   const byPlain = categories.find((c) => plainCategoryLabel(c.name).toLowerCase() === plain);
   if (byPlain) return String(byPlain.id);
   return "";
+}
+
+// ── Entry hover tooltip ───────────────────────────────────────
+
+function formatDateDE(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  return `${d}.${m}.${y}`;
+}
+
+interface EntryTooltipProps {
+  entry: RecurringPlanEntry;
+  account: Account | undefined;
+  targetRef: React.RefObject<HTMLElement | null>;
+  visible: boolean;
+}
+
+function EntryTooltip({ entry, account, targetRef, visible }: EntryTooltipProps) {
+  const [pos, setPos] = useState({ top: 0, left: 0, above: false });
+  const tooltipRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!visible || !targetRef.current) return;
+    const rect = targetRef.current.getBoundingClientRect();
+    const tooltipH = tooltipRef.current?.offsetHeight ?? 200;
+    const above = rect.bottom + tooltipH + 8 > window.innerHeight;
+    const top = above ? rect.top - tooltipH - 6 : rect.bottom + 6;
+    // centre horizontally on the chip, clamp to viewport
+    let left = rect.left + rect.width / 2 - 140;
+    left = Math.max(8, Math.min(left, window.innerWidth - 288));
+    setPos({ top, left, above });
+  }, [visible, targetRef]);
+
+  if (!visible) return null;
+
+  const bank = account ? getBankByName(account.name) : undefined;
+  const isExpense = entry.amount < 0;
+
+  return createPortal(
+    <div
+      ref={tooltipRef}
+      className={clsx(
+        "fixed z-[9999] w-72 rounded-xl bg-bg-surface border border-border shadow-2xl p-3 pointer-events-none",
+        "animate-fade-in"
+      )}
+      style={{ top: pos.top, left: pos.left }}
+    >
+      {/* Arrow */}
+      <div
+        className={clsx(
+          "absolute left-1/2 -translate-x-1/2 w-2.5 h-2.5 bg-bg-surface border-border rotate-45",
+          pos.above
+            ? "bottom-0 translate-y-1/2 border-b border-r"
+            : "top-0 -translate-y-1/2 border-t border-l"
+        )}
+      />
+
+      {/* Header: description + amount */}
+      <div className="flex items-start justify-between gap-2 mb-2.5">
+        <p className="font-semibold text-text-primary text-sm leading-snug flex-1 min-w-0 break-words">
+          {entry.description}
+        </p>
+        <span
+          className={clsx(
+            "text-sm font-mono font-bold shrink-0",
+            isExpense ? "text-loss" : "text-gain"
+          )}
+        >
+          {isExpense ? "−" : "+"}
+          {Math.abs(entry.amount).toLocaleString("de-CH", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}
+        </span>
+      </div>
+
+      {/* Detail rows */}
+      <div className="space-y-1.5 text-xs">
+        {/* Periodicity */}
+        <div className="flex items-center gap-2 text-text-secondary">
+          <RefreshCw className="w-3 h-3 text-text-tertiary shrink-0" />
+          <span>{periodicityLabel(entry.periodicity)}</span>
+        </div>
+
+        {/* Dates */}
+        <div className="flex items-center gap-2 text-text-secondary">
+          <CalendarDays className="w-3 h-3 text-text-tertiary shrink-0" />
+          <span>
+            {formatDateDE(entry.start_date)}
+            {entry.end_date && entry.end_date !== "9999-12-31"
+              ? ` – ${formatDateDE(entry.end_date)}`
+              : " (laufend)"}
+          </span>
+        </div>
+
+        {/* Notes */}
+        {entry.notes && (
+          <div className="flex items-start gap-2 text-text-secondary">
+            <FileText className="w-3 h-3 text-text-tertiary shrink-0 mt-0.5" />
+            <span className="leading-snug break-words">{entry.notes}</span>
+          </div>
+        )}
+
+        {/* Account with bank logo */}
+        {account && (
+          <div className="flex items-center gap-2 text-text-secondary pt-0.5 mt-0.5 border-t border-border/40">
+            {bank ? (
+              <img
+                src={bank.logoUrl}
+                alt={bank.name}
+                className="w-4 h-4 object-contain rounded-sm shrink-0"
+                onError={(e) => { (e.target as HTMLImageElement).src = "/logos/default-bank.svg"; }}
+              />
+            ) : (
+              <Building2 className="w-3 h-3 text-text-tertiary shrink-0" />
+            )}
+            <span>{account.name}</span>
+          </div>
+        )}
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+// ── Entry chip with tooltip ───────────────────────────────────
+
+interface EntryChipProps {
+  entry: RecurringPlanEntry;
+  account: Account | undefined;
+  dndBusy: boolean;
+  dndDraggingId: number | null;
+  isHighlighted: boolean;
+  onHoverChange: (id: number | null) => void;
+  onDragStart: (e: DragEvent<HTMLButtonElement>, entry: RecurringPlanEntry) => void;
+  onDragEnd: () => void;
+  onEdit: (entry: RecurringPlanEntry) => void;
+  providerId: string | null;
+  ScIcon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  scColor: string;
+  scLabel: string;
+  planDisplayAmt: number;
+  refCcy: string;
+}
+
+function EntryChip({
+  entry, account, dndBusy, dndDraggingId,
+  isHighlighted, onHoverChange,
+  onDragStart, onDragEnd, onEdit,
+  providerId, ScIcon, scColor, scLabel,
+  planDisplayAmt, refCcy,
+}: EntryChipProps) {
+  const [hovering, setHovering] = useState(false);
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const chipRef = useRef<HTMLButtonElement | null>(null);
+
+  const handleMouseEnter = useCallback(() => {
+    onHoverChange(entry.id);
+    hoverTimer.current = setTimeout(() => setHovering(true), 350);
+  }, [entry.id, onHoverChange]);
+
+  const handleMouseLeave = useCallback(() => {
+    onHoverChange(null);
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    setHovering(false);
+  }, [onHoverChange]);
+
+  const isExpense = entry.amount < 0;
+
+  return (
+    <div
+      className={clsx(
+        "w-full flex items-stretch rounded-lg border text-xs transition-all duration-150",
+        isHighlighted
+          ? isExpense
+            ? "bg-loss/12 border-loss/70 shadow-[0_0_0_1px] shadow-loss/25"
+            : "bg-gain/12 border-gain/70 shadow-[0_0_0_1px] shadow-gain/25"
+          : isExpense
+            ? "bg-loss/5 border-loss/20"
+            : "bg-gain/5 border-gain/20",
+        dndDraggingId === entry.id && "opacity-50"
+      )}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      <button
+        type="button"
+        draggable={!dndBusy}
+        onDragStart={(e) => onDragStart(e, entry)}
+        onDragEnd={onDragEnd}
+        className={clsx(
+          "flex items-center px-1 shrink-0 cursor-grab active:cursor-grabbing touch-none",
+          "text-text-tertiary hover:text-text-primary border-r border-border/30 bg-transparent",
+          dndBusy && "opacity-40 pointer-events-none cursor-not-allowed"
+        )}
+        title="In anderen Monat ziehen. Mit Wahltaste (⌥) beim Loslassen kopieren."
+        aria-label="Eintrag in anderen Monat ziehen; mit Wahltaste kopieren"
+      >
+        <GripVertical className="w-3.5 h-3.5" aria-hidden />
+      </button>
+      <button
+        ref={chipRef}
+        type="button"
+        onClick={() => onEdit(entry)}
+        title={entry.description}
+        className={clsx(
+          "flex flex-1 min-w-0 flex-col gap-1.5 text-left px-2 py-2 rounded-r-lg transition-colors",
+          entry.amount < 0 ? "hover:border-loss/40" : "hover:border-gain/40"
+        )}
+      >
+        <div className="flex w-full min-w-0 items-center justify-between gap-2">
+          <div className="shrink-0 flex items-center">
+            {providerId ? (
+              <ProviderBrandIcon providerId={providerId} size={22} className="rounded-md" />
+            ) : (
+              <div
+                className="flex items-center justify-center rounded-md shrink-0 border border-border/40 bg-bg-surface2"
+                style={{ width: 22, height: 22 }}
+                aria-hidden
+              >
+                <ScIcon className="w-[13px] h-[13px] text-text-secondary" strokeWidth={2.4} />
+              </div>
+            )}
+          </div>
+          <span
+            className={clsx(
+              "font-semibold tabular-nums text-right min-w-0 shrink-0",
+              entry.amount < 0 ? "text-loss" : "text-gain"
+            )}
+          >
+            {entry.amount < 0 ? "−" : "+"}
+            {formatAmount(Math.abs(planDisplayAmt), refCcy)}
+          </span>
+        </div>
+        <span
+          className="inline-flex self-start max-w-full rounded-full px-2 py-0.5 text-[10px] font-semibold truncate border"
+          style={{
+            backgroundColor: `${scColor}28`,
+            color: scColor,
+            borderColor: `${scColor}55`,
+          }}
+        >
+          {scLabel}
+        </span>
+      </button>
+
+      <EntryTooltip
+        entry={entry}
+        account={account}
+        targetRef={chipRef}
+        visible={hovering}
+      />
+    </div>
+  );
 }
 
 interface CategoryPickerProps {
@@ -593,6 +852,9 @@ export default function Budgetplan() {
   /** Kalender: Drag & Drop auf Monatsspalte */
   const [dndOverMonth, setDndOverMonth] = useState<number | null>(null);
   const [dndDraggingId, setDndDraggingId] = useState<number | null>(null);
+
+  /** Hover-Hervorhebung: Entry-ID deren gleichnamige Einträge über alle Monate leuchten */
+  const [hoveredEntryId, setHoveredEntryId] = useState<number | null>(null);
 
   // Queries
   const { data: entries = [], isLoading } = useQuery({
@@ -1167,15 +1429,6 @@ export default function Budgetplan() {
           </select>
         </div>
 
-        {/* Vorbefüllen button */}
-        <button
-          onClick={() => { closeEditor(); setPrefillOpen(true); }}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-bg-surface2 hover:bg-bg-surface border border-border text-text-secondary hover:text-text-primary rounded-lg text-sm font-medium transition-colors"
-        >
-          <Sparkles className="w-4 h-4" />
-          Vorbefüllen
-        </button>
-
         {/* View toggle */}
         <div className="flex gap-1 bg-bg-surface2 rounded-lg p-1">
           <button
@@ -1201,6 +1454,15 @@ export default function Budgetplan() {
             Monate
           </button>
         </div>
+
+        {/* Vorbefüllen button */}
+        <button
+          onClick={() => { closeEditor(); setPrefillOpen(true); }}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-bg-surface2 hover:bg-bg-surface border border-border text-text-secondary hover:text-text-primary rounded-lg text-sm font-medium transition-colors"
+        >
+          <Sparkles className="w-4 h-4" />
+          Vorbefüllen
+        </button>
 
         {/* Add button */}
         <button
@@ -1316,78 +1578,26 @@ export default function Budgetplan() {
                         ? resolveSuperCategoryForRow(cat)
                         : resolveSuperCategory(entry.description, true);
                       const providerId = matchPlanEntryProviderId(entry.description);
-                      const ScIcon = sc.icon;
+                      const entryAccount = accounts.find((a) => a.id === entry.account_id);
                       return (
-                        <div
+                        <EntryChip
                           key={entry.id}
-                          className={clsx(
-                            "w-full flex items-stretch rounded-lg border text-xs transition-opacity",
-                            entry.amount < 0
-                              ? "bg-loss/5 border-loss/20"
-                              : "bg-gain/5 border-gain/20",
-                            dndDraggingId === entry.id && "opacity-50"
-                          )}
-                        >
-                          <button
-                            type="button"
-                            draggable={!dndBusy}
-                            onDragStart={(e) => handleRecurringDragStart(e, entry)}
-                            onDragEnd={handleRecurringDragEnd}
-                            className={clsx(
-                              "flex items-center px-1 shrink-0 cursor-grab active:cursor-grabbing touch-none",
-                              "text-text-tertiary hover:text-text-primary border-r border-border/30 bg-transparent",
-                              dndBusy && "opacity-40 pointer-events-none cursor-not-allowed"
-                            )}
-                            title="In anderen Monat ziehen. Mit Wahltaste (⌥) beim Loslassen kopieren."
-                            aria-label="Eintrag in anderen Monat ziehen; mit Wahltaste kopieren"
-                          >
-                            <GripVertical className="w-3.5 h-3.5" aria-hidden />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => openEdit(entry)}
-                            title={entry.description}
-                            className={clsx(
-                              "flex flex-1 min-w-0 flex-col gap-1.5 text-left px-2 py-2 rounded-r-lg transition-colors",
-                              entry.amount < 0 ? "hover:border-loss/40" : "hover:border-gain/40"
-                            )}
-                          >
-                            <div className="flex w-full min-w-0 items-center justify-between gap-2">
-                              <div className="shrink-0 flex items-center">
-                                {providerId ? (
-                                  <ProviderBrandIcon providerId={providerId} size={22} className="rounded-md" />
-                                ) : (
-                                  <div
-                                    className="flex items-center justify-center rounded-md shrink-0 border border-border/40 bg-bg-surface2"
-                                    style={{ width: 22, height: 22 }}
-                                    aria-hidden
-                                  >
-                                    <ScIcon className="w-[13px] h-[13px] text-text-secondary" strokeWidth={2.4} />
-                                  </div>
-                                )}
-                              </div>
-                              <span
-                                className={clsx(
-                                  "font-semibold tabular-nums text-right min-w-0 shrink-0",
-                                  entry.amount < 0 ? "text-loss" : "text-gain"
-                                )}
-                              >
-                                {entry.amount < 0 ? "−" : "+"}
-                                {formatAmount(Math.abs(planDisplayAmt(entry)), refCcy)}
-                              </span>
-                            </div>
-                            <span
-                              className="inline-flex self-start max-w-full rounded-full px-2 py-0.5 text-[10px] font-semibold truncate border"
-                              style={{
-                                backgroundColor: `${sc.color}28`,
-                                color: sc.color,
-                                borderColor: `${sc.color}55`,
-                              }}
-                            >
-                              {sc.label}
-                            </span>
-                          </button>
-                        </div>
+                          entry={entry}
+                          account={entryAccount}
+                          dndBusy={dndBusy}
+                          dndDraggingId={dndDraggingId}
+                          isHighlighted={hoveredEntryId === entry.id}
+                          onHoverChange={setHoveredEntryId}
+                          onDragStart={handleRecurringDragStart}
+                          onDragEnd={handleRecurringDragEnd}
+                          onEdit={openEdit}
+                          providerId={providerId}
+                          ScIcon={sc.icon}
+                          scColor={sc.color}
+                          scLabel={sc.label}
+                          planDisplayAmt={planDisplayAmt(entry)}
+                          refCcy={refCcy}
+                        />
                       );
                     })}
                   </div>
