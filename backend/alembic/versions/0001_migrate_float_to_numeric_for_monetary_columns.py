@@ -22,7 +22,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "0001"
-down_revision = None
+down_revision = "b5f6cf721f74"
 branch_labels = None
 depends_on = None
 

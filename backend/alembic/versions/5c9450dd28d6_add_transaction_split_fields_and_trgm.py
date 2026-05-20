@@ -14,7 +14,8 @@ branch_labels = None
 depends_on = None
 
 def upgrade() -> None:
-    op.create_index(op.f('ix_mortgage_tranches_id'), 'mortgage_tranches', ['id'], unique=False)
+    # Note: ix_mortgage_tranches_id was already created in the baseline migration (8a1542a8b20d).
+    # Removed duplicate create_index to avoid "already exists" errors on existing databases.
     op.add_column('transactions', sa.Column('parent_id', sa.Integer(), nullable=True))
     op.add_column('transactions', sa.Column('is_split', sa.Boolean(), nullable=False, server_default=sa.text('false')))
     op.create_index(op.f('ix_transactions_parent_id'), 'transactions', ['parent_id'], unique=False)
@@ -25,4 +26,4 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_transactions_parent_id'), table_name='transactions')
     op.drop_column('transactions', 'is_split')
     op.drop_column('transactions', 'parent_id')
-    op.drop_index(op.f('ix_mortgage_tranches_id'), table_name='mortgage_tranches')
+    # Note: ix_mortgage_tranches_id is managed by the baseline migration — not dropped here.
