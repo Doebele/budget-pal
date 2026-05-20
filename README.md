@@ -115,6 +115,25 @@ AUTO_CREATE_SCHEMA=false     # true = DB ohne Alembic beim ersten Start
 
 ## Entwicklung / Development
 
+### Feature-Branch-Workflow
+
+Direkte Pushes auf `main` sind gesperrt (pre-push hook). Workflow:
+
+```bash
+# 1. Neuen Feature-Branch erstellen (von main)
+make feature name=mein-feature   # → Branch feat/mein-feature
+
+# 2. Entwickeln ...
+
+# 3. Commit + Push + GitHub PR
+make pr msg="feat: kurze Beschreibung"
+
+# Branch mit main synchron halten
+make sync
+```
+
+### Lokale Entwicklung
+
 ```bash
 # Backend lokal (ohne Docker)
 cd backend
@@ -132,6 +151,20 @@ npm run dev    # Vite Dev-Server auf :5173 mit Proxy zu :8000
 make logs
 make logs-backend
 ```
+
+### Tests
+
+```bash
+# Alle Backend-Tests
+make test-backend
+
+# Einzelne Test-Suites
+docker compose exec budget-pal-backend pytest tests/test_auth.py -v
+docker compose exec budget-pal-backend pytest tests/test_transactions.py -v
+docker compose exec budget-pal-backend pytest tests/services/ -v
+```
+
+Test-Abdeckung: Auth-Flows, Transaktions-CRUD, KI-Kategorisierung (5-stufige Pipeline), Monte-Carlo-Projektion.
 
 ---
 
@@ -228,19 +261,30 @@ budget-pal/
 │   │   │   └── models.py       # ORM Models (User, Transaction, RecurringPlan, ...)
 │   │   ├── api/
 │   │   │   ├── auth.py         # POST /auth/register, /login, /me
-│   │   │   ├── transactions.py # CRUD + stats
-│   │   │   ├── imports.py      # CSV/PDF import
+│   │   │   ├── transactions.py # CRUD + stats + bulk-archive
+│   │   │   ├── accounts.py     # CRUD + bulk-delete/preview
+│   │   │   ├── imports.py      # CSV/PDF import (UBS, N26, Revolut, comdirect)
 │   │   │   ├── projections.py  # Monte Carlo scenarios
 │   │   │   ├── recurring_plan.py # Budgetplan CRUD
 │   │   │   ├── taxonomy.py     # Taxonomy + per-User Label-Hiding
 │   │   │   ├── wizard.py       # Empirisches Finanzprofil
-│   │   │   ├── currency.py     # Wechselkurse
+│   │   │   ├── currency.py     # Wechselkurse (ECB / Fallback)
 │   │   │   └── settings.py     # User-Einstellungen
 │   │   └── services/
-│   │       ├── categorization.py     # 5-stage AI pipeline
+│   │       ├── categorization.py     # 5-stufige KI-Pipeline
 │   │       ├── projection.py         # Monte Carlo + AHV/BVG
 │   │       ├── peer_group_seed.py    # System-Kategorie Seeding + Migrationen
 │   │       └── import_parsers/       # UBS, N26, Revolut, comdirect
+│   ├── alembic/
+│   │   └── versions/
+│   │       └── 0001_migrate_float_to_numeric_for_monetary_columns.py
+│   ├── tests/                  # pytest Test-Suite
+│   │   ├── conftest.py         # Async DB-Fixtures, Test-Client
+│   │   ├── test_auth.py        # Auth-Flows (Register, Login, JWT)
+│   │   ├── test_transactions.py
+│   │   └── services/
+│   │       ├── test_categorization.py  # 5-stufige Pipeline
+│   │       └── test_projection.py      # Monte Carlo + Rentensäulen
 │   ├── Dockerfile
 │   └── requirements.txt
 │
@@ -251,6 +295,10 @@ budget-pal/
 │   │   │   ├── api.ts          # Axios + JWT interceptor + alle API-Calls
 │   │   │   ├── auth.tsx        # Auth Context
 │   │   │   └── categories.ts   # useTaxonomy(), SuperCategory Typen, Lookups
+│   │   ├── components/
+│   │   │   ├── EntryTooltip.tsx           # Hover-Tooltip für Budgetplan-Einträge
+│   │   │   └── transactions/
+│   │   │       └── TransactionOverviewHeader.tsx  # Bulk-Archiv/Delete Modal
 │   │   └── pages/
 │   │       ├── Dashboard.tsx   # Sankey, Top-Kategorien, Letzte Transaktionen
 │   │       ├── Transactions.tsx
@@ -259,7 +307,7 @@ budget-pal/
 │   │       ├── Budgetplan.tsx  # Jahresübersicht wiederkehrender Einträge
 │   │       ├── Finanzplan.tsx  # Langfristprognose + Rentensäulen
 │   │       ├── Projections.tsx # Monte Carlo Fan-Chart
-│   │       ├── Forecast.tsx
+│   │       ├── Forecast.tsx    # Kategorie-Breakdown, Chart-Export
 │   │       ├── Wizard.tsx      # Empirisches Finanzprofil
 │   │       ├── Accounts.tsx
 │   │       └── Settings.tsx    # Einstellungen inkl. Kategorie-Taxonomie
@@ -270,9 +318,11 @@ budget-pal/
 ├── shared/
 │   └── taxonomy.json           # Zentrale Superkategorie-Definition
 │
+├── .githooks/
+│   └── pre-push                # Blockiert direkte Pushes auf main
 ├── docker-compose.yml          # Build-Kontext: Repo-Root für alle Services
 ├── .env.example
-├── Makefile
+├── Makefile                    # make feature / make pr / make sync + Docker-Befehle
 ├── context.md                  # Änderungsprotokoll
 └── README.md
 ```
