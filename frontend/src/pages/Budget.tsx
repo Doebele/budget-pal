@@ -17,10 +17,7 @@ import { useState, useMemo, useCallback, lazy, Suspense } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { clsx } from "clsx";
-import {
-  TrendingDown, TrendingUp, ChevronDown, ChevronUp,
-  Lightbulb, Target, Wallet, BarChart3, Gauge, Eye, EyeOff, ArrowDownUp, Layers, TableProperties,
-} from "lucide-react";
+import { Component, DashboardSpeed, DataTransferBoth, Eye, EyeClosed, GraphDown, GraphUp, LightBulb, NavArrowDown, NavArrowUp, Position, Reports, TableRows, Wallet } from "@/lib/icons";
 
 const CategoryGaugeChart = lazy(
   () => import("@/components/charts/CategoryGaugeChart"),
@@ -541,7 +538,7 @@ export default function Budget() {
   // Visible (non-hidden) rows for each view
   const visibleMainRows = mainRows.filter((r) => !hiddenScIds.has(r.sc.id));
 
-  // ── Gauge rows: all mainRows + peer values ────────────────────
+  // ── DashboardSpeed rows: all mainRows + peer values ────────────────────
   const gaugeRows = useMemo(
     () =>
       mainRows.map((r) => ({
@@ -652,8 +649,8 @@ export default function Budget() {
             <span className="text-text-tertiary text-xs uppercase tracking-wide">Netto-Überschuss</span>
             <div className="w-8 h-8 rounded-lg bg-bg-surface2 flex items-center justify-center">
               {kpi.net >= 0
-                ? <TrendingUp className="w-4 h-4 text-gain" />
-                : <TrendingDown className="w-4 h-4 text-loss" />}
+                ? <GraphUp className="w-4 h-4 text-gain" />
+                : <GraphDown className="w-4 h-4 text-loss" />}
             </div>
           </div>
           <p className={clsx(
@@ -709,7 +706,7 @@ export default function Budget() {
           <div className="flex items-center justify-between">
             <span className="text-text-tertiary text-xs uppercase tracking-wide">Ausschöpfung</span>
             <div className="w-8 h-8 rounded-lg bg-bg-surface2 flex items-center justify-center">
-              <Target className="w-4 h-4 text-text-tertiary" />
+              <Position className="w-4 h-4 text-text-tertiary" />
             </div>
           </div>
           {utilisation !== null ? (
@@ -758,11 +755,11 @@ export default function Budget() {
                     : "border-border text-text-tertiary hover:text-text-secondary",
                 )}
               >
-                <ArrowDownUp className="w-3.5 h-3.5" />
+                <DataTransferBoth className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">{sortOrder === "amount" ? "Betrag" : "Standard"}</span>
               </button>
 
-              {/* View toggle: Balken / Gauge / Stacked */}
+              {/* View toggle: Balken / DashboardSpeed / Stacked */}
               <div className="flex items-center rounded-lg border border-border overflow-hidden">
                 <button
                   type="button"
@@ -775,11 +772,11 @@ export default function Budget() {
                       : "text-text-tertiary hover:text-text-secondary",
                   )}
                 >
-                  <BarChart3 className="w-3.5 h-3.5" />
+                  <Reports className="w-3.5 h-3.5" />
                 </button>
                 <button
                   type="button"
-                  title="Gauge-Ansicht"
+                  title="DashboardSpeed-Ansicht"
                   onClick={() => handleSetView("gauge")}
                   className={clsx(
                     "px-2 py-1.5 border-l border-border transition-colors",
@@ -788,7 +785,7 @@ export default function Budget() {
                       : "text-text-tertiary hover:text-text-secondary",
                   )}
                 >
-                  <Gauge className="w-3.5 h-3.5" />
+                  <DashboardSpeed className="w-3.5 h-3.5" />
                 </button>
                 <button
                   type="button"
@@ -801,7 +798,7 @@ export default function Budget() {
                       : "text-text-tertiary hover:text-text-secondary",
                   )}
                 >
-                  <Layers className="w-3.5 h-3.5" />
+                  <Component className="w-3.5 h-3.5" />
                 </button>
                 <button
                   type="button"
@@ -814,7 +811,7 @@ export default function Budget() {
                       : "text-text-tertiary hover:text-text-secondary",
                   )}
                 >
-                  <TableProperties className="w-3.5 h-3.5" />
+                  <TableRows className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
@@ -854,7 +851,7 @@ export default function Budget() {
                 style={!isHidden ? { borderColor: sc.color + "50", backgroundColor: sc.color + "12" } : undefined}
               >
                 {isHidden
-                  ? <EyeOff className="w-3 h-3 shrink-0" />
+                  ? <EyeClosed className="w-3 h-3 shrink-0" />
                   : <sc.icon className="w-3 h-3 shrink-0" style={{ color: sc.color }} />}
                 <span className="hidden sm:inline truncate max-w-[80px]">{sc.label}</span>
               </button>
@@ -888,12 +885,12 @@ export default function Budget() {
           </p>
         )}
 
-        {/* ── Gauge view ── */}
+        {/* ── DashboardSpeed view ── */}
         {view === "gauge" && hasSomeData && (
           <Suspense
             fallback={
               <div className="py-10 flex items-center justify-center text-text-tertiary text-sm">
-                Lade Gauge…
+                Lade DashboardSpeed…
               </div>
             }
           >
@@ -944,7 +941,7 @@ export default function Budget() {
                   onClick={() => setShowSonstiges((v) => !v)}
                 >
                   <span className="flex items-center gap-1.5">
-                    {showSonstiges ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                    {showSonstiges ? <NavArrowUp className="w-3.5 h-3.5" /> : <NavArrowDown className="w-3.5 h-3.5" />}
                     💸 Sonstiges
                     {sonstigesRow.actual > 0 && ` · ${fmtRef(sonstigesRow.actual)}`}
                   </span>
@@ -1134,12 +1131,12 @@ export default function Budget() {
             onClick={() => setShowPeer((v) => !v)}
           >
             <span className="flex items-center gap-2 text-text-secondary font-medium">
-              <Lightbulb className="w-4 h-4 text-warning" />
+              <LightBulb className="w-4 h-4 text-warning" />
               Peer-Vergleich (Schweizer Durchschnitt)
             </span>
             {showPeer
-              ? <ChevronUp className="w-4 h-4 text-text-tertiary" />
-              : <ChevronDown className="w-4 h-4 text-text-tertiary" />}
+              ? <NavArrowUp className="w-4 h-4 text-text-tertiary" />
+              : <NavArrowDown className="w-4 h-4 text-text-tertiary" />}
           </button>
 
           {showPeer && peerData && (
@@ -1210,7 +1207,7 @@ export default function Budget() {
                         key={opp.category}
                         className="flex items-start gap-2 bg-warning/5 border border-warning/20 rounded-lg px-3 py-2"
                       >
-                        <Lightbulb className="w-3.5 h-3.5 text-warning shrink-0 mt-0.5" />
+                        <LightBulb className="w-3.5 h-3.5 text-warning shrink-0 mt-0.5" />
                         <p className="text-text-secondary text-xs">{opp.action}</p>
                       </div>
                     ))}

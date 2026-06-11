@@ -1,46 +1,26 @@
 import { Fragment, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import type { LucideIcon } from "lucide-react";
 import NotificationBell from "./NotificationBell";
-import {
-  LayoutDashboard,
-  ArrowLeftRight,
-  PiggyBank,
-  TrendingUp,
-  Upload,
-  Wallet,
-  Settings,
-  LogOut,
-  ChevronLeft,
-  ChevronRight,
-  Menu,
-  X,
-  BarChart3,
-  Wand2,
-  Archive,
-  Brain,
-  FileBarChart2,
-  CalendarRange,
-  Target,
-} from "lucide-react";
+import type { IconComponent } from "@/lib/icons";
+import { Archive, Brain, Calendar, DashboardDots, DataTransferBoth, GraphUp, LogOut, MagicWand, Menu, NavArrowLeft, NavArrowRight, PiggyBank, Position, Reports, Settings, StatsReport, Upload, Wallet, Xmark } from "@/lib/icons";
 import { useAuth } from "@/lib/auth";
 import { clsx } from "clsx";
 
 const NAV_ITEMS: {
   path: string;
-  icon: LucideIcon;
+  icon: IconComponent;
   label: string;
   dividerAfter?: boolean;
 }[] = [
-  { path: "/", icon: LayoutDashboard, label: "Dashboard" },
-  { path: "/finanzplan", icon: FileBarChart2, label: "Finanzplan" },
+  { path: "/", icon: DashboardDots, label: "Dashboard" },
+  { path: "/finanzplan", icon: StatsReport, label: "Finanzplan" },
   { path: "/budget", icon: PiggyBank, label: "Budgetanalyse" },
-  { path: "/budgetplan", icon: CalendarRange, label: "Budgetplan" },
-  { path: "/goals", icon: Target, label: "Sparziele" },
+  { path: "/budgetplan", icon: Calendar, label: "Budgetplan" },
+  { path: "/goals", icon: Position, label: "Sparziele" },
   { path: "/forecast", icon: Brain, label: "Budgetprognose" },
-  { path: "/projections", icon: TrendingUp, label: "Rentenprognose", dividerAfter: true },
-  { path: "/wizard", icon: Wand2, label: "Empirische Angaben" },
-  { path: "/transactions", icon: ArrowLeftRight, label: "Reale Angaben" },
+  { path: "/projections", icon: GraphUp, label: "Rentenprognose", dividerAfter: true },
+  { path: "/wizard", icon: MagicWand, label: "Empirische Angaben" },
+  { path: "/transactions", icon: DataTransferBoth, label: "Reale Angaben" },
   { path: "/import", icon: Upload, label: "Import" },
   { path: "/accounts", icon: Wallet, label: "Konten" },
   { path: "/transactions/archived", icon: Archive, label: "Archiv" },
@@ -67,7 +47,7 @@ export default function Sidebar() {
       {/* Logo */}
       <div className="flex items-center gap-3 px-4 py-5 border-b border-border/50">
         <div className="w-8 h-8 rounded-lg bg-gradient-accent flex items-center justify-center flex-shrink-0">
-          <BarChart3 className="w-4 h-4 text-white" />
+          <Reports className="w-4 h-4 text-white" />
         </div>
         {!collapsed && (
           <>
@@ -160,7 +140,7 @@ export default function Sidebar() {
         onClick={() => setCollapsed(!collapsed)}
         className="hidden md:flex items-center justify-center h-10 border-t border-border/50 text-text-tertiary hover:text-text-primary transition-colors"
       >
-        {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+        {collapsed ? <NavArrowRight className="w-4 h-4" /> : <NavArrowLeft className="w-4 h-4" />}
       </button>
     </div>
   );
@@ -173,7 +153,7 @@ export default function Sidebar() {
         onClick={() => setMobileOpen(!mobileOpen)}
         aria-label="Menü öffnen"
       >
-        {mobileOpen ? <X className="w-4 h-4 text-text-primary" /> : <Menu className="w-4 h-4 text-text-primary" />}
+        {mobileOpen ? <Xmark className="w-4 h-4 text-text-primary" /> : <Menu className="w-4 h-4 text-text-primary" />}
       </button>
 
       {/* Mobile overlay */}

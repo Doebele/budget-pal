@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { accountsApi } from "@/lib/api";
 import { formatCHF } from "@/lib/theme";
-import { Plus, Edit2, Trash2, Search, Check, AlertTriangle } from "lucide-react";
+import { Check, EditPencil, Plus, Search, Trash, WarningTriangle } from "@/lib/icons";
 import { clsx } from "clsx";
 import {
   BANKS_WITH_LOGOS,
@@ -474,7 +474,7 @@ export default function Accounts() {
                 className="btn-danger ml-auto flex items-center gap-2"
                 disabled={deleteMutation.isPending}
               >
-                <Trash2 className="w-4 h-4" />
+                <Trash className="w-4 h-4" />
                 {deleteMutation.isPending ? "Löschen..." : "Löschen"}
               </button>
             )}
@@ -492,7 +492,7 @@ export default function Accounts() {
           <div className="relative w-full max-w-md bg-slate-800 rounded-lg border border-slate-700 p-6 shadow-xl">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
-                <Trash2 className="w-5 h-5 text-red-500" />
+                <Trash className="w-5 h-5 text-red-500" />
               </div>
               <h3 className="text-lg font-semibold text-white">
                 Konto löschen?
@@ -574,7 +574,7 @@ export default function Accounts() {
                     )}
                     title="Bearbeiten"
                   >
-                    <Edit2 className="w-4 h-4" />
+                    <EditPencil className="w-4 h-4" />
                   </button>
                 </div>
               </div>

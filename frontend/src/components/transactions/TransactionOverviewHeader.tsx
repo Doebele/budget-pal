@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { formatCHF } from "@/lib/theme";
-import { Archive, AlertTriangle, Trash2, X } from "lucide-react";
+import { Archive, Trash, WarningTriangle, Xmark } from "@/lib/icons";
 import { clsx } from "clsx";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
@@ -64,7 +64,7 @@ export function TransactionOverviewHeader({
       >
         <span className="relative inline-flex">
           <Archive className="w-4 h-4" />
-          <AlertTriangle className="w-2.5 h-2.5 text-amber-100 absolute -right-1 -top-0.5" />
+          <WarningTriangle className="w-2.5 h-2.5 text-amber-100 absolute -right-1 -top-0.5" />
         </span>
         <span className="hidden sm:inline">Transaktionen archivieren</span>
       </button>
@@ -85,7 +85,7 @@ export function TransactionOverviewHeader({
             <div className="bg-gradient-to-r from-amber-900/40 to-slate-900 p-5 border-b border-slate-700">
               <div className="flex items-start gap-3">
                 <div className="w-11 h-11 rounded-full bg-amber-500/20 flex items-center justify-center shrink-0">
-                  <AlertTriangle className="w-6 h-6 text-amber-400" />
+                  <WarningTriangle className="w-6 h-6 text-amber-400" />
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-white">
@@ -103,7 +103,7 @@ export function TransactionOverviewHeader({
                   className="ml-auto p-1 rounded text-slate-500 hover:text-white"
                   aria-label="Schließen"
                 >
-                  <X className="w-5 h-5" />
+                  <Xmark className="w-5 h-5" />
                 </button>
               </div>
             </div>
@@ -164,7 +164,7 @@ export function TransactionOverviewHeader({
 
               <div className="rounded-lg border border-red-500/25 bg-red-950/30 p-4 space-y-3">
                 <p className="text-red-200 text-sm font-medium flex items-center gap-2">
-                  <Trash2 className="w-4 h-4" />
+                  <Trash className="w-4 h-4" />
                   Löschen ohne Archivierung (Hard-Delete)
                 </p>
                 <p className="text-red-200/80 text-xs">
@@ -216,7 +216,7 @@ export function TransactionOverviewHeader({
                       : "bg-red-600 hover:bg-red-500 text-white"
                   )}
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash className="w-4 h-4" />
                   Endgültig löschen
                 </button>
               </div>

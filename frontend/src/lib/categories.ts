@@ -6,20 +6,8 @@
  *   • `useTaxonomy()` in React-Komponenten (Farben, resolve*, groupBySuper, …)
  *   • `useTaxonomySuperCategories()` wenn nur die Liste nötig ist
  */
-import type { LucideIcon } from "lucide-react";
-import {
-  Home,
-  ShoppingCart,
-  Train,
-  ShieldCheck,
-  Clapperboard,
-  Smartphone,
-  ShoppingBag,
-  GraduationCap,
-  Landmark,
-  PiggyBank,
-  Layers,
-} from "lucide-react";
+import type { IconComponent } from "@/lib/icons";
+import { Bank, Cart, Component, GraduationCap, Home, Movie, PiggyBank, ShieldCheck, ShoppingBag, SmartphoneDevice, Train } from "@/lib/icons";
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
@@ -29,24 +17,24 @@ import taxonomyJson from "../../../shared/taxonomy.json";
 
 // ── Lucide icons by supercategory id (not in JSON) ─────────────
 
-const SUPER_ICONS: Record<string, LucideIcon> = {
+const SUPER_ICONS: Record<string, IconComponent> = {
   wohnen: Home,
-  essen: ShoppingCart,
+  essen: Cart,
   mobilitaet: Train,
   versicherungen: ShieldCheck,
-  freizeit: Clapperboard,
-  abos: Smartphone,
+  freizeit: Movie,
+  abos: SmartphoneDevice,
   shopping: ShoppingBag,
   bildung: GraduationCap,
-  steuern: Landmark,
+  steuern: Bank,
   sparen: PiggyBank,
-  sonstiges: Layers,
+  sonstiges: Component,
 };
 
 export interface SuperCategory {
   id: string;
   label: string;
-  icon: LucideIcon;
+  icon: IconComponent;
   emoji: string;
   color: string;
   txnCategories: string[];
@@ -68,7 +56,7 @@ export function buildSuperCategoriesFromRows(rows: TaxonomyJsonRow[]): SuperCate
   return rows.map((row) => ({
     id: row.id,
     label: row.label,
-    icon: SUPER_ICONS[row.id] ?? Layers,
+    icon: SUPER_ICONS[row.id] ?? Component,
     emoji: row.emoji,
     color: row.color,
     txnCategories: [...row.txnCategories],

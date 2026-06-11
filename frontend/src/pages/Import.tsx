@@ -1,7 +1,7 @@
 import { useState, useRef, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { importsApi, accountsApi, categoriesApi } from "@/lib/api";
-import { Upload, FileText, CheckCircle2, AlertCircle, Clock, Trash2, X, Eye, Settings2, ChevronDown, ChevronUp, Check, AlertTriangle, Table2, MapPin, Database } from "lucide-react";
+import { Check, CheckCircle, Clock, Database, Eye, MapPin, NavArrowDown, NavArrowUp, Page, Settings, Table, Trash, Upload, WarningCircle, WarningTriangle, Xmark } from "@/lib/icons";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { clsx } from "clsx";
@@ -416,7 +416,7 @@ export default function Import() {
           )}
           onClick={() => selectedAccount && pdfRef.current?.click()}
         >
-          <FileText className="w-8 h-8 text-text-tertiary mx-auto mb-3" />
+          <Page className="w-8 h-8 text-text-tertiary mx-auto mb-3" />
           <p className="text-text-primary font-medium text-sm">PDF importieren</p>
           <p className="text-text-tertiary text-xs mt-1">OCR-Extraktion mit interaktiver Vorschau</p>
           <input ref={pdfRef} type="file" accept=".pdf" className="hidden" onChange={handlePdfChange} />
@@ -463,7 +463,7 @@ export default function Import() {
                   </p>
                 </div>
                 <button onClick={() => setPdfPreview(null)} className="text-slate-400 hover:text-white" type="button">
-                  <X className="w-5 h-5" />
+                  <Xmark className="w-5 h-5" />
                 </button>
               </div>
 
@@ -734,7 +734,7 @@ export default function Import() {
                     <>
                       <span className="text-slate-600">|</span>
                       <span className="text-red-400 flex items-center gap-1">
-                        <AlertTriangle className="w-3 h-3" />
+                        <WarningTriangle className="w-3 h-3" />
                         {previewData.error_rows} Fehler
                       </span>
                     </>
@@ -752,9 +752,9 @@ export default function Import() {
                     : "bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700"
                 )}
               >
-                <Table2 className="w-3.5 h-3.5" />
+                <Table className="w-3.5 h-3.5" />
                 Feldzuweisung
-                {showColumnMapping ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                {showColumnMapping ? <NavArrowUp className="w-3.5 h-3.5" /> : <NavArrowDown className="w-3.5 h-3.5" />}
               </button>
               <button
                 onClick={() => {
@@ -764,7 +764,7 @@ export default function Import() {
                 }}
                 className="px-3 py-2 rounded-lg bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 border border-slate-700 transition-colors"
               >
-                <X className="w-3.5 h-3.5" />
+                <Xmark className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
@@ -775,7 +775,7 @@ export default function Import() {
               {/* Header */}
               <div className="bg-slate-800 px-4 py-3 border-b border-slate-700 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Table2 className="w-4 h-4 text-accent" />
+                  <Table className="w-4 h-4 text-accent" />
                   <span className="text-white font-medium text-sm">CSV-Feldzuweisung</span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -938,7 +938,7 @@ export default function Import() {
                 {mappingWarnings.length > 0 && (
                   <div className="bg-red-900/30 border border-red-500/30 rounded-lg p-3">
                     <div className="flex items-center gap-2 mb-2">
-                      <AlertTriangle className="w-4 h-4 text-red-400" />
+                      <WarningTriangle className="w-4 h-4 text-red-400" />
                       <span className="text-red-300 font-medium text-sm">Zuweisungs-Probleme</span>
                     </div>
                     <ul className="space-y-1">
@@ -1004,7 +1004,7 @@ export default function Import() {
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-xs" title={row.errors.join(", ")}>
-                          <AlertTriangle className="w-3 h-3" />
+                          <WarningTriangle className="w-3 h-3" />
                           Fehler
                         </span>
                       )}
@@ -1052,7 +1052,7 @@ export default function Import() {
               )}
               title={mappingWarnings.find(w => w.includes("erforderlich")) || "Import durchführen"}
             >
-              <CheckCircle2 className="w-4 h-4" />
+              <CheckCircle className="w-4 h-4" />
               {previewData.parsed_rows} Transaktionen importieren
             </button>
           </div>
@@ -1063,7 +1063,7 @@ export default function Import() {
       {importResult && !isLoading && (
         <div className="card">
           <div className="flex items-center gap-3 mb-4">
-            <CheckCircle2 className="w-5 h-5 text-gain" />
+            <CheckCircle className="w-5 h-5 text-gain" />
             <div>
               <p className="text-text-primary font-semibold text-sm">Import abgeschlossen</p>
               <p className="text-text-tertiary text-xs">
@@ -1101,7 +1101,7 @@ export default function Import() {
               className="text-text-tertiary hover:text-loss text-xs flex items-center gap-1 transition-colors"
               title="Letzten Import löschen"
             >
-              <Trash2 className="w-3.5 h-3.5" />
+              <Trash className="w-3.5 h-3.5" />
               Letzten Import rückgängig machen
             </button>
           )}
@@ -1115,8 +1115,8 @@ export default function Import() {
               <div className={clsx("w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0",
                 log.status === "completed" ? "bg-gain/15" : log.status === "failed" ? "bg-loss/15" : "bg-warning/15"
               )}>
-                {log.status === "completed" ? <CheckCircle2 className="w-3.5 h-3.5 text-gain" />
-                  : log.status === "failed" ? <AlertCircle className="w-3.5 h-3.5 text-loss" />
+                {log.status === "completed" ? <CheckCircle className="w-3.5 h-3.5 text-gain" />
+                  : log.status === "failed" ? <WarningCircle className="w-3.5 h-3.5 text-loss" />
                   : <Clock className="w-3.5 h-3.5 text-warning" />}
               </div>
               <div className="flex-1 min-w-0">
@@ -1143,7 +1143,7 @@ export default function Import() {
           <div className="relative w-full max-w-md bg-slate-800 rounded-lg border border-slate-700 p-6 shadow-xl">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
-                <Trash2 className="w-5 h-5 text-red-500" />
+                <Trash className="w-5 h-5 text-red-500" />
               </div>
               <h3 className="text-lg font-semibold text-white">
                 Import komplett löschen?
@@ -1173,7 +1173,7 @@ export default function Import() {
                 className="btn-danger flex items-center gap-2"
                 disabled={deleteMutation.isPending}
               >
-                <Trash2 className="w-4 h-4" />
+                <Trash className="w-4 h-4" />
                 {deleteMutation.isPending ? "Wird gelöscht..." : "Alle Transaktionen löschen"}
               </button>
             </div>

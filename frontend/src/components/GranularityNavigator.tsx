@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { NavArrowLeft, NavArrowRight } from "@/lib/icons";
 import { clsx } from "clsx";
 import {
   TimeGranularity,
@@ -60,7 +60,7 @@ export default function GranularityNavigator({ granularity, anchor, onChange }: 
             className="p-1.5 rounded hover:bg-bg-surface2 text-text-tertiary hover:text-text-primary transition-colors"
             title="Vorherige Periode"
           >
-            <ChevronLeft className="w-4 h-4" />
+            <NavArrowLeft className="w-4 h-4" />
           </button>
         )}
 
@@ -75,7 +75,7 @@ export default function GranularityNavigator({ granularity, anchor, onChange }: 
               className="p-1.5 rounded hover:bg-bg-surface2 text-text-tertiary hover:text-text-primary transition-colors"
               title="Nächste Periode"
             >
-              <ChevronRight className="w-4 h-4" />
+              <NavArrowRight className="w-4 h-4" />
             </button>
 
             <button

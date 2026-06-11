@@ -5,9 +5,7 @@
  * Same fixed-header / scroll-body / fixed-footer pattern as ProviderSidebar.
  */
 import { useState } from "react";
-import {
-  X, Globe, ExternalLink, Calendar, RefreshCw, Trash2, Check,
-} from "lucide-react";
+import { Calendar, Check, Globe, OpenNewWindow, Refresh, Trash, Xmark } from "@/lib/icons";
 import { clsx } from "clsx";
 import {
   toMonthlyCHF, getFaviconUrl,
@@ -142,7 +140,7 @@ export default function CustomProviderSidebar({
           onClick={onClose}
           className="text-text-tertiary hover:text-text-primary transition-colors flex-shrink-0"
         >
-          <X className="w-4 h-4" />
+          <Xmark className="w-4 h-4" />
         </button>
       </header>
 
@@ -188,7 +186,7 @@ export default function CustomProviderSidebar({
                 className="absolute right-2.5 text-text-tertiary hover:text-accent transition-colors"
                 tabIndex={-1}
               >
-                <ExternalLink className="w-3.5 h-3.5" />
+                <OpenNewWindow className="w-3.5 h-3.5" />
               </a>
             )}
           </div>
@@ -237,7 +235,7 @@ export default function CustomProviderSidebar({
           </div>
           {currency !== "CHF" && parsedAmount > 0 && (
             <p className="text-text-tertiary text-[10px] mt-1 flex items-center gap-1">
-              <RefreshCw className="w-2.5 h-2.5" />
+              <Refresh className="w-2.5 h-2.5" />
               Indikativer Kurs · Angaben ohne Gewähr
             </p>
           )}
@@ -304,7 +302,7 @@ export default function CustomProviderSidebar({
               onClick={() => onDelete(entry!.id)}
               className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-loss/30 bg-loss/8 text-loss hover:bg-loss/15 px-3 py-2 text-xs font-medium transition-all"
             >
-              <Trash2 className="w-3 h-3" />
+              <Trash className="w-3 h-3" />
               Anbieter löschen
             </button>
           </div>

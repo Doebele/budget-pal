@@ -12,11 +12,7 @@ import { useMemo } from "react";
 import clsx from "clsx";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import {
-  Wand2, TrendingUp, PiggyBank, ArrowRight,
-  Landmark, ShieldCheck, Coins, Building2,
-  BarChart3, AlertCircle, RefreshCw, AlertTriangle,
-} from "lucide-react";
+import { ArrowRight, Bank, Building, Coins, GraphUp, MagicWand, PiggyBank, Refresh, Reports, ShieldCheck, WarningCircle, WarningTriangle } from "@/lib/icons";
 import { api } from "@/lib/api";
 import { formatCHF } from "@/lib/theme";
 import { useTaxonomy } from "@/lib/categories";
@@ -338,7 +334,7 @@ export default function Finanzplan() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-5 h-5 text-accent animate-spin" />
+        <Refresh className="w-5 h-5 text-accent animate-spin" />
       </div>
     );
   }
@@ -346,7 +342,7 @@ export default function Finanzplan() {
   if (budgetsError) {
     return (
       <div className="flex flex-col items-center gap-3 py-16 text-center">
-        <AlertCircle className="w-8 h-8 text-loss" />
+        <WarningCircle className="w-8 h-8 text-loss" />
         <p className="text-text-secondary text-sm">Finanzplan konnte nicht geladen werden.</p>
       </div>
     );
@@ -356,7 +352,7 @@ export default function Finanzplan() {
     return (
       <div className="max-w-xl mx-auto py-20 flex flex-col items-center gap-6 text-center">
         <div className="w-16 h-16 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center">
-          <BarChart3 className="w-8 h-8 text-accent" />
+          <Reports className="w-8 h-8 text-accent" />
         </div>
         <div>
           <h1 className="text-text-primary font-display font-bold text-2xl mb-2">Kein Finanzplan vorhanden</h1>
@@ -368,7 +364,7 @@ export default function Finanzplan() {
           to="/wizard"
           className="btn-primary flex items-center gap-2 text-sm"
         >
-          <Wand2 className="w-4 h-4" />
+          <MagicWand className="w-4 h-4" />
           Finanzplan erstellen
         </Link>
       </div>
@@ -391,7 +387,7 @@ export default function Finanzplan() {
             to="/wizard"
             className="btn-secondary flex items-center gap-1.5 text-xs py-1.5 px-3"
           >
-            <Wand2 className="w-3.5 h-3.5" />
+            <MagicWand className="w-3.5 h-3.5" />
             Wizard
           </Link>
           <Link
@@ -405,7 +401,7 @@ export default function Finanzplan() {
             to="/projections"
             className="btn-primary flex items-center gap-1.5 text-xs py-1.5 px-3"
           >
-            <TrendingUp className="w-3.5 h-3.5" />
+            <GraphUp className="w-3.5 h-3.5" />
             Rentenprognose
           </Link>
         </div>
@@ -668,7 +664,7 @@ export default function Finanzplan() {
         <section className="bg-bg-surface2 rounded-xl border border-border/40 overflow-hidden">
           <div className="px-5 py-4 border-b border-border/40 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-loss" />
+              <WarningTriangle className="w-4 h-4 text-loss" />
               <h2 className="text-text-primary font-semibold text-sm">Verpflichtungen & Schulden</h2>
             </div>
             <span className="text-loss text-xs font-mono font-semibold">{fmtCHF(totalLiabilities)}</span>
@@ -689,7 +685,7 @@ export default function Finanzplan() {
                 <div key={`${pos.label}-${idx}`} className={clsx("px-5 py-4", !pos.showLtv && "bg-bg-elevated/20")}>
                   <div className="grid grid-cols-4 gap-2 mb-3">
                     <div className="flex items-center gap-2 min-w-0">
-                      <Building2 className="w-4 h-4 text-text-tertiary flex-shrink-0" />
+                      <Building className="w-4 h-4 text-text-tertiary flex-shrink-0" />
                       <span className="text-text-primary text-sm font-medium truncate" title={pos.label}>
                         {pos.label}
                       </span>
@@ -762,7 +758,7 @@ export default function Finanzplan() {
         >
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center">
-              <TrendingUp className="w-4.5 h-4.5 text-accent" />
+              <GraphUp className="w-4.5 h-4.5 text-accent" />
             </div>
             <div>
               <p className="text-text-primary text-sm font-medium">Rentenprognose</p>

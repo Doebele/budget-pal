@@ -14,7 +14,7 @@ import ReactECharts from "echarts-for-react";
 import { useMemo } from "react";
 import { colors, formatCHF } from "@/lib/theme";
 import type { SuperCategory } from "@/lib/categories";
-import { EyeOff } from "lucide-react";
+import { EyeClosed } from "@/lib/icons";
 
 // ── Public types ───────────────────────────────────────────────
 export interface GaugeRow {
@@ -259,7 +259,7 @@ export default function CategoryGaugeChart({ rows, hasPeer, onToggleHide }: Cate
                   onClick={() => onToggleHide(row.sc.id)}
                   className="absolute top-1.5 right-1.5 p-1 rounded-md text-text-disabled hover:text-text-tertiary hover:bg-bg-elevated transition-colors"
                 >
-                  <EyeOff className="w-3 h-3" />
+                  <EyeClosed className="w-3 h-3" />
                 </button>
 
                 {/* ECharts ring gauge */}

@@ -11,7 +11,7 @@ import { useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { healthApi } from "@/lib/api";
 import { clsx } from "clsx";
-import { Activity, ChevronDown, ChevronUp, TrendingUp, X } from "lucide-react";
+import { Activity, GraphUp, NavArrowDown, NavArrowUp, Xmark } from "@/lib/icons";
 
 // ── Colour helpers ────────────────────────────────────────────
 
@@ -295,9 +295,9 @@ export default function HealthScoreWidget() {
             onClick={() => setShowLevers((v) => !v)}
             className="flex items-center gap-1.5 text-[11px] text-text-tertiary hover:text-text-secondary transition-colors w-full"
           >
-            <TrendingUp className="w-3 h-3 text-accent" />
+            <GraphUp className="w-3 h-3 text-accent" />
             <span className="flex-1 text-left">Verbesserungspotenzial</span>
-            {showLevers ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            {showLevers ? <NavArrowUp className="w-3 h-3" /> : <NavArrowDown className="w-3 h-3" />}
           </button>
 
           {showLevers && (

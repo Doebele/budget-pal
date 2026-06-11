@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { api, authApi, settingsApi, taxonomyApi, backupApi } from "@/lib/api";
 import { DEFAULT_SARON_REFERENCE_ANNUAL_PCT, SARON_INDEX_URL } from "@/lib/saron";
-import { Save, ExternalLink, Wand2, RotateCcw, AlertCircle, ChevronDown, ChevronUp, Users, Plus, Pencil, Trash2, X, Check, Tag, Eye, Download, Upload, ShieldCheck } from "lucide-react";
+import { Check, Download, EditPencil, Eye, FloppyDisk, Group, Label, MagicWand, NavArrowDown, NavArrowUp, OpenNewWindow, Plus, ShieldCheck, Trash, Undo, Upload, WarningCircle, Xmark } from "@/lib/icons";
 import { Link } from "react-router-dom";
 import { differenceInYears, parseISO } from "date-fns";
 import { useTaxonomySuperCategories, type SuperCategory } from "@/lib/categories";
@@ -458,7 +458,7 @@ export default function Settings() {
           onClick={() => setTaxoAdd(null)}
           className="p-1 rounded text-text-tertiary hover:text-text-primary hover:bg-bg-surface2 shrink-0"
         >
-          <X className="w-3 h-3" />
+          <Xmark className="w-3 h-3" />
         </button>
       </div>
     );
@@ -533,7 +533,7 @@ export default function Settings() {
                 className="text-accent hover:underline inline-flex items-center gap-1"
               >
                 SIX SARON
-                <ExternalLink className="w-3 h-3 shrink-0" />
+                <OpenNewWindow className="w-3 h-3 shrink-0" />
               </a>
             </p>
           </div>
@@ -585,7 +585,7 @@ export default function Settings() {
             className="btn-primary flex items-center gap-2"
             disabled={mutation.isPending}
           >
-            <Save className="w-4 h-4" />
+            <FloppyDisk className="w-4 h-4" />
             {saved ? "✓ Gespeichert!" : mutation.isPending ? "Speichern..." : "Speichern"}
           </button>
         </div>
@@ -595,7 +595,7 @@ export default function Settings() {
       <div className="card border border-accent/20 bg-accent/5">
         <div className="flex items-start gap-3">
           <div className="w-9 h-9 rounded-lg bg-accent/15 flex items-center justify-center flex-shrink-0 mt-0.5">
-            <Wand2 className="w-4 h-4 text-accent" />
+            <MagicWand className="w-4 h-4 text-accent" />
           </div>
           <div className="flex-1">
             <h2 className="text-text-primary font-semibold text-sm">Empirische Angaben erneut erfassen</h2>
@@ -603,7 +603,7 @@ export default function Settings() {
               Aktualisiere deine Basisdaten, Peer-Gruppe, Vorsorge (AHV/BVG/3a) und Finanzplan-Ziele.
             </p>
             <Link to="/wizard" className="btn-primary inline-flex items-center gap-2 text-sm py-2">
-              <Wand2 className="w-3.5 h-3.5" />
+              <MagicWand className="w-3.5 h-3.5" />
               Zu empirischen Angaben
             </Link>
           </div>
@@ -619,7 +619,7 @@ export default function Settings() {
           </p>
           {peerConfig?.peerLabel && (
             <div className="mt-2 flex items-center gap-1.5 text-xs text-text-tertiary">
-              <Users className="w-3 h-3 text-accent shrink-0" />
+              <Group className="w-3 h-3 text-accent shrink-0" />
               <span>Peer-Gruppe: <span className="text-text-secondary font-medium">{peerConfig.peerLabel}</span></span>
               <span className="text-text-disabled">·</span>
               <span>{peerConfig.sampleSize}</span>
@@ -791,13 +791,13 @@ export default function Settings() {
                         className="flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded-full"
                         style={{ backgroundColor: sc.color + "18", color: sc.color }}
                       >
-                        <Users className="w-2.5 h-2.5" />
+                        <Group className="w-2.5 h-2.5" />
                         Ø {fmtCHF(peer)}/Mo
                       </span>
                     )}
                     {isOpen
-                      ? <ChevronUp className="w-3.5 h-3.5 text-text-tertiary" />
-                      : <ChevronDown className="w-3.5 h-3.5 text-text-tertiary" />}
+                      ? <NavArrowUp className="w-3.5 h-3.5 text-text-tertiary" />
+                      : <NavArrowDown className="w-3.5 h-3.5 text-text-tertiary" />}
                   </div>
                 </button>
                 {isOpen && (
@@ -806,7 +806,7 @@ export default function Settings() {
                     {peerConfig && peer != null && (
                       <div>
                         <p className="text-text-tertiary font-semibold uppercase tracking-wide mb-1.5 flex items-center gap-1">
-                          <Users className="w-3 h-3" />
+                          <Group className="w-3 h-3" />
                           Peer-Gruppe (BFS HABE 2021)
                         </p>
                         <div className="rounded-lg border border-border/30 overflow-hidden">
@@ -855,7 +855,7 @@ export default function Settings() {
                     {peerConfig && peer == null && (
                       <div>
                         <p className="text-text-tertiary font-semibold uppercase tracking-wide mb-1.5 flex items-center gap-1">
-                          <Users className="w-3 h-3" />
+                          <Group className="w-3 h-3" />
                           Peer-Gruppe (BFS HABE 2021)
                         </p>
                         <span className="text-text-disabled italic">Kein Peer-Ø für diese Kategorie verfügbar</span>
@@ -930,7 +930,7 @@ export default function Settings() {
                                     onClick={() => openTaxoDelete(sc.id, l, "wizard")}
                                     className="opacity-0 group-hover:opacity-100 ml-0.5 w-3.5 h-3.5 flex items-center justify-center rounded-full hover:bg-loss/20 text-text-tertiary hover:text-loss transition-all"
                                   >
-                                    <X className="w-2.5 h-2.5" />
+                                    <Xmark className="w-2.5 h-2.5" />
                                   </button>
                                 </span>
                                 )
@@ -948,7 +948,7 @@ export default function Settings() {
                                     onClick={() => { setCatDeleteId(cat.id); setCatReassignTo(""); }}
                                     className="opacity-0 group-hover:opacity-100 ml-0.5 w-3.5 h-3.5 flex items-center justify-center rounded-full hover:bg-loss/20 text-text-tertiary hover:text-loss transition-all"
                                   >
-                                    <X className="w-2.5 h-2.5" />
+                                    <Xmark className="w-2.5 h-2.5" />
                                   </button>
                                 </span>
                               ))}
@@ -1027,7 +1027,7 @@ export default function Settings() {
                                   onClick={() => openTaxoDelete(sc.id, c, "txn")}
                                   className="opacity-0 group-hover:opacity-100 ml-0.5 w-3.5 h-3.5 flex items-center justify-center rounded-full hover:bg-loss/20 text-text-tertiary hover:text-loss transition-all"
                                 >
-                                  <X className="w-2.5 h-2.5" />
+                                  <Xmark className="w-2.5 h-2.5" />
                                 </button>
                               </span>
                             )
@@ -1046,7 +1046,7 @@ export default function Settings() {
                                 onClick={() => { setCatDeleteId(cat.id); setCatReassignTo(""); }}
                                 className="opacity-0 group-hover:opacity-100 ml-0.5 w-3.5 h-3.5 flex items-center justify-center rounded-full hover:bg-loss/20 text-text-tertiary hover:text-loss transition-all"
                               >
-                                <X className="w-2.5 h-2.5" />
+                                <Xmark className="w-2.5 h-2.5" />
                               </button>
                             </span>
                           ))}
@@ -1124,7 +1124,7 @@ export default function Settings() {
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/60 text-text-secondary text-xs hover:bg-bg-surface2 transition-colors disabled:opacity-40"
             title="Auf Standardzuordnungen zurücksetzen"
           >
-            <RotateCcw className="w-3 h-3" />
+            <Undo className="w-3 h-3" />
             Zurücksetzen auf Standard
           </button>
         </div>
@@ -1175,7 +1175,7 @@ export default function Settings() {
 
             {saveMappingsMutation.isError && (
               <div className="flex items-center gap-2 text-loss text-xs bg-loss/10 border border-loss/30 rounded-lg px-3 py-2 mt-3">
-                <AlertCircle className="w-4 h-4 shrink-0" />
+                <WarningCircle className="w-4 h-4 shrink-0" />
                 Fehler beim Speichern.
               </div>
             )}
@@ -1187,7 +1187,7 @@ export default function Settings() {
                 disabled={!mappingDirty || saveMappingsMutation.isPending}
                 className="btn-primary flex items-center gap-2 disabled:opacity-40"
               >
-                <Save className="w-4 h-4" />
+                <FloppyDisk className="w-4 h-4" />
                 {mappingSaved ? "✓ Gespeichert!" : saveMappingsMutation.isPending ? "Speichern..." : "Zuordnungen speichern"}
               </button>
               {mappingDirty && (
@@ -1203,7 +1203,7 @@ export default function Settings() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-text-primary font-semibold text-sm flex items-center gap-2">
-              <Tag className="w-4 h-4 text-accent" />
+              <Label className="w-4 h-4 text-accent" />
               Eigene Kategorien
             </h2>
             <p className="text-text-tertiary text-xs mt-0.5">
@@ -1276,7 +1276,7 @@ export default function Settings() {
                 onClick={() => setCatAddForm(null)}
                 className="p-1.5 rounded text-text-tertiary hover:text-text-primary hover:bg-bg-surface2"
               >
-                <X className="w-3.5 h-3.5" />
+                <Xmark className="w-3.5 h-3.5" />
               </button>
             </div>
             {createCatMutation.isError && (
@@ -1393,7 +1393,7 @@ export default function Settings() {
                             onClick={() => setCatEditId(null)}
                             className="p-1.5 rounded text-text-tertiary hover:text-text-primary hover:bg-bg-surface2"
                           >
-                            <X className="w-3.5 h-3.5" />
+                            <Xmark className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       ) : (
@@ -1415,7 +1415,7 @@ export default function Settings() {
                             onClick={() => { setCatEditId(cat.id); setCatEditName(cat.name); }}
                             className="p-1.5 rounded text-text-tertiary hover:text-text-primary hover:bg-bg-surface2 transition-colors"
                           >
-                            <Pencil className="w-3 h-3" />
+                            <EditPencil className="w-3 h-3" />
                           </button>
                           <button
                             type="button"
@@ -1423,7 +1423,7 @@ export default function Settings() {
                             onClick={() => { setCatDeleteId(cat.id); setCatReassignTo(""); }}
                             className="p-1.5 rounded text-text-tertiary hover:text-loss hover:bg-loss/10 transition-colors"
                           >
-                            <Trash2 className="w-3 h-3" />
+                            <Trash className="w-3 h-3" />
                           </button>
                         </div>
                       )}
@@ -1501,7 +1501,7 @@ export default function Settings() {
           </button>
           {backupExportError && (
             <p className="text-loss text-xs flex items-center gap-1">
-              <AlertCircle className="w-3.5 h-3.5" /> {backupExportError}
+              <WarningCircle className="w-3.5 h-3.5" /> {backupExportError}
             </p>
           )}
         </div>
@@ -1576,7 +1576,7 @@ export default function Settings() {
           )}
           {importError && (
             <p className="text-loss text-xs flex items-center gap-1">
-              <AlertCircle className="w-3.5 h-3.5" /> {importError}
+              <WarningCircle className="w-3.5 h-3.5" /> {importError}
             </p>
           )}
         </div>
@@ -1590,7 +1590,7 @@ export default function Settings() {
           <p className="flex items-center gap-2">
             Domain:
             <a href="https://budgetpal.doebele12.de" target="_blank" rel="noopener" className="text-accent hover:text-accent-light flex items-center gap-1">
-              budgetpal.doebele12.de <ExternalLink className="w-3 h-3" />
+              budgetpal.doebele12.de <OpenNewWindow className="w-3 h-3" />
             </a>
           </p>
         </div>

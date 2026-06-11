@@ -11,7 +11,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { wizardApi } from "@/lib/api";
 import { formatAmount } from "@/lib/theme";
-import { Wallet, TrendingDown, Info } from "lucide-react";
+import { GraphDown, InfoCircle, Wallet } from "@/lib/icons";
 import { clsx } from "clsx";
 import { useState } from "react";
 
@@ -125,7 +125,7 @@ export default function NetIncomeCard({ compact = false }: Props) {
           className="text-text-tertiary hover:text-text-primary transition-colors"
           title="Berechnung anzeigen"
         >
-          <Info className="w-3.5 h-3.5" />
+          <InfoCircle className="w-3.5 h-3.5" />
         </button>
       </div>
 

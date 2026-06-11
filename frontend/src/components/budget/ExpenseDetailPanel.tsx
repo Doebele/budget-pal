@@ -7,7 +7,7 @@
  * transactions contribute to the total.
  */
 import { useMemo, useEffect } from "react";
-import { X, AlertTriangle } from "lucide-react";
+import { WarningTriangle, Xmark } from "@/lib/icons";
 import { clsx } from "clsx";
 import { formatCHF } from "@/lib/theme";
 import type { SuperCategory } from "@/lib/categories";
@@ -100,7 +100,7 @@ export default function ExpenseDetailPanel({
               onClick={onClose}
               className="shrink-0 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
             >
-              <X className="w-5 h-5" />
+              <Xmark className="w-5 h-5" />
             </button>
           </div>
 
@@ -117,7 +117,7 @@ export default function ExpenseDetailPanel({
           {/* Warning if stats API total differs */}
           {hasDiscrepancy && (
             <div className="mt-2 flex items-start gap-1.5 text-xs text-amber-400/80 bg-amber-500/10 rounded-lg px-2.5 py-1.5">
-              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              <WarningTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
               <span>
                 KPI-Kachel zeigt {formatCHF(statsExpenses!)} (aus der Stats-API inkl. alle Transaktionen).
                 Diese Ansicht basiert auf den zuletzt geladenen {transactions.length} Transaktionen.

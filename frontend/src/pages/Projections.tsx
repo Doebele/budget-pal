@@ -7,7 +7,7 @@ import MonteCarloChart from "@/components/charts/MonteCarloChart";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
-import { RefreshCw } from "lucide-react";
+import { Refresh } from "@/lib/icons";
 
 /** Match backend `projection._project_pensions` fallback age when DOB is missing. */
 function currentAgeFromProfileBirth(iso: string | undefined): number {
@@ -106,7 +106,7 @@ export default function Projections() {
           <p className="text-text-tertiary text-sm mt-0.5">Monte Carlo Simulation · Schweizer Rente (AHV/BVG/3a)</p>
         </div>
         <button onClick={() => refetch()} className="btn-secondary flex items-center gap-2" disabled={isLoading}>
-          <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+          <Refresh className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
           Neu berechnen
         </button>
       </div>
@@ -354,7 +354,7 @@ export default function Projections() {
         {isLoading ? (
           <div className="h-80 flex items-center justify-center">
             <div className="flex items-center gap-3 text-text-tertiary">
-              <RefreshCw className="w-5 h-5 animate-spin" />
+              <Refresh className="w-5 h-5 animate-spin" />
               <span className="text-sm">Simulation läuft...</span>
             </div>
           </div>

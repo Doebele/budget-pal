@@ -11,10 +11,7 @@
  */
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import {
-  Brain, RefreshCw, Save, ChevronDown, Info,
-  BarChart3, CalendarDays, Table2, Landmark,
-} from "lucide-react";
+import { Bank, Brain, Calendar, FloppyDisk, InfoCircle, NavArrowDown, Refresh, Reports, Table } from "@/lib/icons";
 
 import { api, accountsApi, transactionsApi, recurringPlanApi, categoriesApi } from "@/lib/api";
 import { formatAmount } from "@/lib/theme";
@@ -80,10 +77,10 @@ type HorizonKey = typeof HORIZONS[number]["key"];
 // ── Tabs ─────────────────────────────────────────────────────
 
 const TABS = [
-  { key: "overview", label: "Übersicht", icon: BarChart3 },
-  { key: "monthly", label: "Monatlich", icon: CalendarDays },
-  { key: "categories", label: "Kategorien", icon: Table2 },
-  { key: "retirement", label: "Ruhestand", icon: Landmark },
+  { key: "overview", label: "Übersicht", icon: Reports },
+  { key: "monthly", label: "Monatlich", icon: Calendar },
+  { key: "categories", label: "Kategorien", icon: Table },
+  { key: "retirement", label: "Ruhestand", icon: Bank },
 ] as const;
 
 type TabKey = typeof TABS[number]["key"];
@@ -472,7 +469,7 @@ export default function Forecast() {
               disabled={!scenarioName || saveMutation.isPending}
               className="btn-secondary flex items-center gap-1.5 text-sm"
             >
-              <Save className="w-3.5 h-3.5" />
+              <FloppyDisk className="w-3.5 h-3.5" />
             </button>
           </div>
           <button
@@ -480,7 +477,7 @@ export default function Forecast() {
             disabled={isRunning}
             className="btn-secondary flex items-center gap-2 text-sm"
           >
-            <RefreshCw className={`w-4 h-4 ${isRunning ? "animate-spin" : ""}`} />
+            <Refresh className={`w-4 h-4 ${isRunning ? "animate-spin" : ""}`} />
             Neu
           </button>
         </div>
@@ -511,7 +508,7 @@ export default function Forecast() {
             ? "bg-amber-500/10 border border-amber-500/30 text-amber-300"
             : "bg-green-500/10 border border-green-500/20 text-green-300"
         }`}>
-          <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+          <InfoCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
           <span>
             {(forecast.data_months ?? 0) < 3
               ? `Nur ${forecast.data_months} Monate Transaktionsdaten — Peer-Gruppe-Werte werden stärker gewichtet.`
@@ -529,7 +526,7 @@ export default function Forecast() {
           onClick={() => setShowPeerSettings(!showPeerSettings)}
         >
           <span className="font-medium">Peer-Gruppe Kalibrierung</span>
-          <ChevronDown className={`w-4 h-4 transition-transform ${showPeerSettings ? "rotate-180" : ""}`} />
+          <NavArrowDown className={`w-4 h-4 transition-transform ${showPeerSettings ? "rotate-180" : ""}`} />
         </button>
         {showPeerSettings && (
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-4">

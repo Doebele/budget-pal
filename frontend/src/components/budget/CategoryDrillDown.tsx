@@ -10,7 +10,7 @@
  * Triggered by clicking any SuperCategoryBar on the Budget page.
  */
 import { useEffect, useState } from "react";
-import { X, TrendingDown, TrendingUp, Minus } from "lucide-react";
+import { GraphDown, GraphUp, Minus, Xmark } from "@/lib/icons";
 import { format } from "date-fns";
 import { clsx } from "clsx";
 import { formatCHF } from "@/lib/theme";
@@ -102,7 +102,7 @@ export default function CategoryDrillDown({
               onClick={onClose}
               className="shrink-0 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
             >
-              <X className="w-5 h-5" />
+              <Xmark className="w-5 h-5" />
             </button>
           </div>
         </div>
@@ -150,9 +150,9 @@ export default function CategoryDrillDown({
                 isOver ? "text-loss" : "text-gain",
               )}>
                 {isOver
-                  ? <TrendingUp className="w-4 h-4" />
+                  ? <GraphUp className="w-4 h-4" />
                   : delta < 0
-                    ? <TrendingDown className="w-4 h-4" />
+                    ? <GraphDown className="w-4 h-4" />
                     : <Minus className="w-4 h-4" />}
                 {isOver ? "+" : ""}
                 {formatCHF(delta)} ({isOver ? "+" : ""}{deltaPct.toFixed(1)}%)

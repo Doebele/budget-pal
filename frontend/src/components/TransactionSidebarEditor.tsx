@@ -5,10 +5,7 @@ import { formatCHF, getFrequencyStyle, PERIODICITY_LABELS } from "@/lib/theme";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { clsx } from "clsx";
-import {
-  X, Save, RotateCcw, Tag, RefreshCw, DollarSign,
-  ChevronRight, Check, AlertCircle,
-} from "lucide-react";
+import { Check, Dollar, FloppyDisk, Label, NavArrowRight, Refresh, Undo, WarningCircle, Xmark } from "@/lib/icons";
 
 type RecurrenceType = "weekly" | "monthly" | "quarterly" | "halfyearly" | "yearly";
 
@@ -200,7 +197,7 @@ export default function TransactionSidebarEditor({ transactions, periodLabel, on
               className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
               title="Schliessen (Esc)"
             >
-              <X className="w-5 h-5" />
+              <Xmark className="w-5 h-5" />
             </button>
           </div>
 
@@ -284,7 +281,7 @@ export default function TransactionSidebarEditor({ transactions, periodLabel, on
                       {isSaved ? (
                         <Check className="w-4 h-4 text-gain" />
                       ) : isSelected ? (
-                        <ChevronRight className="w-4 h-4 text-accent" />
+                        <NavArrowRight className="w-4 h-4 text-accent" />
                       ) : null}
                     </div>
                   </button>
@@ -321,7 +318,7 @@ export default function TransactionSidebarEditor({ transactions, periodLabel, on
               {/* Category */}
               <div>
                 <label className="flex items-center gap-1.5 text-xs text-text-tertiary uppercase tracking-wide mb-1.5">
-                  <Tag className="w-3.5 h-3.5" /> Kategorie
+                  <Label className="w-3.5 h-3.5" /> Kategorie
                 </label>
                 <select
                   value={draft.category ?? ""}
@@ -338,7 +335,7 @@ export default function TransactionSidebarEditor({ transactions, periodLabel, on
               {/* Recurring + Frequency */}
               <div>
                 <label className="flex items-center gap-1.5 text-xs text-text-tertiary uppercase tracking-wide mb-2">
-                  <RefreshCw className="w-3.5 h-3.5" /> Wiederkehrend
+                  <Refresh className="w-3.5 h-3.5" /> Wiederkehrend
                 </label>
                 <div className="flex flex-wrap gap-2 mb-2">
                   {/* Toggle buttons */}
@@ -392,7 +389,7 @@ export default function TransactionSidebarEditor({ transactions, periodLabel, on
               {/* Amount */}
               <div>
                 <label className="flex items-center gap-1.5 text-xs text-text-tertiary uppercase tracking-wide mb-1.5">
-                  <DollarSign className="w-3.5 h-3.5" /> Betrag (CHF)
+                  <Dollar className="w-3.5 h-3.5" /> Betrag (CHF)
                 </label>
                 <input
                   type="number"
@@ -425,7 +422,7 @@ export default function TransactionSidebarEditor({ transactions, periodLabel, on
               {/* Error */}
               {saveMutation.isError && (
                 <div className="flex items-center gap-2 text-loss text-xs bg-loss/10 border border-loss/30 rounded-lg px-3 py-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <WarningCircle className="w-4 h-4 shrink-0" />
                   Fehler beim Speichern. Bitte erneut versuchen.
                 </div>
               )}
@@ -439,7 +436,7 @@ export default function TransactionSidebarEditor({ transactions, periodLabel, on
                 disabled={!dirty}
                 className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-slate-600 text-text-secondary text-sm hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
               >
-                <RotateCcw className="w-3.5 h-3.5" />
+                <Undo className="w-3.5 h-3.5" />
                 Verwerfen
               </button>
               <button
@@ -451,7 +448,7 @@ export default function TransactionSidebarEditor({ transactions, periodLabel, on
                 {saveMutation.isPending ? (
                   <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 ) : (
-                  <Save className="w-3.5 h-3.5" />
+                  <FloppyDisk className="w-3.5 h-3.5" />
                 )}
                 Änderungen speichern
               </button>

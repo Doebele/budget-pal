@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Users, TrendingUp, Shield, ChevronRight } from "lucide-react";
+import { GraphUp, Group, NavArrowRight, Shield } from "@/lib/icons";
 import { clsx } from "clsx";
 import type { PeerGroupDefaults, PeerGroupProfile } from "@/services/peerGroupAnalyzer";
 import { formatCHF } from "@/services/peerGroupAnalyzer";
@@ -217,7 +217,7 @@ export default function PeerGroupCard({
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-lg bg-accent/20 flex items-center justify-center shrink-0">
-              <Users className="w-5 h-5 text-accent" />
+              <Group className="w-5 h-5 text-accent" />
             </div>
             <div>
               <h3 className="text-text-primary font-semibold text-sm leading-tight">
@@ -240,7 +240,7 @@ export default function PeerGroupCard({
       {/* ── Income comparison ────────────────────────────── */}
       <div className="card">
         <div className="flex items-center gap-2 mb-4">
-          <TrendingUp className="w-4 h-4 text-accent" />
+          <GraphUp className="w-4 h-4 text-accent" />
           <h4 className="text-text-primary text-sm font-medium">Einkommensvergleich</h4>
         </div>
         <IncomeComparison
@@ -321,7 +321,7 @@ export default function PeerGroupCard({
                     <p className="text-text-primary font-mono font-semibold text-sm">
                       <AnimatedNumber value={rawValue as number} delay={i * 60 + 200} isSavings={isSavings} />
                     </p>
-                    <ChevronRight className="w-3 h-3 text-text-tertiary opacity-50" />
+                    <NavArrowRight className="w-3 h-3 text-text-tertiary opacity-50" />
                   </div>
                 )}
               </div>

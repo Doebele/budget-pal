@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { budgetsApi } from "@/lib/api";
 import { formatCHF } from "@/lib/theme";
 import { clsx } from "clsx";
-import { X, Save, AlertCircle, DollarSign, ChevronDown } from "lucide-react";
+import { Dollar, FloppyDisk, NavArrowDown, WarningCircle, Xmark } from "@/lib/icons";
 import { useTaxonomy, type SuperCategory } from "@/lib/categories";
 import { deduplicateWizardBatch } from "@/lib/wizardUtils";
 
@@ -15,6 +15,7 @@ interface WizardBudget {
   period: string;
   month?: number | null;
   created_at?: string;
+  [key: string]: unknown;
 }
 
 interface Props {
@@ -153,7 +154,7 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
               onClick={onClose}
               className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
             >
-              <X className="w-5 h-5" />
+              <Xmark className="w-5 h-5" />
             </button>
           </div>
 
@@ -185,7 +186,7 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
                   );
                 })}
               </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              <NavArrowDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
             </div>
           </div>
 
@@ -247,7 +248,7 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
                       {/* Monthly amount input */}
                       <div className="flex-1">
                         <label className="flex items-center gap-1 text-xs text-text-tertiary mb-1">
-                          <DollarSign className="w-3 h-3" /> Monatlich (CHF)
+                          <Dollar className="w-3 h-3" /> Monatlich (CHF)
                         </label>
                         <input
                           type="number"
@@ -279,7 +280,7 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
                             : "border-slate-600 bg-slate-700/30 text-slate-600 cursor-not-allowed",
                         )}
                       >
-                        <Save className="w-4 h-4" />
+                        <FloppyDisk className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
@@ -309,7 +310,7 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
 
             {saveMutation.isError && (
               <div className="flex items-center gap-2 text-loss text-xs bg-loss/10 border border-loss/30 rounded-lg px-3 py-2 mb-3">
-                <AlertCircle className="w-4 h-4 shrink-0" />
+                <WarningCircle className="w-4 h-4 shrink-0" />
                 Fehler beim Speichern. Bitte erneut versuchen.
               </div>
             )}
@@ -323,7 +324,7 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
               {saveMutation.isPending ? (
                 <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
-                <Save className="w-3.5 h-3.5" />
+                <FloppyDisk className="w-3.5 h-3.5" />
               )}
               Alle Änderungen speichern{dirtyIds.size > 0 && ` (${dirtyIds.size})`}
             </button>

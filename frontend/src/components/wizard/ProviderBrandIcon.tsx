@@ -2,7 +2,7 @@
  * ProviderBrandIcon — Shows local provider icons first (stored in public/provider-icons),
  * then falls back to react-simple-icons and finally to Globe.
  */
-import { Globe } from "lucide-react";
+import { Globe } from "@/lib/icons";
 import {
   SiNetflix, SiAppletv, SiYoutube, SiDazn,
   SiSpotify, SiApplemusic, SiDeezer, SiTidal,
@@ -14,7 +14,7 @@ import {
 import { clsx } from "clsx";
 
 // Map provider IDs → SimpleIcon component
-const BRAND_MAP: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
+const BRAND_MAP: Record<string, React.ComponentType<{ size?: number | string; className?: string }>> = {
   // Streaming & TV
   netflix:         SiNetflix,
   "apple-tv":      SiAppletv,

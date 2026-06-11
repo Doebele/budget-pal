@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
-import { BarChart3 } from "lucide-react";
+import { Reports } from "@/lib/icons";
 
 export default function Login() {
   const { login } = useAuth();
@@ -32,7 +32,7 @@ export default function Login() {
         {/* Logo */}
         <div className="flex items-center justify-center gap-3 mb-8">
           <div className="w-10 h-10 rounded-xl bg-gradient-accent flex items-center justify-center">
-            <BarChart3 className="w-5 h-5 text-white" />
+            <Reports className="w-5 h-5 text-white" />
           </div>
           <span className="font-display text-2xl text-text-primary">
             Budget<span className="text-accent">Pal</span>

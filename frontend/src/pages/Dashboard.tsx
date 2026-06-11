@@ -1,10 +1,7 @@
 import { useMemo, useState, lazy, Suspense } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import {
-  ArrowUpRight, ArrowDownRight, Wallet, TrendingUp,
-  Upload, ArrowRight, BarChart3, Target, FileUp, Wand2,
-} from "lucide-react";
+import { ArrowDownRight, ArrowRight, ArrowUpRight, GraphUp, MagicWand, PageUp, Position, Reports, Upload, Wallet } from "@/lib/icons";
 import { transactionsApi, accountsApi, budgetsApi, goalsApi } from "@/lib/api";
 import NetIncomeCard from "@/components/NetIncomeCard";
 import HealthScoreWidget from "@/components/HealthScoreWidget";
@@ -160,7 +157,7 @@ export default function Dashboard() {
               Import
             </Link>
             <Link to="/projections" className="btn-primary flex items-center gap-2">
-              <TrendingUp className="w-4 h-4" />
+              <GraphUp className="w-4 h-4" />
               Prognosen
             </Link>
           </div>
@@ -193,7 +190,7 @@ export default function Dashboard() {
           label="Netto"
           periodHint={range.label}
           value={formatCHF((stats?.total_income || 0) - (stats?.total_expenses || 0))}
-          icon={TrendingUp}
+          icon={GraphUp}
           colorClass={(stats?.net || 0) >= 0 ? "text-gain" : "text-loss"}
         />
       </div>
@@ -411,7 +408,7 @@ export default function Dashboard() {
         <div className="card">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-text-primary font-semibold text-sm flex items-center gap-2">
-              <Target className="w-4 h-4 text-accent" />
+              <Position className="w-4 h-4 text-accent" />
               Sparziele
             </h2>
             <Link to="/goals" className="text-accent text-xs flex items-center gap-1 hover:text-accent-light">
@@ -456,11 +453,11 @@ export default function Dashboard() {
       {/* Quick nav */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         {[
-          { to: "/transactions", label: "Reale Angaben",     desc: "Alle ansehen & filtern", Icon: BarChart3  },
-          { to: "/wizard",       label: "Empirische Angaben", desc: "Profil & Planungsdaten", Icon: Wand2      },
-          { to: "/goals",        label: "Sparziele",          desc: "Ziele verwalten",         Icon: Target     },
-          { to: "/projections",  label: "Prognosen",         desc: "Monte Carlo & Rente",     Icon: TrendingUp },
-          { to: "/import",       label: "Import",            desc: "CSV / PDF hochladen",     Icon: FileUp     },
+          { to: "/transactions", label: "Reale Angaben",     desc: "Alle ansehen & filtern", Icon: Reports  },
+          { to: "/wizard",       label: "Empirische Angaben", desc: "Profil & Planungsdaten", Icon: MagicWand      },
+          { to: "/goals",        label: "Sparziele",          desc: "Ziele verwalten",         Icon: Position     },
+          { to: "/projections",  label: "Prognosen",         desc: "Monte Carlo & Rente",     Icon: GraphUp },
+          { to: "/import",       label: "Import",            desc: "CSV / PDF hochladen",     Icon: PageUp     },
         ].map(({ to, label, desc, Icon }) => (
           <Link
             key={to}

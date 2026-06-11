@@ -1,5 +1,5 @@
 import { clsx } from "clsx";
-import { BookOpen, FlaskConical, GitMerge } from "lucide-react";
+import { Flask, GitMerge, OpenBook } from "@/lib/icons";
 import type { BudgetAnalysisMode } from "@/types/budgetAnalysis";
 
 interface ModeOption {
@@ -14,13 +14,13 @@ const MODES: ModeOption[] = [
     value: "past",
     label: "Historisch",
     description: "Wiederkehrende & einmalige Transaktionen",
-    icon: <BookOpen className="w-4 h-4" />,
+    icon: <OpenBook className="w-4 h-4" />,
   },
   {
     value: "wizard",
     label: "Empirisch",
     description: "Basierend auf empirischen Angaben",
-    icon: <FlaskConical className="w-4 h-4" />,
+    icon: <Flask className="w-4 h-4" />,
   },
   {
     value: "combined",

@@ -1,6 +1,6 @@
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
-import { Archive, RotateCcw, Trash2 } from "lucide-react";
+import { Archive, Trash, Undo } from "@/lib/icons";
 import { formatCHF, PERIODICITY_LABELS } from "@/lib/theme";
 import { clsx } from "clsx";
 
@@ -103,7 +103,7 @@ export function DeletedTransactionsView({
                         onClick={() => onRestore(txn.id)}
                         className="inline-flex items-center gap-1.5 bg-emerald-600/90 hover:bg-emerald-600 disabled:opacity-50 text-white rounded-md px-3 py-1.5 font-medium text-xs transition-colors"
                       >
-                        <RotateCcw className="w-3.5 h-3.5" />
+                        <Undo className="w-3.5 h-3.5" />
                         Wiederherstellen
                       </button>
                       <button
@@ -112,7 +112,7 @@ export function DeletedTransactionsView({
                         onClick={() => onDeletePermanently(txn.id)}
                         className="inline-flex items-center gap-1.5 bg-red-600/90 hover:bg-red-600 disabled:opacity-50 text-white rounded-md px-3 py-1.5 font-medium text-xs transition-colors"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash className="w-3.5 h-3.5" />
                         Endgültig löschen
                       </button>
                     </div>

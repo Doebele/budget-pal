@@ -4,20 +4,14 @@
  * for primary navigation on small screens.
  */
 import { NavLink, useLocation } from "react-router-dom";
-import {
-  LayoutDashboard,
-  ArrowLeftRight,
-  PiggyBank,
-  TrendingUp,
-  Settings,
-} from "lucide-react";
+import { DashboardDots, DataTransferBoth, GraphUp, PiggyBank, Settings } from "@/lib/icons";
 import { clsx } from "clsx";
 
 const BOTTOM_NAV_ITEMS = [
-  { path: "/",             icon: LayoutDashboard, label: "Übersicht" },
-  { path: "/transactions", icon: ArrowLeftRight,  label: "Transakt." },
+  { path: "/",             icon: DashboardDots, label: "Übersicht" },
+  { path: "/transactions", icon: DataTransferBoth,  label: "Transakt." },
   { path: "/budget",       icon: PiggyBank,       label: "Budget" },
-  { path: "/projections",  icon: TrendingUp,      label: "Prognose" },
+  { path: "/projections",  icon: GraphUp,      label: "Prognose" },
   { path: "/settings",     icon: Settings,        label: "Einstellungen" },
 ] as const;
 
