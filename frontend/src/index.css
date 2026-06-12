@@ -292,7 +292,9 @@ body[data-density="low"] .app-shell { height: calc(100vh / 1.12); }
 
 /* ───────────────────────────────────────────────────────────────
    RAIL (Sidebar) — portiert von application-pal
+   (@layer components, damit Utilities wie `hidden`/`md:flex` gewinnen)
    ─────────────────────────────────────────────────────────────── */
+@layer components {
 .app-shell {
   display: flex;
   height: 100vh;
@@ -504,4 +506,5 @@ body[data-density="low"] .app-shell { height: calc(100vh / 1.12); }
   font-weight: 500;
   white-space: nowrap;
   pointer-events: none;
+}
 }
