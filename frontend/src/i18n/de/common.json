@@ -1,0 +1,50 @@
+{
+  "nav": {
+    "workspace": "WORKSPACE",
+    "dashboard": "Dashboard",
+    "finanzplan": "Finanzplan",
+    "budget": "Budgetanalyse",
+    "budgetplan": "Budgetplan",
+    "goals": "Sparziele",
+    "forecast": "Budgetprognose",
+    "projections": "Rentenprognose",
+    "wizard": "Empirische Angaben",
+    "transactions": "Reale Angaben",
+    "import": "Import",
+    "accounts": "Konten",
+    "archive": "Archiv",
+    "settings": "Einstellungen"
+  },
+  "rail": {
+    "collapseSidebar": "Seitenleiste einklappen",
+    "expandSidebar": "Seitenleiste ausklappen",
+    "highDensity": "Kompakt",
+    "lowDensity": "Komfort",
+    "lightMode": "Hell",
+    "darkMode": "Dunkel",
+    "languageGerman": "Deutsch",
+    "languageEnglish": "Englisch"
+  },
+  "user": {
+    "account": "Konto",
+    "logout": "Abmelden",
+    "confirmLogout": "Wirklich abmelden?"
+  },
+  "buttons": {
+    "cancel": "Abbrechen",
+    "save": "Speichern",
+    "close": "Schliessen",
+    "confirm": "Bestätigen",
+    "delete": "Löschen",
+    "edit": "Bearbeiten",
+    "back": "Zurück",
+    "next": "Weiter"
+  },
+  "common": {
+    "loading": "Wird geladen…",
+    "error": "Etwas ist schiefgelaufen",
+    "openMenu": "Menü öffnen",
+    "closeMenu": "Menü schliessen",
+    "more": "Mehr"
+  }
+}

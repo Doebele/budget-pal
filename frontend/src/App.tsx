@@ -3,7 +3,8 @@ import { Suspense, lazy, useEffect } from "react";
 
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { useUiStore } from "@/lib/store";
-import Sidebar from "@/components/layout/Sidebar";
+import Rail from "@/components/layout/Rail";
+import MobileDrawer from "@/components/layout/MobileDrawer";
 import BottomNav from "@/components/layout/BottomNav";
 import LoadingScreen from "@/components/layout/LoadingScreen";
 
@@ -59,8 +60,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 // ── App Shell (authenticated layout) ─────────────────────────
 function AppShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex h-screen bg-bg overflow-hidden">
-      <Sidebar />
+    <div className="app-shell flex h-screen bg-bg overflow-hidden">
+      <Rail />
+      <MobileDrawer />
       <main className="flex-1 overflow-y-auto p-6 pb-20 md:pb-6">
         <Suspense fallback={<LoadingScreen />}>{children}</Suspense>
       </main>

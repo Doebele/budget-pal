@@ -1,0 +1,21 @@
+{
+  "appearance": {
+    "title": "Erscheinungsbild",
+    "subtitle": "Theme, Dichte, Sprache und Akzentfarbe anpassen",
+    "theme": "Theme",
+    "themeLight": "Hell",
+    "themeDark": "Dunkel",
+    "density": "Dichte",
+    "densityHigh": "Kompakt",
+    "densityLow": "Komfort",
+    "language": "Sprache",
+    "languageGerman": "Deutsch",
+    "languageEnglish": "Englisch",
+    "accent": "Akzentfarbe",
+    "accentIndigo": "Indigo",
+    "accentViolet": "Violett",
+    "accentEmerald": "Smaragd",
+    "accentAmber": "Bernstein",
+    "accentRose": "Rosé"
+  }
+}
