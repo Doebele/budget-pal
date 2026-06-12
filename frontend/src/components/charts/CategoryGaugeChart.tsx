@@ -232,7 +232,7 @@ export default function CategoryGaugeChart({ rows, hasPeer, onToggleHide }: Cate
         </span>
         {hasPeer && (
           <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-full inline-block bg-slate-600" />
+            <span className="w-3 h-3 rounded-full inline-block bg-bg-elevated" />
             Peer-Ø — immer bei 50 %
           </span>
         )}

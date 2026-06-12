@@ -221,12 +221,7 @@ export default function HealthScoreWidget() {
               <button
                 type="button"
                 onClick={() => setMode(m.id)}
-                className={clsx(
-                  "px-3 py-1 rounded-full text-[11px] font-medium transition-colors",
-                  mode === m.id
-                    ? "bg-accent text-white shadow-sm"
-                    : "text-text-tertiary hover:text-text-secondary"
-                )}
+                className={clsx("toggle-btn", mode === m.id && "active")}
               >
                 {m.label}
               </button>

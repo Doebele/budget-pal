@@ -10,6 +10,7 @@
  *   · Monthly cash-flow simulation post-retirement
  *   · Deficit / surplus indicator
  */
+import { clsx } from "clsx";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -123,11 +124,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
                 <button
                   key={age}
                   onClick={() => setRetirementAge(age)}
-                  className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-                    retirementAge === age
-                      ? "bg-accent text-white"
-                      : "bg-bg-surface2 text-text-secondary border border-border hover:text-text-primary"
-                  }`}
+                  className={clsx("toggle-btn", retirementAge === age && "active")}
                 >
                   {age}
                 </button>

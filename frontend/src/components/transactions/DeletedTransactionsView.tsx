@@ -33,8 +33,8 @@ export function DeletedTransactionsView({
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center border border-slate-700">
-          <Archive className="w-5 h-5 text-slate-400" />
+        <div className="w-10 h-10 rounded-lg bg-bg-surface2 flex items-center justify-center border border-border">
+          <Archive className="w-5 h-5 text-text-tertiary" />
         </div>
         <div>
           <h2 className="text-text-primary font-semibold text-xl">Gelöschte Transaktionen (Archiv)</h2>

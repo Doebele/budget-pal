@@ -452,17 +452,17 @@ export default function Import() {
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-2 sm:p-4">
-            <div className="w-full max-w-[96vw] max-h-[95vh] overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-2xl flex flex-col">
+            <div className="w-full max-w-[96vw] max-h-[95vh] overflow-hidden rounded-xl border border-border bg-bg-surface shadow-2xl flex flex-col">
 
               {/* ── Header ── */}
-              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700 flex-shrink-0">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-shrink-0">
                 <div>
-                  <h3 className="text-white font-semibold">PDF Vorschau</h3>
-                  <p className="text-slate-400 text-xs">
+                  <h3 className="text-text-primary font-semibold">PDF Vorschau</h3>
+                  <p className="text-text-tertiary text-xs">
                     {pdfPreview.filename} · {pdfPreview.total_rows} Zeilen · {pdfPreview.parsed_rows} erkannt
                   </p>
                 </div>
-                <button onClick={() => setPdfPreview(null)} className="text-slate-400 hover:text-white" type="button">
+                <button onClick={() => setPdfPreview(null)} className="text-text-tertiary hover:text-text-primary" type="button">
                   <Xmark className="w-5 h-5" />
                 </button>
               </div>
@@ -470,24 +470,24 @@ export default function Import() {
               {/* ── Stats row ── */}
               <div className="px-5 pt-4 pb-3 flex-shrink-0">
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
-                  <div className="rounded-lg bg-slate-800 px-3 py-2 text-slate-300">
-                    Bank: <span className="text-white font-semibold">{pdfPreview.bank.toUpperCase()}</span>
+                  <div className="rounded-lg bg-bg-surface2 px-3 py-2 text-text-secondary">
+                    Bank: <span className="text-text-primary font-semibold">{pdfPreview.bank.toUpperCase()}</span>
                   </div>
-                  <div className="rounded-lg bg-green-900/30 border border-green-800/40 px-3 py-2 text-slate-300">
+                  <div className="rounded-lg bg-green-900/30 border border-green-800/40 px-3 py-2 text-text-secondary">
                     Erkannt: <span className="text-green-300 font-semibold">{pdfPreview.parsed_rows}</span>
                   </div>
-                  <div className="rounded-lg bg-slate-800 px-3 py-2 text-slate-300">
+                  <div className="rounded-lg bg-bg-surface2 px-3 py-2 text-text-secondary">
                     Wiederkehrend: <span className="text-violet-300 font-semibold">{recurringCount > 0 ? `${recurringCount} Zahlungen` : "–"}</span>
                   </div>
-                  <div className="rounded-lg bg-slate-800 px-3 py-2 text-slate-300">
+                  <div className="rounded-lg bg-bg-surface2 px-3 py-2 text-text-secondary">
                     Duplikate: <span className="text-amber-300 font-semibold">{pdfPreview.rows.filter((r) => r.duplicate_kind !== "none").length}</span>
                   </div>
-                  <div className="rounded-lg bg-slate-800 px-3 py-2 text-slate-300">
-                    Fehler: <span className={pdfPreview.error_rows > 0 ? "text-red-300 font-semibold" : "text-slate-400"}>{pdfPreview.error_rows}</span>
+                  <div className="rounded-lg bg-bg-surface2 px-3 py-2 text-text-secondary">
+                    Fehler: <span className={pdfPreview.error_rows > 0 ? "text-red-300 font-semibold" : "text-text-tertiary"}>{pdfPreview.error_rows}</span>
                   </div>
                 </div>
                 {hasDuplicates && (
-                  <p className="text-slate-500 text-[11px] mt-2">
+                  <p className="text-text-disabled text-[11px] mt-2">
                     Konto-Duplikate: überschreiben, behalten oder löschen. PDF-Duplikate: importieren oder überspringen.
                   </p>
                 )}
@@ -496,25 +496,25 @@ export default function Import() {
               {/* ── Table ── */}
               <div className="flex-1 overflow-auto px-5 pb-2">
                 <table className="w-full text-xs border-collapse">
-                  <thead className="sticky top-0 z-10 bg-slate-800">
+                  <thead className="sticky top-0 z-10 bg-bg-surface2">
                     <tr>
                       {/* Status badges column */}
-                      <th className="text-left px-2 py-2.5 text-slate-400 font-medium w-[90px] whitespace-nowrap">Status</th>
+                      <th className="text-left px-2 py-2.5 text-text-tertiary font-medium w-[90px] whitespace-nowrap">Status</th>
                       {/* Date */}
-                      <th className="text-left px-2 py-2.5 text-slate-400 font-medium w-[108px]">Datum</th>
+                      <th className="text-left px-2 py-2.5 text-text-tertiary font-medium w-[108px]">Datum</th>
                       {/* Description — gets max remaining space */}
-                      <th className="text-left px-2 py-2.5 text-slate-400 font-medium min-w-[220px]">Beschreibung</th>
+                      <th className="text-left px-2 py-2.5 text-text-tertiary font-medium min-w-[220px]">Beschreibung</th>
                       {/* Amount */}
-                      <th className="text-right px-2 py-2.5 text-slate-400 font-medium w-[110px]">Betrag (CHF)</th>
+                      <th className="text-right px-2 py-2.5 text-text-tertiary font-medium w-[110px]">Betrag (CHF)</th>
                       {/* AI Category + Frequency */}
-                      <th className="text-left px-2 py-2.5 text-slate-400 font-medium w-[310px]">Kategorie / Frequenz</th>
+                      <th className="text-left px-2 py-2.5 text-text-tertiary font-medium w-[310px]">Kategorie / Frequenz</th>
                       {/* Duplicate action — only shown if there are duplicates */}
                       {hasDuplicates && (
-                        <th className="text-left px-2 py-2.5 text-slate-400 font-medium w-[160px]">Duplikat-Aktion</th>
+                        <th className="text-left px-2 py-2.5 text-text-tertiary font-medium w-[160px]">Duplikat-Aktion</th>
                       )}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-700/60">
+                  <tbody className="divide-y divide-border">
                     {pdfPreview.rows.map((row, idx) => {
                       const recurring = isRecurring(row);
                       const isExpense = row.amount < 0;
@@ -522,7 +522,7 @@ export default function Import() {
                         <tr
                           key={row.id}
                           className={clsx(
-                            "transition-colors hover:bg-slate-800/40",
+                            "transition-colors hover:bg-bg-surface2/40",
                             row.is_duplicate && "bg-amber-950/20",
                             recurring && "bg-violet-950/10",
                             !row.parsed && "opacity-50"
@@ -537,7 +537,7 @@ export default function Import() {
                                 </span>
                               )}
                               {row.duplicate_kind === "pdf" && (
-                                <span className="inline-flex rounded px-1.5 py-0.5 bg-slate-700 text-slate-300 text-[10px] font-medium leading-tight">
+                                <span className="inline-flex rounded px-1.5 py-0.5 bg-bg-elevated text-text-secondary text-[10px] font-medium leading-tight">
                                   PDF-Dup
                                 </span>
                               )}
@@ -547,7 +547,7 @@ export default function Import() {
                                 </span>
                               )}
                               {row.duplicate_kind === "none" && !recurring && (
-                                <span className="text-slate-600 text-[10px]">—</span>
+                                <span className="text-text-disabled text-[10px]">—</span>
                               )}
                             </div>
                           </td>
@@ -562,7 +562,7 @@ export default function Import() {
                                 next[idx] = { ...next[idx], original_date: e.target.value };
                                 return { ...prev, rows: next };
                               })}
-                              className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white w-[100px] text-xs"
+                              className="bg-bg-surface2 border border-border rounded px-2 py-1 text-text-primary w-[100px] text-xs"
                             />
                           </td>
 
@@ -576,7 +576,7 @@ export default function Import() {
                                 next[idx] = { ...next[idx], description: e.target.value };
                                 return { ...prev, rows: next };
                               })}
-                              className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white w-full min-w-[200px] text-xs"
+                              className="bg-bg-surface2 border border-border rounded px-2 py-1 text-text-primary w-full min-w-[200px] text-xs"
                               title={row.description}
                             />
                           </td>
@@ -594,7 +594,7 @@ export default function Import() {
                                 return { ...prev, rows: next };
                               })}
                               className={clsx(
-                                "bg-slate-800 border rounded px-2 py-1 text-right w-full font-mono font-semibold text-xs",
+                                "bg-bg-surface2 border rounded px-2 py-1 text-right w-full font-mono font-semibold text-xs",
                                 isExpense
                                   ? "border-red-800/50 text-red-300"
                                   : "border-green-800/50 text-green-300"
@@ -609,7 +609,7 @@ export default function Import() {
                               <select
                                 value={row.category ?? ""}
                                 onChange={(e) => handleCategoryChange(row.id, idx, e.target.value)}
-                                className="flex-1 min-w-0 bg-slate-800 border border-slate-700 rounded px-1.5 py-1 text-slate-300 text-[11px]"
+                                className="flex-1 min-w-0 bg-bg-surface2 border border-border rounded px-1.5 py-1 text-text-secondary text-[11px]"
                               >
                                 <option value="">↩ Zurücksetzen</option>
                                 {pdfCategoryOptions.map((name) => (
@@ -646,7 +646,7 @@ export default function Import() {
                             <td className="px-2 py-2 align-middle">
                               {row.duplicate_kind === "database" ? (
                                 <select
-                                  className="bg-slate-800 border border-slate-700 rounded px-1.5 py-1 text-white text-[11px] w-full"
+                                  className="bg-bg-surface2 border border-border rounded px-1.5 py-1 text-text-primary text-[11px] w-full"
                                   value={row.merge_action}
                                   onChange={(e) =>
                                     setPdfPreview((prev) => {
@@ -664,7 +664,7 @@ export default function Import() {
                                 </select>
                               ) : row.duplicate_kind === "pdf" ? (
                                 <select
-                                  className="bg-slate-800 border border-slate-700 rounded px-1.5 py-1 text-white text-[11px] w-full"
+                                  className="bg-bg-surface2 border border-border rounded px-1.5 py-1 text-text-primary text-[11px] w-full"
                                   value={row.merge_action === "import" ? "import" : "skip"}
                                   onChange={(e) =>
                                     setPdfPreview((prev) => {
@@ -679,7 +679,7 @@ export default function Import() {
                                   <option value="import">Importieren</option>
                                 </select>
                               ) : (
-                                <span className="text-slate-600 text-[10px]">Import</span>
+                                <span className="text-text-disabled text-[10px]">Import</span>
                               )}
                             </td>
                           )}
@@ -691,8 +691,8 @@ export default function Import() {
               </div>
 
               {/* ── Footer ── */}
-              <div className="flex items-center justify-between gap-3 px-5 py-4 border-t border-slate-700 flex-shrink-0">
-                <p className="text-slate-500 text-xs">
+              <div className="flex items-center justify-between gap-3 px-5 py-4 border-t border-border flex-shrink-0">
+                <p className="text-text-disabled text-xs">
                   {pdfPreview.rows.filter((r) => r.merge_action !== "skip" && r.merge_action !== "keep_existing" && r.merge_action !== "delete_both").length} Transaktionen werden importiert
                 </p>
                 <div className="flex gap-3">
@@ -720,19 +720,19 @@ export default function Import() {
                 <Eye className="w-5 h-5 text-accent" />
               </div>
               <div>
-                <p className="text-white font-semibold text-sm">Import-Vorschau: {previewData.total_rows} Zeilen</p>
+                <p className="text-text-primary font-semibold text-sm">Import-Vorschau: {previewData.total_rows} Zeilen</p>
                 <div className="flex items-center gap-2 text-xs">
-                  <span className="text-slate-400">
-                    Bank: <span className="text-white">{previewData.bank.toUpperCase()}</span>
+                  <span className="text-text-tertiary">
+                    Bank: <span className="text-text-primary">{previewData.bank.toUpperCase()}</span>
                   </span>
-                  <span className="text-slate-600">|</span>
+                  <span className="text-text-disabled">|</span>
                   <span className="text-gain flex items-center gap-1">
                     <Check className="w-3 h-3" />
                     {previewData.parsed_rows} erfolgreich
                   </span>
                   {previewData.error_rows > 0 && (
                     <>
-                      <span className="text-slate-600">|</span>
+                      <span className="text-text-disabled">|</span>
                       <span className="text-red-400 flex items-center gap-1">
                         <WarningTriangle className="w-3 h-3" />
                         {previewData.error_rows} Fehler
@@ -749,7 +749,7 @@ export default function Import() {
                   "px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors",
                   showColumnMapping
                     ? "bg-accent/20 text-accent border border-accent/30"
-                    : "bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700"
+                    : "bg-bg-surface2 text-text-secondary hover:bg-bg-elevated border border-border"
                 )}
               >
                 <Table className="w-3.5 h-3.5" />
@@ -762,7 +762,7 @@ export default function Import() {
                   setSelectedFile(null);
                   setShowColumnMapping(false);
                 }}
-                className="px-3 py-2 rounded-lg bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 border border-slate-700 transition-colors"
+                className="px-3 py-2 rounded-lg bg-bg-surface2 text-text-tertiary hover:text-text-primary hover:bg-bg-elevated border border-border transition-colors"
               >
                 <Xmark className="w-3.5 h-3.5" />
               </button>
@@ -771,15 +771,15 @@ export default function Import() {
 
           {/* Enhanced Column Mapping Panel */}
           {showColumnMapping && availableColumns.length > 0 && (
-            <div className="bg-slate-800/50 rounded-lg border border-slate-700 overflow-hidden">
+            <div className="bg-bg-surface2/50 rounded-lg border border-border overflow-hidden">
               {/* Header */}
-              <div className="bg-slate-800 px-4 py-3 border-b border-slate-700 flex items-center justify-between">
+              <div className="bg-bg-surface2 px-4 py-3 border-b border-border flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Table className="w-4 h-4 text-accent" />
-                  <span className="text-white font-medium text-sm">CSV-Feldzuweisung</span>
+                  <span className="text-text-primary font-medium text-sm">CSV-Feldzuweisung</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-400">
+                  <span className="text-xs text-text-tertiary">
                     {mappedColumnsCount} von {availableColumns.length} Spalten zugewiesen
                   </span>
                   {mappingWarnings.length === 0 && (
@@ -793,22 +793,22 @@ export default function Import() {
 
               <div className="p-4 space-y-4">
                 {/* CSV Columns Overview Table */}
-                <div className="overflow-auto max-h-48 border border-slate-700 rounded-lg">
+                <div className="overflow-auto max-h-48 border border-border rounded-lg">
                   <table className="w-full text-sm">
-                    <thead className="bg-slate-700 text-slate-300">
+                    <thead className="bg-bg-elevated text-text-secondary">
                       <tr>
                         <th className="text-left px-3 py-2 text-xs font-medium">CSV Spalte</th>
                         <th className="text-left px-3 py-2 text-xs font-medium">Ziel-Feld</th>
                         <th className="text-left px-3 py-2 text-xs font-medium">Beispielwert</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-700">
+                    <tbody className="divide-y divide-border">
                       {availableColumns.map((col) => {
                         const { type, label, icon } = getColumnType(col);
                         const isMapped = type !== "unassigned";
                         return (
                           <tr key={col} className={clsx(
-                            "hover:bg-slate-700/30 transition-colors",
+                            "hover:bg-bg-elevated/30 transition-colors",
                             isMapped && "bg-accent/5"
                           )}>
                             <td className="px-3 py-2">
@@ -816,7 +816,7 @@ export default function Import() {
                                 <span className="text-lg">{icon}</span>
                                 <span className={clsx(
                                   "font-medium",
-                                  isMapped ? "text-white" : "text-slate-400"
+                                  isMapped ? "text-text-primary" : "text-text-tertiary"
                                 )}>
                                   {col}
                                 </span>
@@ -829,10 +829,10 @@ export default function Import() {
                                   {label}
                                 </span>
                               ) : (
-                                <span className="text-slate-500 text-xs italic">Nicht zugewiesen</span>
+                                <span className="text-text-disabled text-xs italic">Nicht zugewiesen</span>
                               )}
                             </td>
-                            <td className="px-3 py-2 text-slate-400 text-xs font-mono truncate max-w-[150px]">
+                            <td className="px-3 py-2 text-text-tertiary text-xs font-mono truncate max-w-[150px]">
                               {getExampleValue(col)}
                             </td>
                           </tr>
@@ -843,9 +843,9 @@ export default function Import() {
                 </div>
 
                 {/* Manual Field Assignment */}
-                <div className="border-t border-slate-700 pt-4">
-                  <p className="text-slate-300 text-xs font-medium mb-3 flex items-center gap-2">
-                    <Database className="w-3.5 h-3.5 text-slate-400" />
+                <div className="border-t border-border pt-4">
+                  <p className="text-text-secondary text-xs font-medium mb-3 flex items-center gap-2">
+                    <Database className="w-3.5 h-3.5 text-text-tertiary" />
                     Manuelle Feld-Zuweisung
                   </p>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -953,11 +953,11 @@ export default function Import() {
                 )}
 
                 {/* Tips */}
-                <div className="bg-slate-700/30 rounded p-3 text-xs text-slate-400">
+                <div className="bg-bg-elevated/30 rounded p-3 text-xs text-text-tertiary">
                   <p className="flex items-start gap-2">
                     <span className="text-accent">💡</span>
                     <span>
-                      <strong className="text-slate-300">Tipp:</strong> Wähle "Belastung" und "Gutschrift" für separate Spalten,
+                      <strong className="text-text-secondary">Tipp:</strong> Wähle "Belastung" und "Gutschrift" für separate Spalten,
                       oder "Betrag" für eine kombinierte Spalte mit +/- Vorzeichen. Felder mit <span className="text-red-400">*</span> sind erforderlich.
                     </span>
                   </p>
@@ -967,32 +967,32 @@ export default function Import() {
           )}
 
           {/* Preview Table */}
-          <div className="overflow-auto max-h-80 border border-slate-700 rounded-lg">
+          <div className="overflow-auto max-h-80 border border-border rounded-lg">
             <table className="w-full text-xs">
-              <thead className="bg-slate-800 sticky top-0">
+              <thead className="bg-bg-surface2 sticky top-0">
                 <tr>
-                  <th className="text-left px-3 py-2 text-slate-400 font-medium">#</th>
-                  <th className="text-left px-3 py-2 text-slate-400 font-medium">Datum</th>
-                  <th className="text-left px-3 py-2 text-slate-400 font-medium">Beschreibung</th>
-                  <th className="text-right px-3 py-2 text-slate-400 font-medium">Betrag</th>
-                  <th className="text-center px-3 py-2 text-slate-400 font-medium">Status</th>
+                  <th className="text-left px-3 py-2 text-text-tertiary font-medium">#</th>
+                  <th className="text-left px-3 py-2 text-text-tertiary font-medium">Datum</th>
+                  <th className="text-left px-3 py-2 text-text-tertiary font-medium">Beschreibung</th>
+                  <th className="text-right px-3 py-2 text-text-tertiary font-medium">Betrag</th>
+                  <th className="text-center px-3 py-2 text-text-tertiary font-medium">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700/50">
+              <tbody className="divide-y divide-border">
                 {previewData.rows.map((row) => (
                   <tr key={row.row_index} className={clsx(
-                    "hover:bg-slate-800/30 transition-colors",
+                    "hover:bg-bg-surface2/30 transition-colors",
                     !row.parsed && "bg-red-500/5",
                     row.parsed && "bg-green-500/5"
                   )}>
-                    <td className="px-3 py-2 text-slate-500">{row.row_index + 1}</td>
-                    <td className="px-3 py-2 text-white font-mono text-xs">{row.date || "-"}</td>
-                    <td className="px-3 py-2 text-white max-w-xs truncate" title={row.description || ""}>
+                    <td className="px-3 py-2 text-text-disabled">{row.row_index + 1}</td>
+                    <td className="px-3 py-2 text-text-primary font-mono text-xs">{row.date || "-"}</td>
+                    <td className="px-3 py-2 text-text-primary max-w-xs truncate" title={row.description || ""}>
                       {row.description || "-"}
                     </td>
                     <td className={clsx(
                       "px-3 py-2 text-right font-mono font-medium",
-                      row.amount === null ? "text-slate-500" : row.amount >= 0 ? "text-gain" : "text-loss"
+                      row.amount === null ? "text-text-disabled" : row.amount >= 0 ? "text-gain" : "text-loss"
                     )}>
                       {row.amount !== null ? formatCHF(row.amount) : "-"}
                     </td>
@@ -1030,14 +1030,14 @@ export default function Import() {
           )}
 
           {/* Import Button */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
+          <div className="flex justify-end gap-3 pt-4 border-t border-border">
             <button
               onClick={() => {
                 setPreviewData(null);
                 setSelectedFile(null);
                 setShowColumnMapping(false);
               }}
-              className="px-4 py-2 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors text-sm"
+              className="px-4 py-2 rounded-lg bg-bg-elevated text-text-secondary hover:bg-bg-elevated transition-colors text-sm"
             >
               Abbrechen
             </button>
@@ -1047,8 +1047,8 @@ export default function Import() {
               className={clsx(
                 "px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all",
                 previewData.parsed_rows > 0 && !mappingWarnings.some(w => w.includes("erforderlich"))
-                  ? "bg-accent text-slate-900 hover:bg-accent-light"
-                  : "bg-slate-700 text-slate-500 cursor-not-allowed"
+                  ? "bg-accent text-white hover:bg-accent-light"
+                  : "bg-bg-elevated text-text-disabled cursor-not-allowed"
               )}
               title={mappingWarnings.find(w => w.includes("erforderlich")) || "Import durchführen"}
             >
@@ -1140,22 +1140,22 @@ export default function Import() {
             className="absolute inset-0 bg-black/60"
             onClick={() => setShowDeleteConfirm(false)}
           />
-          <div className="relative w-full max-w-md bg-slate-800 rounded-lg border border-slate-700 p-6 shadow-xl">
+          <div className="relative w-full max-w-md bg-bg-surface2 rounded-lg border border-border p-6 shadow-xl">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
                 <Trash className="w-5 h-5 text-red-500" />
               </div>
-              <h3 className="text-lg font-semibold text-white">
+              <h3 className="text-lg font-semibold text-text-primary">
                 Import komplett löschen?
               </h3>
             </div>
-            <p className="text-slate-300 mb-2">
-              Der Import <strong className="text-white">"{lastImport.filename}"</strong> wird gelöscht.
+            <p className="text-text-secondary mb-2">
+              Der Import <strong className="text-text-primary">"{lastImport.filename}"</strong> wird gelöscht.
             </p>
-            <p className="text-slate-300 mb-4">
+            <p className="text-text-secondary mb-4">
               <strong className="text-red-400">ALLE {lastImport.rows_imported} Transaktionen</strong> aus diesem Import werden entfernt.
             </p>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-text-disabled">
               Diese Aktion kann nicht rückgängig gemacht werden!
             </p>
             <div className="mt-6 flex justify-end gap-3">

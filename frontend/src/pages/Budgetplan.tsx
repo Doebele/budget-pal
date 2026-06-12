@@ -1347,10 +1347,8 @@ export default function Budgetplan() {
               key={f}
               onClick={() => setFilterPersist(f)}
               className={clsx(
-                "px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
-                filter === f
-                  ? "bg-accent text-white"
-                  : "bg-bg-surface2 text-text-secondary hover:text-text-primary"
+                "toggle-btn",
+                filter === f && "active"
               )}
             >
               {f === "all" ? "Alle" : f === "expense" ? "Nur Ausgaben" : "Nur Einnahmen"}
@@ -1411,26 +1409,16 @@ export default function Budgetplan() {
         </div>
 
         {/* View toggle */}
-        <div className="flex gap-1 bg-bg-surface2 rounded-lg p-1">
+        <div className="toggle-group">
           <button
             onClick={() => setViewPersist("calendar")}
-            className={clsx(
-              "px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
-              view === "calendar"
-                ? "bg-accent text-white"
-                : "text-text-secondary hover:text-text-primary"
-            )}
+            className={clsx("toggle-btn", view === "calendar" && "active")}
           >
             Kalender
           </button>
           <button
             onClick={() => setViewPersist("accordion")}
-            className={clsx(
-              "px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
-              view === "accordion"
-                ? "bg-accent text-white"
-                : "text-text-secondary hover:text-text-primary"
-            )}
+            className={clsx("toggle-btn", view === "accordion" && "active")}
           >
             Monate
           </button>
@@ -1770,8 +1758,8 @@ export default function Budgetplan() {
                               className={clsx(
                                 "flex-1 px-2 py-2 transition-colors",
                                 editorTplSource === src
-                                  ? "bg-accent text-white"
-                                  : "bg-bg-surface2 text-text-secondary hover:text-text-primary"
+                                  ? "bg-accent/15 text-accent font-semibold"
+                                  : "bg-bg-surface2 text-text-tertiary hover:text-text-secondary"
                               )}
                             >
                               {src === "historical" ? "Historisch" : "Empirisch"}
@@ -2122,8 +2110,8 @@ export default function Budgetplan() {
                       className={clsx(
                         "flex-1 px-3 py-2 transition-colors",
                         prefillSource === src
-                          ? "bg-accent text-white"
-                          : "bg-bg-surface2 text-text-secondary hover:text-text-primary"
+                          ? "bg-accent/15 text-accent font-semibold"
+                          : "bg-bg-surface2 text-text-tertiary hover:text-text-secondary"
                       )}
                     >
                       {src === "historical" ? "Historische Transaktionen" : "Empirische Angaben"}

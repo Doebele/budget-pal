@@ -183,10 +183,10 @@ export default function TransactionSidebarEditor({ transactions, periodLabel, on
       />
 
       {/* Panel */}
-      <div className="fixed right-0 top-0 bottom-0 w-full max-w-lg bg-slate-900 border-l border-slate-700 flex flex-col z-50 shadow-2xl">
+      <div className="fixed right-0 top-0 bottom-0 w-full max-w-lg bg-bg-surface border-l border-border flex flex-col z-50 shadow-2xl">
 
         {/* ── Sticky Header ─────────────────────────────────── */}
-        <div className="shrink-0 px-5 py-4 border-b border-slate-700 bg-slate-800/90 backdrop-blur-sm">
+        <div className="shrink-0 px-5 py-4 border-b border-border bg-bg-surface2/90 backdrop-blur-sm">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-text-primary font-semibold text-base">Transaktionen bearbeiten</h2>
@@ -194,7 +194,7 @@ export default function TransactionSidebarEditor({ transactions, periodLabel, on
             </div>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+              className="p-1.5 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-bg-elevated transition-colors"
               title="Schliessen (Esc)"
             >
               <Xmark className="w-5 h-5" />
@@ -208,12 +208,12 @@ export default function TransactionSidebarEditor({ transactions, periodLabel, on
               placeholder="Suchen…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="flex-1 bg-slate-700/60 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-slate-400"
+              className="flex-1 bg-bg-elevated/60 border border-border-strong rounded-lg px-3 py-1.5 text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent/50"
             />
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="bg-slate-700/60 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:border-slate-400 max-w-[140px]"
+              className="bg-bg-elevated/60 border border-border-strong rounded-lg px-2 py-1.5 text-sm text-text-primary focus:outline-none focus:border-accent/50 max-w-[140px]"
             >
               <option value="all">Alle Kat.</option>
               {txnCategories.map((c) => (
@@ -228,7 +228,7 @@ export default function TransactionSidebarEditor({ transactions, periodLabel, on
           {filtered.length === 0 ? (
             <p className="text-text-tertiary text-sm text-center py-10">Keine Transaktionen gefunden</p>
           ) : (
-            <div className="divide-y divide-slate-800">
+            <div className="divide-y divide-border-subtle">
               {filtered.map((txn) => {
                 const isSelected = selectedId === txn.id;
                 const isSaved = savedId === txn.id;
@@ -240,7 +240,7 @@ export default function TransactionSidebarEditor({ transactions, periodLabel, on
                       "w-full text-left px-4 py-3 transition-colors flex items-start gap-3",
                       isSelected
                         ? "bg-accent/10 border-l-2 border-accent"
-                        : "border-l-2 border-transparent hover:bg-slate-800/60"
+                        : "border-l-2 border-transparent hover:bg-bg-surface2/60"
                     )}
                   >
                     {/* Amount badge */}
@@ -261,7 +261,7 @@ export default function TransactionSidebarEditor({ transactions, periodLabel, on
                           {format(new Date(txn.date), "dd.MM.yy", { locale: de })}
                         </span>
                         {txn.category && (
-                          <span className="text-xs text-text-tertiary bg-slate-800 px-1.5 py-0.5 rounded">
+                          <span className="text-xs text-text-tertiary bg-bg-surface2 px-1.5 py-0.5 rounded">
                             {txn.category}
                           </span>
                         )}
@@ -293,10 +293,10 @@ export default function TransactionSidebarEditor({ transactions, periodLabel, on
 
         {/* ── Detail editor (shown when a transaction is selected) ── */}
         {selected && (
-          <div className="shrink-0 border-t border-slate-700 bg-slate-800 max-h-[55vh] overflow-y-auto">
+          <div className="shrink-0 border-t border-border bg-bg-surface2 max-h-[55vh] overflow-y-auto">
 
             {/* Editor header */}
-            <div className="px-5 py-3 border-b border-slate-700/60 flex items-start justify-between gap-3">
+            <div className="px-5 py-3 border-b border-border flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <p className="text-text-primary text-base font-medium whitespace-normal break-words">
                   {selected.merchant_normalized || selected.description}
@@ -323,7 +323,7 @@ export default function TransactionSidebarEditor({ transactions, periodLabel, on
                 <select
                   value={draft.category ?? ""}
                   onChange={(e) => updateDraft({ category: e.target.value })}
-                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent"
+                  className="w-full bg-bg-elevated border border-border-strong rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent"
                 >
                   <option value="">— Keine Kategorie —</option>
                   {categories.map((c) => (
@@ -346,7 +346,7 @@ export default function TransactionSidebarEditor({ transactions, periodLabel, on
                       "px-3 py-1.5 rounded-lg text-sm border transition-all",
                       !draft.is_recurring
                         ? "border-accent bg-accent/15 text-accent"
-                        : "border-slate-600 bg-slate-700/50 text-text-tertiary hover:border-slate-500"
+                        : "border-border-strong bg-bg-elevated/50 text-text-tertiary hover:border-border-strong"
                     )}
                   >
                     Einmalig
@@ -358,7 +358,7 @@ export default function TransactionSidebarEditor({ transactions, periodLabel, on
                       "px-3 py-1.5 rounded-lg text-sm border transition-all",
                       draft.is_recurring
                         ? "border-accent bg-accent/15 text-accent"
-                        : "border-slate-600 bg-slate-700/50 text-text-tertiary hover:border-slate-500"
+                        : "border-border-strong bg-bg-elevated/50 text-text-tertiary hover:border-border-strong"
                     )}
                   >
                     Wiederkehrend
@@ -376,7 +376,7 @@ export default function TransactionSidebarEditor({ transactions, periodLabel, on
                           "px-2.5 py-1 rounded-md text-xs border transition-all",
                           draft.periodicity === p
                             ? getFrequencyStyle(p)
-                            : "border-slate-600 bg-slate-700/40 text-text-tertiary hover:border-slate-500"
+                            : "border-border-strong bg-bg-elevated/40 text-text-tertiary hover:border-border-strong"
                         )}
                       >
                         {PERIODICITY_LABELS_FULL[p]}
@@ -396,7 +396,7 @@ export default function TransactionSidebarEditor({ transactions, periodLabel, on
                   step="0.01"
                   value={draft.amount ?? ""}
                   onChange={(e) => updateDraft({ amount: parseFloat(e.target.value) || 0 })}
-                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white font-mono focus:outline-none focus:border-accent"
+                  className="w-full bg-bg-elevated border border-border-strong rounded-lg px-3 py-2 text-sm text-text-primary font-mono focus:outline-none focus:border-accent"
                 />
                 {draft.amount !== selected.amount && (
                   <p className="text-xs text-text-tertiary mt-1">
@@ -415,7 +415,7 @@ export default function TransactionSidebarEditor({ transactions, periodLabel, on
                   value={draft.notes ?? ""}
                   onChange={(e) => updateDraft({ notes: e.target.value })}
                   placeholder="Interne Notiz…"
-                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 resize-none focus:outline-none focus:border-accent"
+                  className="w-full bg-bg-elevated border border-border-strong rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-tertiary resize-none focus:outline-none focus:border-accent"
                 />
               </div>
 
@@ -434,7 +434,7 @@ export default function TransactionSidebarEditor({ transactions, periodLabel, on
                 type="button"
                 onClick={handleDiscard}
                 disabled={!dirty}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-slate-600 text-text-secondary text-sm hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-border-strong text-text-secondary text-sm hover:bg-bg-elevated disabled:opacity-40 disabled:cursor-not-allowed transition-all"
               >
                 <Undo className="w-3.5 h-3.5" />
                 Verwerfen

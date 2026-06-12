@@ -9,6 +9,7 @@
  *
  * Zeithorizonte: 3M | 6M | 12M | 2J | 5J | Bis Rente
  */
+import { clsx } from "clsx";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Bank, Brain, Calendar, FloppyDisk, InfoCircle, NavArrowDown, Refresh, Reports, Table } from "@/lib/icons";
@@ -490,11 +491,7 @@ export default function Forecast() {
           <button
             key={h.key}
             onClick={() => setHorizon(h.key)}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              horizon === h.key
-                ? "bg-accent text-white"
-                : "bg-bg-surface2 text-text-secondary border border-border hover:text-text-primary"
-            }`}
+            className={clsx("toggle-btn", horizon === h.key && "active")}
           >
             {h.label}
           </button>

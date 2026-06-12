@@ -212,32 +212,18 @@ export default function Dashboard() {
             <h2 className="text-text-primary font-semibold text-sm">Cashflow</h2>
             <p className="text-text-tertiary text-xs mt-0.5">{range.label}</p>
           </div>
-          <div
-            className="flex rounded-lg border border-border overflow-hidden text-xs shrink-0"
-            role="group"
-            aria-label="Sankey-Sortierung"
-          >
+          <div className="toggle-group shrink-0" role="group" aria-label="Sankey-Sortierung">
             <button
               type="button"
               onClick={() => setSankeyFlowOrder("value")}
-              className={clsx(
-                "px-2.5 py-1.5 transition-colors",
-                sankeyFlowOrder === "value"
-                  ? "bg-accent text-white"
-                  : "text-text-tertiary hover:text-text-primary hover:bg-bg-surface2",
-              )}
+              className={clsx("toggle-btn", sankeyFlowOrder === "value" && "active")}
             >
               Nach Betrag
             </button>
             <button
               type="button"
               onClick={() => setSankeyFlowOrder("superCategory")}
-              className={clsx(
-                "px-2.5 py-1.5 transition-colors border-l border-border",
-                sankeyFlowOrder === "superCategory"
-                  ? "bg-accent text-white"
-                  : "text-text-tertiary hover:text-text-primary hover:bg-bg-surface2",
-              )}
+              className={clsx("toggle-btn", sankeyFlowOrder === "superCategory" && "active")}
             >
               Nach Kategorien
             </button>

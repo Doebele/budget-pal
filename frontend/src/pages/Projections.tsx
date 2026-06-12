@@ -1,3 +1,4 @@
+import { clsx } from "clsx";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { projectionsApi, accountsApi } from "@/lib/api";
@@ -119,11 +120,7 @@ export default function Projections() {
           <button
             key={h.key}
             onClick={() => setHorizon(h.key)}
-            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              horizon === h.key
-                ? "bg-accent text-white"
-                : "bg-bg-surface2 text-text-secondary hover:text-text-primary border border-border"
-            }`}
+            className={clsx("toggle-btn", horizon === h.key && "active")}
           >
             {h.label}
           </button>

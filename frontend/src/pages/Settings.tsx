@@ -1455,10 +1455,8 @@ export default function Settings() {
                 type="button"
                 onClick={() => handleBudgetDefaultView("bar")}
                 className={clsx(
-                  "flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-medium transition-colors",
-                  budgetDefaultView === "bar"
-                    ? "bg-accent/15 border-accent/40 text-accent"
-                    : "border-border text-text-tertiary hover:text-text-secondary",
+                  "toggle-btn",
+                  budgetDefaultView === "bar" && "active",
                 )}
               >
                 Balkenansicht
@@ -1467,10 +1465,8 @@ export default function Settings() {
                 type="button"
                 onClick={() => handleBudgetDefaultView("gauge")}
                 className={clsx(
-                  "flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-medium transition-colors",
-                  budgetDefaultView === "gauge"
-                    ? "bg-accent/15 border-accent/40 text-accent"
-                    : "border-border text-text-tertiary hover:text-text-secondary",
+                  "toggle-btn",
+                  budgetDefaultView === "gauge" && "active",
                 )}
               >
                 Gauge-Ansicht
@@ -1620,13 +1616,7 @@ function AppearanceSection() {
   const { t } = useTranslation("settings");
   const { theme, setTheme, density, setDensity, accent, setAccent, uiLanguage, setUiLanguage } = useUiStore();
 
-  const optionBtn = (active: boolean) =>
-    clsx(
-      "flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-medium transition-colors",
-      active
-        ? "bg-accent/15 border-accent/40 text-accent"
-        : "border-border text-text-tertiary hover:text-text-secondary",
-    );
+  const optionBtn = (active: boolean) => clsx("toggle-btn", active && "active");
 
   const changeLanguage = async (lang: UiLanguage) => {
     setUiLanguage(lang);

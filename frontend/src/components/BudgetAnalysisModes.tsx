@@ -58,16 +58,16 @@ export default function BudgetAnalysisModes({
               active
                 ? "border-accent bg-accent/15 text-accent"
                 : unavailable
-                  ? "border-slate-700/50 bg-slate-800/30 text-slate-600 cursor-not-allowed"
-                  : "border-slate-700 bg-slate-800/60 text-slate-300 hover:border-slate-500 hover:text-text-primary"
+                  ? "border-border bg-bg-surface2/30 text-text-disabled cursor-not-allowed"
+                  : "border-border bg-bg-surface2/60 text-text-secondary hover:border-border-strong hover:text-text-primary"
             )}
           >
-            <span className={clsx(active ? "text-accent" : unavailable ? "text-slate-600" : "text-slate-400")}>
+            <span className={clsx(active ? "text-accent" : unavailable ? "text-text-disabled" : "text-text-tertiary")}>
               {opt.icon}
             </span>
             <span className="font-medium">{opt.label}</span>
             {unavailable && (
-              <span className="text-xs text-slate-600 ml-1">—</span>
+              <span className="text-xs text-text-disabled ml-1">—</span>
             )}
           </button>
         );
