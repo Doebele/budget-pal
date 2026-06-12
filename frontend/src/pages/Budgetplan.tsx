@@ -1749,17 +1749,15 @@ export default function Budgetplan() {
                     <div className="px-3 py-3 space-y-3 border-t border-border/40 bg-bg-surface">
                       <div>
                         <label className="block text-xs text-text-tertiary mb-1.5">Datenquelle</label>
-                        <div className="flex rounded-lg border border-border overflow-hidden text-xs font-medium">
+                        <div className="toggle-group w-full">
                           {(["empirical", "historical"] as const).map((src) => (
                             <button
                               key={src}
                               type="button"
                               onClick={() => setEditorTplSource(src)}
                               className={clsx(
-                                "flex-1 px-2 py-2 transition-colors",
-                                editorTplSource === src
-                                  ? "bg-accent/15 text-accent font-semibold"
-                                  : "bg-bg-surface2 text-text-tertiary hover:text-text-secondary"
+                                "toggle-btn",
+                                editorTplSource === src && "active"
                               )}
                             >
                               {src === "historical" ? "Historisch" : "Empirisch"}
@@ -2102,16 +2100,14 @@ export default function Budgetplan() {
               {/* Source toggle */}
               <div>
                 <label className="block text-xs text-text-tertiary mb-2">Datenquelle</label>
-                <div className="flex rounded-lg border border-border overflow-hidden text-xs font-medium">
+                <div className="toggle-group w-full">
                   {(["empirical", "historical"] as const).map((src) => (
                     <button
                       key={src}
                       onClick={() => setPrefillSource(src)}
                       className={clsx(
-                        "flex-1 px-3 py-2 transition-colors",
-                        prefillSource === src
-                          ? "bg-accent/15 text-accent font-semibold"
-                          : "bg-bg-surface2 text-text-tertiary hover:text-text-secondary"
+                        "toggle-btn",
+                        prefillSource === src && "active"
                       )}
                     >
                       {src === "historical" ? "Historische Transaktionen" : "Empirische Angaben"}
