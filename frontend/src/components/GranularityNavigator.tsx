@@ -72,12 +72,14 @@ export default function GranularityNavigator({ granularity, anchor, onChange }: 
               <NavArrowRight className="w-4 h-4" />
             </button>
 
-            <button
-              onClick={() => onChange(granularity, new Date())}
-              className={clsx("toggle-btn ml-1", current && "active cursor-default")}
-            >
-              Aktuell
-            </button>
+            <div className="toggle-group ml-1">
+              <button
+                onClick={() => onChange(granularity, new Date())}
+                className={clsx("toggle-btn", current && "active cursor-default")}
+              >
+                Aktuell
+              </button>
+            </div>
           </>
         )}
       </div>

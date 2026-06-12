@@ -215,7 +215,7 @@ export default function HealthScoreWidget() {
         </div>
 
         {/* Mode toggle pills */}
-        <div className="flex items-center gap-1 bg-bg-surface2 rounded-full p-0.5">
+        <div className="toggle-group">
           {MODES.map((m) => (
             <Tooltip key={m.id} text={m.tooltip}>
               <button

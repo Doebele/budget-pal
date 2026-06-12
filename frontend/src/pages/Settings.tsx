@@ -1450,7 +1450,7 @@ export default function Settings() {
         <div className="space-y-4">
           <div>
             <label className="label mb-2 block">Standard-Ansicht Budgetanalyse</label>
-            <div className="flex items-center gap-2">
+            <div className="toggle-group">
               <button
                 type="button"
                 onClick={() => handleBudgetDefaultView("bar")}
@@ -1635,7 +1635,7 @@ function AppearanceSection() {
       <div className="space-y-4">
         <div>
           <label className="label mb-2 block">{t("appearance.theme")}</label>
-          <div className="flex items-center gap-2">
+          <div className="toggle-group">
             <button type="button" onClick={() => setTheme("light")} className={optionBtn(theme === "light")}>
               {t("appearance.themeLight")}
             </button>
@@ -1647,7 +1647,7 @@ function AppearanceSection() {
 
         <div>
           <label className="label mb-2 block">{t("appearance.density")}</label>
-          <div className="flex items-center gap-2">
+          <div className="toggle-group">
             <button type="button" onClick={() => setDensity("high")} className={optionBtn(density === "high")}>
               {t("appearance.densityHigh")}
             </button>
@@ -1659,7 +1659,7 @@ function AppearanceSection() {
 
         <div>
           <label className="label mb-2 block">{t("appearance.language")}</label>
-          <div className="flex items-center gap-2">
+          <div className="toggle-group">
             <button type="button" onClick={() => changeLanguage("de")} className={optionBtn(uiLanguage === "de")}>
               {t("appearance.languageGerman")}
             </button>
@@ -1671,7 +1671,7 @@ function AppearanceSection() {
 
         <div>
           <label className="label mb-2 block">{t("appearance.accent")}</label>
-          <div className="flex items-center gap-2">
+          <div className="toggle-group">
             {ACCENT_SWATCHES.map((sw) => (
               <button
                 key={sw.id}
