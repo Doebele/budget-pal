@@ -26,6 +26,9 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+# Unterstützte UI-Sprachen — bei neuen Sprachen hier und im Frontend (i18n) ergänzen
+SUPPORTED_UI_LANGUAGES = {"de", "en"}
+
 router = APIRouter()
 login_rate_limiter = SlidingWindowRateLimiter(max_requests=8, window_seconds=60)
 
@@ -70,6 +73,7 @@ class UserProfileResponse(BaseModel):
     retirement_age: int
     currency: str
     locale: str
+    ui_language: str
     saron_reference_annual_pct: float
 
 
@@ -82,6 +86,7 @@ class UserUpdateRequest(BaseModel):
     retirement_age: Optional[int] = None
     currency: Optional[str] = None
     locale: Optional[str] = None
+    ui_language: Optional[str] = None
     saron_reference_annual_pct: Optional[float] = Field(default=None, ge=0.0, le=25.0)
     current_password: Optional[str] = None
     new_password: Optional[str] = None
@@ -185,6 +190,7 @@ async def get_me(current_user: User = Depends(get_current_user)):
         retirement_age=current_user.retirement_age,
         currency=current_user.currency,
         locale=current_user.locale,
+        ui_language=current_user.ui_language,
         saron_reference_annual_pct=float(current_user.saron_reference_annual_pct),
     )
 
@@ -224,6 +230,14 @@ async def update_me(
         current_user.currency = cur
     if payload.locale is not None:
         current_user.locale = payload.locale
+    if payload.ui_language is not None:
+        lang = payload.ui_language.strip().lower()
+        if lang not in SUPPORTED_UI_LANGUAGES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"ui_language must be one of: {', '.join(sorted(SUPPORTED_UI_LANGUAGES))}",
+            )
+        current_user.ui_language = lang
     if payload.saron_reference_annual_pct is not None:
         current_user.saron_reference_annual_pct = float(
             payload.saron_reference_annual_pct
@@ -260,5 +274,6 @@ async def update_me(
         retirement_age=current_user.retirement_age,
         currency=current_user.currency,
         locale=current_user.locale,
+        ui_language=current_user.ui_language,
         saron_reference_annual_pct=float(current_user.saron_reference_annual_pct),
     )

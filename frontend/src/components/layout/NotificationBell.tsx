@@ -9,6 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import { notificationsApi } from "@/lib/api";
 import { Bell, BellNotification, Cash, CreditCard, Dollar, GraphDown, InfoCircle, Refresh, WarningCircle, WarningTriangle, Xmark } from "@/lib/icons";
 import { clsx } from "clsx";
+import { useTranslation } from "react-i18next";
 
 interface Finding {
   type: string;
@@ -35,6 +36,7 @@ const TYPE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = 
 };
 
 export default function NotificationBell() {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -80,7 +82,7 @@ export default function NotificationBell() {
           "relative flex items-center justify-center w-8 h-8 rounded-lg transition-colors",
           open ? "bg-bg-surface2 text-text-primary" : "text-text-tertiary hover:text-text-primary hover:bg-bg-surface2"
         )}
-        title="Benachrichtigungen"
+        title={t("notifications.title")}
       >
         {total > 0 ? (
           <BellNotification className="w-4 h-4" />
@@ -123,8 +125,8 @@ export default function NotificationBell() {
             {!isLoading && findings.length === 0 && (
               <div className="px-4 py-8 text-center">
                 <Bell className="w-6 h-6 text-text-tertiary mx-auto mb-2" />
-                <p className="text-text-tertiary text-xs">Keine Anomalien erkannt.</p>
-                <p className="text-text-tertiary text-[10px] mt-0.5">Alles sieht normal aus 🎉</p>
+                <p className="text-text-tertiary text-xs">{t("notifications.empty")}</p>
+                <p className="text-text-tertiary text-[10px] mt-0.5">{t("notifications.allGood")}</p>
               </div>
             )}
             {!isLoading && findings.map((f, i) => {

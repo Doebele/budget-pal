@@ -40,6 +40,11 @@
     "back": "Zurück",
     "next": "Weiter"
   },
+  "notifications": {
+    "title": "Benachrichtigungen",
+    "empty": "Keine Anomalien erkannt.",
+    "allGood": "Alles sieht normal aus 🎉"
+  },
   "common": {
     "loading": "Wird geladen…",
     "error": "Etwas ist schiefgelaufen",

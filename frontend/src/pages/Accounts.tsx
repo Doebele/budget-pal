@@ -1,3 +1,4 @@
+import { displayLocale } from "@/lib/format";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { accountsApi } from "@/lib/api";
@@ -83,7 +84,7 @@ const convertToCHF = (amount: number, currency: string): number => {
 
 // Format currency amount
 const formatCurrency = (amount: number, currency: string): string => {
-  return new Intl.NumberFormat("de-CH", {
+  return new Intl.NumberFormat(displayLocale(), {
     style: "currency",
     currency: currency,
     minimumFractionDigits: 2,

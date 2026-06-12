@@ -1,3 +1,4 @@
+import { displayLocale } from "@/lib/format";
 import { useState, useEffect } from "react";
 import { clsx } from "clsx";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -8,6 +9,9 @@ import { Check, Download, EditPencil, Eye, FloppyDisk, Group, Label, MagicWand, 
 import { Link } from "react-router-dom";
 import { differenceInYears, parseISO } from "date-fns";
 import { useTaxonomySuperCategories, type SuperCategory } from "@/lib/categories";
+import { useTranslation } from "react-i18next";
+import { useUiStore, type Accent, type UiLanguage } from "@/lib/store";
+import i18n from "@/i18n";
 
 // ── Peer-Gruppe: Schlüssel je Superkategorie ───────────────────
 // Summe der aufgeführten PeerGroupDefaults-Felder ergibt den monatlichen
@@ -54,7 +58,7 @@ function peerTotal(config: PeerConfig, scId: string): number | null {
 }
 
 function fmtCHF(v: number): string {
-  return `CHF ${v.toLocaleString("de-CH", { maximumFractionDigits: 0 })}`;
+  return `CHF ${v.toLocaleString(displayLocale(), { maximumFractionDigits: 0 })}`;
 }
 
 function calcAge(birthdate: string): number | null {
@@ -1436,6 +1440,9 @@ export default function Settings() {
         )}
       </div>
 
+      {/* ── Erscheinungsbild (Theme / Dichte / Sprache / Akzent) ── */}
+      <AppearanceSection />
+
       {/* Info */}
       {/* Darstellung / Display preferences */}
       <div className="card">
@@ -1593,6 +1600,104 @@ export default function Settings() {
               budgetpal.doebele12.de <OpenNewWindow className="w-3 h-3" />
             </a>
           </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Erscheinungsbild — Theme / Dichte / Sprache / Akzentfarbe ──
+// Schreibt auf dieselben Store-/i18n-/API-Pfade wie der Rail-Footer.
+const ACCENT_SWATCHES: { id: Accent; color: string; labelKey: string }[] = [
+  { id: "indigo", color: "#3b82f6", labelKey: "appearance.accentIndigo" },
+  { id: "violet", color: "#8b5cf6", labelKey: "appearance.accentViolet" },
+  { id: "emerald", color: "#10b981", labelKey: "appearance.accentEmerald" },
+  { id: "amber", color: "#f59e0b", labelKey: "appearance.accentAmber" },
+  { id: "rose", color: "#f43f5e", labelKey: "appearance.accentRose" },
+];
+
+function AppearanceSection() {
+  const { t } = useTranslation("settings");
+  const { theme, setTheme, density, setDensity, accent, setAccent, uiLanguage, setUiLanguage } = useUiStore();
+
+  const optionBtn = (active: boolean) =>
+    clsx(
+      "flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-medium transition-colors",
+      active
+        ? "bg-accent/15 border-accent/40 text-accent"
+        : "border-border text-text-tertiary hover:text-text-secondary",
+    );
+
+  const changeLanguage = async (lang: UiLanguage) => {
+    setUiLanguage(lang);
+    await i18n.changeLanguage(lang);
+    try {
+      await authApi.updateMe({ ui_language: lang });
+    } catch {
+      /* silent — localStorage bleibt als Fallback */
+    }
+  };
+
+  return (
+    <div className="card">
+      <h2 className="text-text-primary font-semibold text-sm mb-1">{t("appearance.title")}</h2>
+      <p className="text-text-disabled text-xs mb-4">{t("appearance.subtitle")}</p>
+      <div className="space-y-4">
+        <div>
+          <label className="label mb-2 block">{t("appearance.theme")}</label>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setTheme("light")} className={optionBtn(theme === "light")}>
+              {t("appearance.themeLight")}
+            </button>
+            <button type="button" onClick={() => setTheme("dark")} className={optionBtn(theme === "dark")}>
+              {t("appearance.themeDark")}
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label className="label mb-2 block">{t("appearance.density")}</label>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setDensity("high")} className={optionBtn(density === "high")}>
+              {t("appearance.densityHigh")}
+            </button>
+            <button type="button" onClick={() => setDensity("low")} className={optionBtn(density === "low")}>
+              {t("appearance.densityLow")}
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label className="label mb-2 block">{t("appearance.language")}</label>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => changeLanguage("de")} className={optionBtn(uiLanguage === "de")}>
+              {t("appearance.languageGerman")}
+            </button>
+            <button type="button" onClick={() => changeLanguage("en")} className={optionBtn(uiLanguage === "en")}>
+              {t("appearance.languageEnglish")}
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label className="label mb-2 block">{t("appearance.accent")}</label>
+          <div className="flex items-center gap-2">
+            {ACCENT_SWATCHES.map((sw) => (
+              <button
+                key={sw.id}
+                type="button"
+                onClick={() => setAccent(sw.id)}
+                className={optionBtn(accent === sw.id)}
+                title={t(sw.labelKey)}
+              >
+                <span
+                  className="w-3 h-3 rounded-full inline-block"
+                  style={{ backgroundColor: sw.color }}
+                />
+                {t(sw.labelKey)}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>

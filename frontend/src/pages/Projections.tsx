@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { projectionsApi, accountsApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { formatCHF, colors } from "@/lib/theme";
+import { formatCHF } from "@/lib/theme";
+import { useThemeColors } from "@/hooks/useThemeColors";
 import MonteCarloChart from "@/components/charts/MonteCarloChart";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -38,6 +39,7 @@ const PILLAR_COLORS = {
 } as const;
 
 export default function Projections() {
+  const { colors } = useThemeColors();
   const { user } = useAuth();
   const [horizon, setHorizon] = useState<HorizonKey>("10yr");
   const [params, setParams] = useState({

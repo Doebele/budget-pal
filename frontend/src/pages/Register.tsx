@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { authApi, setAuthToken } from "@/lib/api";
 import { Reports } from "@/lib/icons";
 
 export default function Register() {
   const navigate = useNavigate();
+  const { t } = useTranslation("auth");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -21,7 +23,7 @@ export default function Register() {
       navigate("/");
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      setError(msg || "Registrierung fehlgeschlagen.");
+      setError(msg || t("register.failed"));
     } finally {
       setLoading(false);
     }
@@ -40,19 +42,19 @@ export default function Register() {
         </div>
 
         <div className="card">
-          <h1 className="text-text-primary font-semibold text-lg mb-6">Konto erstellen</h1>
+          <h1 className="text-text-primary font-semibold text-lg mb-6">{t("register.title")}</h1>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="label">Name</label>
+              <label className="label">{t("register.name")}</label>
               <input type="text" className="input" value={name} onChange={(e) => setName(e.target.value)} required />
             </div>
             <div>
-              <label className="label">E-Mail</label>
+              <label className="label">{t("register.email")}</label>
               <input type="email" className="input" value={email} onChange={(e) => setEmail(e.target.value)} required />
             </div>
             <div>
-              <label className="label">Passwort (min. 8 Zeichen)</label>
+              <label className="label">{t("register.password")}</label>
               <input type="password" className="input" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
             </div>
 
@@ -61,13 +63,13 @@ export default function Register() {
             )}
 
             <button type="submit" className="btn-primary w-full py-2.5" disabled={loading}>
-              {loading ? "Laden..." : "Registrieren"}
+              {loading ? t("register.loading") : t("register.submit")}
             </button>
           </form>
 
           <p className="text-text-tertiary text-sm mt-4 text-center">
-            Bereits ein Konto?{" "}
-            <Link to="/login" className="text-accent hover:text-accent-light">Anmelden</Link>
+            {t("register.hasAccount")}{" "}
+            <Link to="/login" className="text-accent hover:text-accent-light">{t("register.loginLink")}</Link>
           </p>
         </div>
       </div>

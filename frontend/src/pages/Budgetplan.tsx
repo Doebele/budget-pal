@@ -10,6 +10,7 @@
  * Filter: Alle | Nur Ausgaben | Nur Einnahmen (localStorage persisted)
  * Year navigation: prev/next buttons.
  */
+import { displayLocale } from "@/lib/format";
 import { useState, useMemo, useEffect, useRef, useCallback, type DragEvent } from "react";
 import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -359,7 +360,7 @@ function EntryTooltip({ entry, account, targetRef, visible }: EntryTooltipProps)
           )}
         >
           {isExpense ? "−" : "+"}
-          {Math.abs(entry.amount).toLocaleString("de-CH", {
+          {Math.abs(entry.amount).toLocaleString(displayLocale(), {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
           })}

@@ -12,7 +12,8 @@
  */
 import ReactECharts from "echarts-for-react";
 import { useMemo } from "react";
-import { colors, formatCHF } from "@/lib/theme";
+import { formatCHF, type ThemePalette } from "@/lib/theme";
+import { useThemeColors } from "@/hooks/useThemeColors";
 import type { SuperCategory } from "@/lib/categories";
 import { EyeClosed } from "@/lib/icons";
 
@@ -54,7 +55,7 @@ function fmtCompact(v: number): string {
 
 // ── Gauge option factory ───────────────────────────────────────
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function makeOption(row: GaugeRow, hasPeer: boolean): any {
+function makeOption(row: GaugeRow, hasPeer: boolean, colors: ThemePalette): any {
   const { sc, actual, planned, peer } = row;
   const hasPeerVal = hasPeer && (peer ?? 0) > 0;
 
@@ -203,6 +204,7 @@ function makeOption(row: GaugeRow, hasPeer: boolean): any {
 
 // ── Component ──────────────────────────────────────────────────
 export default function CategoryGaugeChart({ rows, hasPeer, onToggleHide }: CategoryGaugeChartProps) {
+  const { colors } = useThemeColors();
   const visibleRows = useMemo(
     () => rows.filter((r) => !r.hidden),
     [rows],
@@ -244,7 +246,7 @@ export default function CategoryGaugeChart({ rows, hasPeer, onToggleHide }: Cate
       {visibleRows.length > 0 ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
           {visibleRows.map((row) => {
-            const option = makeOption(row, hasPeer);
+            const option = makeOption(row, hasPeer, colors);
             const isOver = hasPeer && (row.peer ?? 0) > 0 && row.actual > (row.peer ?? 0);
 
             return (

@@ -40,6 +40,11 @@
     "back": "Back",
     "next": "Next"
   },
+  "notifications": {
+    "title": "Notifications",
+    "empty": "No anomalies detected.",
+    "allGood": "Everything looks normal 🎉"
+  },
   "common": {
     "loading": "Loading…",
     "error": "Something went wrong",

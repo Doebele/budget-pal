@@ -10,7 +10,8 @@ const tokenWithAlpha = (plainVar, monoRgbVar) => ({ opacityValue }) =>
     : `rgb(var(${monoRgbVar}) / ${opacityValue})`;
 
 export default {
-  darkMode: "class",
+  // dark:-Varianten folgen dem data-theme-Attribut (gesetzt in App.tsx)
+  darkMode: ["selector", '[data-theme="dark"]'],
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
