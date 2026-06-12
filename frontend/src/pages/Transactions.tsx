@@ -6,7 +6,7 @@ import { useAuth } from "@/lib/auth";
 import { useTaxonomy, useTaxonomySuperCategories } from "@/lib/categories";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
-import { Search, Upload, ChevronDown, Check, X, LayoutGrid, Building2, Repeat, Wallet, TrendingUp, PieChart, Trash2, Scissors, Download } from "lucide-react";
+import { Building, Check, Download, GraphUp, NavArrowDown, PercentageCircle, Repeat, Scissor, Search, Trash, Upload, ViewGrid, Wallet, Xmark } from "@/lib/icons";
 import GranularityNavigator from "@/components/GranularityNavigator";
 import { computeDateRange, TimeGranularity } from "@/lib/granularity";
 import { Link } from "react-router-dom";
@@ -296,21 +296,21 @@ export default function Transactions() {
       </div>
 
       {/* TransactionFilterBar - Account Selection */}
-      <div className="sticky top-0 z-20 bg-slate-900 border-b border-slate-700 rounded-lg mb-4">
+      <div className="sticky top-0 z-20 bg-bg-surface border-b border-border rounded-lg mb-4">
         <div className="flex items-center justify-between p-4">
           <div className="flex items-center gap-3">
             {viewMode === "all" ? (
-              <LayoutGrid className="w-5 h-5 text-accent" />
+              <ViewGrid className="w-5 h-5 text-accent" />
             ) : (
-              <Building2 className="w-5 h-5 text-accent" />
+              <Building className="w-5 h-5 text-accent" />
             )}
             <div>
-              <h2 className="text-white text-lg font-medium">
+              <h2 className="text-text-primary text-lg font-medium">
                 {viewMode === "all"
                   ? "Alle Konten"
                   : selectedAccount?.name || "Konto"}
               </h2>
-              <p className="text-slate-400 text-xs">
+              <p className="text-text-tertiary text-xs">
                 {viewMode === "all"
                   ? `${accounts?.length || 0} Konten aggregiert`
                   : "Einzelkonto-Ansicht"}
@@ -333,7 +333,7 @@ export default function Transactions() {
                   : "text-text-tertiary hover:text-text-primary hover:bg-bg-surface2 border border-transparent"
               )}
             >
-              <PieChart className="w-4 h-4" />
+              <PercentageCircle className="w-4 h-4" />
               <span className="hidden sm:inline">Budget-Analyse</span>
             </button>
             <span className="text-text-tertiary text-sm hidden sm:inline">Übersicht:</span>
@@ -342,11 +342,11 @@ export default function Transactions() {
             <div className="relative">
               <button
                 onClick={() => setShowAccountDropdown(!showAccountDropdown)}
-                className="flex items-center gap-2 bg-slate-800 text-white px-3 py-2 pr-8 rounded-md border border-slate-600 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent cursor-pointer min-w-[180px] hover:bg-slate-700 transition-colors"
+                className="flex items-center gap-2 bg-bg-surface2 text-text-primary px-3 py-2 pr-8 rounded-md border border-border-strong text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent cursor-pointer min-w-[180px] hover:bg-bg-elevated transition-colors"
               >
                 {viewMode === "all" ? (
                   <>
-                    <LayoutGrid className="w-4 h-4 text-accent" />
+                    <ViewGrid className="w-4 h-4 text-accent" />
                     <span>Alle Konten</span>
                   </>
                 ) : (
@@ -368,7 +368,7 @@ export default function Transactions() {
                             }}
                           />
                         ) : (
-                          <Building2 className="w-4 h-4 text-slate-400" />
+                          <Building className="w-4 h-4 text-text-tertiary" />
                         )}
                         <span className="truncate">{acc.name}</span>
                       </>
@@ -376,7 +376,7 @@ export default function Transactions() {
                   })()
                 )}
               </button>
-              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              <NavArrowDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary pointer-events-none" />
 
               {/* Dropdown Menu */}
               {showAccountDropdown && (
@@ -386,7 +386,7 @@ export default function Transactions() {
                     className="fixed inset-0 z-10"
                     onClick={() => setShowAccountDropdown(false)}
                   />
-                  <div className="absolute top-full right-0 mt-1 w-64 bg-slate-800 border border-slate-700 rounded-md shadow-xl z-20 py-1 max-h-72 overflow-y-auto">
+                  <div className="absolute top-full right-0 mt-1 w-64 bg-bg-surface2 border border-border rounded-md shadow-xl z-20 py-1 max-h-72 overflow-y-auto">
                     {/* All Accounts Option */}
                     <button
                       onClick={() => {
@@ -394,20 +394,20 @@ export default function Transactions() {
                         setShowAccountDropdown(false);
                       }}
                       className={clsx(
-                        "w-full flex items-center gap-3 px-3 py-2.5 text-left text-sm hover:bg-slate-700 transition-colors",
-                        viewMode === "all" && "bg-slate-700/80"
+                        "w-full flex items-center gap-3 px-3 py-2.5 text-left text-sm hover:bg-bg-elevated transition-colors",
+                        viewMode === "all" && "bg-bg-elevated/80"
                       )}
                     >
                       <div className="w-6 h-6 rounded bg-accent/20 flex items-center justify-center flex-shrink-0">
-                        <LayoutGrid className="w-3.5 h-3.5 text-accent" />
+                        <ViewGrid className="w-3.5 h-3.5 text-accent" />
                       </div>
-                      <span className="text-white">Alle Konten</span>
+                      <span className="text-text-primary">Alle Konten</span>
                       {viewMode === "all" && (
                         <Check className="w-4 h-4 text-accent ml-auto" />
                       )}
                     </button>
 
-                    <div className="border-t border-slate-700 my-1" />
+                    <div className="border-t border-border my-1" />
 
                     {/* Account Options */}
                     {(accounts || []).map((acc: AccountRow) => {
@@ -420,8 +420,8 @@ export default function Transactions() {
                             setShowAccountDropdown(false);
                           }}
                           className={clsx(
-                            "w-full flex items-center gap-3 px-3 py-2.5 text-left text-sm hover:bg-slate-700 transition-colors",
-                            String(viewMode) === String(acc.id) && "bg-slate-700/80"
+                            "w-full flex items-center gap-3 px-3 py-2.5 text-left text-sm hover:bg-bg-elevated transition-colors",
+                            String(viewMode) === String(acc.id) && "bg-bg-elevated/80"
                           )}
                         >
                           <div className="w-6 h-6 rounded bg-white/10 flex items-center justify-center flex-shrink-0 overflow-hidden">
@@ -433,16 +433,16 @@ export default function Transactions() {
                                 onError={(e) => {
                                   (e.target as HTMLImageElement).style.display = 'none';
                                   const parent = (e.target as HTMLImageElement).parentElement;
-                                  if (parent) parent.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-slate-400"><path d="M2 10h20M6 10V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v4"/><path d="M12 14v7"/><path d="M4 10v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10"/></svg>';
+                                  if (parent) parent.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-text-tertiary"><path d="M2 10h20M6 10V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v4"/><path d="M12 14v7"/><path d="M4 10v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10"/></svg>';
                                 }}
                               />
                             ) : (
-                              <Building2 className="w-3.5 h-3.5 text-slate-400" />
+                              <Building className="w-3.5 h-3.5 text-text-tertiary" />
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-white truncate">{acc.name}</p>
-                            <p className="text-slate-500 text-xs truncate">{acc.bank}</p>
+                            <p className="text-text-primary truncate">{acc.name}</p>
+                            <p className="text-text-disabled text-xs truncate">{acc.bank}</p>
                           </div>
                           {String(viewMode) === String(acc.id) && (
                             <Check className="w-4 h-4 text-accent flex-shrink-0" />
@@ -460,27 +460,27 @@ export default function Transactions() {
 
       {/* Budget Analysis Panel */}
       {showBudgetAnalysis && budgetAnalysis && (
-        <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4 space-y-4 animate-fade-in">
+        <div className="bg-bg-surface2/50 border border-border rounded-lg p-4 space-y-4 animate-fade-in">
           <div className="flex items-center gap-2 text-accent mb-2">
             <Wallet className="w-5 h-5" />
             <h3 className="font-medium">Budget-Analyse: {range.label}</h3>
           </div>
           {/* Summary Cards — Beträge in Referenzwährung */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="bg-slate-900 rounded-lg p-3">
-              <p className="text-slate-400 text-xs mb-1">Monatliches Einkommen</p>
+            <div className="bg-bg-surface rounded-lg p-3">
+              <p className="text-text-tertiary text-xs mb-1">Monatliches Einkommen</p>
               <p className="text-gain font-mono text-lg">
                 +{formatAmount(budgetAnalysis.total_monthly_income, budgetAnalysis.reference_currency || refCcy)}
               </p>
             </div>
-            <div className="bg-slate-900 rounded-lg p-3">
-              <p className="text-slate-400 text-xs mb-1">Fixe Kosten</p>
+            <div className="bg-bg-surface rounded-lg p-3">
+              <p className="text-text-tertiary text-xs mb-1">Fixe Kosten</p>
               <p className="text-loss font-mono text-lg">
                 −{formatAmount(budgetAnalysis.fixed_recurring_costs, budgetAnalysis.reference_currency || refCcy)}
               </p>
             </div>
-            <div className="bg-slate-900 rounded-lg p-3">
-              <p className="text-slate-400 text-xs mb-1">Variable Kosten</p>
+            <div className="bg-bg-surface rounded-lg p-3">
+              <p className="text-text-tertiary text-xs mb-1">Variable Kosten</p>
               <p className="text-loss font-mono text-lg">
                 −{formatAmount(budgetAnalysis.variable_costs, budgetAnalysis.reference_currency || refCcy)}
               </p>
@@ -489,7 +489,7 @@ export default function Transactions() {
               "rounded-lg p-3",
               budgetAnalysis.variance >= 0 ? "bg-gain/10" : "bg-loss/10"
             )}>
-              <p className="text-slate-400 text-xs mb-1">Verbleibend</p>
+              <p className="text-text-tertiary text-xs mb-1">Verbleibend</p>
               <p className={clsx(
                 "font-mono text-lg",
                 budgetAnalysis.variance >= 0 ? "text-gain" : "text-loss"
@@ -503,13 +503,13 @@ export default function Transactions() {
           {/* Recurring Items List */}
           {budgetAnalysis.recurring_items.length > 0 && (
             <div className="mt-4">
-              <h4 className="text-sm text-slate-300 mb-2 flex items-center gap-2">
+              <h4 className="text-sm text-text-secondary mb-2 flex items-center gap-2">
                 <Repeat className="w-4 h-4 text-accent" />
                 Wiederkehrende Zahlungen
               </h4>
-              <div className="bg-slate-900 rounded-lg overflow-hidden">
+              <div className="bg-bg-surface rounded-lg overflow-hidden">
                 <table className="w-full text-sm">
-                  <thead className="bg-slate-800 text-slate-400 text-xs">
+                  <thead className="bg-bg-surface2 text-text-tertiary text-xs">
                     <tr>
                       <th className="text-left px-3 py-2">Beschreibung</th>
                       <th className="text-left px-3 py-2">Periode</th>
@@ -517,16 +517,16 @@ export default function Transactions() {
                       <th className="text-right px-3 py-2">Monatl. Äquiv.</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800">
+                  <tbody className="divide-y divide-border-subtle">
                     {budgetAnalysis.recurring_items.map((item, idx) => (
-                      <tr key={idx} className="hover:bg-slate-800/50">
-                        <td className="px-3 py-2 text-slate-300">{item.description}</td>
+                      <tr key={idx} className="hover:bg-bg-surface2/50">
+                        <td className="px-3 py-2 text-text-secondary">{item.description}</td>
                         <td className="px-3 py-2">
                           <span className={clsx("inline-flex items-center px-2 py-0.5 rounded text-xs", getFrequencyBadgeStyle(item.periodicity))}>
                             {PERIODICITY_LABELS[item.periodicity] ?? item.periodicity}
                           </span>
                         </td>
-                        <td className="px-3 py-2 text-right font-mono text-slate-400">
+                        <td className="px-3 py-2 text-right font-mono text-text-tertiary">
                           {formatAmount(item.amount, budgetAnalysis.reference_currency || refCcy)}
                         </td>
                         <td className="px-3 py-2 text-right font-mono text-loss">
@@ -542,7 +542,7 @@ export default function Transactions() {
 
           {/* Progress Bar */}
           <div className="mt-4">
-            <div className="flex justify-between text-xs text-slate-400 mb-1">
+            <div className="flex justify-between text-xs text-text-tertiary mb-1">
               <span>Budget-Auslastung</span>
               <span>
                 {budgetAnalysis.monthly_budget_limit > 0
@@ -550,7 +550,7 @@ export default function Transactions() {
                   : "0%"}
               </span>
             </div>
-            <div className="h-2 bg-slate-700 rounded-full overflow-hidden flex">
+            <div className="h-2 bg-bg-elevated rounded-full overflow-hidden flex">
               <div
                 className="h-full bg-loss transition-all"
                 style={{
@@ -571,11 +571,11 @@ export default function Transactions() {
             <div className="flex gap-4 mt-2 text-xs">
               <span className="flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-loss opacity-70" />
-                <span className="text-slate-400">Fix</span>
+                <span className="text-text-tertiary">Fix</span>
               </span>
               <span className="flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-loss-light opacity-70" />
-                <span className="text-slate-400">Variable</span>
+                <span className="text-text-tertiary">Variable</span>
               </span>
             </div>
           </div>
@@ -645,7 +645,7 @@ export default function Transactions() {
       <div className="card p-0 overflow-hidden">
         <div className="overflow-auto max-h-[calc(100vh-320px)]">
           <table className="w-full">
-            <thead className="sticky top-0 z-10 bg-slate-900">
+            <thead className="sticky top-0 z-10 bg-bg-surface">
               <tr className="border-b border-border/50">
                 {["Datum", "Beschreibung", "Konto", "Kategorie", "Wiederkehrend", "Betrag", "Referenz", ""].map((h, colIdx) => (
                   <th
@@ -697,7 +697,7 @@ export default function Transactions() {
                         </p>
                         {txn.is_split && (
                           <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-accent/15 text-accent border border-accent/25 shrink-0">
-                            <Scissors className="w-2.5 h-2.5" />
+                            <Scissor className="w-2.5 h-2.5" />
                             {txn.split_count ?? ""}
                           </span>
                         )}
@@ -747,7 +747,7 @@ export default function Transactions() {
                             ))}
                           </select>
                           <button onClick={() => setEditingId(null)} className="text-text-tertiary hover:text-loss">
-                            <X className="w-3.5 h-3.5" />
+                            <Xmark className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       ) : (
@@ -784,7 +784,7 @@ export default function Transactions() {
                         "inline-flex items-center gap-1.5 rounded text-xs transition-colors",
                         txn.is_recurring
                           ? getFrequencyBadgeStyle(txn.periodicity)
-                          : "text-slate-500"
+                          : "text-text-disabled"
                       )}>
                         <Repeat className="w-3 h-3 shrink-0" />
                         <select
@@ -835,7 +835,7 @@ export default function Transactions() {
                             onClick={() => setConfirmingDeleteId(null)}
                             className="text-text-tertiary hover:text-text-secondary transition-colors"
                           >
-                            <X className="w-3 h-3" />
+                            <Xmark className="w-3 h-3" />
                           </button>
                         </div>
                       ) : (
@@ -846,7 +846,7 @@ export default function Transactions() {
                               className="text-text-tertiary hover:text-accent transition-colors"
                               title="Transaktion aufteilen"
                             >
-                              <Scissors className="w-3.5 h-3.5" />
+                              <Scissor className="w-3.5 h-3.5" />
                             </button>
                           )}
                           <button
@@ -854,7 +854,7 @@ export default function Transactions() {
                             className="text-text-tertiary hover:text-loss transition-colors"
                             title="Eintrag löschen"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       )}

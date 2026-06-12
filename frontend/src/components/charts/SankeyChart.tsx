@@ -12,9 +12,10 @@
  * The public SankeyData / SankeyLink / SankeyNode interfaces are kept
  * unchanged so Dashboard.tsx and Budget.tsx require no modifications.
  */
+import { displayLocale } from "@/lib/format";
 import ReactECharts from "echarts-for-react";
 import { useMemo } from "react";
-import { colors } from "@/lib/theme";
+import { useThemeColors } from "@/hooks/useThemeColors";
 import { compareSubLabelsByTaxonomy, useTaxonomy } from "@/lib/categories";
 
 // ── Public types (unchanged for caller compatibility) ──────────
@@ -66,7 +67,7 @@ const FALLBACK_COLORS = [
 function fmt(v: number): string {
   if (v >= 1_000_000) return `CHF ${(v / 1_000_000).toFixed(2)} Mio.`;
   if (v >= 1_000)     return `CHF ${(v / 1_000).toFixed(1)}k`;
-  return `CHF ${Math.round(v).toLocaleString("de-CH")}`;
+  return `CHF ${Math.round(v).toLocaleString(displayLocale())}`;
 }
 
 /** Separator used to create unique sub-item node names without affecting the displayed label. */
@@ -84,6 +85,7 @@ export default function SankeyChart({
   superCategoryOrder = [],
 }: SankeyChartProps) {
   const { getCategoryColor, superCategories } = useTaxonomy();
+  const { colors } = useThemeColors();
   const option = useMemo(() => {
     const scById = new Map(superCategories.map((s) => [s.id, s] as const));
     function flowColor(link: SankeyLink, idx: number): string {
@@ -342,7 +344,7 @@ export default function SankeyChart({
         },
       ],
     };
-  }, [data, flowOrder, getCategoryColor, superCategoryOrder, superCategories]);
+  }, [data, flowOrder, getCategoryColor, superCategoryOrder, superCategories, colors]);
 
   if (!option) {
     return (

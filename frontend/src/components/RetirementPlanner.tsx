@@ -10,16 +10,14 @@
  *   · Monthly cash-flow simulation post-retirement
  *   · Deficit / surplus indicator
  */
+import { clsx } from "clsx";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, ReferenceLine,
 } from "recharts";
-import {
-  ShieldCheck, AlertTriangle, TrendingUp, Coins,
-  CalendarClock, ArrowRight,
-} from "lucide-react";
+import { ArrowRight, Calendar, Coins, GraphUp, ShieldCheck, WarningTriangle } from "@/lib/icons";
 import { projectionsApi, api } from "@/lib/api";
 import { formatCHF } from "@/lib/theme";
 
@@ -115,7 +113,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
       {/* Controls */}
       <div className="card">
         <h3 className="text-text-primary font-semibold text-sm mb-4 flex items-center gap-2">
-          <CalendarClock className="w-4 h-4 text-accent" />
+          <Calendar className="w-4 h-4 text-accent" />
           Rentenparameter
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -126,11 +124,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
                 <button
                   key={age}
                   onClick={() => setRetirementAge(age)}
-                  className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-                    retirementAge === age
-                      ? "bg-accent text-white"
-                      : "bg-bg-surface2 text-text-secondary border border-border hover:text-text-primary"
-                  }`}
+                  className={clsx("toggle-btn", retirementAge === age && "active")}
                 >
                   {age}
                 </button>
@@ -178,7 +172,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
           label="Vermögen bei Rente"
           value={formatCHF(wealthAtRetirement)}
           sub={`in ${Math.max(yearsToRetirement, 0)} Jahren`}
-          icon={<TrendingUp className="w-4 h-4" style={{ color: "#10b981" }} />}
+          icon={<GraphUp className="w-4 h-4" style={{ color: "#10b981" }} />}
           valueColor="#10b981"
         />
         <KPICard
@@ -195,7 +189,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
           icon={
             isSurplus
               ? <ShieldCheck className="w-4 h-4 text-gain" />
-              : <AlertTriangle className="w-4 h-4 text-loss" />
+              : <WarningTriangle className="w-4 h-4 text-loss" />
           }
           valueColor={isSurplus ? "#10b981" : "#f87171"}
         />

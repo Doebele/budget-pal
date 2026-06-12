@@ -15,15 +15,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  BarChart3, ChevronRight, ChevronLeft,
-  Home, Heart, Car, Train, Banknote,
-  TrendingUp, Building2, Bitcoin, BookOpen,
-  ShieldCheck, Plane, ArrowRight, Check,
-  User, Users, Users2, UserMinus,
-  Briefcase, Globe, TrendingDown, PiggyBank,
-  Landmark, BarChart2, Coins, Wallet, Trash2,
-} from "lucide-react";
+import { Airplane, ArrowRight, Bank, BitcoinCircle, Building, Car, Cash, Check, Coins, Community, Globe, GraphDown, GraphUp, Group, Heart, Home, NavArrowLeft, NavArrowRight, OpenBook, PiggyBank, Reports, ShieldCheck, StatsReport, Suitcase, Train, Trash, User, UserXmark, Wallet } from "@/lib/icons";
 import { clsx } from "clsx";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -436,9 +428,9 @@ function SummaryCard({ label, value, sub }: { label: string; value: string; sub?
 function Step1({ data, update }: { data: WizardData; update: (p: Partial<WizardData>) => void }) {
   const HAUSHALT_OPTIONS: { value: WizardData["haushalt"]; label: string; Icon: React.ComponentType<{ className?: string }> }[] = [
     { value: "single",        label: "Einzelperson",   Icon: User },
-    { value: "couple",        label: "Paar",            Icon: Users },
-    { value: "family",        label: "Familie",         Icon: Users2 },
-    { value: "single-parent", label: "Alleinerziehend", Icon: UserMinus },
+    { value: "couple",        label: "Paar",            Icon: Group },
+    { value: "family",        label: "Familie",         Icon: Community },
+    { value: "single-parent", label: "Alleinerziehend", Icon: UserXmark },
   ];
   const BESCHAEFTIGUNG_OPTIONS: { value: WizardData["beschaeftigung"]; label: string }[] = [
     { value: "employed",      label: "Angestellt" },
@@ -451,7 +443,7 @@ function Step1({ data, update }: { data: WizardData; update: (p: Partial<WizardD
     <div className="space-y-8">
       <div className="text-center space-y-3">
         <div className="w-16 h-16 rounded-lg bg-gradient-to-br from-accent/30 to-accent/10 border border-accent/30 flex items-center justify-center mx-auto">
-          <BarChart3 className="w-8 h-8 text-accent" />
+          <Reports className="w-8 h-8 text-accent" />
         </div>
         <div>
           <h1 className="text-2xl font-display font-semibold text-text-primary">
@@ -555,17 +547,17 @@ function Step2({ data, update }: { data: WizardData; update: (p: Partial<WizardD
 
   const INCOME_SOURCES = [
     {
-      icon: <Briefcase className="w-4 h-4 text-text-tertiary" />, label: "Lohn / Gehalt (brutto)", sublabel: "Monatlich",
+      icon: <Suitcase className="w-4 h-4 text-text-tertiary" />, label: "Lohn / Gehalt (brutto)", sublabel: "Monatlich",
       enabledKey: "lohnEnabled" as const, valueKey: "lohn" as const,
       show: true,
     },
     {
-      icon: <Building2 className="w-4 h-4 text-text-tertiary" />, label: "Selbständiges Einkommen", sublabel: "Monatlicher Durchschnitt",
+      icon: <Building className="w-4 h-4 text-text-tertiary" />, label: "Selbständiges Einkommen", sublabel: "Monatlicher Durchschnitt",
       enabledKey: "selbstaendigEnabled" as const, valueKey: "selbstaendig" as const,
       show: true,
     },
     {
-      icon: <TrendingUp className="w-4 h-4 text-text-tertiary" />, label: "Dividenden & Kapitalerträge", sublabel: "Monatlicher Durchschnitt",
+      icon: <GraphUp className="w-4 h-4 text-text-tertiary" />, label: "Dividenden & Kapitalerträge", sublabel: "Monatlicher Durchschnitt",
       enabledKey: "dividendenEnabled" as const, valueKey: "dividenden" as const,
       show: true,
     },
@@ -626,7 +618,7 @@ function Step2({ data, update }: { data: WizardData; update: (p: Partial<WizardD
               </p>
             </div>
             <div className="w-10 h-10 rounded-xl bg-gain/15 flex items-center justify-center">
-              <Banknote className="w-5 h-5 text-gain" />
+              <Cash className="w-5 h-5 text-gain" />
             </div>
           </div>
           <p className="text-text-tertiary text-xs mt-3 pt-3 border-t border-gain/15">
@@ -742,7 +734,7 @@ function Step4({ data, update }: { data: WizardData; update: (p: Partial<WizardD
               {mode === "miete" ? (
                 <><Home className="w-4 h-4 inline mr-1.5" />Miete</>
               ) : (
-                <><Building2 className="w-4 h-4 inline mr-1.5" />Wohneigentum</>
+                <><Building className="w-4 h-4 inline mr-1.5" />Wohneigentum</>
               )}
             </button>
           ))}
@@ -1060,7 +1052,7 @@ function Step6({ data, update }: { data: WizardData; update: (p: Partial<WizardD
 
   const ASSETS = [
     {
-      icon: <Landmark className="w-4 h-4 text-text-tertiary" />,
+      icon: <Bank className="w-4 h-4 text-text-tertiary" />,
       label: "Bankkonto / Sparkonto",
       sublabel: "Gesamtsaldo aller Konten",
       enabledKey: "bankEnabled" as const,
@@ -1071,7 +1063,7 @@ function Step6({ data, update }: { data: WizardData; update: (p: Partial<WizardD
       ),
     },
     {
-      icon: <BarChart2 className="w-4 h-4 text-text-tertiary" />,
+      icon: <StatsReport className="w-4 h-4 text-text-tertiary" />,
       label: "Aktien & ETFs",
       sublabel: "Aktueller Depotwert",
       enabledKey: "stocksEnabled" as const,
@@ -1081,14 +1073,14 @@ function Step6({ data, update }: { data: WizardData; update: (p: Partial<WizardD
             <ChfInput value={data.stocksValue} onChange={(v) => update({ stocksValue: v })} />
           </Field>
           <p className="text-text-tertiary text-xs flex items-center gap-1.5 mt-1">
-            <TrendingUp className="w-3.5 h-3.5 text-accent" />
+            <GraphUp className="w-3.5 h-3.5 text-accent" />
             Tipp: Du kannst später Daten aus Portfolio-Tracker importieren.
           </p>
         </>
       ),
     },
     {
-      icon: <Building2 className="w-4 h-4 text-text-tertiary" />,
+      icon: <Building className="w-4 h-4 text-text-tertiary" />,
       label: "Immobilien",
       sublabel: "Marktwert abzüglich Hypothek",
       enabledKey: "propertyAssetEnabled" as const,
@@ -1223,7 +1215,7 @@ function Step6({ data, update }: { data: WizardData; update: (p: Partial<WizardD
                         onClick={() => removeMortgageEntry(idx)}
                         className="p-2 rounded-md text-text-tertiary hover:text-loss hover:bg-loss/10 transition-colors"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash className="w-4 h-4" />
                       </button>
                     </div>
                   )}
@@ -1390,7 +1382,7 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
       <div className="card">
         <div className="flex items-center gap-2 mb-4">
           <div className="w-7 h-7 rounded-sm bg-blue-500/15 flex items-center justify-center shrink-0">
-            <Building2 className="w-4 h-4 text-blue-400" />
+            <Building className="w-4 h-4 text-blue-400" />
           </div>
           <h3 className="text-text-primary font-medium text-sm">Säule 2 — BVG / Pensionskasse</h3>
         </div>
@@ -1432,7 +1424,7 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
       <div className="card">
         <div className="flex items-center gap-2 mb-4">
           <div className="w-7 h-7 rounded-sm bg-green-500/15 flex items-center justify-center shrink-0">
-            <Banknote className="w-4 h-4 text-green-400" />
+            <Cash className="w-4 h-4 text-green-400" />
           </div>
           <h3 className="text-text-primary font-medium text-sm">Säule 3a — Gebundene Vorsorge</h3>
         </div>
@@ -1557,9 +1549,9 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
 
 function Step8({ data, update }: { data: WizardData; update: (p: Partial<WizardData>) => void }) {
   const SCENARIOS: { key: "scenarioMortgage" | "scenarioSavings" | "scenarioEarlyRetirement" | "scenarioCare"; icon: React.ReactNode; label: string; sub: string }[] = [
-    { key: "scenarioMortgage",      icon: <TrendingDown className="w-4 h-4" />, label: "Hypothek amortisieren",        sub: "Planmässige Schuldenreduktion bis zur Pensionierung" },
+    { key: "scenarioMortgage",      icon: <GraphDown className="w-4 h-4" />, label: "Hypothek amortisieren",        sub: "Planmässige Schuldenreduktion bis zur Pensionierung" },
     { key: "scenarioSavings",       icon: <PiggyBank className="w-4 h-4" />,    label: "Sparplan erhöhen",             sub: "Optimierung der monatlichen Sparquote" },
-    { key: "scenarioEarlyRetirement", icon: <Plane className="w-4 h-4" />,      label: "Frühpensionierung (vor 65)",   sub: "Analyse der Finanzierbarkeit einer Frühpensionierung" },
+    { key: "scenarioEarlyRetirement", icon: <Airplane className="w-4 h-4" />,      label: "Frühpensionierung (vor 65)",   sub: "Analyse der Finanzierbarkeit einer Frühpensionierung" },
     { key: "scenarioCare",          icon: <Heart className="w-4 h-4" />,        label: "Pflegekosten einplanen (ab 80)", sub: "Szenario für Pflegebedarf im hohen Alter" },
   ];
 
@@ -1725,13 +1717,13 @@ function ReviewScreen({ data }: { data: WizardData }) {
         <h4 className="text-text-primary font-medium text-sm mb-3">Aktivierte Szenarien</h4>
         <div className="flex flex-wrap gap-2">
           {data.scenarioMortgage && (
-            <span className="badge bg-accent/15 text-accent flex items-center gap-1"><TrendingDown className="w-3 h-3" /> Hypothek amortisieren</span>
+            <span className="badge bg-accent/15 text-accent flex items-center gap-1"><GraphDown className="w-3 h-3" /> Hypothek amortisieren</span>
           )}
           {data.scenarioSavings && (
             <span className="badge bg-accent/15 text-accent flex items-center gap-1"><PiggyBank className="w-3 h-3" /> Sparplan erhöhen</span>
           )}
           {data.scenarioEarlyRetirement && (
-            <span className="badge bg-accent/15 text-accent flex items-center gap-1"><Plane className="w-3 h-3" /> Frühpensionierung</span>
+            <span className="badge bg-accent/15 text-accent flex items-center gap-1"><Airplane className="w-3 h-3" /> Frühpensionierung</span>
           )}
           {data.scenarioCare && (
             <span className="badge bg-accent/15 text-accent flex items-center gap-1"><Heart className="w-3 h-3" /> Pflegekosten</span>
@@ -1977,7 +1969,7 @@ export default function Wizard() {
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-accent/40 to-accent/15 flex items-center justify-center">
-              <BarChart3 className="w-4 h-4 text-accent" />
+              <Reports className="w-4 h-4 text-accent" />
             </div>
             <span className="font-display font-semibold text-text-primary text-sm">
               Budget<span className="text-accent">Pal</span>
@@ -2045,7 +2037,7 @@ export default function Wizard() {
               onClick={goBack}
               disabled={animating || isSubmitting}
             >
-              <ChevronLeft className="w-4 h-4" />
+              <NavArrowLeft className="w-4 h-4" />
               {isReview ? "Zurück zu den Zielen" : "Zurück"}
             </button>
           )}
@@ -2080,7 +2072,7 @@ export default function Wizard() {
                 </>
               ) : (
                 <>
-                  Weiter <ChevronRight className="w-4 h-4" />
+                  Weiter <NavArrowRight className="w-4 h-4" />
                 </>
               )}
             </button>

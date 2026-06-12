@@ -8,7 +8,7 @@
  * Clicking opens the drill-down panel.
  */
 import { clsx } from "clsx";
-import { AlertTriangle, ChevronRight } from "lucide-react";
+import { NavArrowRight, WarningTriangle } from "@/lib/icons";
 import { formatCHF } from "@/lib/theme";
 import type { SuperCategory } from "@/lib/categories";
 
@@ -73,7 +73,7 @@ export default function SuperCategoryBar({
               className="shrink-0 flex items-center gap-0.5 text-xs text-loss bg-loss/10 px-1.5 py-0.5 rounded-full border border-loss/25"
               title={`${overPct}% über Budget`}
             >
-              <AlertTriangle className="w-3 h-3" />
+              <WarningTriangle className="w-3 h-3" />
               +{overPct}%
             </span>
           )}
@@ -91,7 +91,7 @@ export default function SuperCategoryBar({
           {hasPlanned && (
             <span className="text-text-tertiary">{formatCHF(planned!)}</span>
           )}
-          <ChevronRight className="w-3.5 h-3.5 text-text-disabled group-hover:text-text-tertiary transition-colors" />
+          <NavArrowRight className="w-3.5 h-3.5 text-text-disabled group-hover:text-text-tertiary transition-colors" />
         </div>
       </div>
 

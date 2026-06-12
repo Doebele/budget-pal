@@ -2,9 +2,40 @@
  * Design system constants — mirror of tailwind.config.js values.
  * Use these in JS/TS contexts (chart configs, inline styles, etc.)
  * that can't read Tailwind classes directly.
+ *
+ * Theme-bewusst: `themePalettes.dark` / `themePalettes.light` +
+ * `buildNivoTheme(palette)`. Komponenten nutzen den Hook
+ * `useThemeColors()` (src/hooks/useThemeColors.ts); die Exporte
+ * `colors` / `nivoTheme` sind Dark-Aliase für noch nicht migrierte Stellen.
  */
+import { displayLocale } from "./format";
 
-export const colors = {
+// Chart-Serienfarben sind in beiden Themes lesbar und bleiben geteilt.
+const chart = {
+  1: "#3b82f6",
+  2: "#4ade80",
+  3: "#f87171",
+  4: "#fbbf24",
+  5: "#a78bfa",
+  6: "#34d399",
+  7: "#fb923c",
+  8: "#38bdf8",
+} as const;
+
+const chartPalette = [
+  "#3b82f6",
+  "#4ade80",
+  "#f87171",
+  "#fbbf24",
+  "#a78bfa",
+  "#34d399",
+  "#fb923c",
+  "#38bdf8",
+  "#f472b6",
+  "#6ee7b7",
+] as const;
+
+const darkPalette = {
   // ── Background ──────────────────────────────────────────────
   bg: "#0d0e12",
   bgSurface: "#13141a",
@@ -48,125 +79,171 @@ export const colors = {
   teal: "#34d399",
 
   // ── Chart palette ─────────────────────────────────────────────
-  chart: {
-    1: "#3b82f6",
-    2: "#4ade80",
-    3: "#f87171",
-    4: "#fbbf24",
-    5: "#a78bfa",
-    6: "#34d399",
-    7: "#fb923c",
-    8: "#38bdf8",
-  },
+  chart,
+  chartPalette,
 
-  chartPalette: [
-    "#3b82f6",
-    "#4ade80",
-    "#f87171",
-    "#fbbf24",
-    "#a78bfa",
-    "#34d399",
-    "#fb923c",
-    "#38bdf8",
-    "#f472b6",
-    "#6ee7b7",
-  ],
+  // Tooltip-Schatten (Nivo/Recharts)
+  tooltipShadow: "0 8px 32px rgba(0,0,0,0.5)",
 } as const;
+
+const lightPalette: ThemePalette = {
+  bg: "#f7f7f5",
+  bgSurface: "#ffffff",
+  bgSurface2: "#f3f3f0",
+  bgElevated: "#ececea",
+
+  border: "rgba(15,17,22,0.12)",
+  borderSubtle: "rgba(15,17,22,0.07)",
+  borderStrong: "rgba(15,17,22,0.22)",
+
+  textPrimary: "#15171c",
+  textSecondary: "#45505d",
+  textTertiary: "#7a8493",
+  textDisabled: "#9aa3ae",
+
+  accent: "#3b82f6",
+  accentLight: "#60a5fa",
+  accentDark: "#2563eb",
+  accentMuted: "rgba(59,130,246,0.15)",
+
+  // Dunklere Semantik für WCAG-Kontrast auf hellen Flächen
+  gain: "#16a34a",
+  gainLight: "#22c55e",
+  gainMuted: "rgba(22,163,74,0.15)",
+
+  loss: "#dc2626",
+  lossLight: "#ef4444",
+  lossMuted: "rgba(220,38,38,0.15)",
+
+  warning: "#d97706",
+  warningLight: "#f59e0b",
+  warningMuted: "rgba(217,119,6,0.15)",
+
+  purple: "#7c3aed",
+  purpleLight: "#8b5cf6",
+  purpleMuted: "rgba(124,58,237,0.15)",
+
+  teal: "#0d9488",
+
+  chart,
+  chartPalette,
+
+  tooltipShadow: "0 8px 32px rgba(15,17,22,0.15)",
+};
+
+export type ThemePalette = {
+  [K in keyof typeof darkPalette]: (typeof darkPalette)[K] extends string
+    ? string
+    : (typeof darkPalette)[K];
+};
+
+export const themePalettes: Record<"dark" | "light", ThemePalette> = {
+  dark: darkPalette,
+  light: lightPalette,
+};
+
+/** @deprecated Dark-Alias — neue Stellen nutzen useThemeColors(). */
+export const colors = themePalettes.dark;
 
 // ── Nivo chart theme ──────────────────────────────────────────
 
-export const nivoTheme = {
-  background: "transparent",
-  textColor: colors.textSecondary,
-  fontSize: 12,
-  fontFamily: "Syne, system-ui, sans-serif",
-  axis: {
-    domain: {
+export function buildNivoTheme(c: ThemePalette) {
+  return {
+    background: "transparent",
+    textColor: c.textSecondary,
+    fontSize: 12,
+    fontFamily: "Syne, system-ui, sans-serif",
+    axis: {
+      domain: {
+        line: {
+          stroke: c.border,
+          strokeWidth: 1,
+        },
+      },
+      legend: {
+        text: {
+          fill: c.textTertiary,
+          fontSize: 11,
+        },
+      },
+      ticks: {
+        line: {
+          stroke: c.borderSubtle,
+          strokeWidth: 1,
+        },
+        text: {
+          fill: c.textTertiary,
+          fontSize: 11,
+        },
+      },
+    },
+    grid: {
       line: {
-        stroke: colors.border,
+        stroke: c.borderSubtle,
         strokeWidth: 1,
       },
     },
-    legend: {
+    legends: {
+      title: {
+        text: {
+          fill: c.textSecondary,
+          fontSize: 11,
+        },
+      },
       text: {
-        fill: colors.textTertiary,
+        fill: c.textSecondary,
         fontSize: 11,
       },
+      ticks: {
+        line: {},
+        text: {
+          fill: c.textTertiary,
+          fontSize: 10,
+        },
+      },
     },
-    ticks: {
-      line: {
-        stroke: colors.borderSubtle,
+    annotations: {
+      text: {
+        fill: c.textPrimary,
+        fontSize: 12,
+      },
+      link: {
+        stroke: c.accent,
         strokeWidth: 1,
       },
-      text: {
-        fill: colors.textTertiary,
-        fontSize: 11,
+      outline: {
+        stroke: c.border,
+        strokeWidth: 2,
+      },
+      symbol: {
+        fill: c.bgSurface,
+        outlineWidth: 2,
+        outlineColor: c.accent,
       },
     },
-  },
-  grid: {
-    line: {
-      stroke: colors.borderSubtle,
-      strokeWidth: 1,
-    },
-  },
-  legends: {
-    title: {
-      text: {
-        fill: colors.textSecondary,
-        fontSize: 11,
+    tooltip: {
+      container: {
+        background: c.bgElevated,
+        color: c.textPrimary,
+        fontSize: 12,
+        borderRadius: "6px",
+        border: `1px solid ${c.border}`,
+        padding: "8px 12px",
+        boxShadow: c.tooltipShadow,
       },
     },
-    text: {
-      fill: colors.textSecondary,
-      fontSize: 11,
-    },
-    ticks: {
-      line: {},
-      text: {
-        fill: colors.textTertiary,
-        fontSize: 10,
+    crosshair: {
+      line: {
+        stroke: c.textTertiary,
+        strokeWidth: 1,
+        strokeOpacity: 0.5,
       },
     },
-  },
-  annotations: {
-    text: {
-      fill: colors.textPrimary,
-      fontSize: 12,
-    },
-    link: {
-      stroke: colors.accent,
-      strokeWidth: 1,
-    },
-    outline: {
-      stroke: colors.border,
-      strokeWidth: 2,
-    },
-    symbol: {
-      fill: colors.bgSurface,
-      outlineWidth: 2,
-      outlineColor: colors.accent,
-    },
-  },
-  tooltip: {
-    container: {
-      background: colors.bgElevated,
-      color: colors.textPrimary,
-      fontSize: 12,
-      borderRadius: "6px",
-      border: `1px solid ${colors.border}`,
-      padding: "8px 12px",
-      boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
-    },
-  },
-  crosshair: {
-    line: {
-      stroke: colors.textTertiary,
-      strokeWidth: 1,
-      strokeOpacity: 0.5,
-    },
-  },
-};
+  };
+}
+
+/** @deprecated Dark-Alias — neue Stellen nutzen useThemeColors().nivoTheme. */
+export const nivoTheme = buildNivoTheme(themePalettes.dark);
 
 // ── Category colors ───────────────────────────────────────────
 // NOTE: canonical colours now live in src/lib/categories.ts (getCategoryColor).
@@ -229,7 +306,7 @@ export function formatCHF(amount: number, compact = false): string {
   if (compact && Math.abs(amount) >= 1_000) {
     return `CHF ${(amount / 1_000).toFixed(0)}k`;
   }
-  return new Intl.NumberFormat("de-CH", {
+  return new Intl.NumberFormat(displayLocale(), {
     style: "currency",
     currency: "CHF",
     minimumFractionDigits: 2,
@@ -238,7 +315,7 @@ export function formatCHF(amount: number, compact = false): string {
 }
 
 export function formatAmount(amount: number, currency = "CHF", maximumFractionDigits = 2): string {
-  return new Intl.NumberFormat("de-CH", {
+  return new Intl.NumberFormat(displayLocale(), {
     style: "currency",
     currency,
     minimumFractionDigits: maximumFractionDigits,
@@ -277,26 +354,28 @@ export const PERIODICITY_LABELS: Record<string, string> = {
 /**
  * Returns Tailwind class string (bg + border + text) for the periodicity value.
  * Guaranteed to use full literal class names so Tailwind JIT keeps them.
+ * Light-Mode-Varianten zuerst, `dark:` überschreibt (darkMode-Selector
+ * in tailwind.config.js zeigt auf [data-theme="dark"]).
  */
 export function getFrequencyStyle(periodicity: string | null | undefined): string {
   switch (periodicity) {
-    case "weekly":     return "bg-cyan-900/20 border-cyan-800 text-cyan-300";
-    case "monthly":    return "bg-blue-900/20 border-blue-800 text-blue-300";
-    case "quarterly":  return "bg-orange-900/20 border-orange-800 text-orange-300";
-    case "halfyearly": return "bg-violet-900/20 border-violet-800 text-violet-300";
-    case "yearly":     return "bg-emerald-900/20 border-emerald-800 text-emerald-300";
-    default:           return "bg-slate-700/50 border-slate-600 text-slate-400";
+    case "weekly":     return "bg-cyan-100 border-cyan-300 text-cyan-700 dark:bg-cyan-900/20 dark:border-cyan-800 dark:text-cyan-300";
+    case "monthly":    return "bg-blue-100 border-blue-300 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300";
+    case "quarterly":  return "bg-orange-100 border-orange-300 text-orange-700 dark:bg-orange-900/20 dark:border-orange-800 dark:text-orange-300";
+    case "halfyearly": return "bg-violet-100 border-violet-300 text-violet-700 dark:bg-violet-900/20 dark:border-violet-800 dark:text-violet-300";
+    case "yearly":     return "bg-emerald-100 border-emerald-300 text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-800 dark:text-emerald-300";
+    default:           return "bg-slate-200 border-slate-300 text-slate-600 dark:bg-slate-700/50 dark:border-slate-600 dark:text-slate-400";
   }
 }
 
 /** Tailwind badge classes (no border) for inline status chips. */
 export function getFrequencyBadgeStyle(periodicity: string | null | undefined): string {
   switch (periodicity) {
-    case "weekly":     return "bg-cyan-900/50 text-cyan-300";
-    case "monthly":    return "bg-blue-900/50 text-blue-300";
-    case "quarterly":  return "bg-orange-900/50 text-orange-300";
-    case "halfyearly": return "bg-violet-900/50 text-violet-300";
-    case "yearly":     return "bg-emerald-900/50 text-emerald-300";
-    default:           return "bg-slate-700 text-slate-400";
+    case "weekly":     return "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/50 dark:text-cyan-300";
+    case "monthly":    return "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300";
+    case "quarterly":  return "bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300";
+    case "halfyearly": return "bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300";
+    case "yearly":     return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300";
+    default:           return "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-400";
   }
 }

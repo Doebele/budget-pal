@@ -1,10 +1,31 @@
 import { Routes, Route, Navigate } from "react-router-dom";
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect } from "react";
 
 import { AuthProvider, useAuth } from "@/lib/auth";
-import Sidebar from "@/components/layout/Sidebar";
+import { useUiStore } from "@/lib/store";
+import Rail from "@/components/layout/Rail";
+import MobileDrawer from "@/components/layout/MobileDrawer";
 import BottomNav from "@/components/layout/BottomNav";
 import LoadingScreen from "@/components/layout/LoadingScreen";
+
+// ── UI-Attribute (Theme / Akzent / Density) ───────────────────
+function UiAttributes() {
+  const theme = useUiStore((s) => s.theme);
+  const accent = useUiStore((s) => s.accent);
+  const density = useUiStore((s) => s.density);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+  }, [theme]);
+  useEffect(() => {
+    document.documentElement.setAttribute("data-accent", accent);
+  }, [accent]);
+  useEffect(() => {
+    document.body.setAttribute("data-density", density);
+  }, [density]);
+
+  return null;
+}
 
 // ── Lazy loaded pages ─────────────────────────────────────────
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
@@ -39,8 +60,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 // ── App Shell (authenticated layout) ─────────────────────────
 function AppShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex h-screen bg-bg overflow-hidden">
-      <Sidebar />
+    <div className="app-shell flex h-screen bg-bg overflow-hidden">
+      <Rail />
+      <MobileDrawer />
       <main className="flex-1 overflow-y-auto p-6 pb-20 md:pb-6">
         <Suspense fallback={<LoadingScreen />}>{children}</Suspense>
       </main>
@@ -53,6 +75,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <AuthProvider>
+      <UiAttributes />
       <Routes>
         {/* Public routes */}
         <Route

@@ -1,6 +1,6 @@
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
-import { Archive, RotateCcw, Trash2 } from "lucide-react";
+import { Archive, Trash, Undo } from "@/lib/icons";
 import { formatCHF, PERIODICITY_LABELS } from "@/lib/theme";
 import { clsx } from "clsx";
 
@@ -33,8 +33,8 @@ export function DeletedTransactionsView({
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center border border-slate-700">
-          <Archive className="w-5 h-5 text-slate-400" />
+        <div className="w-10 h-10 rounded-lg bg-bg-surface2 flex items-center justify-center border border-border">
+          <Archive className="w-5 h-5 text-text-tertiary" />
         </div>
         <div>
           <h2 className="text-text-primary font-semibold text-xl">Gelöschte Transaktionen (Archiv)</h2>
@@ -103,7 +103,7 @@ export function DeletedTransactionsView({
                         onClick={() => onRestore(txn.id)}
                         className="inline-flex items-center gap-1.5 bg-emerald-600/90 hover:bg-emerald-600 disabled:opacity-50 text-white rounded-md px-3 py-1.5 font-medium text-xs transition-colors"
                       >
-                        <RotateCcw className="w-3.5 h-3.5" />
+                        <Undo className="w-3.5 h-3.5" />
                         Wiederherstellen
                       </button>
                       <button
@@ -112,7 +112,7 @@ export function DeletedTransactionsView({
                         onClick={() => onDeletePermanently(txn.id)}
                         className="inline-flex items-center gap-1.5 bg-red-600/90 hover:bg-red-600 disabled:opacity-50 text-white rounded-md px-3 py-1.5 font-medium text-xs transition-colors"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash className="w-3.5 h-3.5" />
                         Endgültig löschen
                       </button>
                     </div>

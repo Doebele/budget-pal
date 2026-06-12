@@ -1,8 +1,9 @@
+import { displayLocale } from "@/lib/format";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { accountsApi } from "@/lib/api";
 import { formatCHF } from "@/lib/theme";
-import { Plus, Edit2, Trash2, Search, Check, AlertTriangle } from "lucide-react";
+import { Check, EditPencil, Plus, Search, Trash, WarningTriangle } from "@/lib/icons";
 import { clsx } from "clsx";
 import {
   BANKS_WITH_LOGOS,
@@ -83,7 +84,7 @@ const convertToCHF = (amount: number, currency: string): number => {
 
 // Format currency amount
 const formatCurrency = (amount: number, currency: string): string => {
-  return new Intl.NumberFormat("de-CH", {
+  return new Intl.NumberFormat(displayLocale(), {
     style: "currency",
     currency: currency,
     minimumFractionDigits: 2,
@@ -317,7 +318,7 @@ export default function Accounts() {
 
               {/* Dropdown with filtered results */}
               {showBankDropdown && (
-                <div className="absolute z-20 w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-lg max-h-72 overflow-y-auto">
+                <div className="absolute z-20 w-full mt-1 bg-bg-surface2 border border-border rounded-md shadow-lg max-h-72 overflow-y-auto">
                   {(() => {
                     const filtered = bankSearchQuery
                       ? BANKS_WITH_LOGOS.filter((b) =>
@@ -342,7 +343,7 @@ export default function Accounts() {
 
                           return (
                             <div key={category}>
-                              <div className="px-4 py-1.5 text-xs font-semibold text-text-tertiary bg-slate-700/50 sticky top-0">
+                              <div className="px-4 py-1.5 text-xs font-semibold text-text-tertiary bg-bg-elevated/50 sticky top-0">
                                 {getBankCategoryLabel(category)}
                               </div>
                               {typeBanks.map((bank) => (
@@ -350,8 +351,8 @@ export default function Accounts() {
                                   key={bank.id}
                                   type="button"
                                   className={clsx(
-                                    "w-full px-3 py-2.5 text-left text-sm hover:bg-slate-700 transition-colors flex items-center gap-3",
-                                    selectedBankId === bank.id && "bg-slate-700/80 text-accent"
+                                    "w-full px-3 py-2.5 text-left text-sm hover:bg-bg-elevated transition-colors flex items-center gap-3",
+                                    selectedBankId === bank.id && "bg-bg-elevated/80 text-accent"
                                   )}
                                   onClick={() => {
                                     setSelectedBankId(bank.id);
@@ -398,14 +399,14 @@ export default function Accounts() {
                           ) && (
                             <button
                               type="button"
-                              className="w-full px-3 py-3 text-left text-sm hover:bg-slate-700 transition-colors text-accent border-t border-slate-700 flex items-center gap-3"
+                              className="w-full px-3 py-3 text-left text-sm hover:bg-bg-elevated transition-colors text-accent border-t border-border flex items-center gap-3"
                               onClick={() => {
                                 setSelectedBankId(null);
                                 setForm((f) => ({ ...f, bank: bankSearchQuery }));
                                 setShowBankDropdown(false);
                               }}
                             >
-                              <div className="flex-shrink-0 w-8 h-8 rounded bg-slate-600 flex items-center justify-center">
+                              <div className="flex-shrink-0 w-8 h-8 rounded bg-bg-elevated flex items-center justify-center">
                                 <DefaultBankIcon size={20} />
                               </div>
                               <span className="font-medium">
@@ -474,7 +475,7 @@ export default function Accounts() {
                 className="btn-danger ml-auto flex items-center gap-2"
                 disabled={deleteMutation.isPending}
               >
-                <Trash2 className="w-4 h-4" />
+                <Trash className="w-4 h-4" />
                 {deleteMutation.isPending ? "Löschen..." : "Löschen"}
               </button>
             )}
@@ -489,19 +490,19 @@ export default function Accounts() {
             className="absolute inset-0 bg-black/60"
             onClick={() => setShowDeleteModal(false)}
           />
-          <div className="relative w-full max-w-md bg-slate-800 rounded-lg border border-slate-700 p-6 shadow-xl">
+          <div className="relative w-full max-w-md bg-bg-surface2 rounded-lg border border-border p-6 shadow-xl">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
-                <Trash2 className="w-5 h-5 text-red-500" />
+                <Trash className="w-5 h-5 text-red-500" />
               </div>
-              <h3 className="text-lg font-semibold text-white">
+              <h3 className="text-lg font-semibold text-text-primary">
                 Konto löschen?
               </h3>
             </div>
-            <p className="text-slate-300 mb-2">
-              Möchtest du das Konto <strong className="text-white">"{accountToDelete.name}"</strong> wirklich löschen?
+            <p className="text-text-secondary mb-2">
+              Möchtest du das Konto <strong className="text-text-primary">"{accountToDelete.name}"</strong> wirklich löschen?
             </p>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-text-disabled">
               Diese Aktion kann nicht rückgängig gemacht werden!
             </p>
             <div className="mt-6 flex justify-end gap-3">
@@ -574,7 +575,7 @@ export default function Accounts() {
                     )}
                     title="Bearbeiten"
                   >
-                    <Edit2 className="w-4 h-4" />
+                    <EditPencil className="w-4 h-4" />
                   </button>
                 </div>
               </div>

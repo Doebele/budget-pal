@@ -10,7 +10,7 @@
  * Triggered by clicking any SuperCategoryBar on the Budget page.
  */
 import { useEffect, useState } from "react";
-import { X, TrendingDown, TrendingUp, Minus } from "lucide-react";
+import { GraphDown, GraphUp, Minus, Xmark } from "@/lib/icons";
 import { format } from "date-fns";
 import { clsx } from "clsx";
 import { formatCHF } from "@/lib/theme";
@@ -77,10 +77,10 @@ export default function CategoryDrillDown({
       />
 
       {/* Panel */}
-      <div className="fixed right-0 top-0 bottom-0 w-full max-w-lg bg-slate-900 border-l border-slate-700 flex flex-col z-50 shadow-2xl animate-slide-in-right">
+      <div className="fixed right-0 top-0 bottom-0 w-full max-w-lg bg-bg-surface border-l border-border flex flex-col z-50 shadow-2xl animate-slide-in-right">
 
         {/* ── Header ─────────────────────────────── */}
-        <div className="shrink-0 px-5 py-4 border-b border-slate-700 bg-slate-800/90">
+        <div className="shrink-0 px-5 py-4 border-b border-border bg-bg-surface2/90">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 min-w-0">
               <span
@@ -100,9 +100,9 @@ export default function CategoryDrillDown({
             </div>
             <button
               onClick={onClose}
-              className="shrink-0 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+              className="shrink-0 p-1.5 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-bg-elevated transition-colors"
             >
-              <X className="w-5 h-5" />
+              <Xmark className="w-5 h-5" />
             </button>
           </div>
         </div>
@@ -111,9 +111,9 @@ export default function CategoryDrillDown({
         <div className="flex-1 overflow-y-auto">
 
           {/* ── Ist vs Soll totals ───────────────── */}
-          <div className="px-5 py-4 border-b border-slate-800">
+          <div className="px-5 py-4 border-b border-border-subtle">
             <div className="grid grid-cols-2 gap-3 mb-3">
-              <div className="bg-slate-800 rounded-xl px-3 py-2.5">
+              <div className="bg-bg-surface2 rounded-xl px-3 py-2.5">
                 <p className="text-text-tertiary text-xs mb-1">IST (Historisch)</p>
                 <p
                   className={clsx(
@@ -124,7 +124,7 @@ export default function CategoryDrillDown({
                   {hasActual ? formatCHF(actual!) : "—"}
                 </p>
               </div>
-              <div className="bg-slate-800 rounded-xl px-3 py-2.5">
+              <div className="bg-bg-surface2 rounded-xl px-3 py-2.5">
                 <p className="text-text-tertiary text-xs mb-1">SOLL (Empirisch)</p>
                 <p className="text-lg font-mono font-semibold text-text-secondary">
                   {hasPlanned ? formatCHF(planned!) : "—"}
@@ -133,7 +133,7 @@ export default function CategoryDrillDown({
             </div>
 
             {/* Visualisierung */}
-            <div className="h-2.5 bg-slate-700 rounded-full overflow-hidden mb-2">
+            <div className="h-2.5 bg-bg-elevated rounded-full overflow-hidden mb-2">
               <div
                 className="h-full rounded-full transition-all duration-500"
                 style={{
@@ -150,9 +150,9 @@ export default function CategoryDrillDown({
                 isOver ? "text-loss" : "text-gain",
               )}>
                 {isOver
-                  ? <TrendingUp className="w-4 h-4" />
+                  ? <GraphUp className="w-4 h-4" />
                   : delta < 0
-                    ? <TrendingDown className="w-4 h-4" />
+                    ? <GraphDown className="w-4 h-4" />
                     : <Minus className="w-4 h-4" />}
                 {isOver ? "+" : ""}
                 {formatCHF(delta)} ({isOver ? "+" : ""}{deltaPct.toFixed(1)}%)
@@ -172,20 +172,20 @@ export default function CategoryDrillDown({
 
           {/* ── Subcategories ────────────────────── */}
           {subItems && subItems.length > 0 && (
-            <div className="px-5 py-4 border-b border-slate-800">
+            <div className="px-5 py-4 border-b border-border-subtle">
               {/* Header + view toggle */}
               <div className="flex items-center justify-between mb-3 gap-2">
                 <h3 className="text-text-secondary text-xs font-semibold uppercase tracking-wide">
                   Ausgabenverteilung
                 </h3>
-                <div className="flex items-center rounded-lg border border-slate-700 overflow-hidden text-xs shrink-0">
+                <div className="flex items-center rounded-lg border border-border overflow-hidden text-xs shrink-0">
                   {(["hist", "emp", "both"] as SubView[]).map((mode) => (
                     <button
                       key={mode}
                       type="button"
                       onClick={() => setSubView(mode)}
                       className={clsx(
-                        "px-2.5 py-1 transition-colors border-l border-slate-700 first:border-l-0",
+                        "px-2.5 py-1 transition-colors border-l border-border first:border-l-0",
                         subView === mode
                           ? "bg-accent/20 text-accent"
                           : "text-text-tertiary hover:text-text-secondary",
@@ -268,7 +268,7 @@ export default function CategoryDrillDown({
                           </div>
 
                           {/* Bar */}
-                          <div className="relative h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                          <div className="relative h-1.5 bg-bg-elevated rounded-full overflow-hidden">
                             {/* Ghost planned bar (only in "both" mode when both exist) */}
                             {subView === "both" && ghostPct > 0 && (
                               <div
@@ -309,7 +309,7 @@ export default function CategoryDrillDown({
                 {transactions.slice(0, 12).map((txn) => (
                   <div
                     key={txn.id}
-                    className="flex items-center justify-between py-1.5 border-b border-slate-800/50 last:border-0"
+                    className="flex items-center justify-between py-1.5 border-b border-border-subtle last:border-0"
                   >
                     <div className="min-w-0 flex-1">
                       <p className="text-text-primary text-xs font-medium truncate">
@@ -342,7 +342,7 @@ export default function CategoryDrillDown({
         </div>
 
         {/* ── Footer actions ──────────────────────── */}
-        <div className="shrink-0 border-t border-slate-700 bg-slate-800 px-5 py-3 flex gap-2">
+        <div className="shrink-0 border-t border-border bg-bg-surface2 px-5 py-3 flex gap-2">
           {onEditTransactions && (
             <button
               type="button"

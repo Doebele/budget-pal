@@ -7,7 +7,7 @@
  * transactions contribute to the total.
  */
 import { useMemo, useEffect } from "react";
-import { X, AlertTriangle } from "lucide-react";
+import { WarningTriangle, Xmark } from "@/lib/icons";
 import { clsx } from "clsx";
 import { formatCHF } from "@/lib/theme";
 import type { SuperCategory } from "@/lib/categories";
@@ -87,10 +87,10 @@ export default function ExpenseDetailPanel({
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40" onClick={onClose} />
 
       {/* Panel */}
-      <div className="fixed right-0 top-0 bottom-0 w-full max-w-lg bg-slate-900 border-l border-slate-700 flex flex-col z-50 shadow-2xl animate-slide-in-right">
+      <div className="fixed right-0 top-0 bottom-0 w-full max-w-lg bg-bg-surface border-l border-border flex flex-col z-50 shadow-2xl animate-slide-in-right">
 
         {/* ── Header ───────────────────────────── */}
-        <div className="shrink-0 px-5 py-4 border-b border-slate-700 bg-slate-800/90">
+        <div className="shrink-0 px-5 py-4 border-b border-border bg-bg-surface2/90">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <h2 className="text-text-primary font-semibold text-base">Ausgaben-Aufschlüsselung</h2>
@@ -98,9 +98,9 @@ export default function ExpenseDetailPanel({
             </div>
             <button
               onClick={onClose}
-              className="shrink-0 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+              className="shrink-0 p-1.5 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-bg-elevated transition-colors"
             >
-              <X className="w-5 h-5" />
+              <Xmark className="w-5 h-5" />
             </button>
           </div>
 
@@ -117,7 +117,7 @@ export default function ExpenseDetailPanel({
           {/* Warning if stats API total differs */}
           {hasDiscrepancy && (
             <div className="mt-2 flex items-start gap-1.5 text-xs text-amber-400/80 bg-amber-500/10 rounded-lg px-2.5 py-1.5">
-              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              <WarningTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
               <span>
                 KPI-Kachel zeigt {formatCHF(statsExpenses!)} (aus der Stats-API inkl. alle Transaktionen).
                 Diese Ansicht basiert auf den zuletzt geladenen {transactions.length} Transaktionen.
@@ -127,7 +127,7 @@ export default function ExpenseDetailPanel({
         </div>
 
         {/* ── Body ─────────────────────────────── */}
-        <div className="flex-1 overflow-y-auto divide-y divide-slate-800">
+        <div className="flex-1 overflow-y-auto divide-y divide-border-subtle">
           {groups.length === 0 && (
             <p className="text-text-tertiary text-sm text-center py-12">
               Keine Ausgaben im gewählten Zeitraum.
@@ -163,7 +163,7 @@ export default function ExpenseDetailPanel({
                 </div>
 
                 {/* SC bar */}
-                <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden mb-3">
+                <div className="h-1.5 bg-bg-elevated rounded-full overflow-hidden mb-3">
                   <div
                     className="h-full rounded-full transition-all duration-500"
                     style={{ width: `${pct}%`, backgroundColor: sc.color, opacity: isSavings ? 0.45 : 0.75 }}
@@ -181,7 +181,7 @@ export default function ExpenseDetailPanel({
                         </span>
                         <div className="flex items-center gap-2 shrink-0">
                           {/* Mini bar */}
-                          <div className="w-20 h-1 bg-slate-700 rounded-full overflow-hidden">
+                          <div className="w-20 h-1 bg-bg-elevated rounded-full overflow-hidden">
                             <div
                               className="h-full rounded-full"
                               style={{ width: `${subPct}%`, backgroundColor: sc.color, opacity: 0.6 }}
@@ -206,7 +206,7 @@ export default function ExpenseDetailPanel({
         </div>
 
         {/* ── Footer total ─────────────────────── */}
-        <div className="shrink-0 border-t border-slate-700 bg-slate-800 px-5 py-3">
+        <div className="shrink-0 border-t border-border bg-bg-surface2 px-5 py-3">
           <div className="flex items-center justify-between text-sm font-semibold">
             <span className="text-text-secondary">Total Ausgaben</span>
             <span className="text-text-primary font-mono">{formatCHF(grandTotal)}</span>

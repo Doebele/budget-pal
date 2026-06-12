@@ -1,13 +1,15 @@
+import { clsx } from "clsx";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { projectionsApi, accountsApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { formatCHF, colors } from "@/lib/theme";
+import { formatCHF } from "@/lib/theme";
+import { useThemeColors } from "@/hooks/useThemeColors";
 import MonteCarloChart from "@/components/charts/MonteCarloChart";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
-import { RefreshCw } from "lucide-react";
+import { Refresh } from "@/lib/icons";
 
 /** Match backend `projection._project_pensions` fallback age when DOB is missing. */
 function currentAgeFromProfileBirth(iso: string | undefined): number {
@@ -38,6 +40,7 @@ const PILLAR_COLORS = {
 } as const;
 
 export default function Projections() {
+  const { colors } = useThemeColors();
   const { user } = useAuth();
   const [horizon, setHorizon] = useState<HorizonKey>("10yr");
   const [params, setParams] = useState({
@@ -106,7 +109,7 @@ export default function Projections() {
           <p className="text-text-tertiary text-sm mt-0.5">Monte Carlo Simulation · Schweizer Rente (AHV/BVG/3a)</p>
         </div>
         <button onClick={() => refetch()} className="btn-secondary flex items-center gap-2" disabled={isLoading}>
-          <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+          <Refresh className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
           Neu berechnen
         </button>
       </div>
@@ -117,11 +120,7 @@ export default function Projections() {
           <button
             key={h.key}
             onClick={() => setHorizon(h.key)}
-            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              horizon === h.key
-                ? "bg-accent text-white"
-                : "bg-bg-surface2 text-text-secondary hover:text-text-primary border border-border"
-            }`}
+            className={clsx("toggle-btn", horizon === h.key && "active")}
           >
             {h.label}
           </button>
@@ -354,7 +353,7 @@ export default function Projections() {
         {isLoading ? (
           <div className="h-80 flex items-center justify-center">
             <div className="flex items-center gap-3 text-text-tertiary">
-              <RefreshCw className="w-5 h-5 animate-spin" />
+              <Refresh className="w-5 h-5 animate-spin" />
               <span className="text-sm">Simulation läuft...</span>
             </div>
           </div>

@@ -1,4 +1,4 @@
-import { Check } from "lucide-react";
+import { Check } from "@/lib/icons";
 import { clsx } from "clsx";
 
 // ── Step labels ────────────────────────────────────────────────

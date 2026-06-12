@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/auth";
-import { BarChart3 } from "lucide-react";
+import { Reports } from "@/lib/icons";
 
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation("auth");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -20,7 +22,7 @@ export default function Login() {
       navigate("/");
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      setError(msg || "Anmeldung fehlgeschlagen.");
+      setError(msg || t("login.failed"));
     } finally {
       setLoading(false);
     }
@@ -32,7 +34,7 @@ export default function Login() {
         {/* Logo */}
         <div className="flex items-center justify-center gap-3 mb-8">
           <div className="w-10 h-10 rounded-xl bg-gradient-accent flex items-center justify-center">
-            <BarChart3 className="w-5 h-5 text-white" />
+            <Reports className="w-5 h-5 text-white" />
           </div>
           <span className="font-display text-2xl text-text-primary">
             Budget<span className="text-accent">Pal</span>
@@ -40,11 +42,11 @@ export default function Login() {
         </div>
 
         <div className="card">
-          <h1 className="text-text-primary font-semibold text-lg mb-6">Anmelden</h1>
+          <h1 className="text-text-primary font-semibold text-lg mb-6">{t("login.title")}</h1>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="label">E-Mail</label>
+              <label className="label">{t("login.email")}</label>
               <input
                 type="email"
                 className="input"
@@ -55,7 +57,7 @@ export default function Login() {
               />
             </div>
             <div>
-              <label className="label">Passwort</label>
+              <label className="label">{t("login.password")}</label>
               <input
                 type="password"
                 className="input"
@@ -73,14 +75,14 @@ export default function Login() {
             )}
 
             <button type="submit" className="btn-primary w-full py-2.5" disabled={loading}>
-              {loading ? "Laden..." : "Anmelden"}
+              {loading ? t("login.loading") : t("login.submit")}
             </button>
           </form>
 
           <p className="text-text-tertiary text-sm mt-4 text-center">
-            Noch kein Konto?{" "}
+            {t("login.noAccount")}{" "}
             <Link to="/register" className="text-accent hover:text-accent-light">
-              Registrieren
+              {t("login.registerLink")}
             </Link>
           </p>
         </div>

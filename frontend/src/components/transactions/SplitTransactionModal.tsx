@@ -8,7 +8,7 @@ import { useState, useCallback } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { transactionsApi } from "@/lib/api";
 import { formatAmount } from "@/lib/theme";
-import { Plus, Trash2, X, Scissors, AlertCircle, Check } from "lucide-react";
+import { Check, Plus, Scissor, Trash, WarningCircle, Xmark } from "@/lib/icons";
 import { clsx } from "clsx";
 
 interface SplitEntry {
@@ -103,14 +103,14 @@ export default function SplitTransactionModal({ transaction, onClose }: Props) {
         {/* Header */}
         <div className="flex items-start justify-between px-5 py-4 border-b border-border">
           <div className="flex items-center gap-2">
-            <Scissors className="w-4 h-4 text-accent" />
+            <Scissor className="w-4 h-4 text-accent" />
             <div>
               <h2 className="text-sm font-semibold text-text-primary">Transaktion aufteilen</h2>
               <p className="text-xs text-text-tertiary truncate max-w-xs">{displayName}</p>
             </div>
           </div>
           <button onClick={onClose} className="text-text-tertiary hover:text-text-primary transition-colors">
-            <X className="w-4 h-4" />
+            <Xmark className="w-4 h-4" />
           </button>
         </div>
 
@@ -138,7 +138,7 @@ export default function SplitTransactionModal({ transaction, onClose }: Props) {
                     onClick={() => removeEntry(entry.id)}
                     className="text-text-tertiary hover:text-loss transition-colors"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Trash className="w-3.5 h-3.5" />
                   </button>
                 )}
               </div>
@@ -206,7 +206,7 @@ export default function SplitTransactionModal({ transaction, onClose }: Props) {
 
         {splitMutation.isError && (
           <div className="mx-5 mb-2 flex items-center gap-2 text-xs text-loss bg-loss/10 border border-loss/20 rounded-lg px-3 py-2">
-            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+            <WarningCircle className="w-3.5 h-3.5 shrink-0" />
             {(splitMutation.error as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Fehler beim Aufteilen."}
           </div>
         )}

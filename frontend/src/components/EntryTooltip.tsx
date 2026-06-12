@@ -1,3 +1,4 @@
+import { displayLocale } from "@/lib/format";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { getBankByName, type BankWithLogo } from "@/data/banks-with-logos";
 import { clsx } from "clsx";
@@ -105,10 +106,10 @@ export default function EntryTooltip({ entry, account, children }: EntryTooltipP
 
   const bankLogo = account ? getBankByName(account.bank) : null;
   const formattedStart = entry.start_date
-    ? new Date(entry.start_date + "T00:00:00").toLocaleDateString("de-CH")
+    ? new Date(entry.start_date + "T00:00:00").toLocaleDateString(displayLocale())
     : "—";
   const formattedEnd = entry.end_date
-    ? new Date(entry.end_date + "T00:00:00").toLocaleDateString("de-CH")
+    ? new Date(entry.end_date + "T00:00:00").toLocaleDateString(displayLocale())
     : "—";
   const isOngoing = !entry.end_date;
   const isExpense = entry.amount < 0;
@@ -179,7 +180,7 @@ export default function EntryTooltip({ entry, account, children }: EntryTooltipP
                 >
                   {isExpense ? "−" : "+"}
                   CHF{" "}
-                  {Math.abs(entry.amount).toLocaleString("de-CH", {
+                  {Math.abs(entry.amount).toLocaleString(displayLocale(), {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}

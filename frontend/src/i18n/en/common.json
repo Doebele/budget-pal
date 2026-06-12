@@ -1,0 +1,55 @@
+{
+  "nav": {
+    "workspace": "WORKSPACE",
+    "dashboard": "Dashboard",
+    "finanzplan": "Financial Plan",
+    "budget": "Budget Analysis",
+    "budgetplan": "Budget Plan",
+    "goals": "Savings Goals",
+    "forecast": "Budget Forecast",
+    "projections": "Pension Forecast",
+    "wizard": "Empirical Data",
+    "transactions": "Actual Data",
+    "import": "Import",
+    "accounts": "Accounts",
+    "archive": "Archive",
+    "settings": "Settings"
+  },
+  "rail": {
+    "collapseSidebar": "Collapse sidebar",
+    "expandSidebar": "Expand sidebar",
+    "highDensity": "Compact",
+    "lowDensity": "Comfort",
+    "lightMode": "Light",
+    "darkMode": "Dark",
+    "languageGerman": "German",
+    "languageEnglish": "English"
+  },
+  "user": {
+    "account": "Account",
+    "logout": "Sign out",
+    "confirmLogout": "Really sign out?"
+  },
+  "buttons": {
+    "cancel": "Cancel",
+    "save": "Save",
+    "close": "Close",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "edit": "Edit",
+    "back": "Back",
+    "next": "Next"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "empty": "No anomalies detected.",
+    "allGood": "Everything looks normal 🎉"
+  },
+  "common": {
+    "loading": "Loading…",
+    "error": "Something went wrong",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "more": "More"
+  }
+}

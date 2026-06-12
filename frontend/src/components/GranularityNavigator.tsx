@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { NavArrowLeft, NavArrowRight } from "@/lib/icons";
 import { clsx } from "clsx";
 import {
   TimeGranularity,
@@ -32,20 +32,14 @@ export default function GranularityNavigator({ granularity, anchor, onChange }: 
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      {/* Granularity segmented control */}
-      <div className="flex rounded-md border border-border/60 overflow-hidden">
-        {TABS.map((tab, i) => (
+      {/* Granularity segmented control — gemeinsames Toggle-Muster */}
+      <div className="toggle-group">
+        {TABS.map((tab) => (
           <button
             key={tab.value}
             title={tab.title}
             onClick={() => onChange(tab.value, new Date())}
-            className={clsx(
-              "px-3 py-1.5 text-xs font-medium transition-colors",
-              i < TABS.length - 1 && "border-r border-border/40",
-              granularity === tab.value
-                ? "bg-accent/20 text-accent"
-                : "text-text-tertiary hover:bg-bg-surface2 hover:text-text-primary"
-            )}
+            className={clsx("toggle-btn", granularity === tab.value && "active")}
           >
             {tab.label}
           </button>
@@ -60,7 +54,7 @@ export default function GranularityNavigator({ granularity, anchor, onChange }: 
             className="p-1.5 rounded hover:bg-bg-surface2 text-text-tertiary hover:text-text-primary transition-colors"
             title="Vorherige Periode"
           >
-            <ChevronLeft className="w-4 h-4" />
+            <NavArrowLeft className="w-4 h-4" />
           </button>
         )}
 
@@ -75,17 +69,12 @@ export default function GranularityNavigator({ granularity, anchor, onChange }: 
               className="p-1.5 rounded hover:bg-bg-surface2 text-text-tertiary hover:text-text-primary transition-colors"
               title="Nächste Periode"
             >
-              <ChevronRight className="w-4 h-4" />
+              <NavArrowRight className="w-4 h-4" />
             </button>
 
             <button
               onClick={() => onChange(granularity, new Date())}
-              className={clsx(
-                "px-2.5 py-1.5 rounded text-xs font-medium transition-colors ml-1",
-                current
-                  ? "text-accent bg-accent/10 cursor-default"
-                  : "text-text-tertiary hover:text-text-primary hover:bg-bg-surface2"
-              )}
+              className={clsx("toggle-btn ml-1", current && "active cursor-default")}
             >
               Aktuell
             </button>

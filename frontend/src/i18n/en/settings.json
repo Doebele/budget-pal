@@ -1,0 +1,21 @@
+{
+  "appearance": {
+    "title": "Appearance",
+    "subtitle": "Adjust theme, density, language and accent color",
+    "theme": "Theme",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "density": "Density",
+    "densityHigh": "Compact",
+    "densityLow": "Comfort",
+    "language": "Language",
+    "languageGerman": "German",
+    "languageEnglish": "English",
+    "accent": "Accent color",
+    "accentIndigo": "Indigo",
+    "accentViolet": "Violet",
+    "accentEmerald": "Emerald",
+    "accentAmber": "Amber",
+    "accentRose": "Rosé"
+  }
+}

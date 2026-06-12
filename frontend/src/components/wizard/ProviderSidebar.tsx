@@ -6,10 +6,7 @@
  *  individual – Enter own amount, frequency, currency, first-payment date
  */
 import { useState, useRef } from "react";
-import {
-  X, Settings2, ChevronLeft, ExternalLink, Trash2,
-  Check, Users, Calendar, RefreshCw, PencilLine,
-} from "lucide-react";
+import { Calendar, Check, EditPencil, Group, NavArrowLeft, OpenNewWindow, Refresh, Settings, Trash, Xmark } from "@/lib/icons";
 import { clsx } from "clsx";
 import ProviderBrandIcon from "./ProviderBrandIcon";
 import {
@@ -92,8 +89,8 @@ export default function ProviderSidebar({
             )}
           >
             {viewMode === "simple"
-              ? <Settings2 className="w-3.5 h-3.5" />
-              : <ChevronLeft className="w-3.5 h-3.5" />}
+              ? <Settings className="w-3.5 h-3.5" />
+              : <NavArrowLeft className="w-3.5 h-3.5" />}
           </button>
         )}
 
@@ -103,7 +100,7 @@ export default function ProviderSidebar({
           onClick={onClose}
           className="text-text-tertiary hover:text-text-primary transition-colors flex-shrink-0"
         >
-          <X className="w-4 h-4" />
+          <Xmark className="w-4 h-4" />
         </button>
       </header>
 
@@ -116,7 +113,7 @@ export default function ProviderSidebar({
         {/* Peer popularity */}
         {(provider.peerPopularity ?? 0) > 0 && (
           <div className="flex items-start gap-2 bg-accent/8 border border-accent/15 rounded-lg px-3 py-2">
-            <Users className="w-3.5 h-3.5 text-accent flex-shrink-0 mt-0.5" />
+            <Group className="w-3.5 h-3.5 text-accent flex-shrink-0 mt-0.5" />
             <p className="text-text-secondary text-xs leading-relaxed">
               <strong className="text-accent">{provider.peerPopularity}%</strong> deiner Peer-Gruppe nutzen diesen Dienst
             </p>
@@ -199,7 +196,7 @@ export default function ProviderSidebar({
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="font-medium flex items-center gap-1">
-                            <PencilLine className="w-3 h-3" />
+                            <EditPencil className="w-3 h-3" />
                             Eigener Preis
                           </div>
                           {isCustomActive && (
@@ -224,7 +221,7 @@ export default function ProviderSidebar({
                                 className="text-text-tertiary hover:text-loss transition-colors ml-1"
                                 title="Zurücksetzen"
                               >
-                                <X className="w-3.5 h-3.5" />
+                                <Xmark className="w-3.5 h-3.5" />
                               </button>
                             </div>
                           )}
@@ -288,7 +285,7 @@ export default function ProviderSidebar({
               </div>
               {entry.currency && entry.currency !== "CHF" && entry.individualAmount && (
                 <p className="text-text-tertiary text-[10px] mt-1 flex items-center gap-1">
-                  <RefreshCw className="w-2.5 h-2.5" />
+                  <Refresh className="w-2.5 h-2.5" />
                   Indikativer Kurs · Angaben ohne Gewähr
                 </p>
               )}
@@ -353,7 +350,7 @@ export default function ProviderSidebar({
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 text-accent hover:text-accent-light text-xs transition-colors"
           >
-            <ExternalLink className="w-3 h-3" />
+            <OpenNewWindow className="w-3 h-3" />
             Webseite besuchen
           </a>
         )}
@@ -366,7 +363,7 @@ export default function ProviderSidebar({
               onClick={onDeselect}
               className="w-full flex items-center justify-center gap-1.5 rounded-md border border-loss/30 bg-loss/8 text-loss hover:bg-loss/15 px-3 py-2 text-xs font-medium transition-all"
             >
-              <Trash2 className="w-3 h-3" />
+              <Trash className="w-3 h-3" />
               Entfernen
             </button>
           ) : (

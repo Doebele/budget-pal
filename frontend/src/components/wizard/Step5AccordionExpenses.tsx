@@ -8,12 +8,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
-import {
-  ChevronDown, ChevronRight, Plus, X,
-  Check, Tv, Music, Cloud, Smartphone, Newspaper,
-  Activity, Train, Briefcase, Home, ShoppingCart,
-  Search, PenLine,
-} from "lucide-react";
+import { Activity, Cart, Check, Cloud, EditPencil, Home, Journal, MusicDoubleNote, NavArrowDown, NavArrowRight, Plus, Search, SmartphoneDevice, Suitcase, Train, Tv, Xmark } from "@/lib/icons";
 import { clsx } from "clsx";
 import { toMonthlyCHF } from "@/services/faviconService";
 import type { Frequency, SupportedCurrency } from "@/services/faviconService";
@@ -123,13 +118,13 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         peerPopularity: 18,
         variants: [
           { id: "single",      label: "Einzeln",             price: 9.99 },
-          { id: "apple-one",   label: "Apple One Einzel",    price: 19.95, popular: true, description: "Music, TV+, Arcade, iCloud 50 GB" },
+          { id: "apple-one",   label: "Apple One Einzel",    price: 19.95, popular: true, description: "MusicDoubleNote, TV+, Arcade, iCloud 50 GB" },
           { id: "apple-fam",   label: "Apple One Familie",   price: 30.95, description: "Bis zu 5 Personen" },
         ],
       },
       {
         id: "yt-premium", name: "YouTube Premium",
-        tagline: "YouTube ohne Werbung + YouTube Music", website: "https://youtube.com/premium",
+        tagline: "YouTube ohne Werbung + YouTube MusicDoubleNote", website: "https://youtube.com/premium",
         peerPopularity: 22,
         variants: [
           { id: "single", label: "Einzel",           price: 13.99, popular: true },
@@ -150,7 +145,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
   {
     id: "musik",
     label: "Musik",
-    Icon: Music,
+    Icon: MusicDoubleNote,
     description: "Musik-Streaming Dienste",
     providers: [
       {
@@ -165,7 +160,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         ],
       },
       {
-        id: "apple-music", name: "Apple Music",
+        id: "apple-music", name: "Apple MusicDoubleNote",
         tagline: "Hi-Res Audio, für Apple-Nutzer", website: "https://music.apple.com",
         peerPopularity: 24,
         variants: [
@@ -252,7 +247,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
   {
     id: "kommunikation",
     label: "Kommunikation",
-    Icon: Smartphone,
+    Icon: SmartphoneDevice,
     description: "Internet, Mobile und Festnetz",
     providers: [
       {
@@ -329,7 +324,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
   {
     id: "news-medien",
     label: "News & Medien",
-    Icon: Newspaper,
+    Icon: Journal,
     description: "Zeitungen, Magazine und Nachrichtenangebote",
     providers: [
       {
@@ -453,7 +448,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
   {
     id: "business",
     label: "Business & Weiterbildung",
-    Icon: Briefcase,
+    Icon: Suitcase,
     description: "Business-Tools, Weiterbildung und KI-Dienste",
     providers: [
       {
@@ -534,7 +529,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
   {
     id: "shopping-loyalty",
     label: "Shopping & Loyalität",
-    Icon: ShoppingCart,
+    Icon: Cart,
     description: "Kundenprogramme und Shopping-Abos",
     providers: [
       {
@@ -832,7 +827,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
                     {selCount}
                   </span>
                 )}
-                <ChevronDown className={clsx(
+                <NavArrowDown className={clsx(
                   "w-4 h-4 text-text-tertiary flex-shrink-0 transition-transform duration-200",
                   isOpen && "rotate-180"
                 )} />
@@ -899,7 +894,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
                           )}
                         </div>
 
-                        {isFocused && <ChevronRight className="w-3.5 h-3.5 text-accent flex-shrink-0" />}
+                        {isFocused && <NavArrowRight className="w-3.5 h-3.5 text-accent flex-shrink-0" />}
                       </div>
                     );
                   })}
@@ -922,13 +917,13 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
                           <div className="w-5 h-5 rounded border bg-warning/20 border-warning/40 flex items-center justify-center flex-shrink-0">
                             <Check className="w-3 h-3 text-warning" />
                           </div>
-                          <PenLine className="w-4 h-4 text-text-tertiary flex-shrink-0" />
+                          <EditPencil className="w-4 h-4 text-text-tertiary flex-shrink-0" />
                           <div className="flex-1 min-w-0">
                             <div className="text-text-primary text-sm font-medium">{custom.name}</div>
                             <div className="text-text-tertiary text-[11px]">Eigener Anbieter</div>
                           </div>
                           <span className="font-mono text-xs text-warning">{fchf(getEffectiveMonthlyCustom(custom))}/Mo</span>
-                          {isFocusedCustom && <ChevronRight className="w-3.5 h-3.5 text-accent flex-shrink-0" />}
+                          {isFocusedCustom && <NavArrowRight className="w-3.5 h-3.5 text-accent flex-shrink-0" />}
                         </div>
                       );
                     })}
@@ -951,7 +946,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
                           onClick={() => { setSearchCategoryId(null); setSearchQuery(""); }}
                           className="text-text-tertiary hover:text-text-primary transition-colors flex-shrink-0"
                         >
-                          <X className="w-4 h-4" />
+                          <Xmark className="w-4 h-4" />
                         </button>
                       </div>
 

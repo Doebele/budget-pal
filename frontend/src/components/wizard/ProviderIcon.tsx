@@ -2,7 +2,7 @@
  * ProviderIcon — Shows provider favicon via Google S2 with Globe fallback.
  */
 import { useState } from "react";
-import { Globe } from "lucide-react";
+import { Globe } from "@/lib/icons";
 import { getFaviconUrl } from "@/services/faviconService";
 import { clsx } from "clsx";
 

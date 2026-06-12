@@ -17,7 +17,30 @@ bank import, AI categorization, long-term financial projections, and the Swiss 3
 
 ---
 
+## ✨ Neueste Updates / Latest Updates
+
+**Juni 2026 — Neues Design-System & Mehrsprachigkeit**
+
+- 🎨 **Light & Dark Mode** — vollständig token-basiertes Design-System (CSS-Variablen), umschaltbar pro Nutzer, inkl. theme-bewusster Charts (Recharts, Nivo, ECharts)
+- 🧭 **Rail-Navigation** — einklappbare Desktop-Seitenleiste (52/220px) mit Tooltips, portiert vom Schwesterprojekt application-pal; auf Mobile weiterhin Bottom-Navigation + Drawer
+- 🗜️ **Density-Modi** — «Kompakt» (mehr Information) und «Komfort» (mehr Weissraum, sanfter UI-Zoom)
+- 🌐 **Sprachwechsel Deutsch/Englisch** — react-i18next mit Persistenz in der Datenbank (`users.ui_language`, erweiterbar für weitere Sprachen); Zahlen- und Datumsformate folgen der Sprache bei Schweizer Konventionen (de-CH/en-CH)
+- 🎯 **5 Akzentfarben** — Indigo, Violett, Smaragd, Bernstein, Rosé (live umschaltbar)
+- 🖌️ **Iconoir-Icons** — komplette Icon-Migration von lucide-react auf iconoir-react (~106 Icons)
+- 🔘 **Einheitliches Toggle-Muster** — alle Segment-Schalter (Zeitraum, Ansichten, Modi) im selben Akzent-Stil
+- ⚙️ **Erscheinungsbild-Einstellungen** — Theme, Dichte, Sprache und Akzentfarbe zentral unter Einstellungen, synchron mit der Rail
+
+Alle Präferenzen (Theme/Dichte/Akzent lokal, Sprache zusätzlich serverseitig) bleiben über Sessions und Geräte hinweg erhalten.
+
+---
+
 ## Features
+
+### Oberfläche / UI
+- **Rail-Navigation** (Desktop) mit Einklapp-Modus und Hover-Tooltips; Bottom-Nav + Drawer auf Mobile
+- **Light/Dark Mode** mit token-basiertem Design-System (`data-theme`, `data-accent`, `data-density`)
+- **Density-Modi** Kompakt/Komfort und 5 Akzentfarben
+- **Zweisprachig DE/EN** mit DB-Persistenz der Sprachwahl pro Nutzer
 
 ### Import
 - **CSV-Import**: UBS, N26, Revolut, comdirect (automatische Formaterkennung)
@@ -95,6 +118,11 @@ docker compose up -d --build
 # Frontend: http://localhost:8011
 # Backend API-Docs: http://localhost:8010/api/docs
 ```
+
+> **Frische Datenbank:** Beim ersten Start erkennt `backend/start.sh` eine leere DB
+> automatisch, legt das vollständige Schema per `create_all()` an und stempelt Alembic
+> auf `head`. Bestehende Installationen erhalten Updates regulär über
+> `alembic upgrade head` — kein manueller Eingriff nötig.
 
 ### Wichtige Umgebungsvariablen / Key Environment Variables
 
@@ -277,7 +305,8 @@ budget-pal/
 │   │       └── import_parsers/       # UBS, N26, Revolut, comdirect
 │   ├── alembic/
 │   │   └── versions/
-│   │       └── 0001_migrate_float_to_numeric_for_monetary_columns.py
+│   │       ├── 0001_migrate_float_to_numeric_for_monetary_columns.py
+│   │       └── 0002_add_user_ui_language.py   # DE/EN-Präferenz pro Nutzer
 │   ├── tests/                  # pytest Test-Suite
 │   │   ├── conftest.py         # Async DB-Fixtures, Test-Client
 │   │   ├── test_auth.py        # Auth-Flows (Register, Login, JWT)
@@ -290,12 +319,24 @@ budget-pal/
 │
 ├── frontend/                   # React 18 + TypeScript + Vite
 │   ├── src/
-│   │   ├── App.tsx             # Routes
+│   │   ├── App.tsx             # Routes + UI-Attribute (data-theme/-accent/-density)
+│   │   ├── i18n/               # react-i18next Setup + de/en Übersetzungen
 │   │   ├── lib/
 │   │   │   ├── api.ts          # Axios + JWT interceptor + alle API-Calls
-│   │   │   ├── auth.tsx        # Auth Context
+│   │   │   ├── auth.tsx        # Auth Context + Sprach-Sync mit DB
+│   │   │   ├── store.ts        # zustand UI-Store (Theme/Dichte/Akzent/Sprache/Rail)
+│   │   │   ├── theme.ts        # themePalettes dark/light + Nivo-Theme-Builder
+│   │   │   ├── format.ts       # locale-bewusste Zahlen-/Datumsformatierung
+│   │   │   ├── icons.tsx       # Iconoir-Adapter (size-Prop-kompatibel)
 │   │   │   └── categories.ts   # useTaxonomy(), SuperCategory Typen, Lookups
+│   │   ├── hooks/
+│   │   │   └── useThemeColors.ts   # theme-bewusste Chart-Farben
 │   │   ├── components/
+│   │   │   ├── layout/
+│   │   │   │   ├── Rail.tsx           # Desktop-Rail (52/220px, Footer-Toggles)
+│   │   │   │   ├── MobileDrawer.tsx   # Hamburger-Navigation < md
+│   │   │   │   ├── BottomNav.tsx      # Mobile Bottom-Tabs
+│   │   │   │   └── navItems.ts        # Gemeinsame Nav-Konfiguration
 │   │   │   ├── EntryTooltip.tsx           # Hover-Tooltip für Budgetplan-Einträge
 │   │   │   └── transactions/
 │   │   │       └── TransactionOverviewHeader.tsx  # Bulk-Archiv/Delete Modal
@@ -342,10 +383,11 @@ budget-pal/
 
 ## Integration mit portfolio-tracker (FinTools)
 
-Budget-Pal und portfolio-tracker sind Schwester-Projekte unter `~/projects/` und bilden
-gemeinsam die **FinTools**-Suite:
+Budget-Pal, portfolio-tracker und application-pal sind Schwester-Projekte unter `~/projects/`
+und bilden gemeinsam die **FinTools**-Suite:
 
-- **Gleiches Design-System**: identische Tailwind-Farben, Schriften, Card-Styles
+- **Gleiches Design-System**: token-basierte CSS-Variablen (Light/Dark, Akzentfarben,
+  Density), Rail-Navigation und Iconoir-Icons — 1:1 von application-pal übernommen
 - **Gemeinsame Auth** (geplant): Single Sign-On
 - **Nettovermögen-Sync** (geplant): Portfolio-Tracker Werte fließen in Budget-Pal ein
 

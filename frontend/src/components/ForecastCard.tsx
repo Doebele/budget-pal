@@ -4,7 +4,7 @@
  * Shows: predicted income, expense, net with confidence badge.
  * Used in the grid view of the Forecast page.
  */
-import { TrendingUp, TrendingDown, Minus, Users } from "lucide-react";
+import { GraphDown, GraphUp, Group, Minus } from "@/lib/icons";
 import { formatCHF } from "@/lib/theme";
 
 export interface ForecastCardData {
@@ -39,9 +39,9 @@ export default function ForecastCard({ data, isSelected, onClick }: Props) {
 
   const netColor = isPositive ? "text-gain" : "text-loss";
   const TrendIcon = isPositive
-    ? TrendingUp
+    ? GraphUp
     : data.net < -100
-    ? TrendingDown
+    ? GraphDown
     : Minus;
 
   return (
@@ -61,7 +61,7 @@ export default function ForecastCard({ data, isSelected, onClick }: Props) {
         <div className="flex items-center gap-1.5">
           {data.peer_calibrated && (
             <span title="Peer-Gruppe kalibriert">
-              <Users className="w-3 h-3 text-violet-400" />
+              <Group className="w-3 h-3 text-violet-400" />
             </span>
           )}
           <TrendIcon className={`w-4 h-4 ${netColor}`} />

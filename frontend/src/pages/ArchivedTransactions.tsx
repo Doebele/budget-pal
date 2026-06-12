@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { transactionsApi, accountsApi } from "@/lib/api";
 import { DeletedTransactionsView, type DeletedTransactionRow } from "@/components/transactions/DeletedTransactionsView";
-import { AlertTriangle, X } from "lucide-react";
+import { WarningTriangle, Xmark } from "@/lib/icons";
 import {
   RECURRENCE_FILTER_OPTIONS,
   recurrenceFilterToApiParams,
@@ -149,7 +149,7 @@ export default function ArchivedTransactions() {
           <div className="relative w-full max-w-md bg-bg-card border border-border rounded-xl p-6 shadow-xl mx-4">
             <div className="flex items-start gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-red-500/15 flex items-center justify-center shrink-0">
-                <AlertTriangle className="w-5 h-5 text-red-400" />
+                <WarningTriangle className="w-5 h-5 text-red-400" />
               </div>
               <div>
                 <h3 className="text-text-primary font-semibold">Endgültig löschen?</h3>
@@ -164,7 +164,7 @@ export default function ArchivedTransactions() {
                 className="p-1 text-text-tertiary hover:text-text-primary ml-auto"
                 aria-label="Schließen"
               >
-                <X className="w-5 h-5" />
+                <Xmark className="w-5 h-5" />
               </button>
             </div>
             <div className="flex justify-end gap-2">

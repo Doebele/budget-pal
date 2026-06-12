@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { goalsApi } from "@/lib/api";
 import { formatAmount } from "@/lib/theme";
-import { Plus, Target, Trophy, Edit2, Trash2, X, ChevronRight, Calendar, TrendingUp, Wallet } from "lucide-react";
+import { Calendar, EditPencil, GraphUp, NavArrowRight, Plus, Position, Trash, Trophy, Wallet, Xmark } from "@/lib/icons";
 import { clsx } from "clsx";
 import { format, parseISO } from "date-fns";
 import { de } from "date-fns/locale";
@@ -142,11 +142,11 @@ export default function Goals() {
         <div className="card border-accent/30 animate-fade-in">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-text-primary font-semibold text-sm flex items-center gap-2">
-              <Target className="w-4 h-4 text-accent" />
+              <Position className="w-4 h-4 text-accent" />
               {editingGoal ? "Ziel bearbeiten" : "Neues Ziel"}
             </h2>
             <button onClick={resetForm} className="text-text-tertiary hover:text-text-primary">
-              <X className="w-4 h-4" />
+              <Xmark className="w-4 h-4" />
             </button>
           </div>
           <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -275,7 +275,7 @@ export default function Goals() {
       {/* Empty state */}
       {!isLoading && goals.length === 0 && (
         <div className="card flex flex-col items-center justify-center py-16 text-center">
-          <Target className="w-12 h-12 text-text-tertiary mb-3" />
+          <Position className="w-12 h-12 text-text-tertiary mb-3" />
           <p className="text-text-primary font-medium mb-1">Noch keine Ziele</p>
           <p className="text-text-tertiary text-sm mb-4">
             Erstelle dein erstes Sparziel und verfolge deinen Fortschritt.
@@ -345,7 +345,7 @@ function GoalCard({ goal, onEdit, onDelete, confirmDelete, onCancelDelete, onCon
         </div>
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
           <button onClick={onEdit} className="text-text-tertiary hover:text-accent transition-colors p-1">
-            <Edit2 className="w-3.5 h-3.5" />
+            <EditPencil className="w-3.5 h-3.5" />
           </button>
           {confirmDelete ? (
             <>
@@ -353,12 +353,12 @@ function GoalCard({ goal, onEdit, onDelete, confirmDelete, onCancelDelete, onCon
                 Löschen
               </button>
               <button onClick={onCancelDelete} className="text-text-tertiary hover:text-text-secondary p-1">
-                <X className="w-3 h-3" />
+                <Xmark className="w-3 h-3" />
               </button>
             </>
           ) : (
             <button onClick={onDelete} className="text-text-tertiary hover:text-loss transition-colors p-1">
-              <Trash2 className="w-3.5 h-3.5" />
+              <Trash className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
@@ -392,7 +392,7 @@ function GoalCard({ goal, onEdit, onDelete, confirmDelete, onCancelDelete, onCon
       <div className="flex flex-wrap gap-2 text-[11px]">
         {goal.monthly_contribution > 0 && (
           <span className="flex items-center gap-1 px-2 py-0.5 bg-bg-surface2 rounded-full text-text-secondary">
-            <TrendingUp className="w-2.5 h-2.5" />
+            <GraphUp className="w-2.5 h-2.5" />
             {formatAmount(goal.monthly_contribution, "CHF")}/Mt.
           </span>
         )}

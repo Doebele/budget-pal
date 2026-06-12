@@ -1,6 +1,17 @@
 /** @type {import('tailwindcss').Config} */
+
+// Token mit eingebautem Alpha (z. B. --border-bp = weiss/0.13):
+// Plain-Nutzung (border-border) liefert den Token unverändert; ein
+// Opacity-Modifier (border-border/50) ersetzt das Alpha themeabhängig
+// über das Mono-RGB-Triplet — wie zuvor mit den rgba-Literalen.
+const tokenWithAlpha = (plainVar, monoRgbVar) => ({ opacityValue }) =>
+  opacityValue === undefined || `${opacityValue}`.includes("var(")
+    ? plainVar
+    : `rgb(var(${monoRgbVar}) / ${opacityValue})`;
+
 export default {
-  darkMode: "class",
+  // dark:-Varianten folgen dem data-theme-Attribut (gesetzt in App.tsx)
+  darkMode: ["selector", '[data-theme="dark"]'],
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
@@ -8,61 +19,65 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Alle Farben zeigen auf CSS-Variablen (index.css) — Light/Dark
+        // wird über [data-theme] gesteuert. RGB-Triplets erhalten die
+        // Tailwind-Opacity-Modifier (z. B. bg-accent/15).
         // ── Background ──────────────────────────────────────
         bg: {
-          DEFAULT: "#0d0e12",
-          surface: "#13141a",
-          surface2: "#1a1b23",
-          elevated: "#20212c",
+          DEFAULT: "rgb(var(--bg-rgb) / <alpha-value>)",
+          surface: "rgb(var(--surface-rgb) / <alpha-value>)",
+          surface2: "rgb(var(--surface-2-rgb) / <alpha-value>)",
+          elevated: "rgb(var(--elevated-rgb) / <alpha-value>)",
         },
 
-        // ── Border ───────────────────────────────────────────
+        // ── Border (Alpha im Token enthalten; Modifier wie
+        //    border-border/50 ersetzen das Alpha themeabhängig) ──
         border: {
-          DEFAULT: "rgba(255,255,255,0.13)",
-          subtle: "rgba(255,255,255,0.07)",
-          strong: "rgba(255,255,255,0.22)",
+          DEFAULT: tokenWithAlpha("var(--border-bp)", "--border-mono-rgb"),
+          subtle: tokenWithAlpha("var(--border-bp-subtle)", "--border-mono-rgb"),
+          strong: tokenWithAlpha("var(--border-bp-strong)", "--border-mono-rgb"),
         },
 
         // ── Text ─────────────────────────────────────────────
         text: {
-          primary: "#f0f1f5",
-          secondary: "#b4bfcc",
-          tertiary: "#8896a8",
-          disabled: "#535e6b",
+          primary: "rgb(var(--fg-1-rgb) / <alpha-value>)",
+          secondary: "rgb(var(--fg-2-rgb) / <alpha-value>)",
+          tertiary: "rgb(var(--fg-3-rgb) / <alpha-value>)",
+          disabled: tokenWithAlpha("var(--fg-disabled)", "--fg-disabled-rgb"),
         },
 
-        // ── Accent (blue) ────────────────────────────────────
+        // ── Accent (folgt data-accent Preset) ────────────────
         accent: {
-          DEFAULT: "#3b82f6",
-          light: "#60a5fa",
-          dark: "#2563eb",
-          muted: "rgba(59,130,246,0.15)",
+          DEFAULT: "rgb(var(--accent-rgb) / <alpha-value>)",
+          light: "var(--accent-light)",
+          dark: "var(--accent-dark)",
+          muted: "var(--accent-15)",
         },
 
         // ── Financial States ─────────────────────────────────
         gain: {
-          DEFAULT: "#4ade80",
-          light: "#86efac",
-          muted: "rgba(74,222,128,0.15)",
+          DEFAULT: "rgb(var(--green-rgb) / <alpha-value>)",
+          light: "var(--green-light)",
+          muted: "rgb(var(--green-rgb) / 0.15)",
         },
         loss: {
-          DEFAULT: "#f87171",
-          light: "#fca5a5",
-          muted: "rgba(248,113,113,0.15)",
+          DEFAULT: "rgb(var(--red-rgb) / <alpha-value>)",
+          light: "var(--red-light)",
+          muted: "rgb(var(--red-rgb) / 0.15)",
         },
 
         // ── Warning ──────────────────────────────────────────
         warning: {
-          DEFAULT: "#fbbf24",
-          light: "#fde68a",
-          muted: "rgba(251,191,36,0.15)",
+          DEFAULT: "rgb(var(--yellow-rgb) / <alpha-value>)",
+          light: "var(--yellow-light)",
+          muted: "rgb(var(--yellow-rgb) / 0.15)",
         },
 
         // ── Purple (projections) ──────────────────────────────
         purple: {
-          DEFAULT: "#a78bfa",
-          light: "#c4b5fd",
-          muted: "rgba(167,139,250,0.15)",
+          DEFAULT: "rgb(var(--purple-rgb) / <alpha-value>)",
+          light: "var(--purple-light)",
+          muted: "rgb(var(--purple-rgb) / 0.15)",
         },
 
         // ── Chart palette ─────────────────────────────────────
@@ -98,13 +113,14 @@ export default {
       },
 
       boxShadow: {
-        card: "0 4px 24px rgba(0,0,0,0.4)",
+        card: "var(--shadow-card)",
+        modal: "var(--shadow-modal)",
         glow: "0 0 20px rgba(59,130,246,0.25)",
         "glow-green": "0 0 20px rgba(74,222,128,0.2)",
       },
 
       backgroundImage: {
-        "gradient-card": "linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)",
+        "gradient-card": "linear-gradient(135deg, var(--gradient-card-from) 0%, var(--gradient-card-to) 100%)",
         "gradient-accent": "linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)",
         "gradient-gain": "linear-gradient(135deg, #4ade80 0%, #34d399 100%)",
       },

@@ -89,6 +89,9 @@ class User(Base):
     retirement_age: Mapped[int] = mapped_column(Integer, default=65)
     currency: Mapped[str] = mapped_column(String(3), default="CHF")
     locale: Mapped[str] = mapped_column(String(10), default="de-CH")
+    # UI-Sprache (ISO 639-1, z. B. "de"/"en") — getrennt von locale (Zahlen-/Datumsformat),
+    # damit künftige Sprachen ohne Schemaänderung ergänzt werden können
+    ui_language: Mapped[str] = mapped_column(String(5), default="de", server_default="de", nullable=False)
     # Referenz-SARON p.a. (%) für Wizard/Anzeige — Nutzer pflegbar in Einstellungen
     saron_reference_annual_pct: Mapped[float] = mapped_column(Float, default=0.5, nullable=False)
     # Per-user hidden canonical taxonomy labels (JSON: {"sc_id:txn": [...], "sc_id:wl": [...]})

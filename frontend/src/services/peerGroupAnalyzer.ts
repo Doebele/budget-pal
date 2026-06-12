@@ -6,6 +6,7 @@
  *
  * All amounts in CHF/Monat (monthly).
  */
+import { displayLocale } from "@/lib/format";
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -317,7 +318,7 @@ export const COMMON_SUBSCRIPTIONS: SubscriptionItem[] = [
 // ── Utility: format CHF ────────────────────────────────────────
 
 export function formatCHF(amount: number, decimals = 0): string {
-  return new Intl.NumberFormat("de-CH", {
+  return new Intl.NumberFormat(displayLocale(), {
     style: "currency",
     currency: "CHF",
     minimumFractionDigits: decimals,

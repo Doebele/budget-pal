@@ -15,7 +15,8 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
-import { colors, formatCHF } from "@/lib/theme";
+import { formatCHF } from "@/lib/theme";
+import { useThemeColors } from "@/hooks/useThemeColors";
 
 interface ProjectionData {
   years: number[];
@@ -62,30 +63,30 @@ function buildChartData(data: ProjectionData): ChartRow[] {
   }));
 }
 
-const ACCENT = colors.accent;
-const TOOLTIP_STYLE = {
-  backgroundColor: colors.bgElevated,
-  border: `1px solid ${colors.border}`,
-  borderRadius: 6,
-  color: colors.textPrimary,
-  fontSize: 12,
-  padding: "8px 12px",
-};
-
 function CustomTooltip({ active, payload, label }: {
   active?: boolean;
   payload?: Array<{ name: string; value: number; payload: ChartRow }>;
   label?: string;
 }) {
+  const { colors } = useThemeColors();
   if (!active || !payload?.length) return null;
   const row = payload[0].payload;
   return (
-    <div style={TOOLTIP_STYLE}>
+    <div
+      style={{
+        backgroundColor: colors.bgElevated,
+        border: `1px solid ${colors.border}`,
+        borderRadius: 6,
+        color: colors.textPrimary,
+        fontSize: 12,
+        padding: "8px 12px",
+      }}
+    >
       <p className="font-semibold mb-1">{label}</p>
       <div className="space-y-0.5 text-xs font-mono">
         <p style={{ color: colors.textSecondary }}>p90: {formatCHF(row.p90 * 1000, true)}</p>
         <p style={{ color: colors.textSecondary }}>p75: {formatCHF(row.p75 * 1000, true)}</p>
-        <p style={{ color: ACCENT }}>p50: <strong>{formatCHF(row.p50 * 1000, true)}</strong></p>
+        <p style={{ color: colors.accent }}>p50: <strong>{formatCHF(row.p50 * 1000, true)}</strong></p>
         <p style={{ color: colors.textSecondary }}>p25: {formatCHF(row.p25 * 1000, true)}</p>
         <p style={{ color: colors.textSecondary }}>p10: {formatCHF(row.p10 * 1000, true)}</p>
       </div>
@@ -99,6 +100,7 @@ export default function MonteCarloChart({
   showRetirementLine = false,
   retirementYear,
 }: MonteCarloChartProps) {
+  const { colors } = useThemeColors();
   if (!data?.years?.length) {
     return (
       <div style={{ height }} className="flex items-center justify-center text-text-tertiary text-sm">
@@ -115,16 +117,16 @@ export default function MonteCarloChart({
         <defs>
           {/* Gradient for each band */}
           <linearGradient id="mc-grad-outer" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor={ACCENT} stopOpacity={0.06} />
-            <stop offset="95%" stopColor={ACCENT} stopOpacity={0.02} />
+            <stop offset="5%" stopColor={colors.accent} stopOpacity={0.06} />
+            <stop offset="95%" stopColor={colors.accent} stopOpacity={0.02} />
           </linearGradient>
           <linearGradient id="mc-grad-mid" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor={ACCENT} stopOpacity={0.12} />
-            <stop offset="95%" stopColor={ACCENT} stopOpacity={0.04} />
+            <stop offset="5%" stopColor={colors.accent} stopOpacity={0.12} />
+            <stop offset="95%" stopColor={colors.accent} stopOpacity={0.04} />
           </linearGradient>
           <linearGradient id="mc-grad-inner" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor={ACCENT} stopOpacity={0.2} />
-            <stop offset="95%" stopColor={ACCENT} stopOpacity={0.06} />
+            <stop offset="5%" stopColor={colors.accent} stopOpacity={0.2} />
+            <stop offset="95%" stopColor={colors.accent} stopOpacity={0.06} />
           </linearGradient>
         </defs>
 
@@ -222,11 +224,11 @@ export default function MonteCarloChart({
         <Area
           type="monotone"
           dataKey="p50"
-          stroke={ACCENT}
+          stroke={colors.accent}
           strokeWidth={2.5}
           fill="transparent"
           dot={false}
-          activeDot={{ r: 4, fill: ACCENT, stroke: colors.bgSurface, strokeWidth: 2 }}
+          activeDot={{ r: 4, fill: colors.accent, stroke: colors.bgSurface, strokeWidth: 2 }}
           name="Median (p50)"
           isAnimationActive={true}
           animationDuration={600}

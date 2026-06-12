@@ -10,30 +10,11 @@
  * Filter: Alle | Nur Ausgaben | Nur Einnahmen (localStorage persisted)
  * Year navigation: prev/next buttons.
  */
+import { displayLocale } from "@/lib/format";
 import { useState, useMemo, useEffect, useRef, useCallback, type DragEvent } from "react";
 import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  CalendarRange,
-  ChevronLeft,
-  ChevronRight,
-  ChevronDown,
-  Plus,
-  X,
-  Pencil,
-  Trash2,
-  Sparkles,
-  CheckSquare,
-  Square,
-  Library,
-  GripVertical,
-  ArrowUpDown,
-  Search,
-  CalendarDays,
-  RefreshCw,
-  FileText,
-  Building2,
-} from "lucide-react";
+import { BookStack, Building, Calendar, CheckSquare, DataTransferBoth, Drag, EditPencil, NavArrowDown, NavArrowLeft, NavArrowRight, Page, Plus, Refresh, Search, Sparks, Square, Trash, Xmark } from "@/lib/icons";
 import { clsx } from "clsx";
 
 import { recurringPlanApi, accountsApi, categoriesApi } from "@/lib/api";
@@ -379,7 +360,7 @@ function EntryTooltip({ entry, account, targetRef, visible }: EntryTooltipProps)
           )}
         >
           {isExpense ? "−" : "+"}
-          {Math.abs(entry.amount).toLocaleString("de-CH", {
+          {Math.abs(entry.amount).toLocaleString(displayLocale(), {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
           })}
@@ -390,13 +371,13 @@ function EntryTooltip({ entry, account, targetRef, visible }: EntryTooltipProps)
       <div className="space-y-1.5 text-xs">
         {/* Periodicity */}
         <div className="flex items-center gap-2 text-text-secondary">
-          <RefreshCw className="w-3 h-3 text-text-tertiary shrink-0" />
+          <Refresh className="w-3 h-3 text-text-tertiary shrink-0" />
           <span>{periodicityLabel(entry.periodicity)}</span>
         </div>
 
         {/* Dates */}
         <div className="flex items-center gap-2 text-text-secondary">
-          <CalendarDays className="w-3 h-3 text-text-tertiary shrink-0" />
+          <Calendar className="w-3 h-3 text-text-tertiary shrink-0" />
           <span>
             {formatDateDE(entry.start_date)}
             {entry.end_date && entry.end_date !== "9999-12-31"
@@ -408,7 +389,7 @@ function EntryTooltip({ entry, account, targetRef, visible }: EntryTooltipProps)
         {/* Notes */}
         {entry.notes && (
           <div className="flex items-start gap-2 text-text-secondary">
-            <FileText className="w-3 h-3 text-text-tertiary shrink-0 mt-0.5" />
+            <Page className="w-3 h-3 text-text-tertiary shrink-0 mt-0.5" />
             <span className="leading-snug break-words">{entry.notes}</span>
           </div>
         )}
@@ -424,7 +405,7 @@ function EntryTooltip({ entry, account, targetRef, visible }: EntryTooltipProps)
                 onError={(e) => { (e.target as HTMLImageElement).src = "/logos/default-bank.svg"; }}
               />
             ) : (
-              <Building2 className="w-3 h-3 text-text-tertiary shrink-0" />
+              <Building className="w-3 h-3 text-text-tertiary shrink-0" />
             )}
             <span>{account.name}</span>
           </div>
@@ -448,7 +429,7 @@ interface EntryChipProps {
   onDragEnd: () => void;
   onEdit: (entry: RecurringPlanEntry) => void;
   providerId: string | null;
-  ScIcon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  ScIcon: React.ComponentType<{ className?: string; strokeWidth?: number | string }>;
   scColor: string;
   scLabel: string;
   planDisplayAmt: number;
@@ -508,7 +489,7 @@ function EntryChip({
         title="In anderen Monat ziehen. Mit Wahltaste (⌥) beim Loslassen kopieren."
         aria-label="Eintrag in anderen Monat ziehen; mit Wahltaste kopieren"
       >
-        <GripVertical className="w-3.5 h-3.5" aria-hidden />
+        <Drag className="w-3.5 h-3.5" aria-hidden />
       </button>
       <button
         ref={chipRef}
@@ -644,7 +625,7 @@ function BudgetplanCategoryPicker({
         ) : (
           <span className="flex-1 text-text-tertiary">Keine Kategorie</span>
         )}
-        <ChevronDown className={clsx("w-4 h-4 shrink-0 text-text-tertiary transition-transform", open && "rotate-180")} />
+        <NavArrowDown className={clsx("w-4 h-4 shrink-0 text-text-tertiary transition-transform", open && "rotate-180")} />
       </button>
       {open && (
         <div className="absolute left-0 right-0 top-full z-[60] mt-1 rounded-lg border border-border bg-bg-surface shadow-xl flex flex-col" style={{ maxHeight: "min(70vh, 24rem)" }}>
@@ -662,7 +643,7 @@ function BudgetplanCategoryPicker({
               />
               {search && (
                 <button type="button" onClick={() => setSearch("")} className="text-text-tertiary hover:text-text-primary">
-                  <X className="w-3.5 h-3.5" />
+                  <Xmark className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>
@@ -1335,7 +1316,7 @@ export default function Budgetplan() {
       {/* ── Header ── */}
       <div className="flex flex-wrap items-center gap-3 mb-5">
         <div className="flex items-center gap-2">
-          <CalendarRange className="w-5 h-5 text-accent" />
+          <Calendar className="w-5 h-5 text-accent" />
           <h1 className="text-text-primary font-semibold text-lg">Budgetplan</h1>
         </div>
 
@@ -1345,7 +1326,7 @@ export default function Budgetplan() {
             onClick={() => setYear((y) => y - 1)}
             className="p-1 text-text-tertiary hover:text-text-primary transition-colors"
           >
-            <ChevronLeft className="w-4 h-4" />
+            <NavArrowLeft className="w-4 h-4" />
           </button>
           <span className="font-mono text-sm text-text-primary px-2 min-w-[4rem] text-center">
             {year}
@@ -1354,7 +1335,7 @@ export default function Budgetplan() {
             onClick={() => setYear((y) => y + 1)}
             className="p-1 text-text-tertiary hover:text-text-primary transition-colors"
           >
-            <ChevronRight className="w-4 h-4" />
+            <NavArrowRight className="w-4 h-4" />
           </button>
         </div>
 
@@ -1366,10 +1347,8 @@ export default function Budgetplan() {
               key={f}
               onClick={() => setFilterPersist(f)}
               className={clsx(
-                "px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
-                filter === f
-                  ? "bg-accent text-white"
-                  : "bg-bg-surface2 text-text-secondary hover:text-text-primary"
+                "toggle-btn",
+                filter === f && "active"
               )}
             >
               {f === "all" ? "Alle" : f === "expense" ? "Nur Ausgaben" : "Nur Einnahmen"}
@@ -1412,7 +1391,7 @@ export default function Budgetplan() {
 
         {/* Sort control */}
         <div className="flex items-center gap-1.5 bg-bg-surface2 border border-border rounded-lg px-2.5 py-1.5">
-          <ArrowUpDown className="w-3.5 h-3.5 text-text-tertiary shrink-0" />
+          <DataTransferBoth className="w-3.5 h-3.5 text-text-tertiary shrink-0" />
           <select
             className="bg-transparent text-xs text-text-secondary focus:outline-none cursor-pointer"
             value={sortOrder}
@@ -1430,26 +1409,16 @@ export default function Budgetplan() {
         </div>
 
         {/* View toggle */}
-        <div className="flex gap-1 bg-bg-surface2 rounded-lg p-1">
+        <div className="toggle-group">
           <button
             onClick={() => setViewPersist("calendar")}
-            className={clsx(
-              "px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
-              view === "calendar"
-                ? "bg-accent text-white"
-                : "text-text-secondary hover:text-text-primary"
-            )}
+            className={clsx("toggle-btn", view === "calendar" && "active")}
           >
             Kalender
           </button>
           <button
             onClick={() => setViewPersist("accordion")}
-            className={clsx(
-              "px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
-              view === "accordion"
-                ? "bg-accent text-white"
-                : "text-text-secondary hover:text-text-primary"
-            )}
+            className={clsx("toggle-btn", view === "accordion" && "active")}
           >
             Monate
           </button>
@@ -1460,7 +1429,7 @@ export default function Budgetplan() {
           onClick={() => { closeEditor(); setPrefillOpen(true); }}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-bg-surface2 hover:bg-bg-surface border border-border text-text-secondary hover:text-text-primary rounded-lg text-sm font-medium transition-colors"
         >
-          <Sparkles className="w-4 h-4" />
+          <Sparks className="w-4 h-4" />
           Vorbefüllen
         </button>
 
@@ -1477,10 +1446,10 @@ export default function Budgetplan() {
       {/* ── Prefill success banner ── */}
       {prefillResult && (
         <div className="flex items-center gap-3 mb-3 px-4 py-3 bg-gain/10 border border-gain/30 rounded-xl text-sm text-gain">
-          <Sparkles className="w-4 h-4 flex-shrink-0" />
+          <Sparks className="w-4 h-4 flex-shrink-0" />
           <span>{prefillResult.created} Einträge erstellt{prefillResult.skipped > 0 ? `, ${prefillResult.skipped} bereits vorhanden übersprungen` : ""}.</span>
           <button onClick={() => setPrefillResult(null)} className="ml-auto text-text-tertiary hover:text-text-primary transition-colors">
-            <X className="w-4 h-4" />
+            <Xmark className="w-4 h-4" />
           </button>
         </div>
       )}
@@ -1527,7 +1496,7 @@ export default function Budgetplan() {
                           }}
                           className="p-1 rounded-md text-text-tertiary hover:text-loss hover:bg-loss/10 transition-colors disabled:opacity-50 shrink-0"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Trash className="w-3.5 h-3.5" />
                         </button>
                       )}
                     </div>
@@ -1656,7 +1625,7 @@ export default function Budgetplan() {
                         </span>
                       )}
                     </div>
-                    <ChevronDown
+                    <NavArrowDown
                       className={clsx(
                         "w-4 h-4 text-text-tertiary transition-transform flex-shrink-0",
                         isOpen && "rotate-180"
@@ -1675,7 +1644,7 @@ export default function Budgetplan() {
                       }}
                       className="p-2 rounded-md text-text-tertiary hover:text-loss hover:bg-loss/10 transition-colors disabled:opacity-50 shrink-0"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash className="w-4 h-4" />
                     </button>
                   )}
                 </div>
@@ -1717,7 +1686,7 @@ export default function Budgetplan() {
                                   {cat?.name ?? "—"}
                                 </td>
                                 <td className="py-2 text-right">
-                                  <Pencil className="w-3.5 h-3.5 text-text-tertiary" />
+                                  <EditPencil className="w-3.5 h-3.5 text-text-tertiary" />
                                 </td>
                               </tr>
                             );
@@ -1754,7 +1723,7 @@ export default function Budgetplan() {
                 {editEntry ? "Eintrag bearbeiten" : "Neuer Eintrag"}
               </h2>
               <button onClick={closeEditor} className="text-text-tertiary hover:text-text-primary transition-colors">
-                <X className="w-5 h-5" />
+                <Xmark className="w-5 h-5" />
               </button>
             </div>
 
@@ -1769,10 +1738,10 @@ export default function Budgetplan() {
                     className="w-full flex items-center justify-between gap-2 px-3 py-2.5 bg-bg-surface2 hover:bg-bg-surface2/80 text-left transition-colors"
                   >
                     <span className="flex items-center gap-2 text-sm font-medium text-text-primary">
-                      <Library className="w-4 h-4 text-accent shrink-0" />
+                      <BookStack className="w-4 h-4 text-accent shrink-0" />
                       Aus Vorlage (historisch / empirisch)
                     </span>
-                    <ChevronDown
+                    <NavArrowDown
                       className={clsx("w-4 h-4 text-text-tertiary shrink-0 transition-transform", editorTemplateOpen && "rotate-180")}
                     />
                   </button>
@@ -1789,8 +1758,8 @@ export default function Budgetplan() {
                               className={clsx(
                                 "flex-1 px-2 py-2 transition-colors",
                                 editorTplSource === src
-                                  ? "bg-accent text-white"
-                                  : "bg-bg-surface2 text-text-secondary hover:text-text-primary"
+                                  ? "bg-accent/15 text-accent font-semibold"
+                                  : "bg-bg-surface2 text-text-tertiary hover:text-text-secondary"
                               )}
                             >
                               {src === "historical" ? "Historisch" : "Empirisch"}
@@ -1806,7 +1775,7 @@ export default function Budgetplan() {
                             onClick={() => setEditorTplYear((y) => y - 1)}
                             className="p-1 text-text-tertiary hover:text-text-primary transition-colors"
                           >
-                            <ChevronLeft className="w-4 h-4" />
+                            <NavArrowLeft className="w-4 h-4" />
                           </button>
                           <span className="font-mono text-sm text-text-primary px-2 min-w-[4rem] text-center">
                             {editorTplYear}
@@ -1816,7 +1785,7 @@ export default function Budgetplan() {
                             onClick={() => setEditorTplYear((y) => y + 1)}
                             className="p-1 text-text-tertiary hover:text-text-primary transition-colors"
                           >
-                            <ChevronRight className="w-4 h-4" />
+                            <NavArrowRight className="w-4 h-4" />
                           </button>
                         </div>
                         <p className="text-[11px] text-text-tertiary mt-1.5">
@@ -2087,7 +2056,7 @@ export default function Budgetplan() {
                   disabled={deleteMut.isPending}
                   className="flex items-center gap-1.5 px-3 py-2 text-sm text-loss hover:bg-loss/10 rounded-lg transition-colors"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash className="w-4 h-4" />
                   Löschen
                 </button>
               )}
@@ -2120,11 +2089,11 @@ export default function Budgetplan() {
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-border/50">
               <h2 className="text-text-primary font-semibold text-base flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-accent" />
+                <Sparks className="w-4 h-4 text-accent" />
                 Budgetplan vorbefüllen
               </h2>
               <button onClick={() => setPrefillOpen(false)} className="text-text-tertiary hover:text-text-primary transition-colors">
-                <X className="w-5 h-5" />
+                <Xmark className="w-5 h-5" />
               </button>
             </div>
 
@@ -2141,8 +2110,8 @@ export default function Budgetplan() {
                       className={clsx(
                         "flex-1 px-3 py-2 transition-colors",
                         prefillSource === src
-                          ? "bg-accent text-white"
-                          : "bg-bg-surface2 text-text-secondary hover:text-text-primary"
+                          ? "bg-accent/15 text-accent font-semibold"
+                          : "bg-bg-surface2 text-text-tertiary hover:text-text-secondary"
                       )}
                     >
                       {src === "historical" ? "Historische Transaktionen" : "Empirische Angaben"}
@@ -2159,7 +2128,7 @@ export default function Budgetplan() {
                     onClick={() => setPrefillSourceYear((y) => y - 1)}
                     className="p-1 text-text-tertiary hover:text-text-primary transition-colors"
                   >
-                    <ChevronLeft className="w-4 h-4" />
+                    <NavArrowLeft className="w-4 h-4" />
                   </button>
                   <span className="font-mono text-sm text-text-primary px-2 min-w-[4rem] text-center">
                     {prefillSourceYear}
@@ -2168,7 +2137,7 @@ export default function Budgetplan() {
                     onClick={() => setPrefillSourceYear((y) => y + 1)}
                     className="p-1 text-text-tertiary hover:text-text-primary transition-colors"
                   >
-                    <ChevronRight className="w-4 h-4" />
+                    <NavArrowRight className="w-4 h-4" />
                   </button>
                 </div>
                 <p className="text-xs text-text-tertiary mt-1.5">

@@ -2,27 +2,184 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  :root {
-    --bg: #0d0e12;
-    --surface: #13141a;
-    --surface2: #1a1b23;
-    --border: rgba(255, 255, 255, 0.13);
-    --text-primary: #f0f1f5;
-    --text-secondary: #b4bfcc;
-    --text-tertiary: #8896a8;
-    --accent: #3b82f6;
-    --gain: #4ade80;
-    --loss: #f87171;
-    --warning: #fbbf24;
-  }
+/* ───────────────────────────────────────────────────────────────
+   DESIGN TOKENS — portiert von application-pal
+   ─────────────────────────────────────────────────────────────── */
+:root {
+  /* Surfaces (dark — default) */
+  --bg:        #0d0e12;
+  --surface:   #13141a;
+  --surface-2: #1a1b23;
+  --surface-3: rgba(0,0,0,0.30);
+  --bg-elevated: #20212c;          /* hover rows, tooltips */
 
+  /* Borders */
+  --border:   rgba(255,255,255,0.10);
+  --border-2: rgba(255,255,255,0.06);
+  --border-bp:        rgba(255,255,255,0.13);
+  --border-bp-subtle: rgba(255,255,255,0.07);
+  --border-bp-strong: rgba(255,255,255,0.22);
+
+  /* Text */
+  --fg-1: #f0f1f5;
+  --fg-2: #b4bfcc;
+  --fg-3: #8896a8;
+  --fg-disabled: #535e6b;
+
+  /* Accent — default indigo */
+  --accent:    #3b82f6;
+  --accent-08: rgba(59,130,246,0.08);
+  --accent-15: rgba(59,130,246,0.15);
+  --accent-35: rgba(59,130,246,0.35);
+  --accent-light: #60a5fa;
+  --accent-dark:  #2563eb;
+
+  /* Semantic */
+  --green:  #4ade80;
+  --red:    #f87171;
+  --yellow: #fbbf24;
+  --green-light:  #86efac;
+  --red-light:    #fca5a5;
+  --yellow-light: #fde68a;
+  --purple:       #a78bfa;
+  --purple-light: #c4b5fd;
+
+  /* Shadows — white halo on dark surfaces (design system spec) */
+  --shadow-modal: 0 32px 80px rgba(255,255,255,0.30);
+  --shadow-card:  0 4px 24px rgba(255,255,255,0.18);
+
+  /* Radius */
+  --r-xs:  4px;
+  --r-sm:  5px;
+  --r-md:  8px;
+  --r-lg:  10px;
+  --r-xl:  12px;
+  --r-2xl: 18px;
+  --r-pill:999px;
+
+  /* Spacing */
+  --sp-1: 4px;  --sp-2: 6px;  --sp-3: 8px;  --sp-4: 10px;
+  --sp-5: 12px; --sp-6: 14px; --sp-7: 16px; --sp-8: 20px;
+  --sp-9: 24px; --sp-10:28px;
+
+  /* Typography — budget-pal Brand-Fonts */
+  --font-sans:  'Syne', system-ui, sans-serif;
+  --font-mono:  'JetBrains Mono', 'Fira Code', monospace;
+  --font-display: 'DM Serif Display', Georgia, serif;
+
+  /* RGB-Triplets für Tailwind <alpha-value> Plumbing */
+  --bg-rgb:        13 14 18;
+  --surface-rgb:   19 20 26;
+  --surface-2-rgb: 26 27 35;
+  --elevated-rgb:  32 33 44;
+  --fg-1-rgb: 240 241 245;
+  --fg-2-rgb: 180 191 204;
+  --fg-3-rgb: 136 150 168;
+  --accent-rgb: 59 130 246;
+  --green-rgb:  74 222 128;
+  --red-rgb:    248 113 113;
+  --yellow-rgb: 251 191 36;
+  --purple-rgb: 167 139 250;
+  --border-mono-rgb: 255 255 255;
+  --fg-disabled-rgb: 83 94 107;
+
+  /* Legacy-Aliase (alte budget-pal Token-Namen) */
+  --surface2: var(--surface-2);
+  --text-primary: var(--fg-1);
+  --text-secondary: var(--fg-2);
+  --text-tertiary: var(--fg-3);
+  --gain: var(--green);
+  --loss: var(--red);
+  --warning: var(--yellow);
+
+  /* Scrollbar */
+  --scrollbar-thumb: rgba(255,255,255,0.15);
+  --scrollbar-thumb-hover: rgba(255,255,255,0.25);
+
+  /* Card-Gradient */
+  --gradient-card-from: rgba(255,255,255,0.03);
+  --gradient-card-to:   rgba(255,255,255,0.01);
+
+  color-scheme: dark;
+}
+
+/* Light theme */
+[data-theme="light"] {
+  --bg:        #f7f7f5;
+  --surface:   #ffffff;
+  --surface-2: #f3f3f0;
+  --surface-3: rgba(0,0,0,0.04);
+  --bg-elevated: #ececea;
+
+  --border:   rgba(15,17,22,0.10);
+  --border-2: rgba(15,17,22,0.06);
+  --border-bp:        rgba(15,17,22,0.12);
+  --border-bp-subtle: rgba(15,17,22,0.07);
+  --border-bp-strong: rgba(15,17,22,0.22);
+
+  --fg-1: #15171c;
+  --fg-2: #45505d;
+  --fg-3: #7a8493;
+  --fg-disabled: #9aa3ae;
+
+  /* Semantik dunkler für WCAG-Kontrast auf hellen Flächen */
+  --green:  #16a34a;
+  --red:    #dc2626;
+  --yellow: #d97706;
+  --green-light:  #22c55e;
+  --red-light:    #ef4444;
+  --yellow-light: #f59e0b;
+  --purple:       #7c3aed;
+  --purple-light: #8b5cf6;
+
+  --shadow-modal: 0 24px 64px rgba(15,17,22,0.16);
+  --shadow-card:  0 1px 2px rgba(15,17,22,0.04), 0 4px 12px rgba(15,17,22,0.04);
+
+  --bg-rgb:        247 247 245;
+  --surface-rgb:   255 255 255;
+  --surface-2-rgb: 243 243 240;
+  --elevated-rgb:  236 236 234;
+  --fg-1-rgb: 21 23 28;
+  --fg-2-rgb: 69 80 93;
+  --fg-3-rgb: 122 132 147;
+  --green-rgb:  22 163 74;
+  --red-rgb:    220 38 38;
+  --yellow-rgb: 217 119 6;
+  --purple-rgb: 124 58 237;
+  --border-mono-rgb: 15 17 22;
+  --fg-disabled-rgb: 154 163 174;
+
+  --scrollbar-thumb: rgba(15,17,22,0.18);
+  --scrollbar-thumb-hover: rgba(15,17,22,0.30);
+
+  --gradient-card-from: rgba(15,17,22,0.03);
+  --gradient-card-to:   rgba(15,17,22,0.01);
+
+  color-scheme: light;
+}
+
+/* Accent presets */
+[data-accent="indigo"]  { --accent:#3b82f6; --accent-08:rgba(59,130,246,.08);  --accent-15:rgba(59,130,246,.15);  --accent-35:rgba(59,130,246,.35); --accent-rgb:59 130 246;  --accent-light:#60a5fa; --accent-dark:#2563eb; }
+[data-accent="violet"]  { --accent:#8b5cf6; --accent-08:rgba(139,92,246,.08);  --accent-15:rgba(139,92,246,.15);  --accent-35:rgba(139,92,246,.35); --accent-rgb:139 92 246;  --accent-light:#a78bfa; --accent-dark:#7c3aed; }
+[data-accent="emerald"] { --accent:#10b981; --accent-08:rgba(16,185,129,.08);  --accent-15:rgba(16,185,129,.15);  --accent-35:rgba(16,185,129,.35); --accent-rgb:16 185 129;  --accent-light:#34d399; --accent-dark:#059669; }
+[data-accent="amber"]   { --accent:#f59e0b; --accent-08:rgba(245,158,11,.08);  --accent-15:rgba(245,158,11,.15);  --accent-35:rgba(245,158,11,.35); --accent-rgb:245 158 11;  --accent-light:#fbbf24; --accent-dark:#d97706; }
+[data-accent="rose"]    { --accent:#f43f5e; --accent-08:rgba(244,63,94,.08);   --accent-15:rgba(244,63,94,.15);   --accent-35:rgba(244,63,94,.35); --accent-rgb:244 63 94;   --accent-light:#fb7185; --accent-dark:#e11d48; }
+
+/* Density — low = mehr Weissraum, high = mehr Information */
+[data-density="low"]  { --pad-card:18px; --pad-row:14px; --gap-stack:14px; }
+[data-density="high"] { --pad-card:12px; --pad-row:10px; --gap-stack:8px; }
+
+/* Low density: zoomt die gesamte UI; app-shell kompensiert den Zoom,
+   damit sie exakt 1 Bildschirm hoch bleibt. */
+body[data-density="low"] { zoom: 1.12; }
+body[data-density="low"] .app-shell { height: calc(100vh / 1.12); }
+
+@layer base {
   * {
     box-sizing: border-box;
   }
 
   html {
-    color-scheme: dark;
     scroll-behavior: smooth;
   }
 
@@ -40,11 +197,11 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.15);
+    background: var(--scrollbar-thumb);
     border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.25);
+    background: var(--scrollbar-thumb-hover);
   }
 
   /* Remove default number input spinners */
@@ -60,11 +217,13 @@
 
 @layer components {
   .card {
-    @apply bg-bg-surface border border-border/50 rounded-lg p-4 shadow-card;
+    @apply bg-bg-surface border border-border-subtle rounded-lg shadow-card;
+    padding: var(--pad-card, 16px);
   }
 
   .card-elevated {
-    @apply bg-bg-surface2 border border-border/50 rounded-lg p-4;
+    @apply bg-bg-surface2 border border-border-subtle rounded-lg;
+    padding: var(--pad-card, 16px);
   }
 
   .btn-primary {
@@ -115,6 +274,20 @@
   .nivo-chart-container {
     @apply text-text-secondary;
   }
+
+  /* Toggle-Switch-Muster (analog Rail-Footer / Erscheinungsbild) */
+  .toggle-group {
+    @apply flex items-center gap-1.5 flex-wrap;
+  }
+  .toggle-btn {
+    @apply flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs font-medium text-text-tertiary transition-colors;
+  }
+  .toggle-btn:hover {
+    @apply text-text-secondary;
+  }
+  .toggle-btn.active {
+    @apply bg-accent/15 border-accent/40 text-accent;
+  }
 }
 
 @layer utilities {
@@ -129,4 +302,223 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+}
+
+/* ───────────────────────────────────────────────────────────────
+   RAIL (Sidebar) — portiert von application-pal
+   (@layer components, damit Utilities wie `hidden`/`md:flex` gewinnen)
+   ─────────────────────────────────────────────────────────────── */
+@layer components {
+.app-shell {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg);
+}
+.app-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.rail {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  will-change: width;
+}
+
+/* Rail header — brand + toggle */
+.rail-header {
+  height: 56px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.rail-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: var(--fg-3);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.12s ease, color 0.12s ease, transform 0.22s cubic-bezier(0.4,0,0.2,1);
+}
+.rail-toggle-btn:hover {
+  background: var(--accent-08);
+  color: var(--fg-1);
+}
+
+.rail-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rail-body::-webkit-scrollbar { width: 3px; }
+
+.rail-section-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+  padding: 4px 10px 2px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.rail-btn {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 5px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg-2);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 500;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.rail-btn:hover {
+  background: var(--accent-08);
+  color: var(--fg-1);
+}
+.rail-btn.active {
+  background: var(--accent-15);
+  color: var(--accent);
+  font-weight: 600;
+}
+.rail-btn.active .rail-icon { color: var(--accent); }
+
+.rail-icon {
+  flex-shrink: 0;
+  width: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg-3);
+  transition: color 0.12s ease;
+}
+.rail-btn:hover .rail-icon { color: var(--fg-1); }
+
+.rail-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rail-badge {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--fg-3);
+}
+
+.rail-divider {
+  height: 1px;
+  background: var(--border-2);
+  margin: 6px 4px;
+  flex-shrink: 0;
+}
+
+/* Rail footer — density/language/theme toggles + user */
+.rail-footer {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  padding: 8px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rail-density-row,
+.rail-lang-row,
+.rail-theme-row {
+  display: flex;
+  gap: 3px;
+}
+
+.rail-density-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 5px 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg-3);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.rail-density-btn:hover {
+  background: var(--accent-08);
+  color: var(--fg-1);
+}
+.rail-density-btn.active {
+  background: var(--accent-15);
+  border-color: var(--accent-35);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.rail-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.rail-user:hover { background: var(--accent-08); }
+
+/* Rail tooltip (collapsed state) */
+.rail-tooltip {
+  position: fixed;
+  z-index: 60;
+  padding: 4px 9px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-card);
+  color: var(--fg-1);
+  font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+}
 }

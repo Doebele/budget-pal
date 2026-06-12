@@ -4,37 +4,28 @@
  * for primary navigation on small screens.
  */
 import { NavLink, useLocation } from "react-router-dom";
-import {
-  LayoutDashboard,
-  ArrowLeftRight,
-  PiggyBank,
-  TrendingUp,
-  Settings,
-} from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { DashboardDots, DataTransferBoth, GraphUp, PiggyBank, Settings } from "@/lib/icons";
 import { clsx } from "clsx";
+import { isNavItemActive } from "./navItems";
 
 const BOTTOM_NAV_ITEMS = [
-  { path: "/",             icon: LayoutDashboard, label: "Übersicht" },
-  { path: "/transactions", icon: ArrowLeftRight,  label: "Transakt." },
-  { path: "/budget",       icon: PiggyBank,       label: "Budget" },
-  { path: "/projections",  icon: TrendingUp,      label: "Prognose" },
-  { path: "/settings",     icon: Settings,        label: "Einstellungen" },
+  { path: "/",             icon: DashboardDots,    labelKey: "nav.dashboard" },
+  { path: "/transactions", icon: DataTransferBoth, labelKey: "nav.transactions" },
+  { path: "/budget",       icon: PiggyBank,        labelKey: "nav.budget" },
+  { path: "/projections",  icon: GraphUp,          labelKey: "nav.projections" },
+  { path: "/settings",     icon: Settings,         labelKey: "nav.settings" },
 ] as const;
 
 export default function BottomNav() {
   const location = useLocation();
-
-  const isActive = (path: string) => {
-    if (path === "/") return location.pathname === "/";
-    if (path === "/transactions") return location.pathname === "/transactions";
-    return location.pathname === path || location.pathname.startsWith(`${path}/`);
-  };
+  const { t } = useTranslation();
 
   return (
     <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-bg-surface border-t border-border/50 safe-area-pb">
       <div className="flex items-stretch h-16">
-        {BOTTOM_NAV_ITEMS.map(({ path, icon: Icon, label }) => {
-          const active = isActive(path);
+        {BOTTOM_NAV_ITEMS.map(({ path, icon: Icon, labelKey }) => {
+          const active = isNavItemActive(location.pathname, path);
           return (
             <NavLink
               key={path}
@@ -52,7 +43,7 @@ export default function BottomNav() {
                   active && "scale-110"
                 )}
               />
-              <span className="leading-none">{label}</span>
+              <span className="leading-none">{t(labelKey)}</span>
               {active && (
                 <span className="absolute top-0 w-8 h-0.5 bg-accent rounded-full" />
               )}
