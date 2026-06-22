@@ -29,6 +29,7 @@ bank import, AI categorization, long-term financial projections, and the Swiss 3
 - 🖌️ **Iconoir-Icons** — komplette Icon-Migration von lucide-react auf iconoir-react (~106 Icons)
 - 🔘 **Einheitliches Toggle-Muster** — alle Segment-Schalter (Zeitraum, Ansichten, Modi) im selben Akzent-Stil
 - ⚙️ **Erscheinungsbild-Einstellungen** — Theme, Dichte, Sprache und Akzentfarbe zentral unter Einstellungen, synchron mit der Rail
+- 🐳 **Docker-Build-Fix** — `frontend/package.json` enthält jetzt korrekt `round-flag-icons`; `vite.config.ts` referenziert im `manualChunks`-Bundle `iconoir-react` statt des entfernten `lucide-react` — `docker compose build` läuft wieder fehlerfrei durch
 
 Alle Präferenzen (Theme/Dichte/Akzent lokal, Sprache zusätzlich serverseitig) bleiben über Sessions und Geräte hinweg erhalten.
 

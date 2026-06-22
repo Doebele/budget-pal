@@ -6,8 +6,5 @@
     "dev": "npm run dev --prefix frontend",
     "lint": "npm run lint --prefix frontend",
     "typecheck": "npm run typecheck --prefix frontend"
-  },
-  "dependencies": {
-    "round-flag-icons": "^1.3.0"
   }
 }
