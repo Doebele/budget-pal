@@ -69,6 +69,9 @@ def test_enabled_is_false_for_none_provider():
 
 
 class _FakeResponse:
+    status_code = 200
+    text = ""
+
     def __init__(self, payload):
         self._payload = payload
 
@@ -145,6 +148,52 @@ async def test_lm_studio_uses_docker_host_and_no_auth_header():
     call = _FakeAsyncClient.last_call
     assert call["url"].startswith("http://host.docker.internal:1234")
     assert "Authorization" not in call["headers"]
+
+
+@pytest.mark.asyncio
+async def test_lm_studio_does_not_receive_json_object_response_format():
+    """LM Studio (Bionic) lehnt response_format 'json_object' mit 400 ab und
+    verlangt 'json_schema' oder 'text' — dort wird der Parameter weggelassen."""
+    fake = _FakeAsyncClient({"choices": [{"message": {"content": "{}"}}]})
+    cfg = AiConfig(provider="lm-studio", lm_studio_model="ornith-35b")
+
+    with patch("app.services.ai_client.httpx.AsyncClient", fake):
+        await ai_client.complete(cfg, "sys", "user", json_mode=True)
+
+    assert "response_format" not in _FakeAsyncClient.last_call["json"]
+
+
+@pytest.mark.asyncio
+async def test_openai_still_receives_json_object_response_format():
+    fake = _FakeAsyncClient({"choices": [{"message": {"content": "{}"}}]})
+    cfg = AiConfig(provider="openai", openai_api_key="sk-test")
+
+    with patch("app.services.ai_client.httpx.AsyncClient", fake):
+        await ai_client.complete(cfg, "sys", "user", json_mode=True)
+
+    assert _FakeAsyncClient.last_call["json"]["response_format"] == {"type": "json_object"}
+
+
+@pytest.mark.asyncio
+async def test_reasoning_content_used_when_content_is_empty():
+    """Reasoning-Modelle legen ihre Ausgabe in reasoning_content ab und lassen
+    content leer, wenn das Token-Budget beim Denken aufgeht."""
+    fake = _FakeAsyncClient(
+        {"choices": [{"message": {"content": "", "reasoning_content": "gedacht"}}]}
+    )
+    cfg = AiConfig(provider="lm-studio", lm_studio_model="ornith-35b")
+
+    with patch("app.services.ai_client.httpx.AsyncClient", fake):
+        assert await ai_client.complete(cfg, "sys", "user") == "gedacht"
+
+
+@pytest.mark.asyncio
+async def test_empty_content_without_reasoning_returns_none():
+    fake = _FakeAsyncClient({"choices": [{"message": {"content": ""}}]})
+    cfg = AiConfig(provider="openai", openai_api_key="sk-test")
+
+    with patch("app.services.ai_client.httpx.AsyncClient", fake):
+        assert await ai_client.complete(cfg, "sys", "user") is None
 
 
 @pytest.mark.asyncio

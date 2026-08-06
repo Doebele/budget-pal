@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, NamedTuple, Optional
 
 import httpx
 from pydantic import BaseModel, Field
@@ -119,16 +119,28 @@ def from_user(user: Any) -> AiConfig:
 # ── Provider-Dispatch ─────────────────────────────────────────
 
 
-def _openai_compatible_target(cfg: AiConfig) -> Optional[tuple[str, str, str, dict]]:
-    """(base_url, api_key, model, extra_headers) für die OpenAI-kompatiblen Provider."""
+class _Target(NamedTuple):
+    base_url: str
+    api_key: str
+    model: str
+    extra_headers: dict
+    # LM Studio lehnt response_format "json_object" ab und verlangt
+    # "json_schema" oder "text" — dort wird der Parameter weggelassen und die
+    # JSON-Form allein über den Prompt erzwungen. Die Aufrufer schneiden das
+    # Objekt ohnehin tolerant aus der Antwort.
+    supports_json_object: bool = True
+
+
+def _openai_compatible_target(cfg: AiConfig) -> Optional[_Target]:
+    """Endpunkt-Parameter für die OpenAI-kompatiblen Provider."""
     if cfg.provider == "openai":
         if not cfg.openai_api_key:
             return None
-        return "https://api.openai.com", cfg.openai_api_key, cfg.openai_model, {}
+        return _Target("https://api.openai.com", cfg.openai_api_key, cfg.openai_model, {})
     if cfg.provider == "openrouter":
         if not cfg.openrouter_api_key:
             return None
-        return (
+        return _Target(
             "https://openrouter.ai/api",
             cfg.openrouter_api_key,
             cfg.openrouter_model,
@@ -136,10 +148,10 @@ def _openai_compatible_target(cfg: AiConfig) -> Optional[tuple[str, str, str, di
         )
     if cfg.provider == "lm-studio":
         base = resolve_host_url(cfg.lm_studio_url or DEFAULT_LM_STUDIO_URL)
-        return base, "", cfg.lm_studio_model, {}
+        return _Target(base, "", cfg.lm_studio_model, {}, supports_json_object=False)
     if cfg.provider == "ollama":
         base = resolve_host_url(cfg.ollama_url or DEFAULT_OLLAMA_URL)
-        return base, "", cfg.ollama_model, {}
+        return _Target(base, "", cfg.ollama_model, {})
     return None
 
 
@@ -149,7 +161,6 @@ async def _complete_openai_compatible(
     target = _openai_compatible_target(cfg)
     if target is None:
         return None
-    base, api_key, model, extra_headers = target
 
     body: Dict[str, Any] = {
         "messages": [
@@ -159,24 +170,49 @@ async def _complete_openai_compatible(
         "max_tokens": max_tokens,
         "temperature": 0,
     }
-    if model:
-        body["model"] = model
-    if json_mode:
+    if target.model:
+        body["model"] = target.model
+    if json_mode and target.supports_json_object:
         body["response_format"] = {"type": "json_object"}
 
-    headers = {"Content-Type": "application/json", **extra_headers}
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
+    headers = {"Content-Type": "application/json", **target.extra_headers}
+    if target.api_key:
+        headers["Authorization"] = f"Bearer {target.api_key}"
 
     async with httpx.AsyncClient(timeout=COMPLETION_TIMEOUT) as client:
-        res = await client.post(f"{base}/v1/chat/completions", json=body, headers=headers)
+        res = await client.post(
+            f"{target.base_url}/v1/chat/completions", json=body, headers=headers
+        )
+        if res.status_code >= 400:
+            # Fehlertext mitloggen — sonst ist ein 400 nicht diagnostizierbar
+            logger.warning(
+                "%s antwortete %s: %s", cfg.provider, res.status_code, res.text[:300]
+            )
         res.raise_for_status()
         data = res.json()
 
     choices = data.get("choices") or []
     if not choices:
         return None
-    return (choices[0].get("message") or {}).get("content")
+
+    message = choices[0].get("message") or {}
+    content = (message.get("content") or "").strip()
+    if content:
+        return content
+
+    # Reasoning-Modelle (z. B. ornith in LM Studio) legen ihre Gedanken in
+    # reasoning_content ab. Ist content leer, ging das Token-Budget beim
+    # Denken auf — die Antwort steckt dann allenfalls noch im Reasoning.
+    reasoning = (message.get("reasoning_content") or "").strip()
+    if reasoning:
+        logger.warning(
+            "%s lieferte leeres content-Feld (Reasoning-Modell, max_tokens=%d "
+            "womöglich zu klein) — versuche Reasoning-Text",
+            cfg.provider,
+            max_tokens,
+        )
+        return reasoning
+    return None
 
 
 async def _complete_anthropic(

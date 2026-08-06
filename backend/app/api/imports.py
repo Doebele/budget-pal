@@ -24,8 +24,9 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.models import Account, ImportLog, ImportStatus, Transaction, User
-from app.services import ai_client
+from app.services import ai_client, pdf_ai_extract
 from app.services.categorization import CategorizationService
+from app.services.user_history import CategoryHints, load_category_hints
 from app.services.import_parsers.comdirect import ComdirectParser
 from app.services.import_parsers.n26 import N26Parser
 from app.services.import_parsers.revolut import RevolutParser
@@ -150,6 +151,10 @@ class PdfPreviewResponse(BaseModel):
     total_rows: int
     parsed_rows: int
     error_rows: int
+    # True, wenn kein Parser passte und die Zeilen per KI aus dem Text
+    # extrahiert wurden — die UI muss das kennzeichnen, damit geratene Werte
+    # nicht wie geparste aussehen
+    ai_extracted: bool = False
 
 
 class PdfImportConfirmRequest(BaseModel):
@@ -568,6 +573,8 @@ async def import_csv(
         raise HTTPException(status_code=422, detail=f"Parse error: {e}")
 
     # Process transactions
+    ai_cfg = ai_client.from_user(current_user)
+    hints = await load_category_hints(db, current_user.id)
     imported = 0
     skipped = 0
     failed = 0
@@ -612,7 +619,7 @@ async def import_csv(
 
             # Categorize
             cat_result = await categorization_service.categorize(
-                raw.get("description", ""), ai_client.from_user(current_user)
+                raw.get("description", ""), ai_cfg, hints
             )
 
             raw_dt = raw["date"]
@@ -784,6 +791,102 @@ async def _ocr_pdf_to_text(tmp_path: str) -> str:
         return full_text
 
 
+async def _extract_pdf_rows(
+    tmp_path: str,
+    bank: Optional[str],
+    *,
+    ai: Optional[ai_client.AiConfig] = None,
+    hints: Optional[CategoryHints] = None,
+    currency: str = "CHF",
+) -> Tuple[str, List[dict], bool]:
+    """PDF in Rohzeilen zerlegen — der einzige Ort, an dem PDF-Parser gewählt werden.
+
+    Reihenfolge: erkanntes Bankformat → dedizierter Parser → OCR → und wenn
+    nichts davon Zeilen liefert, das vom Nutzer gewählte KI-Modell.
+
+    Returns (detected_bank, rows, used_ai).
+    """
+    import pdfplumber
+
+    from app.services.import_parsers.comdirect_pdf import (
+        is_comdirect_pdf,
+        parse_comdirect_pdf_tables,
+        parse_comdirect_pdf_text,
+        parse_comdirect_pdf_words,
+    )
+    from app.services.import_parsers.n26_pdf import is_n26_web_pdf, parse_n26_web_pdf
+    from app.services.import_parsers.ubs_creditcard_pdf import (
+        is_ubs_creditcard_pdf,
+        parse_ubs_creditcard_pdf,
+    )
+
+    forced = (bank or "").lower()
+    raw_transactions: List[dict] = []
+
+    with pdfplumber.open(tmp_path) as pdf:
+        full_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+
+        _is_n26_web = forced == "n26" or (not bank and is_n26_web_pdf(full_text))
+        _is_comdirect = not _is_n26_web and (
+            forced == "comdirect" or (not bank and is_comdirect_pdf(full_text))
+        )
+        _is_ubs_cc = (
+            not _is_n26_web
+            and not _is_comdirect
+            and (forced == "ubs_cc" or (not bank and is_ubs_creditcard_pdf(full_text)))
+        )
+
+        if _is_n26_web:
+            detected_bank = "n26"
+            raw_transactions = parse_n26_web_pdf(pdf)
+            logger.info("N26 web PDF: parser yielded %d rows.", len(raw_transactions))
+        elif _is_comdirect:
+            detected_bank = "comdirect"
+            # 1st choice: pdfplumber table extraction (precise column mapping)
+            raw_transactions = parse_comdirect_pdf_tables(pdf)
+            if not raw_transactions:
+                # 2nd choice: word-position-based extraction (handles +amounts)
+                raw_transactions = parse_comdirect_pdf_words(pdf)
+            if not raw_transactions:
+                # 3rd choice: text-based regex extraction (last resort)
+                if len(full_text.strip()) < 100:
+                    full_text = await _ocr_pdf_to_text(tmp_path)
+                raw_transactions = parse_comdirect_pdf_text(full_text)
+            logger.info("comdirect PDF: %d rows.", len(raw_transactions))
+        elif _is_ubs_cc:
+            detected_bank = "ubs_cc"
+            raw_transactions = parse_ubs_creditcard_pdf(pdf)
+            logger.info(
+                "UBS credit card PDF: parser yielded %d rows.", len(raw_transactions)
+            )
+        else:
+            detected_bank = bank or "ubs"
+            raw_transactions = _parse_ubs_pdf_tables(pdf)
+            if not raw_transactions:
+                if len(full_text.strip()) < 100:
+                    try:
+                        full_text = await _ocr_pdf_to_text(tmp_path)
+                    except Exception as ocr_err:
+                        logger.warning("OCR pipeline failed: %s", ocr_err)
+                raw_transactions = _parse_pdf_text(full_text, detected_bank)
+
+    # Kein Parser hat gegriffen — unbekanntes Format. Jetzt das KI-Modell.
+    if raw_transactions or ai is None or not ai.enabled:
+        return detected_bank, raw_transactions, False
+
+    if len(full_text.strip()) < 100:
+        try:
+            full_text = await _ocr_pdf_to_text(tmp_path)
+        except Exception as ocr_err:
+            logger.warning("OCR before AI extraction failed: %s", ocr_err)
+
+    logger.info("Kein Parser passte — KI-Extraktion über %s.", ai.provider)
+    ai_rows = await pdf_ai_extract.extract_transactions(
+        ai, full_text, hints, currency=currency
+    )
+    return detected_bank, ai_rows, bool(ai_rows)
+
+
 @router.post("/pdf/preview", response_model=PdfPreviewResponse)
 async def preview_pdf_import(
     file: UploadFile = File(...),
@@ -807,91 +910,12 @@ async def preview_pdf_import(
         tmp.write(content)
         tmp_path = tmp.name
 
+    ai_cfg = ai_client.from_user(current_user)
+    hints = await load_category_hints(db, current_user.id)
     try:
-        import pdfplumber
-        from app.services.import_parsers.comdirect_pdf import (
-            is_comdirect_pdf,
-            parse_comdirect_pdf_tables,
-            parse_comdirect_pdf_text,
-            parse_comdirect_pdf_words,
+        detected_bank, raw_transactions, used_ai = await _extract_pdf_rows(
+            tmp_path, bank, ai=ai_cfg, hints=hints
         )
-        from app.services.import_parsers.n26_pdf import (
-            is_n26_web_pdf,
-            parse_n26_web_pdf,
-        )
-        from app.services.import_parsers.ubs_creditcard_pdf import (
-            is_ubs_creditcard_pdf,
-            parse_ubs_creditcard_pdf,
-        )
-
-        with pdfplumber.open(tmp_path) as pdf:
-            full_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
-
-            # Auto-detect bank format
-            _is_n26_web = (bank or "").lower() == "n26" or (
-                not bank and is_n26_web_pdf(full_text)
-            )
-            _is_comdirect = not _is_n26_web and (
-                (bank or "").lower() == "comdirect"
-                or (not bank and is_comdirect_pdf(full_text))
-            )
-            _is_ubs_cc = (
-                not _is_n26_web
-                and not _is_comdirect
-                and (
-                    (bank or "").lower() == "ubs_cc"
-                    or (not bank and is_ubs_creditcard_pdf(full_text))
-                )
-            )
-
-            if _is_n26_web:
-                detected_bank = "n26"
-                raw_transactions = parse_n26_web_pdf(pdf)
-                logger.info(
-                    "N26 web PDF: parser yielded %d rows.", len(raw_transactions)
-                )
-            elif _is_comdirect:
-                detected_bank = "comdirect"
-                # 1st choice: pdfplumber table extraction (precise column mapping)
-                raw_transactions = parse_comdirect_pdf_tables(pdf)
-                if raw_transactions:
-                    logger.info(
-                        "comdirect PDF: table extraction yielded %d rows.",
-                        len(raw_transactions),
-                    )
-                else:
-                    # 2nd choice: word-position-based extraction (column-aware, handles +amounts)
-                    raw_transactions = parse_comdirect_pdf_words(pdf)
-                    if raw_transactions:
-                        logger.info(
-                            "comdirect PDF: word-position parser yielded %d rows.",
-                            len(raw_transactions),
-                        )
-                    else:
-                        # 3rd choice: text-based regex extraction (last resort)
-                        if len(full_text.strip()) < 100:
-                            full_text = await _ocr_pdf_to_text(tmp_path)
-                        raw_transactions = parse_comdirect_pdf_text(full_text)
-                        logger.info(
-                            "comdirect PDF: text fallback yielded %d rows.",
-                            len(raw_transactions),
-                        )
-            elif _is_ubs_cc:
-                detected_bank = "ubs_cc"
-                raw_transactions = parse_ubs_creditcard_pdf(pdf)
-                logger.info(
-                    "UBS credit card PDF: parser yielded %d rows.",
-                    len(raw_transactions),
-                )
-            else:
-                detected_bank = bank or "ubs"
-                # 1st choice: structured UBS table extraction
-                raw_transactions = _parse_ubs_pdf_tables(pdf)
-                if not raw_transactions:
-                    # 2nd choice: text extraction + two-date regex parser
-                    if len(full_text.strip()) < 100:
-                        full_text = await _ocr_pdf_to_text(tmp_path)
-                    raw_transactions = _parse_pdf_text(full_text, detected_bank)
     finally:
         os.unlink(tmp_path)
 
@@ -972,10 +996,14 @@ async def preview_pdf_import(
                     if notes_val
                     else description_val
                 )
-                cat_result = await categorization_service.categorize(
-                    cat_hint, ai_client.from_user(current_user)
-                )
-                preview_category = cat_result.get("category") or None
+                # Hat die KI-Extraktion schon eine Kategorie geliefert, gilt die —
+                # sie kannte den vollen Beleg-Kontext, nicht nur den Buchungstext
+                preview_category = str(row.get("category") or "").strip() or None
+                if not preview_category:
+                    cat_result = await categorization_service.categorize(
+                        cat_hint, ai_cfg, hints
+                    )
+                    preview_category = cat_result.get("category") or None
             except Exception:
                 pass
 
@@ -1010,6 +1038,7 @@ async def preview_pdf_import(
         total_rows=len(rows),
         parsed_rows=parsed_rows,
         error_rows=error_rows,
+        ai_extracted=used_ai,
     )
 
 
@@ -1033,6 +1062,8 @@ async def confirm_pdf_import(
     if not account:
         raise HTTPException(status_code=404, detail="Account not found.")
 
+    ai_cfg = ai_client.from_user(current_user)
+    hints = await load_category_hints(db, current_user.id)
     imported = 0
     skipped = 0
     failed = 0
@@ -1140,7 +1171,7 @@ async def confirm_pdf_import(
                 confidence_score = None
                 if not category:
                     cat_result = await categorization_service.categorize(
-                        description, ai_client.from_user(current_user)
+                        description, ai_cfg, hints
                     )
                     category = cat_result["category"]
                     confidence_score = cat_result["confidence_score"]
@@ -1185,7 +1216,7 @@ async def confirm_pdf_import(
             confidence_score = None
             if not category:
                 cat_result = await categorization_service.categorize(
-                    description, ai_client.from_user(current_user)
+                    description, ai_cfg, hints
                 )
                 category = cat_result["category"]
                 confidence_score = cat_result["confidence_score"]
@@ -1285,71 +1316,12 @@ async def import_pdf(
         tmp.write(content)
         tmp_path = tmp.name
 
-    raw_transactions = []
+    ai_cfg = ai_client.from_user(current_user)
+    hints = await load_category_hints(db, current_user.id)
     try:
-        import pdfplumber
-        from app.services.import_parsers.comdirect_pdf import (
-            is_comdirect_pdf,
-            parse_comdirect_pdf_tables,
-            parse_comdirect_pdf_text,
-            parse_comdirect_pdf_words,
+        _detected_bank, raw_transactions, _used_ai = await _extract_pdf_rows(
+            tmp_path, bank, ai=ai_cfg, hints=hints
         )
-        from app.services.import_parsers.n26_pdf import (
-            is_n26_web_pdf,
-            parse_n26_web_pdf,
-        )
-        from app.services.import_parsers.ubs_creditcard_pdf import (
-            is_ubs_creditcard_pdf,
-            parse_ubs_creditcard_pdf,
-        )
-
-        with pdfplumber.open(tmp_path) as pdf:
-            full_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
-
-            _is_n26_web = (bank or "").lower() == "n26" or (
-                not bank and is_n26_web_pdf(full_text)
-            )
-            _is_comdirect = not _is_n26_web and (
-                (bank or "").lower() == "comdirect"
-                or (not bank and is_comdirect_pdf(full_text))
-            )
-            _is_ubs_cc = (
-                not _is_n26_web
-                and not _is_comdirect
-                and (
-                    (bank or "").lower() == "ubs_cc"
-                    or (not bank and is_ubs_creditcard_pdf(full_text))
-                )
-            )
-
-            if _is_n26_web:
-                raw_transactions = parse_n26_web_pdf(pdf)
-                logger.info(
-                    "N26 web PDF: parser yielded %d rows.", len(raw_transactions)
-                )
-            elif _is_comdirect:
-                raw_transactions = parse_comdirect_pdf_tables(pdf)
-                if not raw_transactions:
-                    raw_transactions = parse_comdirect_pdf_words(pdf)
-                if not raw_transactions:
-                    raw_transactions = parse_comdirect_pdf_text(full_text)
-            elif _is_ubs_cc:
-                raw_transactions = parse_ubs_creditcard_pdf(pdf)
-                logger.info(
-                    "UBS credit card PDF: parser yielded %d rows.",
-                    len(raw_transactions),
-                )
-            else:
-                # UBS (default)
-                raw_transactions = _parse_ubs_pdf_tables(pdf)
-                if not raw_transactions:
-                    if len(full_text.strip()) < 100:
-                        try:
-                            full_text = await _ocr_pdf_to_text(tmp_path)
-                        except Exception as ocr_err:
-                            logger.warning("OCR pipeline failed: %s", ocr_err)
-                    raw_transactions = _parse_pdf_text(full_text, bank or "ubs")
-
     finally:
         os.unlink(tmp_path)
 
@@ -1369,14 +1341,17 @@ async def import_pdf(
                 str(raw.get("description", "")),
             )
 
-            dup_result = await db.execute(
-                select(Transaction.id).where(
-                    Transaction.account_id == account_id,
-                    Transaction.import_hash == import_hash,
-                    Transaction.is_deleted.isnot(True),
-                )
-            )
-            if dup_result.scalar_one_or_none():
+            # Nicht nur der Hash: KI-extrahierte Buchungstexte weichen von dem
+            # ab, was ein Parser gespeichert haette, und wuerden sonst als neue
+            # Buchung durchgehen (siehe pdf_duplicate_detection, Stufe 3)
+            if await find_database_duplicate_transaction_id(
+                db,
+                account_id,
+                _date_str_for_import_hash(raw.get("date")),
+                float(raw.get("amount", 0)),
+                str(raw.get("description", "")),
+                import_hash,
+            ):
                 skipped += 1
                 continue
 
@@ -1388,7 +1363,7 @@ async def import_pdf(
                 else raw.get("description", "")
             )
             cat_result = await categorization_service.categorize(
-                _cat_text, ai_client.from_user(current_user)
+                _cat_text, ai_cfg, hints
             )
 
             raw_dt = raw["date"]

@@ -2,11 +2,11 @@
 AI-based transaction categorization service.
 
 Pipeline (in order of priority):
-1. Manual override cache (exact match)
-2. Rule-based keyword matching (MERCHANT_RULES)
-3. Fuzzy string matching with rapidfuzz
-4. Sentence-transformer embedding similarity (all-MiniLM-L6-v2)
-5. LLM fallback über den vom Nutzer gewählten Provider (services/ai_client.py)
+0. Vom Nutzer bestätigte Zuordnung aus der Historie (services/user_history.py)
+1. Rule-based keyword matching (MERCHANT_RULES)
+2. Fuzzy string matching with rapidfuzz
+3. Sentence-transformer embedding similarity (all-MiniLM-L6-v2)
+4. LLM fallback über den vom Nutzer gewählten Provider (services/ai_client.py)
 
 Returns: {"category", "subcategory", "merchant_normalized", "confidence_score"}
 """
@@ -19,6 +19,7 @@ from functools import lru_cache
 from typing import Dict, Optional, Tuple
 
 from app.services import ai_client
+from app.services.user_history import CategoryHints
 
 logger = logging.getLogger(__name__)
 
@@ -486,7 +487,10 @@ class CategorizationService:
         return None
 
     async def _llm_fallback(
-        self, description: str, ai: Optional["ai_client.AiConfig"] = None
+        self,
+        description: str,
+        ai: Optional["ai_client.AiConfig"] = None,
+        hints: Optional["CategoryHints"] = None,
     ) -> Optional[Tuple[str, str, str, float]]:
         """Letzte Stufe: das vom Nutzer gewählte KI-Modell klassifizieren lassen.
 
@@ -503,6 +507,15 @@ class CategorizationService:
             f'Antworte ausschliesslich mit JSON: {{"category": "...", "subcategory": "...", "merchant": "..."}}. '
             f"Kategorie und Unterkategorie auf Deutsch. Bei Unklarheit: 'Sonstiges'."
         )
+
+        # Bisherige Zuordnungen des Nutzers als Few-Shot-Kontext — damit das
+        # Modell seine Gewohnheiten trifft statt plausibler Eigenerfindungen
+        if hints is not None:
+            examples = hints.prompt_examples()
+            if examples:
+                system += "\n\nSo hat der Nutzer bisher zugeordnet:\n" + "\n".join(
+                    f"- {merchant} → {category}" for merchant, category in examples
+                )
 
         raw = await ai_client.complete(
             ai,
@@ -531,13 +544,17 @@ class CategorizationService:
         return EN_TO_DE_CATEGORY.get(category.lower(), category)
 
     async def categorize(
-        self, description: str, ai: Optional["ai_client.AiConfig"] = None
+        self,
+        description: str,
+        ai: Optional["ai_client.AiConfig"] = None,
+        hints: Optional["CategoryHints"] = None,
     ) -> Dict:
         """
         Run the full categorization pipeline.
 
-        `ai` ist die Provider-Auswahl des Nutzers (ai_client.from_user(user)).
-        Sie wird pro Aufruf durchgereicht statt am Service gehalten — der
+        `ai` ist die Provider-Auswahl des Nutzers (ai_client.from_user(user)),
+        `hints` seine bisherigen Zuordnungen (user_history.load_category_hints).
+        Beide werden pro Aufruf durchgereicht statt am Service gehalten — der
         Service ist ein Modul-Singleton, das sich parallele Requests teilen.
 
         Returns:
@@ -557,6 +574,18 @@ class CategorizationService:
             }
 
         cleaned = self._normalize_description(description)
+
+        # 0. Bestätigte Zuordnung aus der eigenen Historie — schlägt alles
+        # andere, weil der Nutzer sie selbst so gesetzt hat
+        if hints is not None:
+            known = hints.lookup_confirmed(cleaned) or hints.lookup_confirmed(description)
+            if known:
+                return {
+                    "category": known,
+                    "subcategory": "",
+                    "merchant_normalized": cleaned[:50] if cleaned else description[:50],
+                    "confidence_score": 0.99,
+                }
 
         # 1. Rule-based
         result = self._rule_based(cleaned)
@@ -593,7 +622,7 @@ class CategorizationService:
                 }
 
         # 4. LLM-Fallback über den gewählten Provider
-        llm_result = await self._llm_fallback(description, ai)
+        llm_result = await self._llm_fallback(description, ai, hints)
         if llm_result:
             cat, subcat, merchant, conf = llm_result
             return {
