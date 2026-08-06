@@ -24,6 +24,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.models import Account, ImportLog, ImportStatus, Transaction, User
+from app.services import ai_client
 from app.services.categorization import CategorizationService
 from app.services.import_parsers.comdirect import ComdirectParser
 from app.services.import_parsers.n26 import N26Parser
@@ -611,7 +612,7 @@ async def import_csv(
 
             # Categorize
             cat_result = await categorization_service.categorize(
-                raw.get("description", "")
+                raw.get("description", ""), ai_client.from_user(current_user)
             )
 
             raw_dt = raw["date"]
@@ -971,7 +972,9 @@ async def preview_pdf_import(
                     if notes_val
                     else description_val
                 )
-                cat_result = await categorization_service.categorize(cat_hint)
+                cat_result = await categorization_service.categorize(
+                    cat_hint, ai_client.from_user(current_user)
+                )
                 preview_category = cat_result.get("category") or None
             except Exception:
                 pass
@@ -1136,7 +1139,9 @@ async def confirm_pdf_import(
                 category = row.category
                 confidence_score = None
                 if not category:
-                    cat_result = await categorization_service.categorize(description)
+                    cat_result = await categorization_service.categorize(
+                        description, ai_client.from_user(current_user)
+                    )
                     category = cat_result["category"]
                     confidence_score = cat_result["confidence_score"]
                 else:
@@ -1179,7 +1184,9 @@ async def confirm_pdf_import(
             category = row.category
             confidence_score = None
             if not category:
-                cat_result = await categorization_service.categorize(description)
+                cat_result = await categorization_service.categorize(
+                    description, ai_client.from_user(current_user)
+                )
                 category = cat_result["category"]
                 confidence_score = cat_result["confidence_score"]
 
@@ -1380,7 +1387,9 @@ async def import_pdf(
                 if _cat_notes
                 else raw.get("description", "")
             )
-            cat_result = await categorization_service.categorize(_cat_text)
+            cat_result = await categorization_service.categorize(
+                _cat_text, ai_client.from_user(current_user)
+            )
 
             raw_dt = raw["date"]
             txn_dt = (

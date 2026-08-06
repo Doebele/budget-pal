@@ -197,21 +197,21 @@ class TestCategorizePipeline:
             "_embedding_classify",
             return_value=("Freizeit & Unterhaltung", "", "x", 0.3),
         ), patch.object(
-            service, "_openai_fallback", return_value=None
+            service, "_llm_fallback", return_value=None
         ):
             result = await service.categorize("Unklare Buchung")
         # Confidence below 0.5 → falls through to default
         assert result["category"] == "Sonstiges"
         assert result["confidence_score"] == 0.1
 
-    async def test_openai_fallback_used_when_all_else_fails(self, service):
+    async def test_llm_fallback_used_when_all_else_fails(self, service):
         with patch.object(service, "_rule_based", return_value=None), patch.object(
             service, "_fuzzy_match", return_value=None
         ), patch.object(
             service, "_embedding_classify", return_value=None
         ), patch.object(
             service,
-            "_openai_fallback",
+            "_llm_fallback",
             return_value=("Reisen", "Flug", "Swiss", 0.75),
         ):
             result = await service.categorize("LX1612 ZRH-LHR")
@@ -224,7 +224,7 @@ class TestCategorizePipeline:
         ), patch.object(
             service, "_embedding_classify", return_value=None
         ), patch.object(
-            service, "_openai_fallback", return_value=None
+            service, "_llm_fallback", return_value=None
         ):
             result = await service.categorize("Völlig unbekannte Buchung")
         assert result["category"] == "Sonstiges"
@@ -241,19 +241,19 @@ class TestEdgeCases:
 
     async def test_very_long_description(self, service):
         with patch.object(service, "_embedding_classify", return_value=None), \
-             patch.object(service, "_openai_fallback", return_value=None):
+             patch.object(service, "_llm_fallback", return_value=None):
             result = await service.categorize("A" * 10000)
         assert "category" in result
 
     async def test_special_characters(self, service):
         with patch.object(service, "_embedding_classify", return_value=None), \
-             patch.object(service, "_openai_fallback", return_value=None):
+             patch.object(service, "_llm_fallback", return_value=None):
             result = await service.categorize("@#$%^&*()")
         assert "category" in result
 
     async def test_number_only_description(self, service):
         with patch.object(service, "_embedding_classify", return_value=None), \
-             patch.object(service, "_openai_fallback", return_value=None):
+             patch.object(service, "_llm_fallback", return_value=None):
             result = await service.categorize("12345")
         assert "category" in result
 

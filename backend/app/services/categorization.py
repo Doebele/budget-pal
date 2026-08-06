@@ -6,18 +6,33 @@ Pipeline (in order of priority):
 2. Rule-based keyword matching (MERCHANT_RULES)
 3. Fuzzy string matching with rapidfuzz
 4. Sentence-transformer embedding similarity (all-MiniLM-L6-v2)
-5. OpenAI GPT-4o-mini fallback (if API key configured and confidence still low)
+5. LLM fallback über den vom Nutzer gewählten Provider (services/ai_client.py)
 
 Returns: {"category", "subcategory", "merchant_normalized", "confidence_score"}
 """
 
+import json
 import logging
 import re
 import threading
 from functools import lru_cache
 from typing import Dict, Optional, Tuple
 
+from app.services import ai_client
+
 logger = logging.getLogger(__name__)
+
+_JSON_OBJECT_RE = re.compile(r"\{.*\}", re.S)
+
+
+def _extract_json_object(raw: str) -> str:
+    """Das JSON-Objekt aus einer Modellantwort schneiden.
+
+    Lokale Modelle halten sich oft nicht an json_mode und verpacken die Antwort
+    in ```json-Fences oder Fliesstext. Nimmt die äusserste {...}-Gruppe.
+    """
+    match = _JSON_OBJECT_RE.search(raw or "")
+    return match.group(0) if match else (raw or "")
 
 # ── Normalisierungstabelle: Englisch → Deutsch ─────────────────
 # Wird beim Startup als DB-Migration genutzt und in der Pipeline
@@ -348,7 +363,6 @@ class CategorizationService:
     def __init__(self):
         self._embedding_model = None
         self._category_embeddings = None
-        self._openai_client = None
         self._model_lock = threading.Lock()
 
     def _get_embedding_model(self):
@@ -471,63 +485,60 @@ class CategorizationService:
 
         return None
 
-    async def _openai_fallback(
-        self, description: str
+    async def _llm_fallback(
+        self, description: str, ai: Optional["ai_client.AiConfig"] = None
     ) -> Optional[Tuple[str, str, str, float]]:
-        """Use OpenAI GPT as last resort categorizer."""
-        from app.core.config import settings
+        """Letzte Stufe: das vom Nutzer gewählte KI-Modell klassifizieren lassen.
 
-        if not settings.openai_enabled:
+        Ohne konfigurierten Provider fällt die Stufe still aus — die Pipeline
+        landet dann beim 'Sonstiges'-Default.
+        """
+        if ai is None or not ai.enabled:
+            return None
+
+        categories_list = ", ".join(CATEGORY_DESCRIPTIONS.keys())
+        system = (
+            f"Du bist ein Klassifikator für Schweizer Finanztransaktionen. "
+            f"Ordne die Transaktion einer der folgenden deutschen Kategorien zu: {categories_list}. "
+            f'Antworte ausschliesslich mit JSON: {{"category": "...", "subcategory": "...", "merchant": "..."}}. '
+            f"Kategorie und Unterkategorie auf Deutsch. Bei Unklarheit: 'Sonstiges'."
+        )
+
+        raw = await ai_client.complete(
+            ai,
+            system,
+            f"Transaktion: {description}",
+            max_tokens=200,
+            json_mode=True,
+        )
+        if not raw:
             return None
 
         try:
-            import openai
-
-            if self._openai_client is None:
-                self._openai_client = openai.AsyncOpenAI(
-                    api_key=settings.openai_api_key
-                )
-
-            categories_list = ", ".join(CATEGORY_DESCRIPTIONS.keys())
-            response = await self._openai_client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            f"Du bist ein Klassifikator für Schweizer Finanztransaktionen. "
-                            f"Ordne die Transaktion einer der folgenden deutschen Kategorien zu: {categories_list}. "
-                            f'Antworte mit JSON: {{"category": "...", "subcategory": "...", "merchant": "..."}}. '
-                            f"Kategorie und Unterkategorie auf Deutsch. Bei Unklarheit: 'Sonstiges'."
-                        ),
-                    },
-                    {"role": "user", "content": f"Transaktion: {description}"},
-                ],
-                temperature=0,
-                max_tokens=100,
-                response_format={"type": "json_object"},
-            )
-
-            import json
-
-            result = json.loads(response.choices[0].message.content)
-            category = result.get("category", "Sonstiges")
-            subcategory = result.get("subcategory", "")
-            merchant = result.get("merchant", description[:50])
-            return category, subcategory, merchant, 0.75
-
-        except Exception as e:
-            logger.warning(f"OpenAI fallback failed: {e}")
+            result = json.loads(_extract_json_object(raw))
+        except (ValueError, TypeError) as e:
+            logger.warning(f"KI-Antwort war kein gültiges JSON: {e}")
             return None
+
+        category = result.get("category") or "Sonstiges"
+        subcategory = result.get("subcategory") or ""
+        merchant = result.get("merchant") or description[:50]
+        return category, subcategory, merchant, 0.75
 
     @staticmethod
     def normalize_category(category: str) -> str:
         """Normalisiert einen Kategorienamen auf Deutsch (Legacy-Mapping)."""
         return EN_TO_DE_CATEGORY.get(category.lower(), category)
 
-    async def categorize(self, description: str) -> Dict:
+    async def categorize(
+        self, description: str, ai: Optional["ai_client.AiConfig"] = None
+    ) -> Dict:
         """
         Run the full categorization pipeline.
+
+        `ai` ist die Provider-Auswahl des Nutzers (ai_client.from_user(user)).
+        Sie wird pro Aufruf durchgereicht statt am Service gehalten — der
+        Service ist ein Modul-Singleton, das sich parallele Requests teilen.
 
         Returns:
             {
@@ -581,10 +592,10 @@ class CategorizationService:
                     "confidence_score": conf,
                 }
 
-        # 4. OpenAI fallback
-        openai_result = await self._openai_fallback(description)
-        if openai_result:
-            cat, subcat, merchant, conf = openai_result
+        # 4. LLM-Fallback über den gewählten Provider
+        llm_result = await self._llm_fallback(description, ai)
+        if llm_result:
+            cat, subcat, merchant, conf = llm_result
             return {
                 "category": cat,
                 "subcategory": subcat,

@@ -96,6 +96,10 @@ class User(Base):
     saron_reference_annual_pct: Mapped[float] = mapped_column(Float, default=0.5, nullable=False)
     # Per-user hidden canonical taxonomy labels (JSON: {"sc_id:txn": [...], "sc_id:wl": [...]})
     taxonomy_hidden_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Per-user AI provider/model selection — see services/ai_client.py::AiConfig.
+    # Holds API keys, so it is never returned raw by the API (keys are masked to
+    # a has_* boolean). NULL means "no AI configured" (provider "none").
+    ai_config_json: Mapped[Optional[dict]] = mapped_column(PortableJSON, nullable=True)
 
     # Relationships
     accounts: Mapped[List["Account"]] = relationship("Account", back_populates="user", cascade="all, delete-orphan")

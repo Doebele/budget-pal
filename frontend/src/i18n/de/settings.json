@@ -17,5 +17,31 @@
     "accentEmerald": "Smaragd",
     "accentAmber": "Bernstein",
     "accentRose": "Rosé"
+  },
+  "ai": {
+    "title": "KI-Modell",
+    "subtitle": "Anbieter und Modell für Import-Auswertung, automatische Kategorisierung und Analysen",
+    "provider": "Anbieter",
+    "providerNone": "Aus",
+    "providerNoneHint": "Ohne Anbieter nutzt Budget-Pal nur Regeln, Fuzzy-Matching und lokale Embeddings — die KI-Stufe entfällt.",
+    "recommended": "empfohlen",
+    "model": "Modell",
+    "modelPlaceholder": "Modellname",
+    "apiKey": "API-Key",
+    "apiKeySaved": "Gespeichert — leer lassen, um ihn zu behalten",
+    "apiKeyClear": "Löschen",
+    "show": "Zeigen",
+    "hide": "Verbergen",
+    "serverUrl": "Server-URL",
+    "serverUrlHint": "localhost wird im Container automatisch zu host.docker.internal",
+    "testConnection": "Verbindung testen",
+    "modelsFound_one": "{{count}} Modell gefunden",
+    "modelsFound_other": "{{count}} Modelle gefunden",
+    "modelsUnreachable": "Server nicht erreichbar",
+    "modelsIdle": "Zum Laden auf Aktualisieren klicken",
+    "save": "Speichern",
+    "saving": "Speichern …",
+    "saved": "Gespeichert",
+    "saveError": "Speichern fehlgeschlagen"
   }
 }
