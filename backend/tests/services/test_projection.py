@@ -176,7 +176,7 @@ class TestMonteCarloSimulation:
         """Test that inflation adjustment works correctly."""
         result = self.service.run(
             current_net_worth=100000.0,
-            annual_savings=10000.0,
+            annual_savings=0.0,
             annual_income=80000.0,
             years=10,
             mean_return=0.0,
@@ -187,7 +187,8 @@ class TestMonteCarloSimulation:
             runs=100,
         )
 
-        # With zero return and positive inflation, real value should decrease
+        # With zero return, zero savings and positive inflation,
+        # real value should decrease
         assert result["p50"][-1] < result["p50"][0]
 
     def test_monte_carlo_no_inflation(self):
@@ -291,6 +292,7 @@ class TestAHVPension:
                 "average_insured_salary": 80000.0,
             },
             annual_income=80000.0,
+            current_age=66,
         )
 
         # With 44 years (full), should get max pension
@@ -307,6 +309,7 @@ class TestAHVPension:
                 "average_insured_salary": 80000.0,
             },
             annual_income=80000.0,
+            current_age=66,
         )
 
         # With 1 year, should get approximately min pension proportional
@@ -319,6 +322,7 @@ class TestAHVPension:
             retirement_age=65,
             record=None,
             annual_income=80000.0,
+            current_age=66,
         )
 
         # Should still return a value based on defaults
@@ -334,6 +338,7 @@ class TestAHVPension:
                 "average_insured_salary": 200000.0,  # Very high salary
             },
             annual_income=200000.0,
+            current_age=70,
         )
 
         # Should not exceed max pension
@@ -474,9 +479,13 @@ class TestPillar3aProjection:
             years_elapsed=0,
         )
 
-        # Should be annuitized over 20 years
-        expected_annual = 50000.0 / 20.0
-        assert abs(balance - expected_annual) < 100.0  # Allow some variance
+        # Annuitized over PAYOUT_YEARS with residual return during payout:
+        # annual = balance × r / (1 − (1+r)^−years)
+        from app.services.projection import PAYOUT_RESIDUAL_RATE, PAYOUT_YEARS
+
+        r = PAYOUT_RESIDUAL_RATE
+        expected_annual = 50000.0 * r / (1 - (1 + r) ** -PAYOUT_YEARS)
+        assert balance == pytest.approx(expected_annual, rel=1e-6)
 
     def test_3a_compound_growth(self):
         """Test 3a compound growth before retirement."""

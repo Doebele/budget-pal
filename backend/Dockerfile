@@ -65,6 +65,9 @@ COPY --chown=appuser:appuser backend/app/ ./app/
 COPY --chown=appuser:appuser backend/alembic/ ./alembic/
 COPY --chown=appuser:appuser backend/alembic.ini ./alembic.ini
 COPY --chown=appuser:appuser backend/start.sh ./start.sh
+# Tests + pytest config (needed for `make test-backend` inside the container)
+COPY --chown=appuser:appuser backend/tests/ ./tests/
+COPY --chown=appuser:appuser backend/pytest.ini ./pytest.ini
 RUN chmod +x ./start.sh
 # Shared taxonomy (must be at /shared/taxonomy.json — resolved by core/taxonomy.py)
 COPY --chown=appuser:appuser shared/taxonomy.json /shared/taxonomy.json

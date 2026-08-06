@@ -18,7 +18,7 @@ import json
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status, BackgroundTasks
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_, desc, tuple_
+from sqlalchemy import select, func, and_, or_, desc, tuple_, inspect as sa_inspect
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
@@ -271,8 +271,16 @@ def _transaction_to_response(txn: Transaction, user: User, rates: Dict[str, floa
         created_at=txn.created_at,
         parent_id=txn.parent_id,
         is_split=txn.is_split,
-        split_count=len(txn.split_children) if txn.split_children else 0,
+        split_count=_split_count(txn),
     )
+
+
+def _split_count(txn: Transaction) -> int:
+    # Accessing an unloaded relationship would trigger lazy-load IO,
+    # which raises MissingGreenlet in async sessions
+    if "split_children" in sa_inspect(txn).unloaded:
+        return 0
+    return len(txn.split_children) if txn.split_children else 0
 
 
 async def get_user_transaction(
@@ -293,7 +301,7 @@ async def get_user_transaction(
         select(Transaction)
         .join(Account)
         .where(and_(*filters))
-        .options(selectinload(Transaction.account))
+        .options(selectinload(Transaction.account), selectinload(Transaction.split_children))
     )
     txn = result.scalar_one_or_none()
     if not txn:
@@ -315,7 +323,7 @@ async def get_user_archived_transaction(
             Account.user_id == current_user.id,
             Transaction.is_deleted.is_(True),
         )
-        .options(selectinload(Transaction.account))
+        .options(selectinload(Transaction.account), selectinload(Transaction.split_children))
     )
     txn = result.scalar_one_or_none()
     if not txn:
@@ -395,6 +403,8 @@ async def restore_transaction(
     txn.deleted_at = None
     await db.flush()
     await db.refresh(txn)
+    # refresh() expires the eager-loaded relationship — reload it for split_count
+    await db.refresh(txn, ["split_children"])
     await record_activity(
         db,
         user_id=current_user.id,
@@ -630,6 +640,8 @@ async def update_transaction(
 
     await db.flush()
     await db.refresh(txn)
+    # refresh() expires the eager-loaded relationship — reload it for split_count
+    await db.refresh(txn, ["split_children"])
 
     rates = await currency_service.get_rates("EUR")
     return _transaction_to_response(txn, current_user, rates)

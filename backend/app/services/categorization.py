@@ -412,7 +412,7 @@ class CategorizationService:
     def _fuzzy_match(self, description: str) -> Optional[Tuple[str, str, str, float]]:
         """Try fuzzy string matching against merchant names in rules."""
         try:
-            from rapidfuzz import fuzz, process
+            from rapidfuzz import fuzz, process, utils
         except ImportError:
             return None
 
@@ -423,6 +423,9 @@ class CategorizationService:
             description,
             merchant_names,
             scorer=fuzz.token_set_ratio,
+            # case-insensitive: the pipeline passes uppercased descriptions,
+            # merchant names are mixed-case
+            processor=utils.default_process,
         )
 
         if score >= 85:
