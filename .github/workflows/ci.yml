@@ -25,9 +25,11 @@ jobs:
           # Quoten ist Pflicht: ":memory:" endet auf einem Doppelpunkt am
           # Zeilenende, was YAML als Mapping-Indikator liest
           DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          # Default ist /app/data/uploads (Pfad im Container). Auf dem Runner
-          # gibt es kein /app, und der Startup legt das Verzeichnis an.
+          # Defaults zeigen nach /app/... (Pfade im Container). Auf dem Runner
+          # gibt es kein /app, und _ensure_app_data_subdirs() legt sie beim
+          # Startup an — sonst PermissionError in jedem Test, der die App startet.
           UPLOADS_DIR: "${{ runner.temp }}/uploads"
+          RATES_CACHE_PATH: "${{ runner.temp }}/cache/rates.json"
         run: pytest tests -q
 
   frontend-build:
