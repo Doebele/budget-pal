@@ -791,6 +791,30 @@ async def _ocr_pdf_to_text(tmp_path: str) -> str:
         return full_text
 
 
+# Echte Buchungstexte sind kurz. Ist einer laenger, hat der Regex-Parser
+# mehrere Zeilen (oder den ganzen Auszug) zu einer Zeile verschmolzen.
+MAX_PLAUSIBLE_DESCRIPTION = 200
+
+
+def _rows_look_implausible(rows: List[dict]) -> bool:
+    """Sieht die Ausgabe des Auffang-Parsers nach Unsinn aus?
+
+    Der generische Regex-Parser greift bei unbekannten Formaten gelegentlich
+    auf einer Kopfzeile ("Auszug fuer den Zeitraum X bis Y") und liefert dann
+    eine einzige Sammelzeile: ganzer Text als Beschreibung, Betrag 0. Solche
+    Ausgabe ist schlechter als gar keine, weil sie den KI-Fallback verhindert
+    und als echte Buchung importiert wuerde.
+    """
+    if not rows:
+        return True
+    if all(abs(float(row.get("amount") or 0)) < 0.005 for row in rows):
+        return True
+    return any(
+        len(str(row.get("description") or "")) > MAX_PLAUSIBLE_DESCRIPTION
+        for row in rows
+    )
+
+
 async def _extract_pdf_rows(
     tmp_path: str,
     bank: Optional[str],
@@ -870,8 +894,16 @@ async def _extract_pdf_rows(
                         logger.warning("OCR pipeline failed: %s", ocr_err)
                 raw_transactions = _parse_pdf_text(full_text, detected_bank)
 
-    # Kein Parser hat gegriffen — unbekanntes Format. Jetzt das KI-Modell.
-    if raw_transactions or ai is None or not ai.enabled:
+    # Hat ein Detektor angeschlagen oder hat der Nutzer die Bank vorgegeben,
+    # gilt das Ergebnis des zustaendigen Parsers. Sonst war der else-Zweig nur
+    # der Auffangversuch mit dem UBS-Parser — dessen Ausgabe muss sich erst
+    # als plausibel erweisen, bevor wir sie fuer bare Muenze nehmen.
+    format_known = bool(forced) or _is_n26_web or _is_comdirect or _is_ubs_cc
+    parser_failed = not raw_transactions or (
+        not format_known and _rows_look_implausible(raw_transactions)
+    )
+
+    if not parser_failed or ai is None or not ai.enabled:
         return detected_bank, raw_transactions, False
 
     if len(full_text.strip()) < 100:
@@ -880,11 +912,20 @@ async def _extract_pdf_rows(
         except Exception as ocr_err:
             logger.warning("OCR before AI extraction failed: %s", ocr_err)
 
-    logger.info("Kein Parser passte — KI-Extraktion über %s.", ai.provider)
+    logger.info(
+        "Kein Parser passte (%d unbrauchbare Zeilen verworfen) — KI-Extraktion über %s.",
+        len(raw_transactions),
+        ai.provider,
+    )
     ai_rows = await pdf_ai_extract.extract_transactions(
         ai, full_text, hints, currency=currency
     )
-    return detected_bank, ai_rows, bool(ai_rows)
+    # Nur ersetzen, wenn die KI etwas geliefert hat — sonst bleibt die
+    # (unbrauchbare) Parser-Ausgabe, damit der Nutzer wenigstens sieht, dass
+    # etwas gelesen wurde
+    if ai_rows:
+        return detected_bank, ai_rows, True
+    return detected_bank, raw_transactions, False
 
 
 @router.post("/pdf/preview", response_model=PdfPreviewResponse)
