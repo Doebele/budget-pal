@@ -159,6 +159,9 @@ class PdfPreviewResponse(BaseModel):
     # kann die UI dann "Dokument enthaelt keine Buchungen" von "Format nicht
     # erkannt, kein KI-Modell konfiguriert" unterscheiden.
     ai_attempted: bool = False
+    # Welches Modell die Zeilen gelesen hat und wie viele Tokens es gekostet hat
+    ai_model: str = ""
+    ai_tokens: int = 0
 
 
 class PdfImportConfirmRequest(BaseModel):
@@ -831,6 +834,8 @@ class PdfExtraction(NamedTuple):
     rows: List[dict]
     ai_extracted: bool = False
     ai_attempted: bool = False
+    ai_model: str = ""
+    ai_tokens: int = 0
 
 
 async def _extract_pdf_rows(
@@ -934,15 +939,22 @@ async def _extract_pdf_rows(
         len(raw_transactions),
         ai.provider,
     )
-    ai_rows = await pdf_ai_extract.extract_transactions(
+    result = await pdf_ai_extract.extract_transactions(
         ai, full_text, hints, currency=currency
+    )
+    ai_rows, ai_meta = result.rows, dict(
+        ai_model=result.model, ai_tokens=result.total_tokens
     )
     # Nur ersetzen, wenn die KI etwas geliefert hat — sonst bleibt die
     # (unbrauchbare) Parser-Ausgabe, damit der Nutzer wenigstens sieht, dass
     # etwas gelesen wurde
     if ai_rows:
-        return PdfExtraction(detected_bank, ai_rows, ai_extracted=True, ai_attempted=True)
-    return PdfExtraction(detected_bank, raw_transactions, ai_attempted=True)
+        return PdfExtraction(
+            detected_bank, ai_rows, ai_extracted=True, ai_attempted=True, **ai_meta
+        )
+    return PdfExtraction(
+        detected_bank, raw_transactions, ai_attempted=True, **ai_meta
+    )
 
 
 @router.post("/pdf/preview", response_model=PdfPreviewResponse)
@@ -974,6 +986,7 @@ async def preview_pdf_import(
         extraction = await _extract_pdf_rows(tmp_path, bank, ai=ai_cfg, hints=hints)
         detected_bank, raw_transactions = extraction.bank, extraction.rows
         used_ai, ai_attempted = extraction.ai_extracted, extraction.ai_attempted
+        ai_model, ai_tokens = extraction.ai_model, extraction.ai_tokens
     finally:
         os.unlink(tmp_path)
 
@@ -1098,6 +1111,8 @@ async def preview_pdf_import(
         error_rows=error_rows,
         ai_extracted=used_ai,
         ai_attempted=ai_attempted,
+        ai_model=ai_model,
+        ai_tokens=ai_tokens,
     )
 
 

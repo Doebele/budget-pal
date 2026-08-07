@@ -61,8 +61,25 @@ CLOUD_MODELS: Dict[str, List[str]] = {
 
 _LOCALHOST_RE = re.compile(r"^(https?://)(localhost|127\.0\.0\.1)(:\d+)?", re.I)
 
-COMPLETION_TIMEOUT = 120.0  # lokale Modelle brauchen auf CPU gerne mal eine Minute
+# Lokale Modelle sind langsam: ein 35B-Reasoning-Modell braucht fuer einen
+# 8000-Zeichen-Abschnitt gemessene ~170s. Der Wert ist eine Obergrenze fuer den
+# Notfall, keine Wartezeit — Cloud-APIs antworten in Sekunden.
+COMPLETION_TIMEOUT = 600.0
 LISTING_TIMEOUT = 5.0
+
+
+class Completion(NamedTuple):
+    """Antwort plus Verbrauch — die UI zeigt Modell und Tokens an, damit
+    sichtbar ist, was ein Import tatsaechlich gekostet hat."""
+
+    text: Optional[str] = None
+    model: str = ""
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+
+    @property
+    def total_tokens(self) -> int:
+        return self.prompt_tokens + self.completion_tokens
 
 
 class AiConfig(BaseModel):
@@ -157,10 +174,10 @@ def _openai_compatible_target(cfg: AiConfig) -> Optional[_Target]:
 
 async def _complete_openai_compatible(
     cfg: AiConfig, system: str, user: str, max_tokens: int, json_mode: bool
-) -> Optional[str]:
+) -> Completion:
     target = _openai_compatible_target(cfg)
     if target is None:
-        return None
+        return Completion()
 
     body: Dict[str, Any] = {
         "messages": [
@@ -191,14 +208,21 @@ async def _complete_openai_compatible(
         res.raise_for_status()
         data = res.json()
 
+    usage = data.get("usage") or {}
+    meta = dict(
+        model=data.get("model") or target.model,
+        prompt_tokens=int(usage.get("prompt_tokens") or 0),
+        completion_tokens=int(usage.get("completion_tokens") or 0),
+    )
+
     choices = data.get("choices") or []
     if not choices:
-        return None
+        return Completion(**meta)
 
     message = choices[0].get("message") or {}
     content = (message.get("content") or "").strip()
     if content:
-        return content
+        return Completion(content, **meta)
 
     # Reasoning-Modelle (z. B. ornith in LM Studio) legen ihre Gedanken in
     # reasoning_content ab. Ist content leer, ging das Token-Budget beim
@@ -211,15 +235,15 @@ async def _complete_openai_compatible(
             cfg.provider,
             max_tokens,
         )
-        return reasoning
-    return None
+        return Completion(reasoning, **meta)
+    return Completion(**meta)
 
 
 async def _complete_anthropic(
     cfg: AiConfig, system: str, user: str, max_tokens: int
-) -> Optional[str]:
+) -> Completion:
     if not cfg.anthropic_api_key:
-        return None
+        return Completion()
 
     # Kein temperature/top_p: auf aktuellen Claude-Modellen sind die Sampling-
     # Parameter entfernt und liefern 400.
@@ -244,22 +268,30 @@ async def _complete_anthropic(
 
     # Sicherheits-Klassifikatoren können ablehnen — das ist HTTP 200 mit
     # stop_reason "refusal" und leerem content, kein Fehler.
+    usage = data.get("usage") or {}
+    meta = dict(
+        model=data.get("model") or cfg.anthropic_model,
+        prompt_tokens=int(usage.get("input_tokens") or 0),
+        completion_tokens=int(usage.get("output_tokens") or 0),
+    )
+
     if data.get("stop_reason") == "refusal":
         logger.warning("Anthropic hat die Anfrage abgelehnt (refusal)")
-        return None
+        return Completion(**meta)
 
-    return "".join(
+    text = "".join(
         block.get("text", "")
         for block in data.get("content", [])
         if block.get("type") == "text"
-    ) or None
+    )
+    return Completion(text or None, **meta)
 
 
 async def _complete_gemini(
     cfg: AiConfig, system: str, user: str, max_tokens: int, json_mode: bool
-) -> Optional[str]:
+) -> Completion:
     if not cfg.gemini_api_key:
-        return None
+        return Completion()
 
     model = cfg.gemini_model or "gemini-2.0-flash"
     generation: Dict[str, Any] = {"temperature": 0, "maxOutputTokens": max_tokens}
@@ -283,11 +315,18 @@ async def _complete_gemini(
         res.raise_for_status()
         data = res.json()
 
+    usage = data.get("usageMetadata") or {}
+    meta = dict(
+        model=model,
+        prompt_tokens=int(usage.get("promptTokenCount") or 0),
+        completion_tokens=int(usage.get("candidatesTokenCount") or 0),
+    )
+
     candidates = data.get("candidates") or []
     if not candidates:
-        return None
+        return Completion(**meta)
     parts = (candidates[0].get("content") or {}).get("parts") or []
-    return "".join(p.get("text", "") for p in parts) or None
+    return Completion("".join(p.get("text", "") for p in parts) or None, **meta)
 
 
 async def complete(
@@ -298,14 +337,29 @@ async def complete(
     max_tokens: int = 1024,
     json_mode: bool = False,
 ) -> Optional[str]:
-    """Eine Completion beim konfigurierten Provider anfragen.
+    """Nur den Antworttext. Fuer Aufrufer, die den Verbrauch nicht brauchen."""
+    result = await complete_detailed(
+        cfg, system, user, max_tokens=max_tokens, json_mode=json_mode
+    )
+    return result.text
 
-    Gibt None zurück, wenn kein Provider konfiguriert ist, Zugangsdaten fehlen
+
+async def complete_detailed(
+    cfg: Optional[AiConfig],
+    system: str,
+    user: str,
+    *,
+    max_tokens: int = 1024,
+    json_mode: bool = False,
+) -> Completion:
+    """Eine Completion beim konfigurierten Provider anfragen, inkl. Verbrauch.
+
+    `text` ist None, wenn kein Provider konfiguriert ist, Zugangsdaten fehlen
     oder der Aufruf scheitert — Aufrufer müssen einen Fallback haben. KI ist in
     dieser App überall optional.
     """
     if cfg is None or not cfg.enabled:
-        return None
+        return Completion()
 
     try:
         if cfg.provider == "anthropic":
@@ -314,8 +368,15 @@ async def complete(
             return await _complete_gemini(cfg, system, user, max_tokens, json_mode)
         return await _complete_openai_compatible(cfg, system, user, max_tokens, json_mode)
     except Exception as e:
-        logger.warning("KI-Aufruf über %s fehlgeschlagen: %s", cfg.provider, e)
-        return None
+        # Typ mitloggen: httpx.ReadTimeout & Co. haben eine leere Meldung, ein
+        # nacktes "fehlgeschlagen: " ist nicht diagnostizierbar
+        logger.warning(
+            "KI-Aufruf über %s fehlgeschlagen: %s: %s",
+            cfg.provider,
+            type(e).__name__,
+            e or "(keine Meldung)",
+        )
+        return Completion()
 
 
 async def list_models(cfg: AiConfig) -> List[str]:

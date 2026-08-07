@@ -18,6 +18,8 @@ import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from typing import NamedTuple
+
 from app.services import ai_client
 from app.services.pdf_duplicate_detection import normalize_for_match
 from app.services.user_history import CategoryHints
@@ -28,10 +30,27 @@ logger = logging.getLogger(__name__)
 # klein, und ein 40-seitiges PDF sprengt jedes davon.
 CHUNK_CHARS = 8000
 MAX_CHUNKS = 8  # Kostendeckel — ~8 Aufrufe pro Dokument
-MAX_TOKENS_PER_CHUNK = 4000
+# Gemessen an einem 4-seitigen Auszug mit 52 Buchungen: ein Reasoning-Modell
+# (ornith-35b) braucht fuer einen Abschnitt 6536 Completion-Tokens — Denken plus
+# JSON. Mit 4000 lief es ins Limit und lieferte gar nichts. Der Wert ist eine
+# Obergrenze; abgerechnet wird nur Erzeugtes.
+MAX_TOKENS_PER_CHUNK = 12000
 
 _JSON_OBJECT_RE = re.compile(r"\{.*\}", re.S)
 _DATE_FORMATS = ("%Y-%m-%d", "%d.%m.%Y", "%d.%m.%y", "%d/%m/%Y", "%m/%d/%Y")
+
+
+class ExtractionResult(NamedTuple):
+    """Buchungen plus Verbrauch — die Vorschau zeigt Modell und Tokens an."""
+
+    rows: List[Dict[str, Any]]
+    model: str = ""
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+
+    @property
+    def total_tokens(self) -> int:
+        return self.prompt_tokens + self.completion_tokens
 
 
 def _chunks(text: str) -> List[str]:
@@ -175,29 +194,36 @@ async def extract_transactions(
     hints: Optional[CategoryHints] = None,
     *,
     currency: str = "CHF",
-) -> List[Dict[str, Any]]:
+) -> ExtractionResult:
     """Buchungen aus PDF-Text extrahieren.
 
-    Gibt [] zurück, wenn kein Modell konfiguriert ist oder nichts Verwertbares
-    gefunden wurde — der Aufrufer behandelt das wie einen leeren Parser.
+    Liefert leere `rows`, wenn kein Modell konfiguriert ist oder nichts
+    Verwertbares gefunden wurde — der Aufrufer behandelt das wie einen leeren
+    Parser.
     """
     if ai is None or not ai.enabled or not (text or "").strip():
-        return []
+        return ExtractionResult([])
 
     hints = hints or CategoryHints()
     system = _build_system_prompt(hints, currency)
 
     rows: List[Dict[str, Any]] = []
     seen: set[tuple] = set()
+    model = ""
+    prompt_tokens = completion_tokens = 0
 
     for index, chunk in enumerate(_chunks(text), start=1):
-        raw = await ai_client.complete(
+        completion = await ai_client.complete_detailed(
             ai,
             system,
             chunk,
             max_tokens=MAX_TOKENS_PER_CHUNK,
             json_mode=True,
         )
+        model = completion.model or model
+        prompt_tokens += completion.prompt_tokens
+        completion_tokens += completion.completion_tokens
+        raw = completion.text
         if not raw:
             logger.info("KI-Extraktion: Abschnitt %d lieferte keine Antwort", index)
             continue
@@ -214,5 +240,11 @@ async def extract_transactions(
                 seen.add(key)
                 rows.append(row)
 
-    logger.info("KI-Extraktion: %d Buchungen aus %s Zeichen", len(rows), len(text))
-    return rows
+    logger.info(
+        "KI-Extraktion: %d Buchungen aus %d Zeichen (%s, %d Tokens)",
+        len(rows),
+        len(text),
+        model or "unbekanntes Modell",
+        prompt_tokens + completion_tokens,
+    )
+    return ExtractionResult(rows, model, prompt_tokens, completion_tokens)

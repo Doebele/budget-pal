@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.services import pdf_ai_extract
-from app.services.ai_client import AiConfig
+from app.services.ai_client import AiConfig, Completion
 from app.services.pdf_ai_extract import _parse_amount, _parse_date, _rows_from_response
 from app.services.user_history import CategoryHints
 
@@ -116,36 +116,37 @@ def test_chunks_respect_line_boundaries_and_cap():
 
 class TestExtractTransactions:
     async def test_returns_empty_without_provider(self):
-        assert await pdf_ai_extract.extract_transactions(AiConfig(), "Text") == []
-        assert await pdf_ai_extract.extract_transactions(None, "Text") == []
+        assert (await pdf_ai_extract.extract_transactions(AiConfig(), "Text")).rows == []
+        assert (await pdf_ai_extract.extract_transactions(None, "Text")).rows == []
 
     async def test_returns_empty_for_blank_text(self):
         cfg = AiConfig(provider="openai", openai_api_key="sk-test")
-        assert await pdf_ai_extract.extract_transactions(cfg, "   ") == []
+        assert (await pdf_ai_extract.extract_transactions(cfg, "   ")).rows == []
 
     async def test_extracts_and_deduplicates_across_chunks(self):
         # Dasselbe Ergebnis für jeden Abschnitt — die Buchung darf nur einmal kommen
         response = '{"transactions": [{"date": "2026-03-15", "description": "MIGROS", "amount": -20.0}]}'
         with patch.object(
-            pdf_ai_extract.ai_client, "complete", AsyncMock(return_value=response)
+            pdf_ai_extract.ai_client, "complete_detailed",
+            AsyncMock(return_value=Completion(response, "test-model", 100, 50))
         ):
-            rows = await pdf_ai_extract.extract_transactions(
+            rows = (await pdf_ai_extract.extract_transactions(
                 AiConfig(provider="openai", openai_api_key="sk-test"),
                 "\n".join(f"Zeile {i}" for i in range(3000)),
-            )
+            )).rows
         assert len(rows) == 1
         assert rows[0]["description"] == "MIGROS"
 
     async def test_hints_reach_the_prompt(self):
         """Die Kategorien des Nutzers müssen im System-Prompt landen — sonst
         erfindet das Modell eigene."""
-        complete = AsyncMock(return_value='{"transactions": []}')
+        complete = AsyncMock(return_value=Completion('{"transactions": []}', "m", 1, 1))
         hints = CategoryHints(
             categories=["Lebensmittel", "Transport"],
             confirmed={"COOP": "Lebensmittel"},
             seen={"COOP": "Lebensmittel"},
         )
-        with patch.object(pdf_ai_extract.ai_client, "complete", complete):
+        with patch.object(pdf_ai_extract.ai_client, "complete_detailed", complete):
             await pdf_ai_extract.extract_transactions(
                 AiConfig(provider="openai", openai_api_key="sk-test"), "Text", hints
             )
@@ -157,9 +158,9 @@ class TestExtractTransactions:
 
     async def test_model_failure_yields_no_rows(self):
         with patch.object(
-            pdf_ai_extract.ai_client, "complete", AsyncMock(return_value=None)
+            pdf_ai_extract.ai_client, "complete_detailed", AsyncMock(return_value=Completion())
         ):
-            rows = await pdf_ai_extract.extract_transactions(
+            rows = (await pdf_ai_extract.extract_transactions(
                 AiConfig(provider="openai", openai_api_key="sk-test"), "Irgendein Text"
-            )
+            )).rows
         assert rows == []
