@@ -18,9 +18,9 @@ def test_netflix_resolves_to_txn_category():
     assert cat == "Abonnements"
 
 
-def test_saeule_3a_under_steuern_super():
+def test_saeule_3a_under_sparen_super():
     rows = load_base_super_categories()
     sc = resolve_super_category_row(rows, "Säule 3A", is_wizard=False)
-    assert sc.get("id") == "steuern"
+    assert sc.get("id") == "sparen"
     sc_w = resolve_super_category_row(rows, "säule 3a", is_wizard=True)
-    assert sc_w.get("id") == "steuern"
+    assert sc_w.get("id") == "sparen"

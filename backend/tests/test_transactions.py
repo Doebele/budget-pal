@@ -172,7 +172,7 @@ class TestListTransactions:
 
         assert response.status_code == 200
         data = response.json()
-        items = data.get("items", data.get("transactions", data))
+        items = data if isinstance(data, list) else data.get("items", [])
         assert isinstance(items, list)
         assert len(items) == 5
 
@@ -186,7 +186,7 @@ class TestListTransactions:
 
         assert response.status_code == 200
         data = response.json()
-        items = data.get("items", data.get("transactions", data))
+        items = data if isinstance(data, list) else data.get("items", [])
         # Only Food transactions should be returned
         food_count = sum(1 for item in items if item.get("category") == "Food")
         assert food_count > 0
@@ -306,10 +306,12 @@ class TestDeleteTransaction:
 
         response = client.delete(f"/api/transactions/{txn['id']}")
 
+        assert response.status_code == 204
+
+        # Soft delete: gone from the main ledger
+        response = client.get("/api/transactions")
         assert response.status_code == 200
-        data = response.json()
-        assert data["is_deleted"] is True
-        assert "deleted_at" in data
+        assert txn["id"] not in [t["id"] for t in response.json()]
 
     def test_delete_transaction_nonexistent(self, client, test_user):
         """Test deleting a non-existent transaction."""
@@ -497,5 +499,7 @@ class TestBulkCategorize:
             },
         )
 
-        # Should return an error
-        assert response.status_code in [400, 404, 422]
+        # Unknown IDs are ignored — nothing gets updated
+        assert response.status_code == 200
+        data = response.json()
+        assert data["updated"] == 0

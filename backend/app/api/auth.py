@@ -23,7 +23,7 @@ from app.services.currency_service import REFERENCE_CURRENCIES
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr, Field, field_validator
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Unterstützte UI-Sprachen — bei neuen Sprachen hier und im Frontend (i18n) ergänzen
@@ -107,7 +107,9 @@ class UserUpdateRequest(BaseModel):
 )
 async def register(payload: UserRegisterRequest, db: AsyncSession = Depends(get_db)):
     """Register a new user account."""
-    existing = await db.execute(select(User).where(User.email == payload.email))
+    existing = await db.execute(
+        select(User).where(func.lower(User.email) == payload.email.lower())
+    )
     if existing.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -149,7 +151,9 @@ async def login(
             detail=f"Too many login attempts. Try again in {decision.retry_after_seconds}s.",
         )
 
-    result = await db.execute(select(User).where(User.email == payload.email))
+    result = await db.execute(
+        select(User).where(func.lower(User.email) == payload.email.lower())
+    )
     user = result.scalar_one_or_none()
 
     if not user or not verify_password(payload.password, user.hashed_password):
@@ -207,17 +211,19 @@ async def update_me(
     if payload.date_of_birth is not None:
         current_user.date_of_birth = payload.date_of_birth
     if payload.birthdate is not None:
-        # Accept ISO date string "YYYY-MM-DD" from frontend datepicker
-        try:
-            current_user.date_of_birth = datetime.strptime(
-                payload.birthdate, "%Y-%m-%d"
-            )
-        except ValueError:
-            raise HTTPException(
-                status_code=400, detail="birthdate must be in YYYY-MM-DD format."
-            )
-    elif payload.birthdate == "":
-        current_user.date_of_birth = None
+        if payload.birthdate == "":
+            # Empty string clears the birthdate
+            current_user.date_of_birth = None
+        else:
+            # Accept ISO date string "YYYY-MM-DD" from frontend datepicker
+            try:
+                current_user.date_of_birth = datetime.strptime(
+                    payload.birthdate, "%Y-%m-%d"
+                )
+            except ValueError:
+                raise HTTPException(
+                    status_code=400, detail="birthdate must be in YYYY-MM-DD format."
+                )
     if payload.retirement_age is not None:
         current_user.retirement_age = payload.retirement_age
     if payload.currency is not None:

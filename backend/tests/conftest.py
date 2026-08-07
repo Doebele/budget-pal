@@ -8,7 +8,6 @@ Provides:
 - Auth helpers (get test token)
 """
 
-import asyncio
 from datetime import datetime, timezone
 from typing import Any, AsyncGenerator
 
@@ -21,26 +20,27 @@ from fastapi.testclient import TestClient
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 # ── Test Database ─────────────────────────────────────────────
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
 
-@pytest.fixture(scope="session")
-def event_loop():
-    """Create a session-scoped event loop for async fixtures."""
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
-
-
-@pytest.fixture(scope="session")
+@pytest.fixture()
 async def test_engine():
-    """Create an in-memory SQLite engine for the entire test session."""
+    """Create a fresh in-memory SQLite engine per test.
+
+    Function scope keeps tests isolated even when API routes commit —
+    a shared session-scoped DB leaks committed rows (e.g. unique emails)
+    into later tests.
+    """
     engine = create_async_engine(
         TEST_DATABASE_URL,
         echo=False,
+        # StaticPool: one shared connection, otherwise every pool checkout
+        # gets its own empty :memory: database
+        poolclass=StaticPool,
         connect_args={"check_same_thread": False},
     )
 
@@ -49,26 +49,18 @@ async def test_engine():
 
     yield engine
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-
     await engine.dispose()
 
 
 @pytest.fixture()
 async def db_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
-    """Provide a transactional rollback session for each test."""
+    """Provide a session bound to the per-test database."""
     async_session = async_sessionmaker(
         test_engine, class_=AsyncSession, expire_on_commit=False
     )
 
     async with async_session() as session:
-        # Use savepoints for proper nesting with transactional tests
-        await session.begin_nested()
-
         yield session
-
-        await session.rollback()
 
 
 # ── Test User ─────────────────────────────────────────────────

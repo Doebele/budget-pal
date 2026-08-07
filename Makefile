@@ -166,8 +166,10 @@ shell-frontend:
 # ── Testing ───────────────────────────────────────────────────
 
 ## Run backend tests
+# DATABASE_URL → SQLite, damit der App-Startup (Lifespan-Migrationen/Seeds)
+# während der Tests nicht in die echte Postgres-Dev-DB schreibt
 test-backend:
-	$(COMPOSE) exec $(BACKEND_CONTAINER) pytest tests/ -v --tb=short
+	$(COMPOSE) exec -e DATABASE_URL=sqlite+aiosqlite:///:memory: $(BACKEND_CONTAINER) pytest tests/ -v --tb=short
 
 ## Run frontend tests
 test-frontend:
