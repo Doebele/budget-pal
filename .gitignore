@@ -70,7 +70,8 @@ coverage.xml
 *.py,cover
 .hypothesis/
 .pytest_cache/
-pytest.ini
+# pytest.ini NICHT ignorieren — das ist die Testkonfiguration (asyncio_mode),
+# nicht Build-Ausgabe. Ohne sie laufen async-Fixtures in der CI nicht.
 .pytest.ini
 
 # Jupyter Notebook
