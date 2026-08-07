@@ -15,7 +15,7 @@ import os
 import re
 import tempfile
 from datetime import datetime, timezone
-from typing import List, Optional, Tuple
+from typing import List, NamedTuple, Optional, Tuple
 from uuid import uuid4
 
 logger = logging.getLogger(__name__)
@@ -155,6 +155,10 @@ class PdfPreviewResponse(BaseModel):
     # extrahiert wurden — die UI muss das kennzeichnen, damit geratene Werte
     # nicht wie geparste aussehen
     ai_extracted: bool = False
+    # True, wenn die KI-Extraktion ueberhaupt lief. Zusammen mit total_rows == 0
+    # kann die UI dann "Dokument enthaelt keine Buchungen" von "Format nicht
+    # erkannt, kein KI-Modell konfiguriert" unterscheiden.
+    ai_attempted: bool = False
 
 
 class PdfImportConfirmRequest(BaseModel):
@@ -815,6 +819,20 @@ def _rows_look_implausible(rows: List[dict]) -> bool:
     )
 
 
+class PdfExtraction(NamedTuple):
+    """Ergebnis von _extract_pdf_rows.
+
+    `ai_attempted` und `ai_extracted` sind getrennt, damit die UI eine leere
+    Vorschau erklaeren kann: "das Dokument enthaelt keine Buchungen" ist etwas
+    anderes als "Format nicht erkannt und kein KI-Modell konfiguriert".
+    """
+
+    bank: str
+    rows: List[dict]
+    ai_extracted: bool = False
+    ai_attempted: bool = False
+
+
 async def _extract_pdf_rows(
     tmp_path: str,
     bank: Optional[str],
@@ -822,13 +840,12 @@ async def _extract_pdf_rows(
     ai: Optional[ai_client.AiConfig] = None,
     hints: Optional[CategoryHints] = None,
     currency: str = "CHF",
-) -> Tuple[str, List[dict], bool]:
+) -> PdfExtraction:
     """PDF in Rohzeilen zerlegen — der einzige Ort, an dem PDF-Parser gewählt werden.
 
     Reihenfolge: erkanntes Bankformat → dedizierter Parser → OCR → und wenn
     nichts davon Zeilen liefert, das vom Nutzer gewählte KI-Modell.
 
-    Returns (detected_bank, rows, used_ai).
     """
     import pdfplumber
 
@@ -904,7 +921,7 @@ async def _extract_pdf_rows(
     )
 
     if not parser_failed or ai is None or not ai.enabled:
-        return detected_bank, raw_transactions, False
+        return PdfExtraction(detected_bank, raw_transactions)
 
     if len(full_text.strip()) < 100:
         try:
@@ -924,8 +941,8 @@ async def _extract_pdf_rows(
     # (unbrauchbare) Parser-Ausgabe, damit der Nutzer wenigstens sieht, dass
     # etwas gelesen wurde
     if ai_rows:
-        return detected_bank, ai_rows, True
-    return detected_bank, raw_transactions, False
+        return PdfExtraction(detected_bank, ai_rows, ai_extracted=True, ai_attempted=True)
+    return PdfExtraction(detected_bank, raw_transactions, ai_attempted=True)
 
 
 @router.post("/pdf/preview", response_model=PdfPreviewResponse)
@@ -954,9 +971,9 @@ async def preview_pdf_import(
     ai_cfg = ai_client.from_user(current_user)
     hints = await load_category_hints(db, current_user.id)
     try:
-        detected_bank, raw_transactions, used_ai = await _extract_pdf_rows(
-            tmp_path, bank, ai=ai_cfg, hints=hints
-        )
+        extraction = await _extract_pdf_rows(tmp_path, bank, ai=ai_cfg, hints=hints)
+        detected_bank, raw_transactions = extraction.bank, extraction.rows
+        used_ai, ai_attempted = extraction.ai_extracted, extraction.ai_attempted
     finally:
         os.unlink(tmp_path)
 
@@ -1080,6 +1097,7 @@ async def preview_pdf_import(
         parsed_rows=parsed_rows,
         error_rows=error_rows,
         ai_extracted=used_ai,
+        ai_attempted=ai_attempted,
     )
 
 
@@ -1360,9 +1378,9 @@ async def import_pdf(
     ai_cfg = ai_client.from_user(current_user)
     hints = await load_category_hints(db, current_user.id)
     try:
-        _detected_bank, raw_transactions, _used_ai = await _extract_pdf_rows(
-            tmp_path, bank, ai=ai_cfg, hints=hints
-        )
+        raw_transactions = (
+            await _extract_pdf_rows(tmp_path, bank, ai=ai_cfg, hints=hints)
+        ).rows
     finally:
         os.unlink(tmp_path)
 

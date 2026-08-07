@@ -2,6 +2,7 @@ import { useState, useRef, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { importsApi, accountsApi, categoriesApi } from "@/lib/api";
 import { Check, CheckCircle, Clock, Database, Eye, MapPin, NavArrowDown, NavArrowUp, Page, Settings, Table, Trash, Upload, WarningCircle, WarningTriangle, Xmark } from "@/lib/icons";
+import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { clsx } from "clsx";
@@ -93,6 +94,9 @@ interface PdfPreviewData {
   // Kein Parser passte — die Zeilen stammen aus der KI-Extraktion und sind
   // geraten, nicht geparst. Muss sichtbar sein.
   ai_extracted?: boolean;
+  // Lief die KI-Extraktion überhaupt? Unterscheidet bei 0 Zeilen "Dokument
+  // enthält keine Buchungen" von "Format nicht erkannt, keine KI konfiguriert".
+  ai_attempted?: boolean;
 }
 
 interface CategoryRow {
@@ -489,6 +493,33 @@ export default function Import() {
                     Fehler: <span className={pdfPreview.error_rows > 0 ? "text-red-300 font-semibold" : "text-text-tertiary"}>{pdfPreview.error_rows}</span>
                   </div>
                 </div>
+                {pdfPreview.total_rows === 0 && (
+                  <div className="mt-3 rounded-lg bg-bg-surface2 border border-border px-4 py-3">
+                    <p className="text-text-primary text-xs font-semibold flex items-center gap-1.5">
+                      <WarningCircle className="w-3.5 h-3.5 shrink-0" />
+                      Keine Buchungen gefunden
+                    </p>
+                    <p className="text-text-secondary text-[11px] mt-1.5 leading-relaxed">
+                      {pdfPreview.ai_attempted ? (
+                        <>
+                          Das Format wurde nicht erkannt, deshalb hat das KI-Modell den
+                          Text ausgewertet — es enthält aber keine Buchungen. Bei
+                          Auszügen ohne Kontobewegung ist das normal: solche PDFs
+                          bestehen nur aus der Saldo-Übersicht. Prüfe, ob der Auszug
+                          das richtige Konto und den richtigen Zeitraum abdeckt.
+                        </>
+                      ) : (
+                        <>
+                          Das PDF-Format wurde nicht erkannt. Aktiviere unter{" "}
+                          <Link to="/settings" className="text-accent hover:underline">
+                            Einstellungen → KI-Modell
+                          </Link>{" "}
+                          einen Anbieter, damit unbekannte PDFs ausgewertet werden können.
+                        </>
+                      )}
+                    </p>
+                  </div>
+                )}
                 {pdfPreview.ai_extracted && (
                   <p className="text-amber-300 text-[11px] mt-2 flex items-center gap-1.5">
                     <WarningCircle className="w-3.5 h-3.5 shrink-0" />
