@@ -18,6 +18,11 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Run backend tests
+        # Settings() validiert beim Import; ohne diese Variablen bricht schon
+        # conftest.py ab. SQLite in-memory, damit kein Postgres-Service noetig ist.
+        env:
+          JWT_SECRET_KEY: ci-only-dummy-secret-key-at-least-32-chars-long
+          DATABASE_URL: sqlite+aiosqlite:///:memory:
         run: pytest tests -q
 
   frontend-build:
