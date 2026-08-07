@@ -240,6 +240,94 @@ async def test_gemini_sends_key_as_header_not_query():
     assert call["headers"]["x-goog-api-key"] == "AIza-test"
 
 
+# ── Modell und Tokenverbrauch ─────────────────────────────────
+#
+# Die Vorschau zeigt beides an. Jeder Provider benennt die Felder anders.
+
+
+@pytest.mark.asyncio
+async def test_openai_compatible_reports_model_and_tokens():
+    fake = _FakeAsyncClient(
+        {
+            "model": "ornith-35b",
+            "choices": [{"message": {"content": "ok"}}],
+            "usage": {"prompt_tokens": 3720, "completion_tokens": 6536},
+        }
+    )
+    cfg = AiConfig(provider="lm-studio", lm_studio_model="angefragtes-modell")
+
+    with patch("app.services.ai_client.httpx.AsyncClient", fake):
+        result = await ai_client.complete_detailed(cfg, "sys", "user")
+
+    assert result.text == "ok"
+    # Der Server meldet das tatsaechlich geladene Modell — das gilt
+    assert result.model == "ornith-35b"
+    assert result.prompt_tokens == 3720
+    assert result.completion_tokens == 6536
+    assert result.total_tokens == 10256
+
+
+@pytest.mark.asyncio
+async def test_anthropic_maps_input_output_tokens():
+    fake = _FakeAsyncClient(
+        {
+            "model": "claude-opus-5",
+            "content": [{"type": "text", "text": "hallo"}],
+            "usage": {"input_tokens": 100, "output_tokens": 42},
+        }
+    )
+    cfg = AiConfig(provider="anthropic", anthropic_api_key="sk-ant-test")
+
+    with patch("app.services.ai_client.httpx.AsyncClient", fake):
+        result = await ai_client.complete_detailed(cfg, "sys", "user")
+
+    assert result.model == "claude-opus-5"
+    assert (result.prompt_tokens, result.completion_tokens) == (100, 42)
+
+
+@pytest.mark.asyncio
+async def test_gemini_maps_usage_metadata():
+    fake = _FakeAsyncClient(
+        {
+            "candidates": [{"content": {"parts": [{"text": "hallo"}]}}],
+            "usageMetadata": {"promptTokenCount": 80, "candidatesTokenCount": 20},
+        }
+    )
+    cfg = AiConfig(provider="gemini", gemini_api_key="AIza-test")
+
+    with patch("app.services.ai_client.httpx.AsyncClient", fake):
+        result = await ai_client.complete_detailed(cfg, "sys", "user")
+
+    assert result.model == "gemini-2.0-flash"
+    assert (result.prompt_tokens, result.completion_tokens) == (80, 20)
+
+
+@pytest.mark.asyncio
+async def test_missing_usage_block_yields_zero_not_crash():
+    fake = _FakeAsyncClient({"choices": [{"message": {"content": "ok"}}]})
+    cfg = AiConfig(provider="openai", openai_api_key="sk-test")
+
+    with patch("app.services.ai_client.httpx.AsyncClient", fake):
+        result = await ai_client.complete_detailed(cfg, "sys", "user")
+
+    assert result.text == "ok"
+    assert result.total_tokens == 0
+
+
+@pytest.mark.asyncio
+async def test_failed_call_reports_empty_completion():
+    class _Boom(_FakeAsyncClient):
+        async def post(self, url, json=None, headers=None):
+            raise RuntimeError("weg")
+
+    cfg = AiConfig(provider="openai", openai_api_key="sk-test")
+    with patch("app.services.ai_client.httpx.AsyncClient", _Boom({})):
+        result = await ai_client.complete_detailed(cfg, "sys", "user")
+
+    assert result.text is None
+    assert result.total_tokens == 0
+
+
 @pytest.mark.asyncio
 async def test_complete_swallows_transport_errors():
     class _Boom(_FakeAsyncClient):

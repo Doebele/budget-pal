@@ -1,7 +1,8 @@
-import { useState, useRef, useMemo, useCallback } from "react";
+import { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { importsApi, accountsApi, categoriesApi } from "@/lib/api";
+import { importsApi, accountsApi, categoriesApi, aiApi, type AiSettings } from "@/lib/api";
 import { Check, CheckCircle, Clock, Database, Eye, MapPin, NavArrowDown, NavArrowUp, Page, Settings, Table, Trash, Upload, WarningCircle, WarningTriangle, Xmark } from "@/lib/icons";
+import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { clsx } from "clsx";
@@ -69,6 +70,26 @@ interface PdfPreviewRow {
 }
 
 /** Normalise description for smart category grouping (strip digits, keep first 5 words ≥3 chars). */
+// Modellname des aktuell gewählten Providers — jeder Provider hat sein eigenes Feld.
+function modelNameFor(s?: AiSettings): string {
+  if (!s || s.provider === "none") return "";
+  const byProvider: Record<string, string | undefined> = {
+    "lm-studio": s.lm_studio_model,
+    ollama: s.ollama_model,
+    anthropic: s.anthropic_model,
+    openai: s.openai_model,
+    gemini: s.gemini_model,
+    openrouter: s.openrouter_model,
+  };
+  return byProvider[s.provider] || s.provider;
+}
+
+function formatElapsed(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return m > 0 ? `${m}:${String(s).padStart(2, "0")} min` : `${s}s`;
+}
+
 function descGroupKey(desc: string): string {
   return desc
     .toLowerCase()
@@ -93,6 +114,12 @@ interface PdfPreviewData {
   // Kein Parser passte — die Zeilen stammen aus der KI-Extraktion und sind
   // geraten, nicht geparst. Muss sichtbar sein.
   ai_extracted?: boolean;
+  // Lief die KI-Extraktion überhaupt? Unterscheidet bei 0 Zeilen "Dokument
+  // enthält keine Buchungen" von "Format nicht erkannt, keine KI konfiguriert".
+  ai_attempted?: boolean;
+  // Welches Modell gelesen hat und was es gekostet hat
+  ai_model?: string;
+  ai_tokens?: number;
 }
 
 interface CategoryRow {
@@ -314,6 +341,32 @@ export default function Import() {
     pdfPreviewMutation.isPending ||
     pdfConfirmMutation.isPending;
 
+  // Konfiguriertes Modell — damit der Ladezustand benennen kann, wer da gerade
+  // arbeitet, statt nur "bitte warten" zu zeigen.
+  const { data: aiSettings } = useQuery({
+    queryKey: ["ai-settings"],
+    queryFn: async () => (await aiApi.get()).data,
+    staleTime: 5 * 60_000,
+  });
+  const activeModel = modelNameFor(aiSettings);
+
+  // Mitlaufende Uhr waehrend eines Imports. Das Backend meldet keinen echten
+  // Fortschritt (es streamt nicht), aber eine laufende Sekundenanzeige zeigt,
+  // dass noch gearbeitet wird — bei KI-Auswertung dauert es Minuten.
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!isLoading) {
+      setElapsed(0);
+      return;
+    }
+    const startedAt = Date.now();
+    const id = setInterval(
+      () => setElapsed(Math.floor((Date.now() - startedAt) / 1000)),
+      1000,
+    );
+    return () => clearInterval(id);
+  }, [isLoading]);
+
   // Get all available columns from sample data
   const availableColumns = previewData?.sample_raw?.[0]
     ? Object.keys(previewData.sample_raw[0])
@@ -429,20 +482,42 @@ export default function Import() {
       {/* Loading */}
       {isLoading && !previewData && (
         <div className="card flex items-center gap-4">
-          <div className="w-8 h-8 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
-          <div>
-            <p className="text-text-primary text-sm font-medium">
+          <div className="w-8 h-8 border-2 border-accent/30 border-t-accent rounded-full animate-spin shrink-0" />
+          <div className="min-w-0">
+            <p className="text-text-primary text-sm font-medium flex items-center gap-2">
               {previewMutation.isPending || pdfPreviewMutation.isPending
-                ? "Vorschau wird erstellt..."
-                : "Import läuft..."}
+                ? "Vorschau wird erstellt…"
+                : "Import läuft…"}
+              {elapsed > 0 && (
+                <span className="text-text-tertiary text-xs font-normal tabular-nums">
+                  {formatElapsed(elapsed)}
+                </span>
+              )}
             </p>
             <p className="text-text-tertiary text-xs">
               {previewMutation.isPending
                 ? "CSV wird analysiert"
                 : pdfPreviewMutation.isPending
-                  ? "PDF wird per OCR extrahiert"
+                  ? "PDF wird gelesen und ausgewertet"
                   : "KI-Kategorisierung wird durchgeführt"}
             </p>
+            {/* Bei unbekannten Formaten laeuft die KI-Extraktion synchron und
+                braucht mit lokalen Modellen Minuten. Ohne diesen Hinweis wirkt
+                die Anzeige eingefroren und der Upload wird abgebrochen. */}
+            {pdfPreviewMutation.isPending && elapsed >= 15 && (
+              <p className="text-text-disabled text-[11px] mt-1.5 leading-relaxed">
+                Das Format ist offenbar unbekannt — {activeModel ? (
+                  <>
+                    <span className="font-mono text-text-tertiary">{activeModel}</span>{" "}
+                    wertet den Text aus
+                  </>
+                ) : (
+                  "das KI-Modell wertet den Text aus"
+                )}
+                . Bei lokalen Modellen und mehrseitigen Auszügen dauert das mehrere
+                Minuten. Fenster bitte offen lassen.
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -489,11 +564,49 @@ export default function Import() {
                     Fehler: <span className={pdfPreview.error_rows > 0 ? "text-red-300 font-semibold" : "text-text-tertiary"}>{pdfPreview.error_rows}</span>
                   </div>
                 </div>
+                {pdfPreview.total_rows === 0 && (
+                  <div className="mt-3 rounded-lg bg-bg-surface2 border border-border px-4 py-3">
+                    <p className="text-text-primary text-xs font-semibold flex items-center gap-1.5">
+                      <WarningCircle className="w-3.5 h-3.5 shrink-0" />
+                      Keine Buchungen gefunden
+                    </p>
+                    <p className="text-text-secondary text-[11px] mt-1.5 leading-relaxed">
+                      {pdfPreview.ai_attempted ? (
+                        <>
+                          Das Format wurde nicht erkannt, deshalb hat das KI-Modell den
+                          Text ausgewertet — es enthält aber keine Buchungen. Bei
+                          Auszügen ohne Kontobewegung ist das normal: solche PDFs
+                          bestehen nur aus der Saldo-Übersicht. Prüfe, ob der Auszug
+                          das richtige Konto und den richtigen Zeitraum abdeckt.
+                        </>
+                      ) : (
+                        <>
+                          Das PDF-Format wurde nicht erkannt. Aktiviere unter{" "}
+                          <Link to="/settings" className="text-accent hover:underline">
+                            Einstellungen → KI-Modell
+                          </Link>{" "}
+                          einen Anbieter, damit unbekannte PDFs ausgewertet werden können.
+                        </>
+                      )}
+                    </p>
+                  </div>
+                )}
                 {pdfPreview.ai_extracted && (
-                  <p className="text-amber-300 text-[11px] mt-2 flex items-center gap-1.5">
-                    <WarningCircle className="w-3.5 h-3.5 shrink-0" />
-                    Unbekanntes PDF-Format — diese Zeilen wurden per KI aus dem Text
-                    gelesen. Bitte Beträge und Daten vor dem Import prüfen.
+                  <p className="text-amber-300 text-[11px] mt-2 flex items-start gap-1.5">
+                    <WarningCircle className="w-3.5 h-3.5 shrink-0 mt-px" />
+                    <span>
+                      Unbekanntes PDF-Format — diese Zeilen wurden per KI aus dem Text
+                      gelesen. Bitte Beträge und Daten vor dem Import prüfen.
+                      {pdfPreview.ai_model && (
+                        <span className="text-text-disabled">
+                          {" "}
+                          Modell: <span className="font-mono">{pdfPreview.ai_model}</span>
+                          {pdfPreview.ai_tokens
+                            ? ` · ${pdfPreview.ai_tokens.toLocaleString("de-CH")} Tokens`
+                            : ""}
+                        </span>
+                      )}
+                    </span>
                   </p>
                 )}
                 {hasDuplicates && (

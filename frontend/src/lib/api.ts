@@ -8,6 +8,10 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 const TOKEN_KEY = "budget_pal_token";
 
+// Obergrenze fuer Requests, hinter denen ein KI-Modell steckt. Muss unter dem
+// proxy_read_timeout in frontend/nginx.conf bleiben, sonst bricht nginx zuerst ab.
+const AI_IMPORT_TIMEOUT_MS = 890_000;
+
 export const api = axios.create({
   baseURL: BASE_URL,
   headers: {
@@ -120,10 +124,19 @@ export const transactionsApi = {
 export const importsApi = {
   uploadCsv: (formData: FormData) =>
     api.post("/imports/csv", formData, { headers: { "Content-Type": "multipart/form-data" } }),
+  // PDF-Import laeuft bei unbekannten Formaten synchron durch das KI-Modell.
+  // Ein lokales Modell braucht dafuer Minuten, nicht Sekunden — der globale
+  // 30s-Timeout wuerde den Upload abbrechen, waehrend das Backend noch arbeitet.
   uploadPdf: (formData: FormData) =>
-    api.post("/imports/pdf", formData, { headers: { "Content-Type": "multipart/form-data" } }),
+    api.post("/imports/pdf", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      timeout: AI_IMPORT_TIMEOUT_MS,
+    }),
   previewPdf: (formData: FormData) =>
-    api.post("/imports/pdf/preview", formData, { headers: { "Content-Type": "multipart/form-data" } }),
+    api.post("/imports/pdf/preview", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      timeout: AI_IMPORT_TIMEOUT_MS,
+    }),
   confirmPdf: (payload: Record<string, unknown>) => api.post("/imports/pdf/confirm", payload),
   history: () => api.get("/imports/history"),
   preview: (id: number) => api.get(`/imports/${id}/preview`),

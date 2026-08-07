@@ -521,7 +521,11 @@ class CategorizationService:
             ai,
             system,
             f"Transaktion: {description}",
-            max_tokens=200,
+            # Die JSON-Antwort ist winzig, aber Reasoning-Modelle verbrauchen das
+            # Budget beim Denken und liefern sonst ein leeres content-Feld.
+            # max_tokens ist eine Obergrenze — abgerechnet wird nur Erzeugtes,
+            # fuer nicht-reasoning Modelle kostet der hoehere Wert also nichts.
+            max_tokens=1500,
             json_mode=True,
         )
         if not raw:

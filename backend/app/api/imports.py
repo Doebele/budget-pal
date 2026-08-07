@@ -15,7 +15,7 @@ import os
 import re
 import tempfile
 from datetime import datetime, timezone
-from typing import List, Optional, Tuple
+from typing import List, NamedTuple, Optional, Tuple
 from uuid import uuid4
 
 logger = logging.getLogger(__name__)
@@ -155,6 +155,13 @@ class PdfPreviewResponse(BaseModel):
     # extrahiert wurden — die UI muss das kennzeichnen, damit geratene Werte
     # nicht wie geparste aussehen
     ai_extracted: bool = False
+    # True, wenn die KI-Extraktion ueberhaupt lief. Zusammen mit total_rows == 0
+    # kann die UI dann "Dokument enthaelt keine Buchungen" von "Format nicht
+    # erkannt, kein KI-Modell konfiguriert" unterscheiden.
+    ai_attempted: bool = False
+    # Welches Modell die Zeilen gelesen hat und wie viele Tokens es gekostet hat
+    ai_model: str = ""
+    ai_tokens: int = 0
 
 
 class PdfImportConfirmRequest(BaseModel):
@@ -791,6 +798,46 @@ async def _ocr_pdf_to_text(tmp_path: str) -> str:
         return full_text
 
 
+# Echte Buchungstexte sind kurz. Ist einer laenger, hat der Regex-Parser
+# mehrere Zeilen (oder den ganzen Auszug) zu einer Zeile verschmolzen.
+MAX_PLAUSIBLE_DESCRIPTION = 200
+
+
+def _rows_look_implausible(rows: List[dict]) -> bool:
+    """Sieht die Ausgabe des Auffang-Parsers nach Unsinn aus?
+
+    Der generische Regex-Parser greift bei unbekannten Formaten gelegentlich
+    auf einer Kopfzeile ("Auszug fuer den Zeitraum X bis Y") und liefert dann
+    eine einzige Sammelzeile: ganzer Text als Beschreibung, Betrag 0. Solche
+    Ausgabe ist schlechter als gar keine, weil sie den KI-Fallback verhindert
+    und als echte Buchung importiert wuerde.
+    """
+    if not rows:
+        return True
+    if all(abs(float(row.get("amount") or 0)) < 0.005 for row in rows):
+        return True
+    return any(
+        len(str(row.get("description") or "")) > MAX_PLAUSIBLE_DESCRIPTION
+        for row in rows
+    )
+
+
+class PdfExtraction(NamedTuple):
+    """Ergebnis von _extract_pdf_rows.
+
+    `ai_attempted` und `ai_extracted` sind getrennt, damit die UI eine leere
+    Vorschau erklaeren kann: "das Dokument enthaelt keine Buchungen" ist etwas
+    anderes als "Format nicht erkannt und kein KI-Modell konfiguriert".
+    """
+
+    bank: str
+    rows: List[dict]
+    ai_extracted: bool = False
+    ai_attempted: bool = False
+    ai_model: str = ""
+    ai_tokens: int = 0
+
+
 async def _extract_pdf_rows(
     tmp_path: str,
     bank: Optional[str],
@@ -798,13 +845,12 @@ async def _extract_pdf_rows(
     ai: Optional[ai_client.AiConfig] = None,
     hints: Optional[CategoryHints] = None,
     currency: str = "CHF",
-) -> Tuple[str, List[dict], bool]:
+) -> PdfExtraction:
     """PDF in Rohzeilen zerlegen — der einzige Ort, an dem PDF-Parser gewählt werden.
 
     Reihenfolge: erkanntes Bankformat → dedizierter Parser → OCR → und wenn
     nichts davon Zeilen liefert, das vom Nutzer gewählte KI-Modell.
 
-    Returns (detected_bank, rows, used_ai).
     """
     import pdfplumber
 
@@ -870,9 +916,17 @@ async def _extract_pdf_rows(
                         logger.warning("OCR pipeline failed: %s", ocr_err)
                 raw_transactions = _parse_pdf_text(full_text, detected_bank)
 
-    # Kein Parser hat gegriffen — unbekanntes Format. Jetzt das KI-Modell.
-    if raw_transactions or ai is None or not ai.enabled:
-        return detected_bank, raw_transactions, False
+    # Hat ein Detektor angeschlagen oder hat der Nutzer die Bank vorgegeben,
+    # gilt das Ergebnis des zustaendigen Parsers. Sonst war der else-Zweig nur
+    # der Auffangversuch mit dem UBS-Parser — dessen Ausgabe muss sich erst
+    # als plausibel erweisen, bevor wir sie fuer bare Muenze nehmen.
+    format_known = bool(forced) or _is_n26_web or _is_comdirect or _is_ubs_cc
+    parser_failed = not raw_transactions or (
+        not format_known and _rows_look_implausible(raw_transactions)
+    )
+
+    if not parser_failed or ai is None or not ai.enabled:
+        return PdfExtraction(detected_bank, raw_transactions)
 
     if len(full_text.strip()) < 100:
         try:
@@ -880,11 +934,27 @@ async def _extract_pdf_rows(
         except Exception as ocr_err:
             logger.warning("OCR before AI extraction failed: %s", ocr_err)
 
-    logger.info("Kein Parser passte — KI-Extraktion über %s.", ai.provider)
-    ai_rows = await pdf_ai_extract.extract_transactions(
+    logger.info(
+        "Kein Parser passte (%d unbrauchbare Zeilen verworfen) — KI-Extraktion über %s.",
+        len(raw_transactions),
+        ai.provider,
+    )
+    result = await pdf_ai_extract.extract_transactions(
         ai, full_text, hints, currency=currency
     )
-    return detected_bank, ai_rows, bool(ai_rows)
+    ai_rows, ai_meta = result.rows, dict(
+        ai_model=result.model, ai_tokens=result.total_tokens
+    )
+    # Nur ersetzen, wenn die KI etwas geliefert hat — sonst bleibt die
+    # (unbrauchbare) Parser-Ausgabe, damit der Nutzer wenigstens sieht, dass
+    # etwas gelesen wurde
+    if ai_rows:
+        return PdfExtraction(
+            detected_bank, ai_rows, ai_extracted=True, ai_attempted=True, **ai_meta
+        )
+    return PdfExtraction(
+        detected_bank, raw_transactions, ai_attempted=True, **ai_meta
+    )
 
 
 @router.post("/pdf/preview", response_model=PdfPreviewResponse)
@@ -913,9 +983,10 @@ async def preview_pdf_import(
     ai_cfg = ai_client.from_user(current_user)
     hints = await load_category_hints(db, current_user.id)
     try:
-        detected_bank, raw_transactions, used_ai = await _extract_pdf_rows(
-            tmp_path, bank, ai=ai_cfg, hints=hints
-        )
+        extraction = await _extract_pdf_rows(tmp_path, bank, ai=ai_cfg, hints=hints)
+        detected_bank, raw_transactions = extraction.bank, extraction.rows
+        used_ai, ai_attempted = extraction.ai_extracted, extraction.ai_attempted
+        ai_model, ai_tokens = extraction.ai_model, extraction.ai_tokens
     finally:
         os.unlink(tmp_path)
 
@@ -1039,6 +1110,9 @@ async def preview_pdf_import(
         parsed_rows=parsed_rows,
         error_rows=error_rows,
         ai_extracted=used_ai,
+        ai_attempted=ai_attempted,
+        ai_model=ai_model,
+        ai_tokens=ai_tokens,
     )
 
 
@@ -1319,9 +1393,9 @@ async def import_pdf(
     ai_cfg = ai_client.from_user(current_user)
     hints = await load_category_hints(db, current_user.id)
     try:
-        _detected_bank, raw_transactions, _used_ai = await _extract_pdf_rows(
-            tmp_path, bank, ai=ai_cfg, hints=hints
-        )
+        raw_transactions = (
+            await _extract_pdf_rows(tmp_path, bank, ai=ai_cfg, hints=hints)
+        ).rows
     finally:
         os.unlink(tmp_path)
 
