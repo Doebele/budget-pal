@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,6 +25,7 @@ from app.core.taxonomy import (
     normalize_stored_mapping_to_super_id,
 )
 from app.models.models import Account, Transaction, User, WizardCategoryMapping
+from app.services import ai_client
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -196,3 +197,112 @@ async def reset_category_mappings(
     for row in result.scalars():
         await db.delete(row)
     await db.commit()
+
+
+# ── KI-Provider / Modellauswahl ───────────────────────────────
+#
+# GET  /api/settings/ai         → aktuelle Auswahl, API-Keys als has_*-Flags maskiert
+# PUT  /api/settings/ai         → Teil-Update; Key weglassen = unverändert, "" = löschen
+# GET  /api/settings/ai/models  → Modellliste (lokale Provider werden live abgefragt)
+
+
+class AiSettingsResponse(BaseModel):
+    provider: str
+    lm_studio_url: str
+    lm_studio_model: str
+    ollama_url: str
+    ollama_model: str
+    anthropic_model: str
+    openai_model: str
+    gemini_model: str
+    openrouter_model: str
+    # Keys werden nie zurückgegeben — nur ob einer hinterlegt ist
+    has_anthropic_key: bool
+    has_openai_key: bool
+    has_gemini_key: bool
+    has_openrouter_key: bool
+
+
+class AiSettingsRequest(BaseModel):
+    provider: Optional[str] = None
+    lm_studio_url: Optional[str] = None
+    lm_studio_model: Optional[str] = None
+    ollama_url: Optional[str] = None
+    ollama_model: Optional[str] = None
+    anthropic_model: Optional[str] = None
+    openai_model: Optional[str] = None
+    gemini_model: Optional[str] = None
+    openrouter_model: Optional[str] = None
+    # None = unverändert lassen, "" = Key löschen
+    anthropic_api_key: Optional[str] = None
+    openai_api_key: Optional[str] = None
+    gemini_api_key: Optional[str] = None
+    openrouter_api_key: Optional[str] = None
+
+
+def _ai_response(cfg: ai_client.AiConfig) -> AiSettingsResponse:
+    return AiSettingsResponse(
+        provider=cfg.provider,
+        lm_studio_url=cfg.lm_studio_url,
+        lm_studio_model=cfg.lm_studio_model,
+        ollama_url=cfg.ollama_url,
+        ollama_model=cfg.ollama_model,
+        anthropic_model=cfg.anthropic_model,
+        openai_model=cfg.openai_model,
+        gemini_model=cfg.gemini_model,
+        openrouter_model=cfg.openrouter_model,
+        has_anthropic_key=bool(cfg.anthropic_api_key),
+        has_openai_key=bool(cfg.openai_api_key),
+        has_gemini_key=bool(cfg.gemini_api_key),
+        has_openrouter_key=bool(cfg.openrouter_api_key),
+    )
+
+
+@router.get("/ai", response_model=AiSettingsResponse)
+async def get_ai_settings(current_user: User = Depends(get_current_user)):
+    return _ai_response(ai_client.from_user(current_user))
+
+
+@router.put("/ai", response_model=AiSettingsResponse)
+async def put_ai_settings(
+    payload: AiSettingsRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if payload.provider is not None and payload.provider not in ai_client.PROVIDERS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unbekannter Provider. Erlaubt: {', '.join(ai_client.PROVIDERS)}",
+        )
+
+    cfg = ai_client.from_user(current_user)
+    # exclude_unset: weggelassene Felder bleiben unverändert — ein weggelassener
+    # API-Key darf den gespeicherten nicht überschreiben
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        if value is not None:
+            setattr(cfg, field, value)
+
+    current_user.ai_config_json = cfg.model_dump()
+    await db.commit()
+    return _ai_response(cfg)
+
+
+@router.get("/ai/models", response_model=List[str])
+async def get_ai_models(
+    provider: Optional[str] = None,
+    url: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+):
+    """Modellliste. `provider`/`url` überschreiben die gespeicherte Konfiguration,
+    damit die UI eine Verbindung testen kann, bevor sie gespeichert wird."""
+    cfg = ai_client.from_user(current_user)
+    if provider:
+        if provider not in ai_client.PROVIDERS:
+            raise HTTPException(status_code=400, detail="Unbekannter Provider.")
+        cfg.provider = provider
+    if url:
+        if cfg.provider == "lm-studio":
+            cfg.lm_studio_url = url
+        elif cfg.provider == "ollama":
+            cfg.ollama_url = url
+    return await ai_client.list_models(cfg)

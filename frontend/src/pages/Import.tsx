@@ -90,6 +90,9 @@ interface PdfPreviewData {
   total_rows: number;
   parsed_rows: number;
   error_rows: number;
+  // Kein Parser passte — die Zeilen stammen aus der KI-Extraktion und sind
+  // geraten, nicht geparst. Muss sichtbar sein.
+  ai_extracted?: boolean;
 }
 
 interface CategoryRow {
@@ -486,6 +489,13 @@ export default function Import() {
                     Fehler: <span className={pdfPreview.error_rows > 0 ? "text-red-300 font-semibold" : "text-text-tertiary"}>{pdfPreview.error_rows}</span>
                   </div>
                 </div>
+                {pdfPreview.ai_extracted && (
+                  <p className="text-amber-300 text-[11px] mt-2 flex items-center gap-1.5">
+                    <WarningCircle className="w-3.5 h-3.5 shrink-0" />
+                    Unbekanntes PDF-Format — diese Zeilen wurden per KI aus dem Text
+                    gelesen. Bitte Beträge und Daten vor dem Import prüfen.
+                  </p>
+                )}
                 {hasDuplicates && (
                   <p className="text-text-disabled text-[11px] mt-2">
                     Konto-Duplikate: überschreiben, behalten oder löschen. PDF-Duplikate: importieren oder überspringen.

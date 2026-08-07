@@ -3,9 +3,9 @@ import { useState, useEffect } from "react";
 import { clsx } from "clsx";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
-import { api, authApi, settingsApi, taxonomyApi, backupApi } from "@/lib/api";
+import { api, authApi, settingsApi, taxonomyApi, backupApi, aiApi, type AiProvider, type AiSettings } from "@/lib/api";
 import { DEFAULT_SARON_REFERENCE_ANNUAL_PCT, SARON_INDEX_URL } from "@/lib/saron";
-import { Check, Download, EditPencil, Eye, FloppyDisk, Group, Label, MagicWand, NavArrowDown, NavArrowUp, OpenNewWindow, Plus, ShieldCheck, Trash, Undo, Upload, WarningCircle, Xmark } from "@/lib/icons";
+import { Check, CheckCircle, Download, EditPencil, Eye, FloppyDisk, Group, Label, MagicWand, NavArrowDown, NavArrowUp, OpenNewWindow, Plus, Refresh, ShieldCheck, Sparks, Trash, Undo, Upload, WarningCircle, Xmark } from "@/lib/icons";
 import { Link } from "react-router-dom";
 import { differenceInYears, parseISO } from "date-fns";
 import { useTaxonomySuperCategories, type SuperCategory } from "@/lib/categories";
@@ -1443,6 +1443,8 @@ export default function Settings() {
       {/* ── Erscheinungsbild (Theme / Dichte / Sprache / Akzent) ── */}
       <AppearanceSection />
 
+      <AiModelSection />
+
       {/* Info */}
       {/* Darstellung / Display preferences */}
       <div className="card">
@@ -1596,6 +1598,252 @@ export default function Settings() {
               budgetpal.doebele12.de <OpenNewWindow className="w-3 h-3" />
             </a>
           </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── KI-Modell — Anbieter- und Modellauswahl ────────────────────
+// Provider und Modell liegen serverseitig pro User (users.ai_config_json);
+// API-Keys kommen nie zurück, die API meldet nur has_*_key.
+const AI_PROVIDERS: { id: AiProvider; label: string; color?: string }[] = [
+  { id: "none", label: "Aus" },
+  { id: "lm-studio", label: "LM Studio", color: "#10b981" },
+  { id: "ollama", label: "Ollama", color: "#e05d44" },
+  { id: "anthropic", label: "Anthropic", color: "#f59e0b" },
+  { id: "openai", label: "OpenAI", color: "#74aa9c" },
+  { id: "gemini", label: "Gemini", color: "#4285f4" },
+  { id: "openrouter", label: "OpenRouter", color: "#a855f7" },
+];
+
+// Provider mit lokalem Server → Modellliste wird live abgefragt
+const LOCAL_PROVIDERS: AiProvider[] = ["lm-studio", "ollama"];
+// Provider mit Freitext-Modellfeld statt Auswahlliste
+const FREETEXT_MODEL_PROVIDERS: AiProvider[] = ["openrouter"];
+
+const AI_KEY_FIELD: Partial<Record<AiProvider, { field: string; has: keyof AiSettings; placeholder: string }>> = {
+  anthropic:  { field: "anthropic_api_key",  has: "has_anthropic_key",  placeholder: "sk-ant-…" },
+  openai:     { field: "openai_api_key",     has: "has_openai_key",     placeholder: "sk-…" },
+  gemini:     { field: "gemini_api_key",     has: "has_gemini_key",     placeholder: "AIza…" },
+  openrouter: { field: "openrouter_api_key", has: "has_openrouter_key", placeholder: "sk-or-…" },
+};
+
+const AI_MODEL_FIELD: Partial<Record<AiProvider, keyof AiSettings>> = {
+  "lm-studio": "lm_studio_model",
+  ollama: "ollama_model",
+  anthropic: "anthropic_model",
+  openai: "openai_model",
+  gemini: "gemini_model",
+  openrouter: "openrouter_model",
+};
+
+const AI_URL_FIELD: Partial<Record<AiProvider, keyof AiSettings>> = {
+  "lm-studio": "lm_studio_url",
+  ollama: "ollama_url",
+};
+
+function AiModelSection() {
+  const { t } = useTranslation("settings");
+  const queryClient = useQueryClient();
+
+  const { data: settings } = useQuery({
+    queryKey: ["ai-settings"],
+    queryFn: async () => (await aiApi.get()).data,
+  });
+
+  // Entwurf: nur geänderte Felder werden gesendet, damit ein weggelassener
+  // API-Key den gespeicherten serverseitig nicht überschreibt.
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [showKey, setShowKey] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const provider = (draft.provider ?? settings?.provider ?? "none") as AiProvider;
+  const urlField = AI_URL_FIELD[provider];
+  const modelField = AI_MODEL_FIELD[provider];
+  const keyMeta = AI_KEY_FIELD[provider];
+
+  const value = (field?: keyof AiSettings | string) => {
+    if (!field) return "";
+    return draft[field as string] ?? ((settings?.[field as keyof AiSettings] as string) ?? "");
+  };
+  const set = (field: string, v: string) => {
+    setSaved(false);
+    setDraft((d) => ({ ...d, [field]: v }));
+  };
+
+  const currentUrl = urlField ? value(urlField) : undefined;
+  const { data: models = [], isFetching: modelsLoading, isError: modelsError, refetch } = useQuery({
+    queryKey: ["ai-models", provider, currentUrl],
+    queryFn: async () => (await aiApi.models(provider, currentUrl)).data,
+    enabled: provider !== "none",
+  });
+
+  const save = useMutation({
+    mutationFn: async () => (await aiApi.update(draft)).data,
+    onSuccess: (data) => {
+      queryClient.setQueryData(["ai-settings"], data);
+      setDraft({});
+      setShowKey(false);
+      setSaved(true);
+    },
+  });
+
+  const optionBtn = (active: boolean) => clsx("toggle-btn", active && "active");
+  const dirty = Object.keys(draft).length > 0;
+
+  return (
+    <div className="card">
+      <h2 className="text-text-primary font-semibold text-sm mb-1 flex items-center gap-2">
+        <Sparks className="w-4 h-4 text-accent" /> {t("ai.title")}
+      </h2>
+      <p className="text-text-disabled text-xs mb-4">{t("ai.subtitle")}</p>
+
+      <div className="space-y-4">
+        <div>
+          <label className="label mb-2 block">{t("ai.provider")}</label>
+          <div className="toggle-group flex-wrap">
+            {AI_PROVIDERS.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => set("provider", p.id)}
+                className={optionBtn(provider === p.id)}
+              >
+                {p.color && (
+                  <span
+                    className="w-2 h-2 rounded-full inline-block"
+                    style={{ backgroundColor: p.color }}
+                  />
+                )}
+                {p.id === "none" ? t("ai.providerNone") : p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {provider === "none" && (
+          <p className="text-text-disabled text-xs">{t("ai.providerNoneHint")}</p>
+        )}
+
+        {urlField && (
+          <div>
+            <label className="label mb-2 block">{t("ai.serverUrl")}</label>
+            <div className="flex items-center gap-2">
+              <input
+                className="input font-mono text-xs flex-1"
+                value={value(urlField)}
+                onChange={(e) => set(urlField as string, e.target.value)}
+                placeholder={provider === "ollama" ? "http://localhost:11434" : "http://localhost:1234"}
+              />
+              <button
+                type="button"
+                className="btn btn-secondary shrink-0"
+                onClick={() => refetch()}
+                title={t("ai.testConnection")}
+              >
+                <Refresh className={clsx("w-3.5 h-3.5", modelsLoading && "animate-spin")} />
+              </button>
+              {!modelsLoading && models.length > 0 && (
+                <CheckCircle className="w-4 h-4 text-gain shrink-0" />
+              )}
+              {!modelsLoading && (modelsError || models.length === 0) && (
+                <WarningCircle className="w-4 h-4 text-loss shrink-0" />
+              )}
+            </div>
+            <p className="text-text-disabled text-[11px] mt-1">{t("ai.serverUrlHint")}</p>
+          </div>
+        )}
+
+        {modelField && (
+          <div>
+            <label className="label mb-2 block">{t("ai.model")}</label>
+            {models.length > 0 && !FREETEXT_MODEL_PROVIDERS.includes(provider) ? (
+              <select
+                className="input font-mono text-xs"
+                value={value(modelField)}
+                onChange={(e) => set(modelField as string, e.target.value)}
+              >
+                <option value="">—</option>
+                {models.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            ) : (
+              <input
+                className="input font-mono text-xs"
+                value={value(modelField)}
+                onChange={(e) => set(modelField as string, e.target.value)}
+                placeholder={t("ai.modelPlaceholder")}
+              />
+            )}
+            {LOCAL_PROVIDERS.includes(provider) && (
+              <p className="text-text-disabled text-[11px] mt-1">
+                {modelsError
+                  ? t("ai.modelsUnreachable")
+                  : models.length > 0
+                    ? t("ai.modelsFound", { count: models.length })
+                    : t("ai.modelsIdle")}
+              </p>
+            )}
+          </div>
+        )}
+
+        {keyMeta && (
+          <div>
+            <label className="label mb-2 block">{t("ai.apiKey")}</label>
+            <div className="flex items-center gap-2">
+              <input
+                type={showKey ? "text" : "password"}
+                className="input font-mono text-xs flex-1"
+                value={draft[keyMeta.field] ?? ""}
+                onChange={(e) => set(keyMeta.field, e.target.value)}
+                placeholder={settings?.[keyMeta.has] ? "••••••••" : keyMeta.placeholder}
+                autoComplete="off"
+              />
+              <button
+                type="button"
+                className="btn btn-ghost shrink-0 text-xs"
+                onClick={() => setShowKey((s) => !s)}
+              >
+                {showKey ? t("ai.hide") : t("ai.show")}
+              </button>
+            </div>
+            {settings?.[keyMeta.has] && (
+              <p className="text-text-disabled text-[11px] mt-1 flex items-center gap-2">
+                {t("ai.apiKeySaved")}
+                <button
+                  type="button"
+                  className="text-loss hover:underline"
+                  onClick={() => set(keyMeta.field, "")}
+                >
+                  {t("ai.apiKeyClear")}
+                </button>
+              </p>
+            )}
+          </div>
+        )}
+
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={!dirty || save.isPending}
+            onClick={() => save.mutate()}
+          >
+            <FloppyDisk className="w-3.5 h-3.5" />
+            {save.isPending ? t("ai.saving") : t("ai.save")}
+          </button>
+          {saved && (
+            <span className="text-gain text-xs flex items-center gap-1">
+              <Check className="w-3.5 h-3.5" /> {t("ai.saved")}
+            </span>
+          )}
+          {save.isError && (
+            <span className="text-loss text-xs flex items-center gap-1">
+              <WarningCircle className="w-3.5 h-3.5" /> {t("ai.saveError")}
+            </span>
+          )}
         </div>
       </div>
     </div>

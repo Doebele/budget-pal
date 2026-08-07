@@ -262,6 +262,41 @@ export const settingsApi = {
   resetCategoryMappings: () => api.delete("/settings/category-mappings"),
 };
 
+// KI-Provider / Modellauswahl — siehe backend/app/services/ai_client.py
+export type AiProvider =
+  | "none"
+  | "lm-studio"
+  | "ollama"
+  | "anthropic"
+  | "openai"
+  | "gemini"
+  | "openrouter";
+
+export interface AiSettings {
+  provider: AiProvider;
+  lm_studio_url: string;
+  lm_studio_model: string;
+  ollama_url: string;
+  ollama_model: string;
+  anthropic_model: string;
+  openai_model: string;
+  gemini_model: string;
+  openrouter_model: string;
+  // API-Keys kommen nie zurück — nur ob einer hinterlegt ist
+  has_anthropic_key: boolean;
+  has_openai_key: boolean;
+  has_gemini_key: boolean;
+  has_openrouter_key: boolean;
+}
+
+export const aiApi = {
+  get: () => api.get<AiSettings>("/settings/ai"),
+  // Weggelassene Felder bleiben serverseitig unverändert; "" löscht einen Key
+  update: (data: Partial<Record<string, string>>) => api.put<AiSettings>("/settings/ai", data),
+  models: (provider?: AiProvider, url?: string) =>
+    api.get<string[]>("/settings/ai/models", { params: { provider, url } }),
+};
+
 // Wizard state (raw data blob from wizard onboarding)
 export const wizardApi = {
   getState: () => api.get<Record<string, unknown>>("/wizard/state"),

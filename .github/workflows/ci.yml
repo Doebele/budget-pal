@@ -18,6 +18,18 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Run backend tests
+        # Settings() validiert beim Import; ohne diese Variablen bricht schon
+        # conftest.py ab. SQLite in-memory, damit kein Postgres-Service noetig ist.
+        env:
+          JWT_SECRET_KEY: "ci-only-dummy-secret-key-at-least-32-chars-long"
+          # Quoten ist Pflicht: ":memory:" endet auf einem Doppelpunkt am
+          # Zeilenende, was YAML als Mapping-Indikator liest
+          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+          # Defaults zeigen nach /app/... (Pfade im Container). Auf dem Runner
+          # gibt es kein /app, und _ensure_app_data_subdirs() legt sie beim
+          # Startup an — sonst PermissionError in jedem Test, der die App startet.
+          UPLOADS_DIR: "${{ runner.temp }}/uploads"
+          RATES_CACHE_PATH: "${{ runner.temp }}/cache/rates.json"
         run: pytest tests -q
 
   frontend-build:

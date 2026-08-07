@@ -24,6 +24,7 @@ from sqlalchemy.orm import selectinload
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.models import Transaction, Account, User, Category
+from app.services import ai_client
 from app.services.categorization import CategorizationService
 from app.services.audit_log import record_activity
 from app.services.currency_service import (
@@ -590,7 +591,9 @@ async def create_transaction(
 
     # Run categorization if no category provided
     if not cat:
-        result = await categorization_service.categorize(payload.description)
+        result = await categorization_service.categorize(
+            payload.description, ai_client.from_user(current_user)
+        )
         cat = result["category"]
         subcat = result.get("subcategory")
         confidence = result["confidence_score"]
@@ -704,11 +707,12 @@ async def bulk_categorize(
     )
     transactions = result.scalars().all()
 
+    ai_cfg = ai_client.from_user(current_user)
     updated = 0
     for txn in transactions:
         if txn.user_verified and not payload.force_recategorize:
             continue
-        cat_result = await categorization_service.categorize(txn.description)
+        cat_result = await categorization_service.categorize(txn.description, ai_cfg)
         txn.category = cat_result["category"]
         txn.subcategory = cat_result.get("subcategory")
         txn.confidence_score = cat_result["confidence_score"]

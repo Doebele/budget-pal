@@ -17,5 +17,31 @@
     "accentEmerald": "Emerald",
     "accentAmber": "Amber",
     "accentRose": "Rosé"
+  },
+  "ai": {
+    "title": "AI model",
+    "subtitle": "Provider and model for import analysis, automatic categorisation and insights",
+    "provider": "Provider",
+    "providerNone": "Off",
+    "providerNoneHint": "Without a provider Budget-Pal uses only rules, fuzzy matching and local embeddings — the AI stage is skipped.",
+    "recommended": "recommended",
+    "model": "Model",
+    "modelPlaceholder": "Model name",
+    "apiKey": "API key",
+    "apiKeySaved": "Saved — leave empty to keep it",
+    "apiKeyClear": "Clear",
+    "show": "Show",
+    "hide": "Hide",
+    "serverUrl": "Server URL",
+    "serverUrlHint": "localhost is rewritten to host.docker.internal inside the container",
+    "testConnection": "Test connection",
+    "modelsFound_one": "{{count}} model found",
+    "modelsFound_other": "{{count}} models found",
+    "modelsUnreachable": "Server unreachable",
+    "modelsIdle": "Click refresh to load",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Saved",
+    "saveError": "Could not save"
   }
 }
