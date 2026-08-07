@@ -16,7 +16,7 @@ import json
 import logging
 import re
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Awaitable, Callable, Dict, List, Optional
 
 from typing import NamedTuple
 
@@ -38,6 +38,10 @@ MAX_TOKENS_PER_CHUNK = 12000
 
 _JSON_OBJECT_RE = re.compile(r"\{.*\}", re.S)
 _DATE_FORMATS = ("%Y-%m-%d", "%d.%m.%Y", "%d.%m.%y", "%d/%m/%Y", "%m/%d/%Y")
+
+
+# (fertige Abschnitte, Abschnitte gesamt) — die UI zeigt daraus den Fortschritt
+ProgressCallback = Callable[[int, int], Awaitable[None]]
 
 
 class ExtractionResult(NamedTuple):
@@ -194,6 +198,7 @@ async def extract_transactions(
     hints: Optional[CategoryHints] = None,
     *,
     currency: str = "CHF",
+    on_progress: Optional[ProgressCallback] = None,
 ) -> ExtractionResult:
     """Buchungen aus PDF-Text extrahieren.
 
@@ -212,7 +217,10 @@ async def extract_transactions(
     model = ""
     prompt_tokens = completion_tokens = 0
 
-    for index, chunk in enumerate(_chunks(text), start=1):
+    chunks = _chunks(text)
+    for index, chunk in enumerate(chunks, start=1):
+        if on_progress is not None:
+            await on_progress(index - 1, len(chunks))
         completion = await ai_client.complete_detailed(
             ai,
             system,
@@ -239,6 +247,9 @@ async def extract_transactions(
             if key not in seen:
                 seen.add(key)
                 rows.append(row)
+
+    if on_progress is not None:
+        await on_progress(len(chunks), len(chunks))
 
     logger.info(
         "KI-Extraktion: %d Buchungen aus %d Zeichen (%s, %d Tokens)",

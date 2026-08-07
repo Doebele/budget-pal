@@ -1,6 +1,14 @@
 import { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { importsApi, accountsApi, categoriesApi, aiApi, type AiSettings } from "@/lib/api";
+import {
+  importsApi,
+  accountsApi,
+  categoriesApi,
+  aiApi,
+  isImportJobRunning,
+  type AiSettings,
+} from "@/lib/api";
+import { useActiveImportJob, useImportJob, importJobProgressLabel } from "@/hooks/useImportJob";
 import { Check, CheckCircle, Clock, Database, Eye, MapPin, NavArrowDown, NavArrowUp, Page, Settings, Table, Trash, Upload, WarningCircle, WarningTriangle, Xmark } from "@/lib/icons";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
@@ -216,6 +224,56 @@ export default function Import() {
     },
   });
 
+  // Der Upload stösst nur an; die Auswertung läuft als Hintergrundjob, damit
+  // man währenddessen navigieren kann und ein Neuladen nichts verliert.
+  const [jobId, setJobId] = useState<number | null>(null);
+  const { data: activeJob } = useActiveImportJob();
+  const { data: job } = useImportJob(jobId);
+
+  // Beim Betreten der Seite an einen bereits laufenden Job andocken
+  useEffect(() => {
+    if (jobId === null && activeJob) setJobId(activeJob.import_id);
+  }, [activeJob, jobId]);
+
+  const startPdfJob = useMutation({
+    mutationFn: async (file: File) => {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("account_id", selectedAccount);
+      if (selectedBank) fd.append("bank", selectedBank);
+      return (await importsApi.previewPdfAsync(fd)).data;
+    },
+    onSuccess: (started) => {
+      setJobId(started.import_id);
+      queryClient.invalidateQueries({ queryKey: ["import-job", "active"] });
+    },
+  });
+
+  // Vorschau übernehmen — identisch, egal ob sie synchron kam oder aus dem Job
+  const applyPdfPreview = useCallback((data: PdfPreviewData) => {
+    manuallyChangedCategories.current = new Set();
+    const rows: PdfPreviewRow[] = (data.rows ?? []).map((r) => ({
+      ...r,
+      duplicate_kind: (r as PdfPreviewRow).duplicate_kind ?? "none",
+      merge_action: ((r as PdfPreviewRow).merge_action ?? "import") as PdfMergeAction,
+      existing_transaction_id: (r as PdfPreviewRow).existing_transaction_id ?? undefined,
+      duplicate_of_row_id: (r as PdfPreviewRow).duplicate_of_row_id ?? undefined,
+      is_recurring: (r as PdfPreviewRow).is_recurring ?? false,
+      periodicity: (r as PdfPreviewRow).periodicity ?? null,
+    }));
+    setPdfPreview({ ...data, rows });
+    setPdfFileName(data.filename);
+  }, []);
+
+  // Job fertig → Ergebnis in die Vorschau übernehmen
+  useEffect(() => {
+    if (job?.status === "completed" && job.result) {
+      applyPdfPreview(job.result as unknown as PdfPreviewData);
+      setJobId(null);
+      queryClient.invalidateQueries({ queryKey: ["import-job", "active"] });
+    }
+  }, [job, applyPdfPreview, queryClient]);
+
   const pdfPreviewMutation = useMutation({
     mutationFn: (file: File) => {
       const fd = new FormData();
@@ -224,20 +282,7 @@ export default function Import() {
       if (selectedBank) fd.append("bank", selectedBank);
       return importsApi.previewPdf(fd).then((r) => r.data as PdfPreviewData);
     },
-    onSuccess: (data) => {
-      manuallyChangedCategories.current = new Set();
-      const rows: PdfPreviewRow[] = (data.rows ?? []).map((r) => ({
-        ...r,
-        duplicate_kind: (r as PdfPreviewRow).duplicate_kind ?? "none",
-        merge_action: ((r as PdfPreviewRow).merge_action ?? "import") as PdfMergeAction,
-        existing_transaction_id: (r as PdfPreviewRow).existing_transaction_id ?? undefined,
-        duplicate_of_row_id: (r as PdfPreviewRow).duplicate_of_row_id ?? undefined,
-        is_recurring: (r as PdfPreviewRow).is_recurring ?? false,
-        periodicity: (r as PdfPreviewRow).periodicity ?? null,
-      }));
-      setPdfPreview({ ...data, rows });
-      setPdfFileName(data.filename);
-    },
+    onSuccess: applyPdfPreview,
   });
 
   const pdfConfirmMutation = useMutation({
@@ -332,13 +377,17 @@ export default function Import() {
       alert("Bitte zuerst ein Ziel-Konto auswählen.");
       return;
     }
-    pdfPreviewMutation.mutate(file);
+    // Hintergrundjob statt synchronem Request — sonst blockiert die Auswertung
+    // die Seite minutenlang und ein Navigieren verwirft den Lauf.
+    startPdfJob.mutate(file);
   };
 
+  const pdfJobRunning = startPdfJob.isPending || isImportJobRunning(job);
   const isLoading =
     csvMutation.isPending ||
     previewMutation.isPending ||
     pdfPreviewMutation.isPending ||
+    pdfJobRunning ||
     pdfConfirmMutation.isPending;
 
   // Konfiguriertes Modell — damit der Ladezustand benennen kann, wer da gerade
@@ -497,14 +546,29 @@ export default function Import() {
             <p className="text-text-tertiary text-xs">
               {previewMutation.isPending
                 ? "CSV wird analysiert"
-                : pdfPreviewMutation.isPending
-                  ? "PDF wird gelesen und ausgewertet"
-                  : "KI-Kategorisierung wird durchgeführt"}
+                : startPdfJob.isPending
+                  ? "PDF wird hochgeladen"
+                  : pdfJobRunning
+                    ? `PDF wird ausgewertet — ${importJobProgressLabel(job)}`
+                    : pdfPreviewMutation.isPending
+                      ? "PDF wird gelesen und ausgewertet"
+                      : "KI-Kategorisierung wird durchgeführt"}
             </p>
-            {/* Bei unbekannten Formaten laeuft die KI-Extraktion synchron und
-                braucht mit lokalen Modellen Minuten. Ohne diesen Hinweis wirkt
-                die Anzeige eingefroren und der Upload wird abgebrochen. */}
-            {pdfPreviewMutation.isPending && elapsed >= 15 && (
+
+            {/* Echter Fortschritt: der Job meldet, welchen Textabschnitt er gerade
+                auswertet. Beim synchronen Weg gibt es das nicht. */}
+            {pdfJobRunning && (job?.chunks_total ?? 0) > 0 && (
+              <div className="mt-2 h-1 w-56 max-w-full rounded-full bg-bg-surface2 overflow-hidden">
+                <div
+                  className="h-full bg-accent transition-all duration-500"
+                  style={{
+                    width: `${Math.round(((job?.chunks_done ?? 0) / (job?.chunks_total || 1)) * 100)}%`,
+                  }}
+                />
+              </div>
+            )}
+
+            {pdfJobRunning && elapsed >= 10 && (
               <p className="text-text-disabled text-[11px] mt-1.5 leading-relaxed">
                 Das Format ist offenbar unbekannt — {activeModel ? (
                   <>
@@ -514,8 +578,14 @@ export default function Import() {
                 ) : (
                   "das KI-Modell wertet den Text aus"
                 )}
-                . Bei lokalen Modellen und mehrseitigen Auszügen dauert das mehrere
-                Minuten. Fenster bitte offen lassen.
+                . Das läuft im Hintergrund weiter: du kannst die Seite wechseln oder
+                neu laden, der Import geht nicht verloren.
+              </p>
+            )}
+
+            {job?.status === "failed" && (
+              <p className="text-loss text-[11px] mt-1.5">
+                Auswertung fehlgeschlagen: {job.error_message}
               </p>
             )}
           </div>

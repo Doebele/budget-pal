@@ -4,6 +4,7 @@ import { Suspense, lazy, useEffect } from "react";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { useUiStore } from "@/lib/store";
 import Rail from "@/components/layout/Rail";
+import ImportJobIndicator from "@/components/layout/ImportJobIndicator";
 import MobileDrawer from "@/components/layout/MobileDrawer";
 import BottomNav from "@/components/layout/BottomNav";
 import LoadingScreen from "@/components/layout/LoadingScreen";
@@ -66,6 +67,8 @@ function AppShell({ children }: { children: React.ReactNode }) {
       <main className="flex-1 overflow-y-auto p-6 pb-20 md:pb-6">
         <Suspense fallback={<LoadingScreen />}>{children}</Suspense>
       </main>
+      {/* Läuft ein PDF-Import, bleibt er von jeder Seite aus sichtbar */}
+      <ImportJobIndicator />
       <BottomNav />
     </div>
   );

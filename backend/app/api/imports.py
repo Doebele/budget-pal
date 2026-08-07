@@ -36,9 +36,18 @@ from app.services.pdf_import_row_match import (
     find_pdf_internal_duplicate_of,
     normalize_preview_date_str,
 )
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    UploadFile,
+    status,
+)
 from pydantic import BaseModel, Field
-from sqlalchemy import desc, select
+from sqlalchemy import desc, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
@@ -845,6 +854,7 @@ async def _extract_pdf_rows(
     ai: Optional[ai_client.AiConfig] = None,
     hints: Optional[CategoryHints] = None,
     currency: str = "CHF",
+    on_progress: Optional[pdf_ai_extract.ProgressCallback] = None,
 ) -> PdfExtraction:
     """PDF in Rohzeilen zerlegen — der einzige Ort, an dem PDF-Parser gewählt werden.
 
@@ -940,7 +950,7 @@ async def _extract_pdf_rows(
         ai.provider,
     )
     result = await pdf_ai_extract.extract_transactions(
-        ai, full_text, hints, currency=currency
+        ai, full_text, hints, currency=currency, on_progress=on_progress
     )
     ai_rows, ai_meta = result.rows, dict(
         ai_model=result.model, ai_tokens=result.total_tokens
@@ -957,33 +967,28 @@ async def _extract_pdf_rows(
     )
 
 
-@router.post("/pdf/preview", response_model=PdfPreviewResponse)
-async def preview_pdf_import(
-    file: UploadFile = File(...),
-    bank: Optional[str] = Form(None),
-    account_id: Optional[int] = Form(None),
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Extract PDF transactions and return editable preview rows."""
-    if account_id is not None:
-        acct_result = await db.execute(
-            select(Account).where(
-                Account.id == account_id, Account.user_id == current_user.id
-            )
-        )
-        if not acct_result.scalar_one_or_none():
-            raise HTTPException(status_code=404, detail="Account not found.")
+async def _build_pdf_preview(
+    db: AsyncSession,
+    current_user: User,
+    tmp_path: str,
+    bank: Optional[str],
+    account_id: Optional[int],
+    filename: str,
+    *,
+    on_progress: Optional[pdf_ai_extract.ProgressCallback] = None,
+) -> PdfPreviewResponse:
+    """PDF auswerten und die fertigen Vorschauzeilen bauen.
 
-    content = await file.read()
-    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-        tmp.write(content)
-        tmp_path = tmp.name
-
+    Gemeinsamer Kern von `preview_pdf_import` (synchron) und dem
+    Hintergrundjob — beide muessen dieselben Zeilen produzieren, sonst
+    unterscheidet sich die Vorschau je nach gewaehltem Weg.
+    """
     ai_cfg = ai_client.from_user(current_user)
     hints = await load_category_hints(db, current_user.id)
     try:
-        extraction = await _extract_pdf_rows(tmp_path, bank, ai=ai_cfg, hints=hints)
+        extraction = await _extract_pdf_rows(
+            tmp_path, bank, ai=ai_cfg, hints=hints, on_progress=on_progress
+        )
         detected_bank, raw_transactions = extraction.bank, extraction.rows
         used_ai, ai_attempted = extraction.ai_extracted, extraction.ai_attempted
         ai_model, ai_tokens = extraction.ai_model, extraction.ai_tokens
@@ -1104,7 +1109,7 @@ async def preview_pdf_import(
 
     return PdfPreviewResponse(
         bank=detected_bank,
-        filename=file.filename or "upload.pdf",
+        filename=filename,
         rows=rows,
         total_rows=len(rows),
         parsed_rows=parsed_rows,
@@ -1114,6 +1119,248 @@ async def preview_pdf_import(
         ai_model=ai_model,
         ai_tokens=ai_tokens,
     )
+
+
+async def _assert_account_owned(
+    db: AsyncSession, account_id: Optional[int], user_id: int
+) -> None:
+    if account_id is None:
+        return
+    result = await db.execute(
+        select(Account).where(Account.id == account_id, Account.user_id == user_id)
+    )
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Account not found.")
+
+
+async def _stash_upload(file: UploadFile) -> str:
+    content = await file.read()
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+        tmp.write(content)
+        return tmp.name
+
+
+@router.post("/pdf/preview", response_model=PdfPreviewResponse)
+async def preview_pdf_import(
+    file: UploadFile = File(...),
+    bank: Optional[str] = Form(None),
+    account_id: Optional[int] = Form(None),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Extract PDF transactions and return editable preview rows (synchron).
+
+    Bleibt fuer kleine, erkannte PDFs bestehen. Bei unbekannten Formaten laeuft
+    die KI-Auswertung minutenlang — dafuer gibt es /pdf/preview-async.
+    """
+    await _assert_account_owned(db, account_id, current_user.id)
+    tmp_path = await _stash_upload(file)
+    return await _build_pdf_preview(
+        db, current_user, tmp_path, bank, account_id, file.filename or "upload.pdf"
+    )
+
+
+# ── PDF-Import im Hintergrund ─────────────────────────────────
+#
+# Der synchrone Weg haelt den Request minutenlang offen: der Nutzer kann nicht
+# navigieren, ein Reload verliert den Lauf, und drei Timeouts (axios, nginx,
+# httpx) muessen passen. Hier wird stattdessen ein ImportLog als Job-Datensatz
+# angelegt und per Polling abgefragt.
+#
+# Der Zustand MUSS in die DB: das Backend laeuft mit --workers 2, eine
+# Statusabfrage kann also den anderen Worker treffen als den, der rechnet.
+
+
+class ImportJobResponse(BaseModel):
+    import_id: int
+    status: str  # pending | processing | completed | failed
+    filename: str
+    # Fortschritt der KI-Auswertung, sobald bekannt
+    chunks_done: int = 0
+    chunks_total: int = 0
+    error_message: Optional[str] = None
+    # Erst bei status == "completed" gefuellt
+    result: Optional[PdfPreviewResponse] = None
+
+
+def _job_progress(log: ImportLog) -> Tuple[int, int]:
+    payload = log.preview_json if isinstance(log.preview_json, dict) else {}
+    progress = payload.get("progress") or {}
+    return int(progress.get("done") or 0), int(progress.get("total") or 0)
+
+
+def _job_to_response(log: ImportLog) -> ImportJobResponse:
+    payload = log.preview_json if isinstance(log.preview_json, dict) else {}
+    done, total = _job_progress(log)
+    result = payload.get("result")
+    return ImportJobResponse(
+        import_id=log.id,
+        status=log.status.value if hasattr(log.status, "value") else str(log.status),
+        filename=log.filename,
+        chunks_done=done,
+        chunks_total=total,
+        error_message=log.error_message,
+        result=PdfPreviewResponse(**result) if result else None,
+    )
+
+
+async def _run_pdf_preview_job(
+    import_id: int, user_id: int, tmp_path: str, bank: Optional[str],
+    account_id: Optional[int], filename: str,
+) -> None:
+    """Hintergrundlauf: PDF auswerten und Ergebnis in den ImportLog schreiben.
+
+    Braucht eine eigene DB-Session — die des Requests ist geschlossen, sobald
+    die Antwort raus ist.
+    """
+    from app.core.database import AsyncSessionLocal
+
+    async with AsyncSessionLocal() as db:
+        log = await db.get(ImportLog, import_id)
+        user = await db.get(User, user_id)
+        if log is None or user is None:  # zwischenzeitlich geloescht
+            _remove_quietly(tmp_path)
+            return
+
+        async def on_progress(done: int, total: int) -> None:
+            # Eigene Transaktion pro Fortschritt, damit das Polling ihn sieht
+            log.preview_json = {"progress": {"done": done, "total": total}}
+            log.status = ImportStatus.processing
+            await db.commit()
+
+        try:
+            log.status = ImportStatus.processing
+            await db.commit()
+
+            preview = await _build_pdf_preview(
+                db, user, tmp_path, bank, account_id, filename,
+                on_progress=on_progress,
+            )
+            done, total = _job_progress(log)
+            log.preview_json = {
+                "progress": {"done": done or total, "total": total},
+                "result": preview.model_dump(),
+            }
+            log.rows_imported = 0
+            log.rows_skipped = 0
+            log.rows_failed = preview.error_rows
+            log.status = ImportStatus.completed
+            await db.commit()
+            logger.info(
+                "PDF-Job %d fertig: %d Zeilen (%s)",
+                import_id, preview.total_rows, preview.bank,
+            )
+        except Exception as e:
+            logger.exception("PDF-Job %d fehlgeschlagen", import_id)
+            await db.rollback()
+            log = await db.get(ImportLog, import_id)
+            if log is not None:
+                log.status = ImportStatus.failed
+                log.error_message = f"{type(e).__name__}: {e}"[:500]
+                await db.commit()
+        finally:
+            _remove_quietly(tmp_path)
+
+
+def _remove_quietly(path: str) -> None:
+    try:
+        os.unlink(path)
+    except OSError:
+        pass
+
+
+async def fail_stale_import_jobs(db: AsyncSession) -> int:
+    """Haengende Jobs beim Start als gescheitert markieren.
+
+    PDF-Jobs laufen im Worker-Prozess. Ein Neustart mittendrin liesse sie fuer
+    immer auf "processing" stehen — die Fortschrittsanzeige im Frontend wuerde
+    ewig drehen und der Nutzer koennte den Import nie abschliessen.
+    """
+    result = await db.execute(
+        update(ImportLog)
+        .where(ImportLog.status.in_([ImportStatus.pending, ImportStatus.processing]))
+        .values(
+            status=ImportStatus.failed,
+            error_message="Durch einen Neustart des Servers abgebrochen.",
+        )
+    )
+    await db.commit()
+    return result.rowcount or 0
+
+
+@router.post(
+    "/pdf/preview-async",
+    response_model=ImportJobResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def start_pdf_preview_job(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    bank: Optional[str] = Form(None),
+    account_id: Optional[int] = Form(None),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Auswertung anstossen und sofort mit einer Import-ID antworten."""
+    await _assert_account_owned(db, account_id, current_user.id)
+    filename = file.filename or "upload.pdf"
+    tmp_path = await _stash_upload(file)
+
+    log = ImportLog(
+        user_id=current_user.id,
+        account_id=account_id,
+        filename=filename,
+        bank=bank,
+        file_type="pdf",
+        status=ImportStatus.pending,
+    )
+    db.add(log)
+    await db.commit()
+    await db.refresh(log)
+
+    background_tasks.add_task(
+        _run_pdf_preview_job,
+        log.id, current_user.id, tmp_path, bank, account_id, filename,
+    )
+    return _job_to_response(log)
+
+
+@router.get("/jobs/active", response_model=Optional[ImportJobResponse])
+async def get_active_import_job(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Laufender PDF-Job dieses Nutzers — fuer die globale Anzeige."""
+    result = await db.execute(
+        select(ImportLog)
+        .where(
+            ImportLog.user_id == current_user.id,
+            ImportLog.file_type == "pdf",
+            ImportLog.status.in_([ImportStatus.pending, ImportStatus.processing]),
+        )
+        .order_by(desc(ImportLog.created_at))
+        .limit(1)
+    )
+    log = result.scalar_one_or_none()
+    return _job_to_response(log) if log else None
+
+
+@router.get("/jobs/{import_id}", response_model=ImportJobResponse)
+async def get_import_job(
+    import_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Status und — sobald fertig — Ergebnis eines PDF-Jobs."""
+    result = await db.execute(
+        select(ImportLog).where(
+            ImportLog.id == import_id, ImportLog.user_id == current_user.id
+        )
+    )
+    log = result.scalar_one_or_none()
+    if log is None:
+        raise HTTPException(status_code=404, detail="Import job not found.")
+    return _job_to_response(log)
 
 
 @router.post(
