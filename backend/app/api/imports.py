@@ -149,7 +149,7 @@ class PdfPreviewTransaction(BaseModel):
     # Recurring detection
     is_recurring: bool = False
     periodicity: Optional[str] = (
-        None  # 'monthly' | 'quarterly' | 'halfyearly' | 'yearly'
+        None  # 'weekly' | 'monthly' | 'quarterly' | 'halfyearly' | 'yearly'
     )
 
 
@@ -1777,6 +1777,7 @@ def _detect_recurring_periodicity(
     Groups parsed rows by normalized description (first 5 significant words, digits
     stripped), sorts by date, computes the median day-gap between consecutive
     occurrences, and maps to the matching periodicity bucket:
+        weekly      ≈ 5-9 days
         monthly     ≈ 22-36 days
         quarterly   ≈ 75-105 days
         halfyearly  ≈ 155-205 days
@@ -1829,7 +1830,9 @@ def _detect_recurring_periodicity(
 
         median_gap = statistics.median(gaps)
 
-        if 22 <= median_gap <= 36:
+        if 5 <= median_gap <= 9:
+            periodicity = "weekly"
+        elif 22 <= median_gap <= 36:
             periodicity = "monthly"
         elif 75 <= median_gap <= 105:
             periodicity = "quarterly"

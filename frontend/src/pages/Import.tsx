@@ -826,6 +826,7 @@ export default function Import() {
                                 )}
                               >
                                 <option value="">Einmalig</option>
+                                <option value="weekly">Wöchentlich</option>
                                 <option value="monthly">Monatlich</option>
                                 <option value="quarterly">Vierteljährlich</option>
                                 <option value="halfyearly">Halbjährlich</option>
