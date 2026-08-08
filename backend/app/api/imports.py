@@ -171,6 +171,9 @@ class PdfPreviewResponse(BaseModel):
     # Welches Modell die Zeilen gelesen hat und wie viele Tokens es gekostet hat
     ai_model: str = ""
     ai_tokens: int = 0
+    # True, wenn das Dokument am Kostendeckel abgeschnitten wurde — dann fehlen
+    # Buchungen aus dem hinteren Teil und die Vorschau ist unvollstaendig
+    ai_truncated: bool = False
 
 
 class PdfImportConfirmRequest(BaseModel):
@@ -845,6 +848,7 @@ class PdfExtraction(NamedTuple):
     ai_attempted: bool = False
     ai_model: str = ""
     ai_tokens: int = 0
+    ai_truncated: bool = False
 
 
 async def _extract_pdf_rows(
@@ -953,7 +957,9 @@ async def _extract_pdf_rows(
         ai, full_text, hints, currency=currency, on_progress=on_progress
     )
     ai_rows, ai_meta = result.rows, dict(
-        ai_model=result.model, ai_tokens=result.total_tokens
+        ai_model=result.model,
+        ai_tokens=result.total_tokens,
+        ai_truncated=result.truncated,
     )
     # Nur ersetzen, wenn die KI etwas geliefert hat — sonst bleibt die
     # (unbrauchbare) Parser-Ausgabe, damit der Nutzer wenigstens sieht, dass
@@ -992,6 +998,7 @@ async def _build_pdf_preview(
         detected_bank, raw_transactions = extraction.bank, extraction.rows
         used_ai, ai_attempted = extraction.ai_extracted, extraction.ai_attempted
         ai_model, ai_tokens = extraction.ai_model, extraction.ai_tokens
+        ai_truncated = extraction.ai_truncated
     finally:
         os.unlink(tmp_path)
 
@@ -1118,6 +1125,7 @@ async def _build_pdf_preview(
         ai_attempted=ai_attempted,
         ai_model=ai_model,
         ai_tokens=ai_tokens,
+        ai_truncated=ai_truncated,
     )
 
 

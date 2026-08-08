@@ -102,13 +102,48 @@ def test_empty_transaction_list_is_valid():
 # ── Chunking ──────────────────────────────────────────────────
 
 
-def test_chunks_respect_line_boundaries_and_cap():
+def test_chunks_respect_line_boundaries():
     text = "\n".join(f"Zeile {i} mit etwas Text" for i in range(5000))
     chunks = pdf_ai_extract._chunks(text)
-    assert len(chunks) <= pdf_ai_extract.MAX_CHUNKS
-    # Keine Transaktion darf mitten in einer Zeile zerschnitten werden
+    # _chunks liefert ALLE Abschnitte; der Deckel greift erst beim Verarbeiten,
+    # damit die Kuerzung sichtbar wird statt still zu passieren
+    assert len(chunks) > pdf_ai_extract.MAX_CHUNKS
     assert all(not c.startswith(" ") for c in chunks)
     assert all("Zeile" in c for c in chunks)
+
+
+class TestTruncationIsReported:
+    """Ein zu langes Dokument wird am Kostendeckel abgeschnitten. Passiert das
+    still, importiert der Nutzer ein halbes Dokument im Glauben, es sei
+    vollstaendig."""
+
+    async def test_long_document_is_flagged(self):
+        response = '{"transactions": []}'
+        long_text = "\n".join(f"Buchungszeile {i} mit etwas Text" for i in range(6000))
+        with patch.object(
+            pdf_ai_extract.ai_client, "complete_detailed",
+            AsyncMock(return_value=Completion(response, "m", 1, 1)),
+        ):
+            result = await pdf_ai_extract.extract_transactions(
+                AiConfig(provider="openai", openai_api_key="sk-test"), long_text
+            )
+
+        assert result.truncated is True
+        assert result.chunks_processed == pdf_ai_extract.MAX_CHUNKS
+        assert result.chunks_total > result.chunks_processed
+
+    async def test_short_document_is_not_flagged(self):
+        response = '{"transactions": []}'
+        with patch.object(
+            pdf_ai_extract.ai_client, "complete_detailed",
+            AsyncMock(return_value=Completion(response, "m", 1, 1)),
+        ):
+            result = await pdf_ai_extract.extract_transactions(
+                AiConfig(provider="openai", openai_api_key="sk-test"), "Kurzer Text"
+            )
+
+        assert result.truncated is False
+        assert result.chunks_processed == result.chunks_total == 1
 
 
 # ── Ende-zu-Ende mit gemocktem Modell ─────────────────────────

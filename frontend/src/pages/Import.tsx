@@ -128,6 +128,8 @@ interface PdfPreviewData {
   // Welches Modell gelesen hat und was es gekostet hat
   ai_model?: string;
   ai_tokens?: number;
+  // Dokument war zu lang und wurde abgeschnitten — es fehlen Buchungen
+  ai_truncated?: boolean;
 }
 
 interface CategoryRow {
@@ -660,6 +662,17 @@ export default function Import() {
                       )}
                     </p>
                   </div>
+                )}
+                {pdfPreview.ai_truncated && (
+                  <p className="text-loss text-[11px] mt-2 flex items-start gap-1.5">
+                    <WarningCircle className="w-3.5 h-3.5 shrink-0 mt-px" />
+                    <span>
+                      <strong>Unvollständig:</strong> Das Dokument ist länger, als in
+                      einem Durchgang ausgewertet werden kann — Buchungen aus dem
+                      hinteren Teil fehlen. Teile das PDF auf oder nutze, falls
+                      vorhanden, den CSV-Export der Bank.
+                    </span>
+                  </p>
                 )}
                 {pdfPreview.ai_extracted && (
                   <p className="text-amber-300 text-[11px] mt-2 flex items-start gap-1.5">

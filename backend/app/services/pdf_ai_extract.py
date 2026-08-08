@@ -51,14 +51,27 @@ class ExtractionResult(NamedTuple):
     model: str = ""
     prompt_tokens: int = 0
     completion_tokens: int = 0
+    # Wurde das Dokument am Kostendeckel abgeschnitten? Dann fehlen Buchungen,
+    # und der Nutzer MUSS das erfahren — sonst importiert er ein halbes Dokument
+    # im Glauben, es sei vollstaendig.
+    chunks_processed: int = 0
+    chunks_total: int = 0
 
     @property
     def total_tokens(self) -> int:
         return self.prompt_tokens + self.completion_tokens
 
+    @property
+    def truncated(self) -> bool:
+        return self.chunks_total > self.chunks_processed
+
 
 def _chunks(text: str) -> List[str]:
-    """Text an Zeilengrenzen stückeln, damit keine Transaktion zerschnitten wird."""
+    """Text an Zeilengrenzen stückeln, damit keine Transaktion zerschnitten wird.
+
+    Gibt ALLE Abschnitte zurück; der Kostendeckel wird erst beim Verarbeiten
+    angewandt, damit der Aufrufer merkt, dass etwas weggelassen wurde.
+    """
     lines = (text or "").splitlines()
     out: List[str] = []
     current: List[str] = []
@@ -73,7 +86,7 @@ def _chunks(text: str) -> List[str]:
 
     if current:
         out.append("\n".join(current))
-    return out[:MAX_CHUNKS]
+    return out
 
 
 def _parse_date(value: Any) -> Optional[str]:
@@ -217,7 +230,15 @@ async def extract_transactions(
     model = ""
     prompt_tokens = completion_tokens = 0
 
-    chunks = _chunks(text)
+    all_chunks = _chunks(text)
+    chunks = all_chunks[:MAX_CHUNKS]
+    if len(all_chunks) > len(chunks):
+        logger.warning(
+            "Dokument zu lang: nur %d von %d Abschnitten ausgewertet "
+            "(MAX_CHUNKS=%d). Spaetere Buchungen fehlen.",
+            len(chunks), len(all_chunks), MAX_CHUNKS,
+        )
+
     for index, chunk in enumerate(chunks, start=1):
         if on_progress is not None:
             await on_progress(index - 1, len(chunks))
@@ -258,4 +279,7 @@ async def extract_transactions(
         model or "unbekanntes Modell",
         prompt_tokens + completion_tokens,
     )
-    return ExtractionResult(rows, model, prompt_tokens, completion_tokens)
+    return ExtractionResult(
+        rows, model, prompt_tokens, completion_tokens,
+        chunks_processed=len(chunks), chunks_total=len(all_chunks),
+    )
