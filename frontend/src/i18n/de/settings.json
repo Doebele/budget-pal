@@ -42,6 +42,11 @@
     "save": "Speichern",
     "saving": "Speichern …",
     "saved": "Gespeichert",
-    "saveError": "Speichern fehlgeschlagen"
+    "saveError": "Speichern fehlgeschlagen",
+    "contextSize": "Textmenge pro KI-Anfrage",
+    "contextAuto": "automatisch",
+    "contextDetected": "Kontextfenster erkannt: {{tokens}} Tokens.",
+    "contextEffective": "Verwendet werden {{chars}} Zeichen pro Anfrage.",
+    "contextUnknown": "Kontextfenster unbekannt — es gilt ein konservativer Vorgabewert. Regler nach rechts, wenn dein Modell mehr verträgt; zu hoch eingestellt lehnt der Server die Anfrage ab."
   }
 }

@@ -368,3 +368,122 @@ async def test_list_models_cloud_provider_is_static():
     assert "claude-opus-5" in models
     # Modell-IDs tragen kein Datums-Suffix
     assert all("-2025" not in m and "-2026" not in m for m in models)
+
+
+# ── Kontextfenster und Zuschnitt ──────────────────────────────
+#
+# Wie viel Dokumenttext pro Anfrage mitgeht, haengt am Kontextfenster des
+# Modells. Zu klein verschenkt Leistung und schneidet lange PDFs ab, zu gross
+# laesst den Server die Anfrage ablehnen.
+
+
+@pytest.mark.asyncio
+async def test_lm_studio_context_is_read_from_native_api():
+    fake = _FakeAsyncClient(
+        {"data": [{"id": "ornith-35b", "loaded_context_length": 262144}]}
+    )
+    cfg = AiConfig(provider="lm-studio", lm_studio_model="ornith-35b")
+
+    with patch("app.services.ai_client.httpx.AsyncClient", fake):
+        assert await ai_client.detect_context_tokens(cfg) == 262144
+    assert _FakeAsyncClient.last_call["url"].endswith("/api/v0/models")
+
+
+@pytest.mark.asyncio
+async def test_lm_studio_context_ignores_other_models():
+    fake = _FakeAsyncClient(
+        {"data": [{"id": "ein-anderes", "loaded_context_length": 4096}]}
+    )
+    cfg = AiConfig(provider="lm-studio", lm_studio_model="ornith-35b")
+    with patch("app.services.ai_client.httpx.AsyncClient", fake):
+        assert await ai_client.detect_context_tokens(cfg) is None
+
+
+@pytest.mark.asyncio
+async def test_ollama_context_is_read_from_model_info():
+    # Der Schluessel traegt den Architekturnamen
+    fake = _FakeAsyncClient({"model_info": {"gemma3.context_length": 131072}})
+    cfg = AiConfig(provider="ollama", ollama_model="gemma3:12b")
+    with patch("app.services.ai_client.httpx.AsyncClient", fake):
+        assert await ai_client.detect_context_tokens(cfg) == 131072
+
+
+@pytest.mark.asyncio
+async def test_cloud_context_comes_from_table():
+    assert await ai_client.detect_context_tokens(
+        AiConfig(provider="anthropic")
+    ) == ai_client.CLOUD_CONTEXT_TOKENS["anthropic"]
+
+
+@pytest.mark.asyncio
+async def test_unreachable_server_yields_no_context():
+    class _Boom(_FakeAsyncClient):
+        async def get(self, url):
+            raise RuntimeError("weg")
+
+    with patch("app.services.ai_client.httpx.AsyncClient", _Boom({})):
+        cfg = AiConfig(provider="lm-studio", lm_studio_model="m")
+        assert await ai_client.detect_context_tokens(cfg) is None
+
+
+@pytest.mark.asyncio
+async def test_chunk_size_falls_back_when_context_unknown():
+    class _Boom(_FakeAsyncClient):
+        async def get(self, url):
+            raise RuntimeError("weg")
+
+    with patch("app.services.ai_client.httpx.AsyncClient", _Boom({})):
+        cfg = AiConfig(provider="lm-studio", lm_studio_model="m")
+        assert await ai_client.resolve_chunk_chars(cfg, 12000) == ai_client.DEFAULT_CHUNK_CHARS
+
+
+@pytest.mark.asyncio
+async def test_chunk_size_respects_the_ceiling():
+    fake = _FakeAsyncClient(
+        {"data": [{"id": "gross", "loaded_context_length": 1_000_000}]}
+    )
+    cfg = AiConfig(provider="lm-studio", lm_studio_model="gross")
+    with patch("app.services.ai_client.httpx.AsyncClient", fake):
+        assert await ai_client.resolve_chunk_chars(cfg, 12000) == ai_client.MAX_CHUNK_CHARS
+
+
+@pytest.mark.asyncio
+async def test_small_context_leaves_room_for_prompt_and_answer():
+    """Eingabe, System-Prompt und Antwort teilen sich das Fenster."""
+    fake = _FakeAsyncClient({"data": [{"id": "klein", "loaded_context_length": 16000}]})
+    cfg = AiConfig(provider="lm-studio", lm_studio_model="klein")
+    with patch("app.services.ai_client.httpx.AsyncClient", fake):
+        chars = await ai_client.resolve_chunk_chars(cfg, 12000)
+    # 16000 − 12000 Antwort − 2000 Prompt = 2000 Tokens nutzbar
+    assert chars == int(2000 * ai_client.CHARS_PER_TOKEN)
+    # deutlich weniger als bei einem grossen Fenster
+    assert chars < ai_client.MAX_CHUNK_CHARS
+
+
+@pytest.mark.asyncio
+async def test_tiny_context_never_goes_below_the_floor():
+    fake = _FakeAsyncClient({"data": [{"id": "winzig", "loaded_context_length": 13000}]})
+    cfg = AiConfig(provider="lm-studio", lm_studio_model="winzig")
+    with patch("app.services.ai_client.httpx.AsyncClient", fake):
+        # 13000 − 12000 − 2000 < 0 → Mindestgroesse
+        assert await ai_client.resolve_chunk_chars(cfg, 12000) == ai_client.MIN_CHUNK_CHARS
+
+
+@pytest.mark.asyncio
+async def test_override_wins_over_detection():
+    fake = _FakeAsyncClient(
+        {"data": [{"id": "ornith-35b", "loaded_context_length": 262144}]}
+    )
+    cfg = AiConfig(
+        provider="lm-studio", lm_studio_model="ornith-35b", context_chars_override=20000
+    )
+    with patch("app.services.ai_client.httpx.AsyncClient", fake):
+        assert await ai_client.resolve_chunk_chars(cfg, 12000) == 20000
+
+
+@pytest.mark.asyncio
+async def test_override_is_clamped_to_sane_range():
+    cfg = AiConfig(provider="anthropic", context_chars_override=99_999_999)
+    assert await ai_client.resolve_chunk_chars(cfg, 12000) == ai_client.MAX_CHUNK_CHARS
+    cfg = AiConfig(provider="anthropic", context_chars_override=10)
+    assert await ai_client.resolve_chunk_chars(cfg, 12000) == ai_client.MIN_CHUNK_CHARS

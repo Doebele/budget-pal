@@ -327,6 +327,12 @@ export interface AiSettings {
   has_openai_key: boolean;
   has_gemini_key: boolean;
   has_openrouter_key: boolean;
+  // Textmenge pro KI-Anfrage. 0 = automatisch aus dem Kontextfenster ableiten.
+  context_chars_override: number;
+  // Erkanntes Kontextfenster des Modells (Tokens), null wenn unbekannt
+  detected_context_tokens: number | null;
+  // Was tatsächlich verwendet wird — erkannt oder übersteuert
+  effective_context_chars: number;
 }
 
 export const aiApi = {

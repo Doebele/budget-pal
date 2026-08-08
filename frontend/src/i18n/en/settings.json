@@ -42,6 +42,11 @@
     "save": "Save",
     "saving": "Saving…",
     "saved": "Saved",
-    "saveError": "Could not save"
+    "saveError": "Could not save",
+    "contextSize": "Text per AI request",
+    "contextAuto": "automatic",
+    "contextDetected": "Detected context window: {{tokens}} tokens.",
+    "contextEffective": "Using {{chars}} characters per request.",
+    "contextUnknown": "Context window unknown — a conservative default applies. Move the slider right if your model can take more; set too high, the server will reject the request."
   }
 }

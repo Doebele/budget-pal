@@ -28,7 +28,10 @@ logger = logging.getLogger(__name__)
 
 # Ein Auszug wird stückweise geschickt: Kontextfenster lokaler Modelle sind
 # klein, und ein 40-seitiges PDF sprengt jedes davon.
-CHUNK_CHARS = 8000
+# Rueckfall, wenn das Kontextfenster des Modells unbekannt ist. Der echte Wert
+# wird pro Lauf aus ai_client.resolve_chunk_chars() bestimmt — ein Modell mit
+# grossem Fenster nimmt ein ganzes Dokument in einem Durchgang.
+CHUNK_CHARS = ai_client.DEFAULT_CHUNK_CHARS
 MAX_CHUNKS = 8  # Kostendeckel — ~8 Aufrufe pro Dokument
 # Gemessen an einem 4-seitigen Auszug mit 52 Buchungen: ein Reasoning-Modell
 # (ornith-35b) braucht fuer einen Abschnitt 6536 Completion-Tokens — Denken plus
@@ -66,7 +69,7 @@ class ExtractionResult(NamedTuple):
         return self.chunks_total > self.chunks_processed
 
 
-def _chunks(text: str) -> List[str]:
+def _chunks(text: str, chunk_chars: int = CHUNK_CHARS) -> List[str]:
     """Text an Zeilengrenzen stückeln, damit keine Transaktion zerschnitten wird.
 
     Gibt ALLE Abschnitte zurück; der Kostendeckel wird erst beim Verarbeiten
@@ -78,7 +81,7 @@ def _chunks(text: str) -> List[str]:
     size = 0
 
     for line in lines:
-        if size + len(line) > CHUNK_CHARS and current:
+        if size + len(line) > chunk_chars and current:
             out.append("\n".join(current))
             current, size = [], 0
         current.append(line)
@@ -230,7 +233,12 @@ async def extract_transactions(
     model = ""
     prompt_tokens = completion_tokens = 0
 
-    all_chunks = _chunks(text)
+    chunk_chars = await ai_client.resolve_chunk_chars(ai, MAX_TOKENS_PER_CHUNK)
+    all_chunks = _chunks(text, chunk_chars)
+    logger.info(
+        "KI-Extraktion: %d Zeichen, %d pro Anfrage → %d Abschnitt(e)",
+        len(text), chunk_chars, len(all_chunks),
+    )
     chunks = all_chunks[:MAX_CHUNKS]
     if len(all_chunks) > len(chunks):
         logger.warning(

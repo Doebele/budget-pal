@@ -1824,6 +1824,42 @@ function AiModelSection() {
           </div>
         )}
 
+        {provider !== "none" && (
+          <div>
+            <label className="label mb-2 block">{t("ai.contextSize")}</label>
+            <div className="flex items-center gap-3">
+              <input
+                type="range"
+                min={0}
+                max={120000}
+                step={4000}
+                value={Number(value("context_chars_override")) || 0}
+                onChange={(e) => set("context_chars_override", e.target.value)}
+                className="flex-1 accent-accent cursor-pointer"
+              />
+              <span className="text-text-secondary text-xs font-mono w-28 text-right tabular-nums">
+                {Number(value("context_chars_override")) > 0
+                  ? `${Number(value("context_chars_override")).toLocaleString("de-CH")} Z.`
+                  : t("ai.contextAuto")}
+              </span>
+            </div>
+            <p className="text-text-disabled text-[11px] mt-1.5 leading-relaxed">
+              {settings?.detected_context_tokens ? (
+                <>
+                  {t("ai.contextDetected", {
+                    tokens: settings.detected_context_tokens.toLocaleString("de-CH"),
+                  })}{" "}
+                  {t("ai.contextEffective", {
+                    chars: (settings?.effective_context_chars ?? 0).toLocaleString("de-CH"),
+                  })}
+                </>
+              ) : (
+                t("ai.contextUnknown")
+              )}
+            </p>
+          </div>
+        )}
+
         <div className="flex items-center gap-3">
           <button
             type="button"

@@ -67,6 +67,10 @@ _LOCALHOST_RE = re.compile(r"^(https?://)(localhost|127\.0\.0\.1)(:\d+)?", re.I)
 COMPLETION_TIMEOUT = 600.0
 LISTING_TIMEOUT = 5.0
 
+# Rueckfallwert, wenn das Kontextfenster unbekannt ist — bewusst klein, damit
+# ein unbekanntes Modell nicht am ersten Aufruf scheitert.
+DEFAULT_CHUNK_CHARS = 8_000
+
 
 class Completion(NamedTuple):
     """Antwort plus Verbrauch — die UI zeigt Modell und Tokens an, damit
@@ -105,6 +109,10 @@ class AiConfig(BaseModel):
 
     openrouter_api_key: str = ""
     openrouter_model: str = Field(default="anthropic/claude-haiku-4-5")
+
+    # Zeichen pro Anfrage bei der PDF-Auswertung. 0 = automatisch aus dem
+    # Kontextfenster des Modells ableiten.
+    context_chars_override: int = 0
 
     @property
     def enabled(self) -> bool:
@@ -377,6 +385,96 @@ async def complete_detailed(
             e or "(keine Meldung)",
         )
         return Completion()
+
+
+# ── Kontextfenster ────────────────────────────────────────────
+#
+# Wie viel Text pro Anfrage sinnvoll ist, haengt am Kontextfenster des Modells.
+# Lokale Server melden es; Cloud-Modelle sind bekannt genug fuer eine Tabelle.
+
+# Konservativ: deutscher Fliesstext mit Zahlen liegt eher bei 3-4 Zeichen/Token
+CHARS_PER_TOKEN = 3.5
+# Platz fuer System-Prompt samt Few-Shot-Beispielen
+PROMPT_RESERVE_TOKENS = 2000
+# Deckel pro Anfrage. Ein 262k-Modell koennte theoretisch ein ganzes Buch
+# aufnehmen, aber die Antwortzeit waechst mit der Prompt-Laenge — und ein
+# Fehlversuch kostet dann Minuten statt Sekunden.
+MAX_CHUNK_CHARS = 120_000
+MIN_CHUNK_CHARS = 4_000
+
+# Kontextfenster bekannter Cloud-Modelle (Tokens)
+CLOUD_CONTEXT_TOKENS: Dict[str, int] = {
+    "anthropic": 200_000,
+    "openai": 128_000,
+    "gemini": 1_000_000,
+    "openrouter": 128_000,  # variiert stark — konservativ
+}
+
+
+async def detect_context_tokens(cfg: AiConfig) -> Optional[int]:
+    """Kontextfenster des aktuell gewaehlten Modells in Tokens.
+
+    Lokale Server werden gefragt (LM Studio: /api/v0/models, Ollama:
+    /api/show), Cloud-Provider kommen aus der Tabelle. None, wenn unbekannt.
+    """
+    if not cfg.enabled:
+        return None
+
+    if cfg.provider == "lm-studio":
+        base = resolve_host_url(cfg.lm_studio_url or DEFAULT_LM_STUDIO_URL)
+        try:
+            async with httpx.AsyncClient(timeout=LISTING_TIMEOUT) as client:
+                res = await client.get(f"{base}/api/v0/models")
+                res.raise_for_status()
+                for entry in res.json().get("data", []):
+                    if entry.get("id") != cfg.lm_studio_model:
+                        continue
+                    value = entry.get("loaded_context_length") or entry.get(
+                        "max_context_length"
+                    )
+                    return int(value) if value else None
+        except Exception as e:
+            logger.info("Kontextfenster von LM Studio nicht abrufbar: %s", e)
+        return None
+
+    if cfg.provider == "ollama":
+        base = resolve_host_url(cfg.ollama_url or DEFAULT_OLLAMA_URL)
+        try:
+            async with httpx.AsyncClient(timeout=LISTING_TIMEOUT) as client:
+                res = await client.post(
+                    f"{base}/api/show", json={"model": cfg.ollama_model}
+                )
+                res.raise_for_status()
+                info = res.json().get("model_info") or {}
+                # Der Schluessel traegt den Architekturnamen: "gemma3.context_length"
+                for key, value in info.items():
+                    if key.endswith(".context_length") and value:
+                        return int(value)
+        except Exception as e:
+            logger.info("Kontextfenster von Ollama nicht abrufbar: %s", e)
+        return None
+
+    return CLOUD_CONTEXT_TOKENS.get(cfg.provider)
+
+
+async def resolve_chunk_chars(cfg: AiConfig, max_output_tokens: int) -> int:
+    """Wie viele Zeichen Dokumenttext pro Anfrage mitgehen duerfen.
+
+    Übersteuerung des Nutzers schlaegt alles. Sonst aus dem Kontextfenster
+    abgeleitet, abzueglich Platz fuer System-Prompt und Antwort — beide teilen
+    sich das Fenster mit der Eingabe.
+    """
+    if cfg.context_chars_override > 0:
+        return max(MIN_CHUNK_CHARS, min(cfg.context_chars_override, MAX_CHUNK_CHARS))
+
+    context_tokens = await detect_context_tokens(cfg)
+    if not context_tokens:
+        return DEFAULT_CHUNK_CHARS
+
+    usable = context_tokens - max_output_tokens - PROMPT_RESERVE_TOKENS
+    if usable <= 0:
+        return MIN_CHUNK_CHARS
+    return max(MIN_CHUNK_CHARS, min(int(usable * CHARS_PER_TOKEN), MAX_CHUNK_CHARS))
 
 
 async def list_models(cfg: AiConfig) -> List[str]:

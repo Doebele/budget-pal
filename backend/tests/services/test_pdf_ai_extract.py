@@ -120,13 +120,16 @@ class TestTruncationIsReported:
     async def test_long_document_is_flagged(self):
         response = '{"transactions": []}'
         long_text = "\n".join(f"Buchungszeile {i} mit etwas Text" for i in range(6000))
+        # Zuschnitt fest vorgeben, damit der Test nicht vom erkannten
+        # Kontextfenster des jeweiligen Modells abhaengt
+        cfg = AiConfig(
+            provider="openai", openai_api_key="sk-test", context_chars_override=4000
+        )
         with patch.object(
             pdf_ai_extract.ai_client, "complete_detailed",
             AsyncMock(return_value=Completion(response, "m", 1, 1)),
         ):
-            result = await pdf_ai_extract.extract_transactions(
-                AiConfig(provider="openai", openai_api_key="sk-test"), long_text
-            )
+            result = await pdf_ai_extract.extract_transactions(cfg, long_text)
 
         assert result.truncated is True
         assert result.chunks_processed == pdf_ai_extract.MAX_CHUNKS
