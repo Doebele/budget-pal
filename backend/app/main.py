@@ -205,6 +205,20 @@ async def lifespan(app: FastAPI):
         logger.error(f"Failed to load currency rates: {e}")
         # Non-fatal: fallback rates will be used
 
+    # Haengengebliebene Import-Jobs abraeumen. PDF-Jobs laufen im Worker-Prozess;
+    # ein Neustart mittendrin liesse sie fuer immer auf "processing" stehen und
+    # die Fortschrittsanzeige im Frontend wuerde ewig drehen.
+    try:
+        from app.api.imports import fail_stale_import_jobs
+        from app.core.database import AsyncSessionLocal
+
+        async with AsyncSessionLocal() as session:
+            cleaned = await fail_stale_import_jobs(session)
+            if cleaned:
+                logger.info("%d haengende Import-Jobs abgeraeumt.", cleaned)
+    except Exception as e:
+        logger.warning("Aufraeumen haengender Import-Jobs uebersprungen: %s", e)
+
     yield
 
     logger.info("Shutting down Budget-Pal backend.")

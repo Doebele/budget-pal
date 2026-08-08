@@ -137,6 +137,16 @@ export const importsApi = {
       headers: { "Content-Type": "multipart/form-data" },
       timeout: AI_IMPORT_TIMEOUT_MS,
     }),
+  // Hintergrund-Variante: antwortet sofort mit einer Import-ID, das Ergebnis
+  // wird per Polling abgeholt. Der Upload selbst darf ruhig lange dauern
+  // (grosse Datei), die Auswertung laeuft danach ohne offenen Request.
+  previewPdfAsync: (formData: FormData) =>
+    api.post<ImportJob>("/imports/pdf/preview-async", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      timeout: 120_000,
+    }),
+  importJob: (importId: number) => api.get<ImportJob>(`/imports/jobs/${importId}`),
+  activeImportJob: () => api.get<ImportJob | null>("/imports/jobs/active"),
   confirmPdf: (payload: Record<string, unknown>) => api.post("/imports/pdf/confirm", payload),
   history: () => api.get("/imports/history"),
   preview: (id: number) => api.get(`/imports/${id}/preview`),
@@ -274,6 +284,23 @@ export const settingsApi = {
     api.put("/settings/category-mappings", { mappings }),
   resetCategoryMappings: () => api.delete("/settings/category-mappings"),
 };
+
+// PDF-Import als Hintergrundjob — siehe backend/app/api/imports.py
+export type ImportJobStatus = "pending" | "processing" | "completed" | "failed" | "partial";
+
+export interface ImportJob {
+  import_id: number;
+  status: ImportJobStatus;
+  filename: string;
+  chunks_done: number;
+  chunks_total: number;
+  error_message: string | null;
+  // Erst bei status === "completed" gefüllt; Form entspricht der Vorschau
+  result: Record<string, unknown> | null;
+}
+
+export const isImportJobRunning = (job?: ImportJob | null): boolean =>
+  job?.status === "pending" || job?.status === "processing";
 
 // KI-Provider / Modellauswahl — siehe backend/app/services/ai_client.py
 export type AiProvider =
