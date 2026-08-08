@@ -169,10 +169,31 @@
 [data-density="low"]  { --pad-card:18px; --pad-row:14px; --gap-stack:14px; }
 [data-density="high"] { --pad-card:12px; --pad-row:10px; --gap-stack:8px; }
 
-/* Low density: zoomt die gesamte UI; app-shell kompensiert den Zoom,
-   damit sie exakt 1 Bildschirm hoch bleibt. */
-body[data-density="low"] { zoom: 1.12; }
-body[data-density="low"] .app-shell { height: calc(100vh / 1.12); }
+/* Low density: zoomt die gesamte UI.
+   ACHTUNG: `zoom` skaliert vh-Einheiten NICHT mit. Ein Element mit 95vh wird
+   dadurch faktisch 95 × 1.12 = 106 % der Fensterhöhe hoch und ragt oben und
+   unten heraus (gemessen: je 35 px bei 1103 px Fensterhöhe). Jede
+   vh-Angabe muss deshalb durch --ui-zoom geteilt werden — dafür gibt es die
+   Klassen .overlay-panel und .overlay-sheet weiter unten. */
+:root { --ui-zoom: 1; }
+body[data-density="low"] { zoom: 1.12; --ui-zoom: 1.12; }
+body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
+
+/* Overlays: zoom-korrigierte Höhen. Der Innenraum muss zusätzlich
+   min-height:0 erlauben, sonst wächst ein flex-Kind über die Maximalhöhe
+   hinaus und der Fussbereich mit den Buttons rutscht aus dem Bild. */
+.overlay-panel {
+  max-height: calc(92vh / var(--ui-zoom));
+  display: flex;
+  flex-direction: column;
+}
+.overlay-panel > .overlay-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+.overlay-sheet { max-height: calc(88vh / var(--ui-zoom)); }
+.overlay-pane  { max-height: calc(55vh / var(--ui-zoom)); }
 
 @layer base {
   * {

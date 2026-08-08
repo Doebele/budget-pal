@@ -293,7 +293,7 @@ export default function TransactionSidebarEditor({ transactions, periodLabel, on
 
         {/* ── Detail editor (shown when a transaction is selected) ── */}
         {selected && (
-          <div className="shrink-0 border-t border-border bg-bg-surface2 max-h-[55vh] overflow-y-auto">
+          <div className="shrink-0 border-t border-border bg-bg-surface2 overlay-pane overflow-y-auto">
 
             {/* Editor header */}
             <div className="px-5 py-3 border-b border-border flex items-start justify-between gap-3">

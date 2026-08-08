@@ -292,6 +292,8 @@ export interface ImportJob {
   import_id: number;
   status: ImportJobStatus;
   filename: string;
+  // Ziel-Konto des Jobs — zum Wiederherstellen der Auswahl
+  account_id: number | null;
   chunks_done: number;
   chunks_total: number;
   error_message: string | null;

@@ -1075,7 +1075,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
           />
 
           {/* Bottom sheet */}
-          <div className="fixed bottom-0 left-0 right-0 z-50 flex flex-col max-h-[88vh] animate-slide-up">
+          <div className="fixed bottom-0 left-0 right-0 z-50 flex flex-col overlay-sheet animate-slide-up">
             {/* Drag handle */}
             <div className="flex justify-center pt-2 pb-1 bg-bg-surface rounded-t-lg border-t border-x border-border/50">
               <div className="w-10 h-1 rounded-full bg-white/20" />

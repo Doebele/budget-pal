@@ -1187,6 +1187,9 @@ class ImportJobResponse(BaseModel):
     import_id: int
     status: str  # pending | processing | completed | failed
     filename: str
+    # Ziel-Konto des Jobs — damit die UI beim Zurueckkehren wieder weiss,
+    # wohin importiert werden soll
+    account_id: Optional[int] = None
     # Fortschritt der KI-Auswertung, sobald bekannt
     chunks_done: int = 0
     chunks_total: int = 0
@@ -1209,6 +1212,7 @@ def _job_to_response(log: ImportLog) -> ImportJobResponse:
         import_id=log.id,
         status=log.status.value if hasattr(log.status, "value") else str(log.status),
         filename=log.filename,
+        account_id=log.account_id,
         chunks_done=done,
         chunks_total=total,
         error_message=log.error_message,

@@ -14,6 +14,7 @@ import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { clsx } from "clsx";
+import { useUiStore } from "@/lib/store";
 import { formatCHF, getFrequencyStyle, getFrequencyBadgeStyle, PERIODICITY_LABELS } from "@/lib/theme";
 
 const BANKS = [
@@ -143,7 +144,10 @@ export default function Import() {
   const queryClient = useQueryClient();
   const csvRef = useRef<HTMLInputElement>(null);
   const pdfRef = useRef<HTMLInputElement>(null);
-  const [selectedAccount, setSelectedAccount] = useState("");
+  // Ziel-Konto überlebt Seitenwechsel und Neuladen — der Import läuft im
+  // Hintergrund, und der Bestätigen-Schritt braucht das Konto danach wieder.
+  const { importAccountId: selectedAccount, setImportAccountId: setSelectedAccount } =
+    useUiStore();
   const [selectedBank, setSelectedBank] = useState("");
   const [importResult, setImportResult] = useState<{
     rows_imported: number;
@@ -232,10 +236,16 @@ export default function Import() {
   const { data: activeJob } = useActiveImportJob();
   const { data: job } = useImportJob(jobId);
 
-  // Beim Betreten der Seite an einen bereits laufenden Job andocken
+  // Beim Betreten der Seite an einen bereits laufenden Job andocken — samt
+  // dessen Ziel-Konto, falls die Auswahl lokal fehlt
   useEffect(() => {
-    if (jobId === null && activeJob) setJobId(activeJob.import_id);
-  }, [activeJob, jobId]);
+    if (jobId === null && activeJob) {
+      setJobId(activeJob.import_id);
+      if (!selectedAccount && activeJob.account_id) {
+        setSelectedAccount(String(activeJob.account_id));
+      }
+    }
+  }, [activeJob, jobId, selectedAccount, setSelectedAccount]);
 
   const startPdfJob = useMutation({
     mutationFn: async (file: File) => {
@@ -606,7 +616,7 @@ export default function Import() {
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-2 sm:p-4">
-            <div className="w-full max-w-[96vw] max-h-[95vh] overflow-hidden rounded-xl border border-border bg-bg-surface shadow-2xl flex flex-col">
+            <div className="w-full max-w-[96vw] overlay-panel overflow-hidden rounded-xl border border-border bg-bg-surface shadow-2xl">
 
               {/* ── Header ── */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-shrink-0">
@@ -704,7 +714,7 @@ export default function Import() {
               </div>
 
               {/* ── Table ── */}
-              <div className="flex-1 overflow-auto px-5 pb-2">
+              <div className="overlay-body px-5 pb-2">
                 <table className="w-full text-xs border-collapse">
                   <thead className="sticky top-0 z-10 bg-bg-surface2">
                     <tr>
