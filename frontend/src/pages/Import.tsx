@@ -351,6 +351,10 @@ export default function Import() {
 
   // Get the last completed import
   const lastImport = history?.[0];
+  // Der Eintrag, auf den sich der Löschdialog bezieht — nicht zwingend der letzte
+  const selectedImport = (history ?? []).find(
+    (l: { id: number }) => l.id === importToDelete,
+  ) as { id: number; filename: string; rows_imported: number } | undefined;
 
   const handleCsvPreview = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1332,6 +1336,24 @@ export default function Import() {
                   {log.bank?.toUpperCase()} · {log.rows_imported} Einträge · {format(new Date(log.created_at), "dd.MM.yyyy HH:mm")}
                 </p>
               </div>
+              {/* Jeder Eintrag einzeln entfernbar — nicht nur der letzte. Bei
+                  gescheiterten Importen gibt es nichts zurückzunehmen, dort
+                  verschwindet nur der Eintrag. */}
+              <button
+                onClick={() => {
+                  setImportToDelete(log.id);
+                  setShowDeleteConfirm(true);
+                }}
+                className="text-text-tertiary hover:text-loss transition-colors shrink-0 p-1"
+                title={
+                  log.rows_imported > 0
+                    ? `Import rückgängig machen (${log.rows_imported} Transaktionen entfernen)`
+                    : "Eintrag aus der Historie entfernen"
+                }
+                aria-label="Import entfernen"
+              >
+                <Trash className="w-3.5 h-3.5" />
+              </button>
             </div>
           ))}
           {(!history || history.length === 0) && (
@@ -1341,7 +1363,7 @@ export default function Import() {
       </div>
 
       {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && importToDelete && lastImport && (
+      {showDeleteConfirm && importToDelete && selectedImport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div
             className="absolute inset-0 bg-black/60"
@@ -1353,18 +1375,33 @@ export default function Import() {
                 <Trash className="w-5 h-5 text-red-500" />
               </div>
               <h3 className="text-lg font-semibold text-text-primary">
-                Import komplett löschen?
+                {selectedImport.rows_imported > 0
+                  ? "Import rückgängig machen?"
+                  : "Eintrag entfernen?"}
               </h3>
             </div>
             <p className="text-text-secondary mb-2">
-              Der Import <strong className="text-text-primary">"{lastImport.filename}"</strong> wird gelöscht.
+              Der Import <strong className="text-text-primary">"{selectedImport.filename}"</strong> wird entfernt.
             </p>
-            <p className="text-text-secondary mb-4">
-              <strong className="text-red-400">ALLE {lastImport.rows_imported} Transaktionen</strong> aus diesem Import werden entfernt.
-            </p>
-            <p className="text-sm text-text-disabled">
-              Diese Aktion kann nicht rückgängig gemacht werden!
-            </p>
+            {selectedImport.rows_imported > 0 ? (
+              <>
+                <p className="text-text-secondary mb-4">
+                  <strong className="text-red-400">
+                    ALLE {selectedImport.rows_imported} Transaktionen
+                  </strong>{" "}
+                  aus diesem Import werden gelöscht.
+                </p>
+                <p className="text-sm text-text-disabled">
+                  Diese Aktion kann nicht rückgängig gemacht werden!
+                </p>
+              </>
+            ) : (
+              /* Gescheiterte oder leere Importe haben nichts angelegt */
+              <p className="text-text-secondary mb-4">
+                Dieser Import hat keine Transaktionen angelegt — es verschwindet nur
+                der Eintrag aus der Historie.
+              </p>
+            )}
             <div className="mt-6 flex justify-end gap-3">
               <button
                 onClick={() => {
@@ -1381,7 +1418,11 @@ export default function Import() {
                 disabled={deleteMutation.isPending}
               >
                 <Trash className="w-4 h-4" />
-                {deleteMutation.isPending ? "Wird gelöscht..." : "Alle Transaktionen löschen"}
+                {deleteMutation.isPending
+                  ? "Wird gelöscht…"
+                  : selectedImport.rows_imported > 0
+                    ? "Alle Transaktionen löschen"
+                    : "Eintrag entfernen"}
               </button>
             </div>
           </div>

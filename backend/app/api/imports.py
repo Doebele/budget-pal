@@ -1179,6 +1179,10 @@ async def preview_pdf_import(
 # Statusabfrage kann also den anderen Worker treffen als den, der rechnet.
 
 
+# Eigener file_type fuer laufende Vorschau-Jobs (String(10) im Modell)
+PDF_JOB_FILE_TYPE = "pdf_job"
+
+
 class ImportJobResponse(BaseModel):
     import_id: int
     status: str  # pending | processing | completed | failed
@@ -1319,7 +1323,10 @@ async def start_pdf_preview_job(
         account_id=account_id,
         filename=filename,
         bank=bank,
-        file_type="pdf",
+        # Eigener Typ: ein laufender Vorschau-Job ist KEIN Import. Sonst steht
+        # jede Vorschau in der Historie und verdeckt den letzten echten Import,
+        # an dem der "Rueckgaengig"-Knopf haengt.
+        file_type=PDF_JOB_FILE_TYPE,
         status=ImportStatus.pending,
     )
     db.add(log)
@@ -1343,7 +1350,7 @@ async def get_active_import_job(
         select(ImportLog)
         .where(
             ImportLog.user_id == current_user.id,
-            ImportLog.file_type == "pdf",
+            ImportLog.file_type == PDF_JOB_FILE_TYPE,
             ImportLog.status.in_([ImportStatus.pending, ImportStatus.processing]),
         )
         .order_by(desc(ImportLog.created_at))
@@ -2157,10 +2164,16 @@ async def import_history(
     db: AsyncSession = Depends(get_db),
     limit: int = 50,
 ):
-    """List the current user's import history."""
+    """List the current user's import history.
+
+    Vorschau-Jobs sind ausgenommen — sie sind Zwischenstand, kein Import.
+    """
     result = await db.execute(
         select(ImportLog)
-        .where(ImportLog.user_id == current_user.id)
+        .where(
+            ImportLog.user_id == current_user.id,
+            ImportLog.file_type != PDF_JOB_FILE_TYPE,
+        )
         .order_by(desc(ImportLog.created_at))
         .limit(limit)
     )
