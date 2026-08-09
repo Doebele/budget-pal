@@ -3,7 +3,8 @@ import { useState, useEffect } from "react";
 import { clsx } from "clsx";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
-import { api, authApi, settingsApi, taxonomyApi, backupApi, aiApi, type AiProvider, type AiSettings } from "@/lib/api";
+import { api, authApi, settingsApi, taxonomyApi, backupApi, aiApi, passkeysApi, SESSION_TIMEOUTS, type AiProvider, type AiSettings, type SessionTimeout } from "@/lib/api";
+import { startRegistration } from "@simplewebauthn/browser";
 import { DEFAULT_SARON_REFERENCE_ANNUAL_PCT, SARON_INDEX_URL } from "@/lib/saron";
 import { Check, CheckCircle, Download, EditPencil, Eye, FloppyDisk, Group, Label, MagicWand, NavArrowDown, NavArrowUp, OpenNewWindow, Plus, Refresh, ShieldCheck, Sparks, Trash, Undo, Upload, WarningCircle, Xmark } from "@/lib/icons";
 import { Link } from "react-router-dom";
@@ -1445,6 +1446,8 @@ export default function Settings() {
 
       <AiModelSection />
 
+      <SecuritySection />
+
       {/* Info */}
       {/* Darstellung / Display preferences */}
       <div className="card">
@@ -1598,6 +1601,170 @@ export default function Settings() {
               budgetpal.doebele12.de <OpenNewWindow className="w-3 h-3" />
             </a>
           </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Sicherheit — Session-Dauer und Passkeys ───────────────────
+// Passkeys brauchen einen sicheren Kontext (HTTPS oder localhost) und binden
+// sich an die Domain; passt die rp_id des Backends nicht zur aufgerufenen
+// Adresse, lehnt schon der Browser ab.
+const SESSION_TIMEOUT_LABELS: Record<SessionTimeout, string> = {
+  "15m": "15 Minuten",
+  "1h": "1 Stunde",
+  "6h": "6 Stunden",
+  "24h": "24 Stunden",
+  "7d": "1 Woche",
+  "30d": "30 Tage",
+};
+
+function SecuritySection() {
+  const { t } = useTranslation("settings");
+  const queryClient = useQueryClient();
+  const [deviceName, setDeviceName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const { data: profile } = useQuery({
+    queryKey: ["me"],
+    queryFn: async () => (await authApi.getMe()).data,
+  });
+
+  const { data: passkeys = [] } = useQuery({
+    queryKey: ["passkeys"],
+    queryFn: async () => (await passkeysApi.list()).data,
+  });
+
+  const saveTimeout = useMutation({
+    mutationFn: (value: string) => authApi.updateMe({ session_timeout: value }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["me"] }),
+  });
+
+  const registerPasskey = useMutation({
+    mutationFn: async () => {
+      setError(null);
+      const options = JSON.parse((await passkeysApi.registerOptions()).data);
+      // Der Browser fuehrt die Ceremony (Face ID, Touch ID, Windows Hello)
+      const credential = await startRegistration({ optionsJSON: options });
+      return (await passkeysApi.registerVerify(credential, deviceName)).data;
+    },
+    onSuccess: () => {
+      setDeviceName("");
+      queryClient.invalidateQueries({ queryKey: ["passkeys"] });
+    },
+    onError: (e: unknown) => {
+      // Abbruch durch den Nutzer ist kein Fehler, den man anschreien muss
+      const name = (e as { name?: string })?.name;
+      setError(
+        name === "NotAllowedError"
+          ? t("security.passkeyCancelled")
+          : t("security.passkeyFailed"),
+      );
+    },
+  });
+
+  const removePasskey = useMutation({
+    mutationFn: (id: number) => passkeysApi.remove(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["passkeys"] }),
+  });
+
+  const supported = typeof window !== "undefined" && !!window.PublicKeyCredential;
+
+  return (
+    <div className="card">
+      <h2 className="text-text-primary font-semibold text-sm mb-1 flex items-center gap-2">
+        <ShieldCheck className="w-4 h-4 text-accent" /> {t("security.title")}
+      </h2>
+      <p className="text-text-disabled text-xs mb-4">{t("security.subtitle")}</p>
+
+      <div className="space-y-5">
+        <div>
+          <label className="label mb-2 block">{t("security.sessionDuration")}</label>
+          <select
+            className="input"
+            value={(profile?.session_timeout as string) ?? "30m"}
+            onChange={(e) => saveTimeout.mutate(e.target.value)}
+          >
+            {SESSION_TIMEOUTS.map((v) => (
+              <option key={v} value={v}>{SESSION_TIMEOUT_LABELS[v]}</option>
+            ))}
+          </select>
+          <p className="text-text-disabled text-[11px] mt-1.5">
+            {t("security.sessionDurationHint")}
+          </p>
+        </div>
+
+        <div>
+          <label className="label mb-2 block">{t("security.passkeys")}</label>
+          <p className="text-text-disabled text-[11px] mb-2">
+            {t("security.passkeysHint")}
+          </p>
+
+          {!supported ? (
+            <p className="text-text-tertiary text-xs">{t("security.passkeyUnsupported")}</p>
+          ) : (
+            <>
+              <div className="flex items-center gap-2">
+                <input
+                  className="input flex-1"
+                  value={deviceName}
+                  onChange={(e) => setDeviceName(e.target.value)}
+                  placeholder={t("security.devicePlaceholder")}
+                  maxLength={120}
+                />
+                <button
+                  type="button"
+                  className="btn btn-primary shrink-0"
+                  disabled={registerPasskey.isPending}
+                  onClick={() => registerPasskey.mutate()}
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  {registerPasskey.isPending ? t("security.registering") : t("security.register")}
+                </button>
+              </div>
+              {error && (
+                <p className="text-loss text-[11px] mt-1.5 flex items-center gap-1">
+                  <WarningCircle className="w-3.5 h-3.5" /> {error}
+                </p>
+              )}
+
+              <div className="mt-3 space-y-2">
+                {passkeys.map((k) => (
+                  <div
+                    key={k.id}
+                    className="flex items-center gap-3 rounded-lg bg-bg-surface2 px-3 py-2"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-text-primary text-xs font-medium truncate">
+                        {k.device_name || t("security.unknownDevice")}
+                      </p>
+                      <p className="text-text-tertiary text-[11px]">
+                        {t("security.addedOn", {
+                          date: new Date(k.created_at).toLocaleDateString("de-CH"),
+                        })}
+                        {k.last_used_at &&
+                          ` · ${t("security.lastUsed", {
+                            date: new Date(k.last_used_at).toLocaleDateString("de-CH"),
+                          })}`}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removePasskey.mutate(k.id)}
+                      className="text-text-tertiary hover:text-loss transition-colors p-1"
+                      title={t("security.removePasskey")}
+                    >
+                      <Trash className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+                {passkeys.length === 0 && (
+                  <p className="text-text-tertiary text-xs">{t("security.noPasskeys")}</p>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

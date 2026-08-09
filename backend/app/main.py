@@ -13,6 +13,7 @@ from app.core.config import settings
 from app.core.database import AsyncSessionLocal, init_db
 from app.api import auth, transactions, imports, projections, accounts, categories, budgets, pension, assets, wizard, currency, forecasting, budget_multimodal, recurring_plan, taxonomy, backup, goals, notifications
 from app.api import settings as settings_api
+from app.api import webauthn
 from app.services.currency_service import currency_service
 
 logging.basicConfig(
@@ -249,6 +250,7 @@ app.add_middleware(
 # ── Routers ───────────────────────────────────────────────────
 
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
+app.include_router(webauthn.router, prefix="/api/auth/webauthn", tags=["passkeys"])
 app.include_router(transactions.router, prefix="/api/transactions", tags=["transactions"])
 app.include_router(imports.router, prefix="/api/imports", tags=["imports"])
 app.include_router(projections.router, prefix="/api/projections", tags=["projections"])

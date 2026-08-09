@@ -100,6 +100,12 @@ class User(Base):
     # Holds API keys, so it is never returned raw by the API (keys are masked to
     # a has_* boolean). NULL means "no AI configured" (provider "none").
     ai_config_json: Mapped[Optional[dict]] = mapped_column(PortableJSON, nullable=True)
+    # Wie lange eine Anmeldung gilt ("15m", "1h", "6h", "24h", "7d", "30d").
+    # Wirkt ab der naechsten Anmeldung — ein bereits ausgestelltes Token traegt
+    # seine Laufzeit in sich.
+    session_timeout: Mapped[str] = mapped_column(
+        String(8), default="30m", server_default="30m", nullable=False
+    )
 
     # Relationships
     accounts: Mapped[List["Account"]] = relationship("Account", back_populates="user", cascade="all, delete-orphan")
@@ -116,6 +122,9 @@ class User(Base):
     forecast_scenarios: Mapped[List["ForecastScenario"]] = relationship("ForecastScenario", back_populates="user", cascade="all, delete-orphan")
     activity_logs: Mapped[List["ActivityLog"]] = relationship("ActivityLog", back_populates="user")
     goals: Mapped[List["Goal"]] = relationship("Goal", back_populates="user", cascade="all, delete-orphan")
+    webauthn_credentials: Mapped[List["WebAuthnCredential"]] = relationship(
+        "WebAuthnCredential", back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 # ── Account ───────────────────────────────────────────────────
@@ -637,3 +646,51 @@ class Goal(Base):
 
     user: Mapped["User"] = relationship("User", back_populates="goals")
     linked_account: Mapped[Optional["Account"]] = relationship("Account")
+
+
+# ── WebAuthn / Passkeys ───────────────────────────────────────
+
+
+class WebAuthnCredential(Base):
+    """Ein registrierter Passkey (Face ID, Touch ID, Windows Hello, Sicherheitsschluessel)."""
+
+    __tablename__ = "webauthn_credentials"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    # Base64url-kodierte Credential-ID, wie sie der Authenticator liefert
+    credential_id: Mapped[str] = mapped_column(String(512), unique=True, nullable=False, index=True)
+    public_key: Mapped[str] = mapped_column(Text, nullable=False)
+    # Zaehler des Authenticators — springt er zurueck, ist der Schluessel geklont
+    sign_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    device_name: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    last_used_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    user: Mapped["User"] = relationship("User", back_populates="webauthn_credentials")
+
+
+class WebAuthnChallenge(Base):
+    """Kurzlebige Challenge einer laufenden WebAuthn-Ceremony.
+
+    Bewusst in der Datenbank, nicht im Arbeitsspeicher: das Backend laeuft mit
+    mehreren Workern, und die Verifikation trifft nicht zwingend denselben
+    Prozess, der die Challenge ausgestellt hat.
+    """
+
+    __tablename__ = "webauthn_challenges"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    challenge: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    # NULL bei der Anmeldung — da ist der Nutzer noch unbekannt
+    user_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True
+    )
+    purpose: Mapped[str] = mapped_column(String(16), nullable=False)  # register | login
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

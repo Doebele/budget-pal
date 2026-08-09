@@ -30,6 +30,19 @@ class Settings(BaseSettings):
     postgres_port: int = 5432
 
     # ── Auth / JWT ────────────────────────────────────────────
+    # ── Passkeys (WebAuthn) ───────────────────────────────────
+    # WebAuthn bindet einen Passkey fest an die Domain. rp_id ist die nackte
+    # Domain (ohne Schema/Port), origins sind die vollstaendigen Adressen, unter
+    # denen die App erreichbar ist. Passt das nicht zur aufgerufenen Adresse,
+    # lehnt schon der Browser ab.
+    webauthn_rp_id: str = "localhost"
+    webauthn_rp_name: str = "Budget-Pal"
+    webauthn_origins_raw: str = "http://localhost:8011,http://localhost:5173"
+
+    @property
+    def webauthn_origins(self) -> list[str]:
+        return [o.strip() for o in self.webauthn_origins_raw.split(",") if o.strip()]
+
     jwt_secret_key: str = ""
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30

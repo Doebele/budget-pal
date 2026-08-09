@@ -304,6 +304,36 @@ export interface ImportJob {
 export const isImportJobRunning = (job?: ImportJob | null): boolean =>
   job?.status === "pending" || job?.status === "processing";
 
+// Passkeys (WebAuthn) — siehe backend/app/api/webauthn.py
+export interface PasskeyCredential {
+  id: number;
+  device_name: string | null;
+  created_at: string;
+  last_used_at: string | null;
+}
+
+export const SESSION_TIMEOUTS = ["15m", "1h", "6h", "24h", "7d", "30d"] as const;
+export type SessionTimeout = (typeof SESSION_TIMEOUTS)[number];
+
+export const passkeysApi = {
+  // Die Options-Endpunkte liefern JSON als String, so wie die WebAuthn-Spec
+  // es erwartet — er geht unveraendert an den Browser weiter.
+  registerOptions: () => api.post<string>("/auth/webauthn/register/options"),
+  registerVerify: (credential: unknown, deviceName?: string) =>
+    api.post<PasskeyCredential>("/auth/webauthn/register/verify", {
+      credential,
+      device_name: deviceName || null,
+    }),
+  loginOptions: () => api.post<string>("/auth/webauthn/login/options"),
+  loginVerify: (credential: unknown) =>
+    api.post<{ access_token: string; user_id: number; name: string; email: string }>(
+      "/auth/webauthn/login/verify",
+      { credential },
+    ),
+  list: () => api.get<PasskeyCredential[]>("/auth/webauthn/credentials"),
+  remove: (id: number) => api.delete(`/auth/webauthn/credentials/${id}`),
+};
+
 // KI-Provider / Modellauswahl — siehe backend/app/services/ai_client.py
 export type AiProvider =
   | "none"
