@@ -487,3 +487,55 @@ async def test_override_is_clamped_to_sane_range():
     assert await ai_client.resolve_chunk_chars(cfg, 12000) == ai_client.MAX_CHUNK_CHARS
     cfg = AiConfig(provider="anthropic", context_chars_override=10)
     assert await ai_client.resolve_chunk_chars(cfg, 12000) == ai_client.MIN_CHUNK_CHARS
+
+
+# ── JSON aus Modellantworten schneiden ────────────────────────
+#
+# Modelle halten sich nicht an json_mode. Reasoning-Modelle erklaeren vorher
+# das gewuenschte Format MIT Beispielklammern — ein gieriges "erstes { bis
+# letztes }" spannt dann ueber Beispiel UND Antwort und ist unparsebar.
+
+
+def test_parses_plain_json():
+    assert ai_client.parse_json_object('{"a": 1}') == {"a": 1}
+
+
+def test_parses_json_in_markdown_fence():
+    raw = 'Hier:\n```json\n{"a": 1}\n```'
+    assert ai_client.parse_json_object(raw) == {"a": 1}
+
+
+def test_takes_the_last_object_after_an_explaining_example():
+    """Der konkrete Fall, der die Sammelkategorisierung lahmlegte."""
+    raw = (
+        'Ich soll so antworten: {"results": [{"nr": 1, "category": "..."}]}\n'
+        'Hier das Ergebnis:\n'
+        '{"results": [{"nr": 1, "category": "Shopping"}]}'
+    )
+    parsed = ai_client.parse_json_object(raw)
+    assert parsed["results"][0]["category"] == "Shopping"
+
+
+def test_braces_inside_strings_do_not_confuse_the_scanner():
+    raw = '{"text": "geschweifte Klammer } im String", "ok": true}'
+    assert ai_client.parse_json_object(raw)["ok"] is True
+
+
+def test_escaped_quotes_are_handled():
+    raw = '{"text": "er sagte \\"hallo\\"", "ok": true}'
+    assert ai_client.parse_json_object(raw)["ok"] is True
+
+
+def test_returns_none_without_json():
+    assert ai_client.parse_json_object("Das kann ich nicht.") is None
+    assert ai_client.parse_json_object("") is None
+    assert ai_client.parse_json_object(None) is None
+
+
+def test_returns_none_for_unbalanced_fragment():
+    assert ai_client.parse_json_object('{"a": 1') is None
+
+
+def test_ignores_json_arrays_at_top_level():
+    # Die Aufrufer erwarten ein Objekt; eine nackte Liste ist keins
+    assert ai_client.parse_json_object('[1, 2, 3]') is None

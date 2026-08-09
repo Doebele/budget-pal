@@ -15,6 +15,7 @@ und Gemini haben ein eigenes Format.
 """
 from __future__ import annotations
 
+import json
 import logging
 import re
 from typing import Any, Dict, List, NamedTuple, Optional
@@ -70,6 +71,65 @@ LISTING_TIMEOUT = 5.0
 # Rueckfallwert, wenn das Kontextfenster unbekannt ist — bewusst klein, damit
 # ein unbekanntes Modell nicht am ersten Aufruf scheitert.
 DEFAULT_CHUNK_CHARS = 8_000
+
+
+def parse_json_object(raw: Optional[str]) -> Optional[Dict[str, Any]]:
+    """Das JSON-Objekt aus einer Modellantwort holen.
+
+    Modelle halten sich nicht an json_mode: sie verpacken die Antwort in
+    ```json-Fences, stellen Fliesstext voran oder — bei Reasoning-Modellen —
+    erklaeren vorher das gewuenschte Format MIT Beispielklammern. Ein gieriges
+    "vom ersten { bis zum letzten }" spannt dann ueber Beispiel UND Antwort und
+    ist unparsebar.
+
+    Deshalb: erst die ganze Antwort versuchen, dann jede balancierte
+    {...}-Gruppe einzeln — die letzte gueltige gewinnt, weil die eigentliche
+    Antwort hinter der Erklaerung steht.
+    """
+    text = (raw or "").strip()
+    if not text:
+        return None
+
+    try:
+        direct = json.loads(text)
+        if isinstance(direct, dict):
+            return direct
+    except ValueError:
+        pass
+
+    best: Optional[Dict[str, Any]] = None
+    depth = 0
+    start = -1
+    in_string = False
+    escaped = False
+
+    for index, char in enumerate(text):
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char == "{":
+            if depth == 0:
+                start = index
+            depth += 1
+        elif char == "}":
+            if depth == 0:
+                continue
+            depth -= 1
+            if depth == 0 and start >= 0:
+                try:
+                    candidate = json.loads(text[start : index + 1])
+                except ValueError:
+                    continue
+                if isinstance(candidate, dict):
+                    best = candidate
+    return best
 
 
 class Completion(NamedTuple):

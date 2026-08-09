@@ -1006,6 +1006,8 @@ async def _build_pdf_preview(
     parsed_rows = 0
     error_rows = 0
     prior_for_pdf: List[Tuple[str, str, float, str]] = []
+    # (Zeilenindex, Text) fuer die gebuendelte Kategorisierung nach der Schleife
+    pending_categorization: List[Tuple[int, str]] = []
 
     for row in raw_transactions:
         date_val = row.get("date")
@@ -1068,27 +1070,20 @@ async def _build_pdf_preview(
             else str(date_val or "")
         )
 
-        # AI category suggestion for preview
-        # Use MCC merchant category (from credit card PDFs) as extra context for the AI
-        preview_category: Optional[str] = None
-        if parsed and description_val:
-            try:
-                notes_val = str(row.get("notes", "")).strip()
-                cat_hint = (
-                    f"{description_val} {notes_val}".strip()
-                    if notes_val
-                    else description_val
+        # Kategorie: was die KI-Extraktion schon geliefert hat, gilt — sie
+        # kannte den vollen Beleg-Kontext, nicht nur den Buchungstext. Der
+        # Rest wird NACH der Schleife in einem Rutsch kategorisiert; einzeln
+        # waere das ein LLM-Aufruf pro Zeile (gemessen 20-30s je Aufruf).
+        preview_category: Optional[str] = str(row.get("category") or "").strip() or None
+        if parsed and description_val and not preview_category:
+            notes_val = str(row.get("notes", "")).strip()
+            # MCC-Notizen aus Kreditkarten-PDFs sind zusaetzlicher Kontext
+            pending_categorization.append(
+                (
+                    len(rows),
+                    f"{description_val} {notes_val}".strip() if notes_val else description_val,
                 )
-                # Hat die KI-Extraktion schon eine Kategorie geliefert, gilt die —
-                # sie kannte den vollen Beleg-Kontext, nicht nur den Buchungstext
-                preview_category = str(row.get("category") or "").strip() or None
-                if not preview_category:
-                    cat_result = await categorization_service.categorize(
-                        cat_hint, ai_cfg, hints
-                    )
-                    preview_category = cat_result.get("category") or None
-            except Exception:
-                pass
+            )
 
         rows.append(
             PdfPreviewTransaction(
@@ -1111,6 +1106,21 @@ async def _build_pdf_preview(
         )
         if parsed:
             prior_for_pdf.append((row_id, date_str, amount_val, description_val))
+
+    # Alles, was die Extraktion offen liess, in EINEM Durchgang kategorisieren
+    if pending_categorization:
+        try:
+            categorized = await categorization_service.categorize_many(
+                [text for _, text in pending_categorization], ai_cfg, hints
+            )
+            for (row_index, _), result in zip(pending_categorization, categorized):
+                category = result.get("category")
+                if category:
+                    rows[row_index] = rows[row_index].model_copy(
+                        update={"category": category}
+                    )
+        except Exception:
+            logger.exception("Sammelkategorisierung fehlgeschlagen — Zeilen bleiben offen")
 
     rows = _detect_recurring_periodicity(rows)
 

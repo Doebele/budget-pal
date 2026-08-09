@@ -16,7 +16,7 @@ import logging
 import re
 import threading
 from functools import lru_cache
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from app.services import ai_client
 from app.services.user_history import CategoryHints
@@ -24,6 +24,10 @@ from app.services.user_history import CategoryHints
 logger = logging.getLogger(__name__)
 
 _JSON_OBJECT_RE = re.compile(r"\{.*\}", re.S)
+
+# Obergrenze fuer einen Sammelaufruf. Reasoning-Modelle denken vor der Antwort
+# nach; zu knapp bemessen liefern sie ein leeres content-Feld.
+MAX_BATCH_TOKENS = 16000
 
 
 def _extract_json_object(raw: str) -> str:
@@ -486,6 +490,116 @@ class CategorizationService:
 
         return None
 
+    def _classifier_system_prompt(self, hints: Optional["CategoryHints"]) -> str:
+        """Gemeinsame Grundlage für Einzel- und Sammelklassifikation."""
+        categories_list = ", ".join(CATEGORY_DESCRIPTIONS.keys())
+        system = (
+            f"Du bist ein Klassifikator für Schweizer Finanztransaktionen. "
+            f"Ordne jede Transaktion einer der folgenden deutschen Kategorien zu: "
+            f"{categories_list}. Bei Unklarheit: 'Sonstiges'."
+        )
+        # Bisherige Zuordnungen des Nutzers als Few-Shot-Kontext — damit das
+        # Modell seine Gewohnheiten trifft statt plausibler Eigenerfindungen
+        if hints is not None:
+            examples = hints.prompt_examples()
+            if examples:
+                system += "\n\nSo hat der Nutzer bisher zugeordnet:\n" + "\n".join(
+                    f"- {merchant} → {category}" for merchant, category in examples
+                )
+        return system
+
+    async def categorize_many(
+        self,
+        descriptions: List[str],
+        ai: Optional["ai_client.AiConfig"] = None,
+        hints: Optional["CategoryHints"] = None,
+    ) -> List[Dict]:
+        """Viele Buchungen auf einmal kategorisieren.
+
+        Warum überhaupt: die Stufen 0–3 sind lokal und schnell, die LLM-Stufe
+        ist es nicht. Ein Auszug mit 25 Zeilen ergab 12 Einzelaufrufe à 20–30s
+        — rund fünf Minuten nur fürs Kategorisieren. Hier laufen erst alle
+        lokalen Stufen, und was danach offen ist, geht in EINEM Aufruf ans
+        Modell.
+        """
+        # Stufe 0–3 pro Zeile, ohne LLM (ai=None)
+        results = [await self.categorize(d, None, hints) for d in descriptions]
+
+        # Was beim 'Sonstiges'-Default gelandet ist, hat keine der lokalen
+        # Stufen erkannt — nur diese Zeilen kommen ins Modell.
+        open_indices = [
+            i
+            for i, r in enumerate(results)
+            if r["category"] == "Sonstiges" and r["confidence_score"] <= 0.1
+        ]
+        if not open_indices or ai is None or not ai.enabled:
+            return results
+
+        resolved = await self._llm_batch(
+            [descriptions[i] for i in open_indices], ai, hints
+        )
+        for position, index in enumerate(open_indices):
+            category = resolved.get(position)
+            if category:
+                results[index] = {
+                    **results[index],
+                    "category": category,
+                    "confidence_score": 0.75,
+                }
+        return results
+
+    async def _llm_batch(
+        self,
+        descriptions: List[str],
+        ai: "ai_client.AiConfig",
+        hints: Optional["CategoryHints"],
+    ) -> Dict[int, str]:
+        """Ein Aufruf für viele Buchungen. Gibt {Position: Kategorie} zurück;
+        fehlende Positionen bleiben beim Default des Aufrufers."""
+        if not descriptions:
+            return {}
+
+        system = self._classifier_system_prompt(hints) + (
+            '\n\nDu bekommst eine nummerierte Liste. Antworte ausschliesslich mit JSON:\n'
+            '{"results": [{"nr": 1, "category": "..."}, ...]}\n'
+            "Genau ein Eintrag pro Nummer, in derselben Reihenfolge, nichts weglassen."
+        )
+        listing = "\n".join(f"{i}. {d[:200]}" for i, d in enumerate(descriptions, 1))
+
+        # Budget mit der Anzahl skalieren: pro Ergebnis ~40 Tokens, dazu
+        # Spielraum fuer Reasoning-Modelle, die vor der Antwort nachdenken.
+        max_tokens = min(2000 + 60 * len(descriptions), MAX_BATCH_TOKENS)
+
+        raw = await ai_client.complete(
+            ai, system, listing, max_tokens=max_tokens, json_mode=True
+        )
+        if not raw:
+            logger.warning("Sammelkategorisierung: keine Antwort vom Modell")
+            return {}
+
+        data = ai_client.parse_json_object(raw)
+        if data is None:
+            logger.warning("Sammelkategorisierung: Antwort enthielt kein JSON-Objekt")
+            return {}
+
+        out: Dict[int, str] = {}
+        for item in data.get("results") or []:
+            if not isinstance(item, dict):
+                continue
+            try:
+                position = int(item.get("nr")) - 1
+            except (TypeError, ValueError):
+                continue
+            category = str(item.get("category") or "").strip()
+            if category and 0 <= position < len(descriptions):
+                out[position] = category
+
+        logger.info(
+            "Sammelkategorisierung: %d von %d Zeilen in einem Aufruf zugeordnet",
+            len(out), len(descriptions),
+        )
+        return out
+
     async def _llm_fallback(
         self,
         description: str,
@@ -500,22 +614,11 @@ class CategorizationService:
         if ai is None or not ai.enabled:
             return None
 
-        categories_list = ", ".join(CATEGORY_DESCRIPTIONS.keys())
-        system = (
-            f"Du bist ein Klassifikator für Schweizer Finanztransaktionen. "
-            f"Ordne die Transaktion einer der folgenden deutschen Kategorien zu: {categories_list}. "
-            f'Antworte ausschliesslich mit JSON: {{"category": "...", "subcategory": "...", "merchant": "..."}}. '
-            f"Kategorie und Unterkategorie auf Deutsch. Bei Unklarheit: 'Sonstiges'."
+        system = self._classifier_system_prompt(hints) + (
+            '\n\nAntworte ausschliesslich mit JSON: '
+            '{"category": "...", "subcategory": "...", "merchant": "..."}. '
+            "Kategorie und Unterkategorie auf Deutsch."
         )
-
-        # Bisherige Zuordnungen des Nutzers als Few-Shot-Kontext — damit das
-        # Modell seine Gewohnheiten trifft statt plausibler Eigenerfindungen
-        if hints is not None:
-            examples = hints.prompt_examples()
-            if examples:
-                system += "\n\nSo hat der Nutzer bisher zugeordnet:\n" + "\n".join(
-                    f"- {merchant} → {category}" for merchant, category in examples
-                )
 
         raw = await ai_client.complete(
             ai,
@@ -531,10 +634,9 @@ class CategorizationService:
         if not raw:
             return None
 
-        try:
-            result = json.loads(_extract_json_object(raw))
-        except (ValueError, TypeError) as e:
-            logger.warning(f"KI-Antwort war kein gültiges JSON: {e}")
+        result = ai_client.parse_json_object(raw)
+        if result is None:
+            logger.warning("KI-Antwort enthielt kein JSON-Objekt")
             return None
 
         category = result.get("category") or "Sonstiges"

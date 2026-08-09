@@ -174,12 +174,8 @@ def _build_system_prompt(hints: CategoryHints, currency: str) -> str:
 
 
 def _rows_from_response(raw: str, currency: str) -> List[Dict[str, Any]]:
-    match = _JSON_OBJECT_RE.search(raw or "")
-    if not match:
-        return []
-    try:
-        data = json.loads(match.group(0))
-    except (ValueError, TypeError):
+    data = ai_client.parse_json_object(raw)
+    if data is None:
         logger.warning("KI-Extraktion lieferte kein gültiges JSON")
         return []
 
