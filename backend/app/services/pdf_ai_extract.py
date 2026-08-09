@@ -28,7 +28,10 @@ logger = logging.getLogger(__name__)
 
 # Ein Auszug wird stückweise geschickt: Kontextfenster lokaler Modelle sind
 # klein, und ein 40-seitiges PDF sprengt jedes davon.
-CHUNK_CHARS = 8000
+# Rueckfall, wenn das Kontextfenster des Modells unbekannt ist. Der echte Wert
+# wird pro Lauf aus ai_client.resolve_chunk_chars() bestimmt — ein Modell mit
+# grossem Fenster nimmt ein ganzes Dokument in einem Durchgang.
+CHUNK_CHARS = ai_client.DEFAULT_CHUNK_CHARS
 MAX_CHUNKS = 8  # Kostendeckel — ~8 Aufrufe pro Dokument
 # Gemessen an einem 4-seitigen Auszug mit 52 Buchungen: ein Reasoning-Modell
 # (ornith-35b) braucht fuer einen Abschnitt 6536 Completion-Tokens — Denken plus
@@ -51,21 +54,34 @@ class ExtractionResult(NamedTuple):
     model: str = ""
     prompt_tokens: int = 0
     completion_tokens: int = 0
+    # Wurde das Dokument am Kostendeckel abgeschnitten? Dann fehlen Buchungen,
+    # und der Nutzer MUSS das erfahren — sonst importiert er ein halbes Dokument
+    # im Glauben, es sei vollstaendig.
+    chunks_processed: int = 0
+    chunks_total: int = 0
 
     @property
     def total_tokens(self) -> int:
         return self.prompt_tokens + self.completion_tokens
 
+    @property
+    def truncated(self) -> bool:
+        return self.chunks_total > self.chunks_processed
 
-def _chunks(text: str) -> List[str]:
-    """Text an Zeilengrenzen stückeln, damit keine Transaktion zerschnitten wird."""
+
+def _chunks(text: str, chunk_chars: int = CHUNK_CHARS) -> List[str]:
+    """Text an Zeilengrenzen stückeln, damit keine Transaktion zerschnitten wird.
+
+    Gibt ALLE Abschnitte zurück; der Kostendeckel wird erst beim Verarbeiten
+    angewandt, damit der Aufrufer merkt, dass etwas weggelassen wurde.
+    """
     lines = (text or "").splitlines()
     out: List[str] = []
     current: List[str] = []
     size = 0
 
     for line in lines:
-        if size + len(line) > CHUNK_CHARS and current:
+        if size + len(line) > chunk_chars and current:
             out.append("\n".join(current))
             current, size = [], 0
         current.append(line)
@@ -73,7 +89,7 @@ def _chunks(text: str) -> List[str]:
 
     if current:
         out.append("\n".join(current))
-    return out[:MAX_CHUNKS]
+    return out
 
 
 def _parse_date(value: Any) -> Optional[str]:
@@ -158,12 +174,8 @@ def _build_system_prompt(hints: CategoryHints, currency: str) -> str:
 
 
 def _rows_from_response(raw: str, currency: str) -> List[Dict[str, Any]]:
-    match = _JSON_OBJECT_RE.search(raw or "")
-    if not match:
-        return []
-    try:
-        data = json.loads(match.group(0))
-    except (ValueError, TypeError):
+    data = ai_client.parse_json_object(raw)
+    if data is None:
         logger.warning("KI-Extraktion lieferte kein gültiges JSON")
         return []
 
@@ -217,7 +229,20 @@ async def extract_transactions(
     model = ""
     prompt_tokens = completion_tokens = 0
 
-    chunks = _chunks(text)
+    chunk_chars = await ai_client.resolve_chunk_chars(ai, MAX_TOKENS_PER_CHUNK)
+    all_chunks = _chunks(text, chunk_chars)
+    logger.info(
+        "KI-Extraktion: %d Zeichen, %d pro Anfrage → %d Abschnitt(e)",
+        len(text), chunk_chars, len(all_chunks),
+    )
+    chunks = all_chunks[:MAX_CHUNKS]
+    if len(all_chunks) > len(chunks):
+        logger.warning(
+            "Dokument zu lang: nur %d von %d Abschnitten ausgewertet "
+            "(MAX_CHUNKS=%d). Spaetere Buchungen fehlen.",
+            len(chunks), len(all_chunks), MAX_CHUNKS,
+        )
+
     for index, chunk in enumerate(chunks, start=1):
         if on_progress is not None:
             await on_progress(index - 1, len(chunks))
@@ -258,4 +283,7 @@ async def extract_transactions(
         model or "unbekanntes Modell",
         prompt_tokens + completion_tokens,
     )
-    return ExtractionResult(rows, model, prompt_tokens, completion_tokens)
+    return ExtractionResult(
+        rows, model, prompt_tokens, completion_tokens,
+        chunks_processed=len(chunks), chunks_total=len(all_chunks),
+    )

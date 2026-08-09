@@ -14,6 +14,7 @@ import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { clsx } from "clsx";
+import { useUiStore } from "@/lib/store";
 import { formatCHF, getFrequencyStyle, getFrequencyBadgeStyle, PERIODICITY_LABELS } from "@/lib/theme";
 
 const BANKS = [
@@ -128,6 +129,8 @@ interface PdfPreviewData {
   // Welches Modell gelesen hat und was es gekostet hat
   ai_model?: string;
   ai_tokens?: number;
+  // Dokument war zu lang und wurde abgeschnitten — es fehlen Buchungen
+  ai_truncated?: boolean;
 }
 
 interface CategoryRow {
@@ -141,7 +144,10 @@ export default function Import() {
   const queryClient = useQueryClient();
   const csvRef = useRef<HTMLInputElement>(null);
   const pdfRef = useRef<HTMLInputElement>(null);
-  const [selectedAccount, setSelectedAccount] = useState("");
+  // Ziel-Konto überlebt Seitenwechsel und Neuladen — der Import läuft im
+  // Hintergrund, und der Bestätigen-Schritt braucht das Konto danach wieder.
+  const { importAccountId: selectedAccount, setImportAccountId: setSelectedAccount } =
+    useUiStore();
   const [selectedBank, setSelectedBank] = useState("");
   const [importResult, setImportResult] = useState<{
     rows_imported: number;
@@ -230,10 +236,16 @@ export default function Import() {
   const { data: activeJob } = useActiveImportJob();
   const { data: job } = useImportJob(jobId);
 
-  // Beim Betreten der Seite an einen bereits laufenden Job andocken
+  // Beim Betreten der Seite an einen bereits laufenden Job andocken — samt
+  // dessen Ziel-Konto, falls die Auswahl lokal fehlt
   useEffect(() => {
-    if (jobId === null && activeJob) setJobId(activeJob.import_id);
-  }, [activeJob, jobId]);
+    if (jobId === null && activeJob) {
+      setJobId(activeJob.import_id);
+      if (!selectedAccount && activeJob.account_id) {
+        setSelectedAccount(String(activeJob.account_id));
+      }
+    }
+  }, [activeJob, jobId, selectedAccount, setSelectedAccount]);
 
   const startPdfJob = useMutation({
     mutationFn: async (file: File) => {
@@ -349,6 +361,10 @@ export default function Import() {
 
   // Get the last completed import
   const lastImport = history?.[0];
+  // Der Eintrag, auf den sich der Löschdialog bezieht — nicht zwingend der letzte
+  const selectedImport = (history ?? []).find(
+    (l: { id: number }) => l.id === importToDelete,
+  ) as { id: number; filename: string; rows_imported: number } | undefined;
 
   const handleCsvPreview = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -600,7 +616,7 @@ export default function Import() {
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-2 sm:p-4">
-            <div className="w-full max-w-[96vw] max-h-[95vh] overflow-hidden rounded-xl border border-border bg-bg-surface shadow-2xl flex flex-col">
+            <div className="w-full max-w-[96vw] overlay-panel overflow-hidden rounded-xl border border-border bg-bg-surface shadow-2xl">
 
               {/* ── Header ── */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-shrink-0">
@@ -661,6 +677,17 @@ export default function Import() {
                     </p>
                   </div>
                 )}
+                {pdfPreview.ai_truncated && (
+                  <p className="text-loss text-[11px] mt-2 flex items-start gap-1.5">
+                    <WarningCircle className="w-3.5 h-3.5 shrink-0 mt-px" />
+                    <span>
+                      <strong>Unvollständig:</strong> Das Dokument ist länger, als in
+                      einem Durchgang ausgewertet werden kann — Buchungen aus dem
+                      hinteren Teil fehlen. Teile das PDF auf oder nutze, falls
+                      vorhanden, den CSV-Export der Bank.
+                    </span>
+                  </p>
+                )}
                 {pdfPreview.ai_extracted && (
                   <p className="text-amber-300 text-[11px] mt-2 flex items-start gap-1.5">
                     <WarningCircle className="w-3.5 h-3.5 shrink-0 mt-px" />
@@ -687,7 +714,7 @@ export default function Import() {
               </div>
 
               {/* ── Table ── */}
-              <div className="flex-1 overflow-auto px-5 pb-2">
+              <div className="overlay-body px-5 pb-2">
                 <table className="w-full text-xs border-collapse">
                   <thead className="sticky top-0 z-10 bg-bg-surface2">
                     <tr>
@@ -826,6 +853,7 @@ export default function Import() {
                                 )}
                               >
                                 <option value="">Einmalig</option>
+                                <option value="weekly">Wöchentlich</option>
                                 <option value="monthly">Monatlich</option>
                                 <option value="quarterly">Vierteljährlich</option>
                                 <option value="halfyearly">Halbjährlich</option>
@@ -1318,6 +1346,24 @@ export default function Import() {
                   {log.bank?.toUpperCase()} · {log.rows_imported} Einträge · {format(new Date(log.created_at), "dd.MM.yyyy HH:mm")}
                 </p>
               </div>
+              {/* Jeder Eintrag einzeln entfernbar — nicht nur der letzte. Bei
+                  gescheiterten Importen gibt es nichts zurückzunehmen, dort
+                  verschwindet nur der Eintrag. */}
+              <button
+                onClick={() => {
+                  setImportToDelete(log.id);
+                  setShowDeleteConfirm(true);
+                }}
+                className="text-text-tertiary hover:text-loss transition-colors shrink-0 p-1"
+                title={
+                  log.rows_imported > 0
+                    ? `Import rückgängig machen (${log.rows_imported} Transaktionen entfernen)`
+                    : "Eintrag aus der Historie entfernen"
+                }
+                aria-label="Import entfernen"
+              >
+                <Trash className="w-3.5 h-3.5" />
+              </button>
             </div>
           ))}
           {(!history || history.length === 0) && (
@@ -1327,7 +1373,7 @@ export default function Import() {
       </div>
 
       {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && importToDelete && lastImport && (
+      {showDeleteConfirm && importToDelete && selectedImport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div
             className="absolute inset-0 bg-black/60"
@@ -1339,18 +1385,33 @@ export default function Import() {
                 <Trash className="w-5 h-5 text-red-500" />
               </div>
               <h3 className="text-lg font-semibold text-text-primary">
-                Import komplett löschen?
+                {selectedImport.rows_imported > 0
+                  ? "Import rückgängig machen?"
+                  : "Eintrag entfernen?"}
               </h3>
             </div>
             <p className="text-text-secondary mb-2">
-              Der Import <strong className="text-text-primary">"{lastImport.filename}"</strong> wird gelöscht.
+              Der Import <strong className="text-text-primary">"{selectedImport.filename}"</strong> wird entfernt.
             </p>
-            <p className="text-text-secondary mb-4">
-              <strong className="text-red-400">ALLE {lastImport.rows_imported} Transaktionen</strong> aus diesem Import werden entfernt.
-            </p>
-            <p className="text-sm text-text-disabled">
-              Diese Aktion kann nicht rückgängig gemacht werden!
-            </p>
+            {selectedImport.rows_imported > 0 ? (
+              <>
+                <p className="text-text-secondary mb-4">
+                  <strong className="text-red-400">
+                    ALLE {selectedImport.rows_imported} Transaktionen
+                  </strong>{" "}
+                  aus diesem Import werden gelöscht.
+                </p>
+                <p className="text-sm text-text-disabled">
+                  Diese Aktion kann nicht rückgängig gemacht werden!
+                </p>
+              </>
+            ) : (
+              /* Gescheiterte oder leere Importe haben nichts angelegt */
+              <p className="text-text-secondary mb-4">
+                Dieser Import hat keine Transaktionen angelegt — es verschwindet nur
+                der Eintrag aus der Historie.
+              </p>
+            )}
             <div className="mt-6 flex justify-end gap-3">
               <button
                 onClick={() => {
@@ -1367,7 +1428,11 @@ export default function Import() {
                 disabled={deleteMutation.isPending}
               >
                 <Trash className="w-4 h-4" />
-                {deleteMutation.isPending ? "Wird gelöscht..." : "Alle Transaktionen löschen"}
+                {deleteMutation.isPending
+                  ? "Wird gelöscht…"
+                  : selectedImport.rows_imported > 0
+                    ? "Alle Transaktionen löschen"
+                    : "Eintrag entfernen"}
               </button>
             </div>
           </div>

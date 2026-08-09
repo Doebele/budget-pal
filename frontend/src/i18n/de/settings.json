@@ -42,6 +42,30 @@
     "save": "Speichern",
     "saving": "Speichern …",
     "saved": "Gespeichert",
-    "saveError": "Speichern fehlgeschlagen"
+    "saveError": "Speichern fehlgeschlagen",
+    "contextSize": "Textmenge pro KI-Anfrage",
+    "contextAuto": "automatisch",
+    "contextDetected": "Kontextfenster erkannt: {{tokens}} Tokens.",
+    "contextEffective": "Verwendet werden {{chars}} Zeichen pro Anfrage.",
+    "contextUnknown": "Kontextfenster unbekannt — es gilt ein konservativer Vorgabewert. Regler nach rechts, wenn dein Modell mehr verträgt; zu hoch eingestellt lehnt der Server die Anfrage ab."
+  },
+  "security": {
+    "title": "Sicherheit",
+    "subtitle": "Anmeldedauer und passwortlose Anmeldung",
+    "sessionDuration": "Session-Dauer",
+    "sessionDurationHint": "Wie lange die Anmeldung aktiv bleibt — wirksam ab der nächsten Anmeldung, ein bereits ausgestelltes Token behält seine Frist.",
+    "passkeys": "Passkeys",
+    "passkeysHint": "Face ID, Touch ID, Windows Hello oder Sicherheitsschlüssel — Anmeldung ohne Passwort.",
+    "devicePlaceholder": "Gerätename, z. B. MacBook Pro",
+    "register": "Registrieren",
+    "registering": "Warte auf Gerät …",
+    "removePasskey": "Passkey entfernen",
+    "noPasskeys": "Noch kein Passkey hinterlegt.",
+    "unknownDevice": "Unbenanntes Gerät",
+    "addedOn": "Hinzugefügt: {{date}}",
+    "lastUsed": "zuletzt genutzt: {{date}}",
+    "passkeyCancelled": "Abgebrochen — es wurde kein Passkey angelegt.",
+    "passkeyFailed": "Passkey konnte nicht registriert werden. Passkeys brauchen HTTPS oder localhost.",
+    "passkeyUnsupported": "Dieser Browser unterstützt keine Passkeys."
   }
 }

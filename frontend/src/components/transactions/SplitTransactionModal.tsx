@@ -99,7 +99,7 @@ export default function SplitTransactionModal({ transaction, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-lg bg-bg-surface border border-border rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
+      <div className="w-full max-w-lg bg-bg-surface border border-border rounded-2xl shadow-2xl overlay-panel">
         {/* Header */}
         <div className="flex items-start justify-between px-5 py-4 border-b border-border">
           <div className="flex items-center gap-2">
@@ -126,7 +126,7 @@ export default function SplitTransactionModal({ transaction, onClose }: Props) {
         </div>
 
         {/* Split entries */}
-        <div className="flex-1 overflow-y-auto px-5 py-2 space-y-2">
+        <div className="overlay-body px-5 py-2 space-y-2">
           {entries.map((entry, idx) => (
             <div key={entry.id} className="bg-bg-surface2 border border-border/60 rounded-xl p-3 space-y-2">
               <div className="flex items-center justify-between gap-2">

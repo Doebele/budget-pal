@@ -34,6 +34,29 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 
+# Erlaubte Session-Dauern. Der Wert steht am User; die Laufzeit wandert beim
+# Anmelden ins Token — eine Aenderung wirkt deshalb erst ab der naechsten
+# Anmeldung, ein bereits ausgestelltes Token traegt seine Frist in sich.
+SESSION_TIMEOUTS: dict[str, timedelta] = {
+    "15m": timedelta(minutes=15),
+    "1h": timedelta(hours=1),
+    "6h": timedelta(hours=6),
+    "24h": timedelta(hours=24),
+    "7d": timedelta(days=7),
+    "30d": timedelta(days=30),
+}
+DEFAULT_SESSION_TIMEOUT = "30m"
+
+
+def session_timeout_delta(value: Optional[str]) -> Optional[timedelta]:
+    """Gespeicherte Session-Dauer in ein timedelta uebersetzen.
+
+    Unbekannte oder fehlende Werte ergeben None — dann greift der Vorgabewert
+    aus der Konfiguration.
+    """
+    return SESSION_TIMEOUTS.get(value or "")
+
+
 def create_access_token(subject: str, expires_delta: Optional[timedelta] = None) -> str:
     """Create a signed JWT access token.
 

@@ -414,6 +414,7 @@ async def restore_transaction(
         affected_rows=1,
         detail={"transaction_id": transaction_id, "account_id": txn.account_id},
     )
+    await db.commit()
     rates = await currency_service.get_rates("EUR")
     return _transaction_to_response(txn, current_user, rates)
 
@@ -618,6 +619,7 @@ async def create_transaction(
     db.add(txn)
     await db.flush()
     await db.refresh(txn)
+    await db.commit()
     txn.account = account
 
     rates = await currency_service.get_rates("EUR")
@@ -645,6 +647,7 @@ async def update_transaction(
     await db.refresh(txn)
     # refresh() expires the eager-loaded relationship — reload it for split_count
     await db.refresh(txn, ["split_children"])
+    await db.commit()
 
     rates = await currency_service.get_rates("EUR")
     return _transaction_to_response(txn, current_user, rates)
@@ -720,6 +723,7 @@ async def bulk_categorize(
         updated += 1
 
     await db.flush()
+    await db.commit()
     return {"updated": updated, "skipped": len(transactions) - updated}
 
 

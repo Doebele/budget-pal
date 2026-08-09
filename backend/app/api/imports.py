@@ -149,7 +149,7 @@ class PdfPreviewTransaction(BaseModel):
     # Recurring detection
     is_recurring: bool = False
     periodicity: Optional[str] = (
-        None  # 'monthly' | 'quarterly' | 'halfyearly' | 'yearly'
+        None  # 'weekly' | 'monthly' | 'quarterly' | 'halfyearly' | 'yearly'
     )
 
 
@@ -171,6 +171,9 @@ class PdfPreviewResponse(BaseModel):
     # Welches Modell die Zeilen gelesen hat und wie viele Tokens es gekostet hat
     ai_model: str = ""
     ai_tokens: int = 0
+    # True, wenn das Dokument am Kostendeckel abgeschnitten wurde — dann fehlen
+    # Buchungen aus dem hinteren Teil und die Vorschau ist unvollstaendig
+    ai_truncated: bool = False
 
 
 class PdfImportConfirmRequest(BaseModel):
@@ -845,6 +848,7 @@ class PdfExtraction(NamedTuple):
     ai_attempted: bool = False
     ai_model: str = ""
     ai_tokens: int = 0
+    ai_truncated: bool = False
 
 
 async def _extract_pdf_rows(
@@ -953,7 +957,9 @@ async def _extract_pdf_rows(
         ai, full_text, hints, currency=currency, on_progress=on_progress
     )
     ai_rows, ai_meta = result.rows, dict(
-        ai_model=result.model, ai_tokens=result.total_tokens
+        ai_model=result.model,
+        ai_tokens=result.total_tokens,
+        ai_truncated=result.truncated,
     )
     # Nur ersetzen, wenn die KI etwas geliefert hat — sonst bleibt die
     # (unbrauchbare) Parser-Ausgabe, damit der Nutzer wenigstens sieht, dass
@@ -992,6 +998,7 @@ async def _build_pdf_preview(
         detected_bank, raw_transactions = extraction.bank, extraction.rows
         used_ai, ai_attempted = extraction.ai_extracted, extraction.ai_attempted
         ai_model, ai_tokens = extraction.ai_model, extraction.ai_tokens
+        ai_truncated = extraction.ai_truncated
     finally:
         os.unlink(tmp_path)
 
@@ -999,6 +1006,8 @@ async def _build_pdf_preview(
     parsed_rows = 0
     error_rows = 0
     prior_for_pdf: List[Tuple[str, str, float, str]] = []
+    # (Zeilenindex, Text) fuer die gebuendelte Kategorisierung nach der Schleife
+    pending_categorization: List[Tuple[int, str]] = []
 
     for row in raw_transactions:
         date_val = row.get("date")
@@ -1061,27 +1070,20 @@ async def _build_pdf_preview(
             else str(date_val or "")
         )
 
-        # AI category suggestion for preview
-        # Use MCC merchant category (from credit card PDFs) as extra context for the AI
-        preview_category: Optional[str] = None
-        if parsed and description_val:
-            try:
-                notes_val = str(row.get("notes", "")).strip()
-                cat_hint = (
-                    f"{description_val} {notes_val}".strip()
-                    if notes_val
-                    else description_val
+        # Kategorie: was die KI-Extraktion schon geliefert hat, gilt — sie
+        # kannte den vollen Beleg-Kontext, nicht nur den Buchungstext. Der
+        # Rest wird NACH der Schleife in einem Rutsch kategorisiert; einzeln
+        # waere das ein LLM-Aufruf pro Zeile (gemessen 20-30s je Aufruf).
+        preview_category: Optional[str] = str(row.get("category") or "").strip() or None
+        if parsed and description_val and not preview_category:
+            notes_val = str(row.get("notes", "")).strip()
+            # MCC-Notizen aus Kreditkarten-PDFs sind zusaetzlicher Kontext
+            pending_categorization.append(
+                (
+                    len(rows),
+                    f"{description_val} {notes_val}".strip() if notes_val else description_val,
                 )
-                # Hat die KI-Extraktion schon eine Kategorie geliefert, gilt die —
-                # sie kannte den vollen Beleg-Kontext, nicht nur den Buchungstext
-                preview_category = str(row.get("category") or "").strip() or None
-                if not preview_category:
-                    cat_result = await categorization_service.categorize(
-                        cat_hint, ai_cfg, hints
-                    )
-                    preview_category = cat_result.get("category") or None
-            except Exception:
-                pass
+            )
 
         rows.append(
             PdfPreviewTransaction(
@@ -1105,6 +1107,21 @@ async def _build_pdf_preview(
         if parsed:
             prior_for_pdf.append((row_id, date_str, amount_val, description_val))
 
+    # Alles, was die Extraktion offen liess, in EINEM Durchgang kategorisieren
+    if pending_categorization:
+        try:
+            categorized = await categorization_service.categorize_many(
+                [text for _, text in pending_categorization], ai_cfg, hints
+            )
+            for (row_index, _), result in zip(pending_categorization, categorized):
+                category = result.get("category")
+                if category:
+                    rows[row_index] = rows[row_index].model_copy(
+                        update={"category": category}
+                    )
+        except Exception:
+            logger.exception("Sammelkategorisierung fehlgeschlagen — Zeilen bleiben offen")
+
     rows = _detect_recurring_periodicity(rows)
 
     return PdfPreviewResponse(
@@ -1118,6 +1135,7 @@ async def _build_pdf_preview(
         ai_attempted=ai_attempted,
         ai_model=ai_model,
         ai_tokens=ai_tokens,
+        ai_truncated=ai_truncated,
     )
 
 
@@ -1171,10 +1189,17 @@ async def preview_pdf_import(
 # Statusabfrage kann also den anderen Worker treffen als den, der rechnet.
 
 
+# Eigener file_type fuer laufende Vorschau-Jobs (String(10) im Modell)
+PDF_JOB_FILE_TYPE = "pdf_job"
+
+
 class ImportJobResponse(BaseModel):
     import_id: int
     status: str  # pending | processing | completed | failed
     filename: str
+    # Ziel-Konto des Jobs — damit die UI beim Zurueckkehren wieder weiss,
+    # wohin importiert werden soll
+    account_id: Optional[int] = None
     # Fortschritt der KI-Auswertung, sobald bekannt
     chunks_done: int = 0
     chunks_total: int = 0
@@ -1197,6 +1222,7 @@ def _job_to_response(log: ImportLog) -> ImportJobResponse:
         import_id=log.id,
         status=log.status.value if hasattr(log.status, "value") else str(log.status),
         filename=log.filename,
+        account_id=log.account_id,
         chunks_done=done,
         chunks_total=total,
         error_message=log.error_message,
@@ -1311,7 +1337,10 @@ async def start_pdf_preview_job(
         account_id=account_id,
         filename=filename,
         bank=bank,
-        file_type="pdf",
+        # Eigener Typ: ein laufender Vorschau-Job ist KEIN Import. Sonst steht
+        # jede Vorschau in der Historie und verdeckt den letzten echten Import,
+        # an dem der "Rueckgaengig"-Knopf haengt.
+        file_type=PDF_JOB_FILE_TYPE,
         status=ImportStatus.pending,
     )
     db.add(log)
@@ -1335,7 +1364,7 @@ async def get_active_import_job(
         select(ImportLog)
         .where(
             ImportLog.user_id == current_user.id,
-            ImportLog.file_type == "pdf",
+            ImportLog.file_type == PDF_JOB_FILE_TYPE,
             ImportLog.status.in_([ImportStatus.pending, ImportStatus.processing]),
         )
         .order_by(desc(ImportLog.created_at))
@@ -1777,6 +1806,7 @@ def _detect_recurring_periodicity(
     Groups parsed rows by normalized description (first 5 significant words, digits
     stripped), sorts by date, computes the median day-gap between consecutive
     occurrences, and maps to the matching periodicity bucket:
+        weekly      ≈ 5-9 days
         monthly     ≈ 22-36 days
         quarterly   ≈ 75-105 days
         halfyearly  ≈ 155-205 days
@@ -1829,7 +1859,9 @@ def _detect_recurring_periodicity(
 
         median_gap = statistics.median(gaps)
 
-        if 22 <= median_gap <= 36:
+        if 5 <= median_gap <= 9:
+            periodicity = "weekly"
+        elif 22 <= median_gap <= 36:
             periodicity = "monthly"
         elif 75 <= median_gap <= 105:
             periodicity = "quarterly"
@@ -2146,10 +2178,16 @@ async def import_history(
     db: AsyncSession = Depends(get_db),
     limit: int = 50,
 ):
-    """List the current user's import history."""
+    """List the current user's import history.
+
+    Vorschau-Jobs sind ausgenommen — sie sind Zwischenstand, kein Import.
+    """
     result = await db.execute(
         select(ImportLog)
-        .where(ImportLog.user_id == current_user.id)
+        .where(
+            ImportLog.user_id == current_user.id,
+            ImportLog.file_type != PDF_JOB_FILE_TYPE,
+        )
         .order_by(desc(ImportLog.created_at))
         .limit(limit)
     )

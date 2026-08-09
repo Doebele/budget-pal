@@ -14,6 +14,7 @@ from unittest.mock import patch
 
 import pytest
 
+from app.api.imports import PDF_JOB_FILE_TYPE
 from app.models.models import ImportLog, ImportStatus
 
 MINIMAL_PDF_LINES = [
@@ -166,7 +167,7 @@ class TestStaleJobCleanup:
                 ImportLog(
                     user_id=test_user.id,
                     filename=f"{status_value.value}.pdf",
-                    file_type="pdf",
+                    file_type=PDF_JOB_FILE_TYPE,
                     status=status_value,
                 )
             )
@@ -202,7 +203,7 @@ class TestActiveJob:
         log = ImportLog(
             user_id=test_user.id,
             filename="laeuft.pdf",
-            file_type="pdf",
+            file_type=PDF_JOB_FILE_TYPE,
             status=ImportStatus.processing,
             preview_json={"progress": {"done": 1, "total": 4}},
         )
@@ -219,9 +220,63 @@ class TestActiveJob:
             ImportLog(
                 user_id=test_user.id,
                 filename="fertig.pdf",
-                file_type="pdf",
+                file_type=PDF_JOB_FILE_TYPE,
                 status=ImportStatus.completed,
             )
         )
         await db_session.flush()
         assert client.get("/api/imports/jobs/active").json() is None
+
+
+class TestHistoryExcludesJobs:
+    """Ein laufender Vorschau-Job ist kein Import. Stand er in der Historie,
+    verdeckte er den letzten echten Import — und der Rueckgaengig-Knopf, der
+    an history[0] haengt, zeigte ins Leere."""
+
+    async def test_running_job_is_not_in_history(self, client, db_session, test_user):
+        db_session.add(
+            ImportLog(
+                user_id=test_user.id,
+                filename="vorschau.pdf",
+                file_type=PDF_JOB_FILE_TYPE,
+                status=ImportStatus.processing,
+            )
+        )
+        await db_session.flush()
+
+        history = client.get("/api/imports/history").json()
+        assert [h["filename"] for h in history] == []
+
+    async def test_real_import_stays_in_history(self, client, db_session, test_user):
+        db_session.add(
+            ImportLog(
+                user_id=test_user.id,
+                filename="echt.pdf",
+                file_type="pdf",
+                status=ImportStatus.completed,
+                rows_imported=12,
+            )
+        )
+        await db_session.flush()
+
+        history = client.get("/api/imports/history").json()
+        assert [h["filename"] for h in history] == ["echt.pdf"]
+
+
+class TestJobReportsAccount:
+    """Beim Zurueckkehren auf die Import-Seite muss die UI das Ziel-Konto
+    wiederherstellen koennen — sonst laeuft das Bestaetigen ins Leere."""
+
+    async def test_active_job_carries_account_id(self, client, db_session, test_user, test_account):
+        db_session.add(
+            ImportLog(
+                user_id=test_user.id,
+                account_id=test_account.id,
+                filename="laeuft.pdf",
+                file_type=PDF_JOB_FILE_TYPE,
+                status=ImportStatus.processing,
+            )
+        )
+        await db_session.flush()
+
+        assert client.get("/api/imports/jobs/active").json()["account_id"] == test_account.id

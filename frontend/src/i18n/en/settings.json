@@ -42,6 +42,30 @@
     "save": "Save",
     "saving": "Saving…",
     "saved": "Saved",
-    "saveError": "Could not save"
+    "saveError": "Could not save",
+    "contextSize": "Text per AI request",
+    "contextAuto": "automatic",
+    "contextDetected": "Detected context window: {{tokens}} tokens.",
+    "contextEffective": "Using {{chars}} characters per request.",
+    "contextUnknown": "Context window unknown — a conservative default applies. Move the slider right if your model can take more; set too high, the server will reject the request."
+  },
+  "security": {
+    "title": "Security",
+    "subtitle": "Session duration and passwordless sign-in",
+    "sessionDuration": "Session duration",
+    "sessionDurationHint": "How long a sign-in stays valid — applies from the next sign-in; an already issued token keeps its expiry.",
+    "passkeys": "Passkeys",
+    "passkeysHint": "Face ID, Touch ID, Windows Hello or a security key — sign in without a password.",
+    "devicePlaceholder": "Device name, e.g. MacBook Pro",
+    "register": "Register",
+    "registering": "Waiting for device…",
+    "removePasskey": "Remove passkey",
+    "noPasskeys": "No passkey registered yet.",
+    "unknownDevice": "Unnamed device",
+    "addedOn": "Added: {{date}}",
+    "lastUsed": "last used: {{date}}",
+    "passkeyCancelled": "Cancelled — no passkey was created.",
+    "passkeyFailed": "Could not register the passkey. Passkeys require HTTPS or localhost.",
+    "passkeyUnsupported": "This browser does not support passkeys."
   }
 }

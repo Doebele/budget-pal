@@ -163,6 +163,7 @@ async def run_projection(
         )
         db.add(cache_entry)
         await db.flush()
+        await db.commit()
 
     return ProjectionResult(**result_dict)
 
@@ -221,6 +222,7 @@ async def create_scenario(
     db.add(scenario)
     await db.flush()
     await db.refresh(scenario)
+    await db.commit()
 
     return ScenarioResponse(
         id=scenario.id,
@@ -272,6 +274,7 @@ async def update_scenario(
 
     await db.flush()
     await db.refresh(scenario)
+    await db.commit()
 
     return ScenarioResponse(
         id=scenario.id,

@@ -292,6 +292,8 @@ export interface ImportJob {
   import_id: number;
   status: ImportJobStatus;
   filename: string;
+  // Ziel-Konto des Jobs — zum Wiederherstellen der Auswahl
+  account_id: number | null;
   chunks_done: number;
   chunks_total: number;
   error_message: string | null;
@@ -301,6 +303,36 @@ export interface ImportJob {
 
 export const isImportJobRunning = (job?: ImportJob | null): boolean =>
   job?.status === "pending" || job?.status === "processing";
+
+// Passkeys (WebAuthn) — siehe backend/app/api/webauthn.py
+export interface PasskeyCredential {
+  id: number;
+  device_name: string | null;
+  created_at: string;
+  last_used_at: string | null;
+}
+
+export const SESSION_TIMEOUTS = ["15m", "1h", "6h", "24h", "7d", "30d"] as const;
+export type SessionTimeout = (typeof SESSION_TIMEOUTS)[number];
+
+export const passkeysApi = {
+  // Die Options-Endpunkte liefern JSON als String, so wie die WebAuthn-Spec
+  // es erwartet — er geht unveraendert an den Browser weiter.
+  registerOptions: () => api.post<string>("/auth/webauthn/register/options"),
+  registerVerify: (credential: unknown, deviceName?: string) =>
+    api.post<PasskeyCredential>("/auth/webauthn/register/verify", {
+      credential,
+      device_name: deviceName || null,
+    }),
+  loginOptions: () => api.post<string>("/auth/webauthn/login/options"),
+  loginVerify: (credential: unknown) =>
+    api.post<{ access_token: string; user_id: number; name: string; email: string }>(
+      "/auth/webauthn/login/verify",
+      { credential },
+    ),
+  list: () => api.get<PasskeyCredential[]>("/auth/webauthn/credentials"),
+  remove: (id: number) => api.delete(`/auth/webauthn/credentials/${id}`),
+};
 
 // KI-Provider / Modellauswahl — siehe backend/app/services/ai_client.py
 export type AiProvider =
@@ -327,6 +359,12 @@ export interface AiSettings {
   has_openai_key: boolean;
   has_gemini_key: boolean;
   has_openrouter_key: boolean;
+  // Textmenge pro KI-Anfrage. 0 = automatisch aus dem Kontextfenster ableiten.
+  context_chars_override: number;
+  // Erkanntes Kontextfenster des Modells (Tokens), null wenn unbekannt
+  detected_context_tokens: number | null;
+  // Was tatsächlich verwendet wird — erkannt oder übersteuert
+  effective_context_chars: number;
 }
 
 export const aiApi = {

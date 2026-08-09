@@ -8,7 +8,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { Activity, Cart, Check, Cloud, EditPencil, Home, Journal, MusicDoubleNote, NavArrowDown, NavArrowRight, Plus, Search, SmartphoneDevice, Suitcase, Train, Tv, Xmark } from "@/lib/icons";
+import { Activity, Cart, Check, Cloud, CreditCard, EditPencil, Home, Journal, MusicDoubleNote, NavArrowDown, NavArrowRight, Plus, Search, SmartphoneDevice, Suitcase, Train, Tv, Xmark } from "@/lib/icons";
 import { clsx } from "clsx";
 import { toMonthlyCHF } from "@/services/faviconService";
 import type { Frequency, SupportedCurrency } from "@/services/faviconService";
@@ -479,6 +479,60 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         ],
       },
       {
+        id: "google-gemini", name: "Google Gemini",
+        tagline: "Google AI mit Gemini-Modellen", website: "https://gemini.google.com",
+        peerPopularity: 16,
+        variants: [
+          { id: "pro",   label: "Google AI Pro",   price: 21.90, popular: true },
+          { id: "ultra", label: "Google AI Ultra", price: 274.00, description: "Höchste Limits" },
+        ],
+      },
+      {
+        id: "cursor", name: "Cursor",
+        tagline: "KI-Editor für Entwicklung", website: "https://cursor.com",
+        peerPopularity: 9,
+        variants: [
+          { id: "pro",   label: "Pro",   price: 18.00, popular: true },
+          { id: "ultra", label: "Ultra", price: 180.00 },
+        ],
+      },
+      {
+        id: "figma", name: "Figma",
+        tagline: "Design und Prototyping", website: "https://figma.com",
+        peerPopularity: 8,
+        variants: [
+          { id: "professional", label: "Professional (pro Platz)", price: 13.50, popular: true },
+          { id: "organization", label: "Organization (pro Platz)", price: 40.00 },
+        ],
+      },
+      {
+        id: "kimi", name: "Kimi",
+        tagline: "Moonshot AI mit langem Kontext", website: "https://kimi.moonshot.cn",
+        peerPopularity: 4,
+        variants: [
+          { id: "plus", label: "Plus", price: 18.00, popular: true },
+        ],
+      },
+      {
+        id: "z-ai", name: "Z.AI",
+        tagline: "GLM-Modelle, günstiger Coding-Plan", website: "https://z.ai",
+        peerPopularity: 3,
+        variants: [
+          { id: "lite", label: "Coding Lite", price: 3.00, popular: true },
+          { id: "pro",  label: "Coding Pro",  price: 14.00 },
+        ],
+      },
+      {
+        id: "higgsfield", name: "Higgsfield",
+        tagline: "KI-Generierung für Bild und Video", website: "https://higgsfield.ai",
+        peerPopularity: 3,
+        variants: [
+          { id: "basic",   label: "Basic",   price: 8.00 },
+          { id: "pro",     label: "Pro",     price: 26.00, popular: true },
+          { id: "ultimate", label: "Ultimate", price: 45.00 },
+        ],
+      },
+      {
         id: "slack", name: "Slack",
         tagline: "Team-Kommunikation", website: "https://slack.com",
         peerPopularity: 11,
@@ -522,6 +576,80 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         variants: [
           { id: "basic", label: "Basic Monitoring",  price: 29.90 },
           { id: "full",  label: "Full Service",      price: 59.90, popular: true },
+        ],
+      },
+    ],
+  },
+  {
+    id: "finanzdienste",
+    label: "Finanzdienste",
+    Icon: CreditCard,
+    description: "Konto-, Karten- und Depotgebühren",
+    providers: [
+      {
+        id: "revolut", name: "Revolut",
+        tagline: "Konto und Karte mit Fremdwährungen", website: "https://revolut.com",
+        peerPopularity: 24,
+        variants: [
+          { id: "standard", label: "Standard", price: 0.00, description: "Kostenlos" },
+          { id: "plus",     label: "Plus",     price: 3.99 },
+          { id: "premium",  label: "Premium",  price: 9.99, popular: true },
+          { id: "metal",    label: "Metal",    price: 16.99 },
+          { id: "ultra",    label: "Ultra",    price: 45.00 },
+        ],
+      },
+      {
+        id: "trade-republic", name: "Trade Republic",
+        tagline: "Broker mit Verrechnungskonto", website: "https://traderepublic.com",
+        peerPopularity: 14,
+        variants: [
+          { id: "free",   label: "Kostenlos",                 price: 0.00, popular: true },
+          { id: "orders", label: "Ordergebühren (geschätzt)", price: 3.00, description: "z. B. 3 Trades/Monat" },
+        ],
+      },
+      {
+        id: "neon", name: "neon",
+        tagline: "Schweizer Smartphone-Konto", website: "https://neon-free.ch",
+        peerPopularity: 18,
+        variants: [
+          { id: "free",  label: "neon free",  price: 0.00, popular: true },
+          { id: "green", label: "neon green", price: 5.00 },
+          { id: "metal", label: "neon metal", price: 16.00 },
+        ],
+      },
+      {
+        id: "yuh", name: "Yuh",
+        tagline: "Konto, Anlegen und Vorsorge in einer App", website: "https://yuh.com",
+        peerPopularity: 11,
+        variants: [
+          { id: "free", label: "Kostenlos", price: 0.00, popular: true },
+        ],
+      },
+      {
+        id: "n26", name: "N26",
+        tagline: "Digitales Konto mit Karte", website: "https://n26.com",
+        peerPopularity: 9,
+        variants: [
+          { id: "standard", label: "Standard", price: 0.00, popular: true },
+          { id: "smart",    label: "Smart",    price: 4.90 },
+          { id: "you",      label: "You",      price: 9.90 },
+          { id: "metal",    label: "Metal",    price: 16.90 },
+        ],
+      },
+      {
+        id: "swissquote", name: "Swissquote",
+        tagline: "Schweizer Online-Broker", website: "https://swissquote.ch",
+        peerPopularity: 8,
+        variants: [
+          { id: "custody", label: "Depotgebühr (geschätzt)", price: 5.00, popular: true },
+        ],
+      },
+      {
+        id: "interactive-brokers", name: "Interactive Brokers",
+        tagline: "Internationaler Broker", website: "https://interactivebrokers.com",
+        peerPopularity: 5,
+        variants: [
+          { id: "orders", label: "Ordergebühren (geschätzt)", price: 4.00, popular: true },
         ],
       },
     ],
@@ -1075,7 +1203,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
           />
 
           {/* Bottom sheet */}
-          <div className="fixed bottom-0 left-0 right-0 z-50 flex flex-col max-h-[88vh] animate-slide-up">
+          <div className="fixed bottom-0 left-0 right-0 z-50 flex flex-col overlay-sheet animate-slide-up">
             {/* Drag handle */}
             <div className="flex justify-center pt-2 pb-1 bg-bg-surface rounded-t-lg border-t border-x border-border/50">
               <div className="w-10 h-1 rounded-full bg-white/20" />

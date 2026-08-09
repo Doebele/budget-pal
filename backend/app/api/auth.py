@@ -13,7 +13,9 @@ from typing import Optional
 from app.core.database import get_db
 from app.core.rate_limit import SlidingWindowRateLimiter
 from app.core.security import (
+    SESSION_TIMEOUTS,
     create_access_token,
+    session_timeout_delta,
     get_current_user,
     hash_password,
     verify_password,
@@ -74,6 +76,7 @@ class UserProfileResponse(BaseModel):
     currency: str
     locale: str
     ui_language: str
+    session_timeout: str
     saron_reference_annual_pct: float
 
 
@@ -87,9 +90,19 @@ class UserUpdateRequest(BaseModel):
     currency: Optional[str] = None
     locale: Optional[str] = None
     ui_language: Optional[str] = None
+    session_timeout: Optional[str] = None
     saron_reference_annual_pct: Optional[float] = Field(default=None, ge=0.0, le=25.0)
     current_password: Optional[str] = None
     new_password: Optional[str] = None
+
+    @field_validator("session_timeout")
+    @classmethod
+    def known_session_timeout(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in SESSION_TIMEOUTS:
+            raise ValueError(
+                f"session_timeout must be one of {sorted(SESSION_TIMEOUTS)}"
+            )
+        return v
 
     @field_validator("new_password")
     @classmethod
@@ -167,7 +180,10 @@ async def login(
             detail="Account is deactivated.",
         )
 
-    token = create_access_token(str(user.id))
+    # Anmeldedauer aus dem Profil — wirkt ab dieser Anmeldung
+    token = create_access_token(
+        str(user.id), session_timeout_delta(user.session_timeout)
+    )
     # Successful login resets the attempt window for this key.
     login_rate_limiter.reset(limit_key)
     return TokenResponse(
@@ -195,6 +211,7 @@ async def get_me(current_user: User = Depends(get_current_user)):
         currency=current_user.currency,
         locale=current_user.locale,
         ui_language=current_user.ui_language,
+        session_timeout=current_user.session_timeout,
         saron_reference_annual_pct=float(current_user.saron_reference_annual_pct),
     )
 
@@ -236,6 +253,8 @@ async def update_me(
         current_user.currency = cur
     if payload.locale is not None:
         current_user.locale = payload.locale
+    if payload.session_timeout is not None:
+        current_user.session_timeout = payload.session_timeout
     if payload.ui_language is not None:
         lang = payload.ui_language.strip().lower()
         if lang not in SUPPORTED_UI_LANGUAGES:
@@ -281,5 +300,6 @@ async def update_me(
         currency=current_user.currency,
         locale=current_user.locale,
         ui_language=current_user.ui_language,
+        session_timeout=current_user.session_timeout,
         saron_reference_annual_pct=float(current_user.saron_reference_annual_pct),
     )

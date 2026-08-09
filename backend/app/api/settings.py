@@ -221,6 +221,11 @@ class AiSettingsResponse(BaseModel):
     has_openai_key: bool
     has_gemini_key: bool
     has_openrouter_key: bool
+    # 0 = automatisch. Daneben der erkannte Wert, damit die UI zeigen kann,
+    # was ohne Uebersteuerung passieren wuerde.
+    context_chars_override: int = 0
+    detected_context_tokens: Optional[int] = None
+    effective_context_chars: int = 0
 
 
 class AiSettingsRequest(BaseModel):
@@ -238,9 +243,14 @@ class AiSettingsRequest(BaseModel):
     openai_api_key: Optional[str] = None
     gemini_api_key: Optional[str] = None
     openrouter_api_key: Optional[str] = None
+    context_chars_override: Optional[int] = None
 
 
-def _ai_response(cfg: ai_client.AiConfig) -> AiSettingsResponse:
+async def _ai_response(cfg: ai_client.AiConfig) -> AiSettingsResponse:
+    from app.services.pdf_ai_extract import MAX_TOKENS_PER_CHUNK
+
+    detected = await ai_client.detect_context_tokens(cfg)
+    effective = await ai_client.resolve_chunk_chars(cfg, MAX_TOKENS_PER_CHUNK)
     return AiSettingsResponse(
         provider=cfg.provider,
         lm_studio_url=cfg.lm_studio_url,
@@ -255,12 +265,15 @@ def _ai_response(cfg: ai_client.AiConfig) -> AiSettingsResponse:
         has_openai_key=bool(cfg.openai_api_key),
         has_gemini_key=bool(cfg.gemini_api_key),
         has_openrouter_key=bool(cfg.openrouter_api_key),
+        context_chars_override=cfg.context_chars_override,
+        detected_context_tokens=detected,
+        effective_context_chars=effective,
     )
 
 
 @router.get("/ai", response_model=AiSettingsResponse)
 async def get_ai_settings(current_user: User = Depends(get_current_user)):
-    return _ai_response(ai_client.from_user(current_user))
+    return await _ai_response(ai_client.from_user(current_user))
 
 
 @router.put("/ai", response_model=AiSettingsResponse)
@@ -284,7 +297,7 @@ async def put_ai_settings(
 
     current_user.ai_config_json = cfg.model_dump()
     await db.commit()
-    return _ai_response(cfg)
+    return await _ai_response(cfg)
 
 
 @router.get("/ai/models", response_model=List[str])

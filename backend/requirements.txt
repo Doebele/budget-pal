@@ -60,3 +60,6 @@ pytest-asyncio==0.23.7
 pytest-cov==5.0.0
 httpx==0.28.1
 ruff==0.4.4
+
+# Passkeys (WebAuthn / FIDO2) — Registrierung und Anmeldung ohne Passwort
+webauthn==2.5.2
