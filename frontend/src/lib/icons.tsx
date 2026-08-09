@@ -105,6 +105,7 @@ export const Reports = withSize(Iconoir.Reports, "Reports");
 export const Scissor = withSize(Iconoir.Scissor, "Scissor");
 export const Search = withSize(Iconoir.Search, "Search");
 export const Settings = withSize(Iconoir.Settings, "Settings");
+export const Key = withSize(Iconoir.Key, "Key");
 export const Shield = withSize(Iconoir.Shield, "Shield");
 export const ShieldCheck = withSize(Iconoir.ShieldCheck, "ShieldCheck");
 export const ShoppingBag = withSize(Iconoir.ShoppingBag, "ShoppingBag");

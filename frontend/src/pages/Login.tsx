@@ -2,16 +2,37 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/auth";
-import { Reports } from "@/lib/icons";
+import { Key, Reports } from "@/lib/icons";
 
 export default function Login() {
-  const { login } = useAuth();
+  const { login, loginWithPasskey } = useAuth();
   const navigate = useNavigate();
   const { t } = useTranslation("auth");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [passkeyLoading, setPasskeyLoading] = useState(false);
+  // Passkeys brauchen einen sicheren Kontext (HTTPS oder localhost); ohne
+  // WebAuthn-Unterstuetzung bleibt der Knopf weg statt beim Klick zu scheitern.
+  const passkeysSupported =
+    typeof window !== "undefined" && !!window.PublicKeyCredential;
+
+  const handlePasskeyLogin = async () => {
+    setError("");
+    setPasskeyLoading(true);
+    try {
+      await loginWithPasskey();
+      navigate("/");
+    } catch (err: unknown) {
+      // Abbruch durch den Nutzer ist kein Fehler, den man anschreien muss
+      if ((err as { name?: string })?.name === "NotAllowedError") return;
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setError(msg || t("login.passkeyFailed"));
+    } finally {
+      setPasskeyLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,6 +99,25 @@ export default function Login() {
               {loading ? t("login.loading") : t("login.submit")}
             </button>
           </form>
+
+          {passkeysSupported && (
+            <>
+              <div className="flex items-center gap-3 my-4">
+                <div className="h-px flex-1 bg-border" />
+                <span className="text-text-tertiary text-xs">{t("login.or")}</span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+              <button
+                type="button"
+                onClick={handlePasskeyLogin}
+                disabled={passkeyLoading}
+                className="btn-secondary w-full py-2.5 flex items-center justify-center gap-2"
+              >
+                <Key className="w-4 h-4" />
+                {passkeyLoading ? t("login.passkeyWaiting") : t("login.passkey")}
+              </button>
+            </>
+          )}
 
           <p className="text-text-tertiary text-sm mt-4 text-center">
             {t("login.noAccount")}{" "}

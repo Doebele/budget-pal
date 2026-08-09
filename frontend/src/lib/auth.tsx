@@ -2,7 +2,9 @@
  * Auth context — provides isAuthenticated, user, login, logout.
  */
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { authApi, setAuthToken, clearAuthToken, getAuthToken } from "./api";
+import { startAuthentication } from "@simplewebauthn/browser";
+
+import { authApi, passkeysApi, setAuthToken, clearAuthToken, getAuthToken } from "./api";
 import { useUiStore, type UiLanguage } from "./store";
 import i18n from "@/i18n";
 
@@ -27,6 +29,8 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  /** Anmeldung per Passkey — das Token kommt schon fertig vom Server. */
+  loginWithPasskey: () => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
 }
@@ -70,6 +74,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await refreshUser();
   }, [refreshUser]);
 
+  const loginWithPasskey = useCallback(async () => {
+    const options = JSON.parse((await passkeysApi.loginOptions()).data);
+    // Der Browser waehlt den passenden Passkey und fuehrt die Ceremony
+    const credential = await startAuthentication({ optionsJSON: options });
+    const { data } = await passkeysApi.loginVerify(credential);
+    setAuthToken(data.access_token);
+    setUser({
+      id: data.user_id, email: data.email, name: data.name,
+      currency: "CHF", locale: "de-CH", retirement_age: 65,
+    });
+    await refreshUser();
+  }, [refreshUser]);
+
   const logout = useCallback(() => {
     clearAuthToken();
     setUser(null);
@@ -77,7 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, loginWithPasskey, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );
