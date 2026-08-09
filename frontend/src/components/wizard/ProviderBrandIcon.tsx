@@ -10,6 +10,8 @@ import {
   SiSunrise,
   SiFitbit, SiApple, SiStrava,
   SiCoursera, SiUdemy, SiDuolingo,
+  SiGooglegemini, SiFigma, SiCursor,
+  SiRevolut, SiN26,
 } from "@icons-pack/react-simple-icons";
 import { clsx } from "clsx";
 
@@ -41,6 +43,15 @@ const BRAND_MAP: Record<string, React.ComponentType<{ size?: number | string; cl
   coursera:        SiCoursera,
   udemy:           SiUdemy,
   duolingo:        SiDuolingo,
+  // KI und Werkzeuge
+  "google-gemini": SiGooglegemini,
+  figma:           SiFigma,
+  cursor:          SiCursor,
+  // Finanzdienste
+  revolut:         SiRevolut,
+  n26:             SiN26,
+  // Ohne Marken-Icon im Paket (kimi, z-ai, higgsfield, trade-republic, neon,
+  // yuh, swissquote, interactive-brokers) faellt die Anzeige auf Globe zurueck.
 };
 
 // Normalize provider IDs that differ from brand map keys
