@@ -27,6 +27,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import get_current_user
+from app.services.wizard_derive import (
+    health_insurance_monthly,
+    monthly_amount,
+    mortgage_interest_monthly,
+)
 from app.models.models import (
     Asset,
     AssetType,
@@ -161,10 +166,16 @@ class WizardCompletePayload(BaseModel):
     outstanding_debt: float = 0.0
     monthly_amortization: float = 0.0
     health_insurance_per_person: float = 420.0
+    # "person": Summe von health_insurance_premiums (eine Prämie je Person).
+    # "total":  health_insurance_per_person ist bereits die Haushaltsprämie.
+    health_insurance_mode: Literal["person", "total"] = "person"
+    health_insurance_premiums: List[float] = Field(default_factory=list)
     franchise: Literal[300, 500, 1000, 1500, 2000, 2500] = 300
     zusatzversicherung: float = 0.0
     hausrat: float = 70.0
     autoversicherung: float = 0.0
+    # Autoversicherungen werden meist einmal jährlich fällig.
+    autoversicherung_period: Literal["monat", "jahr"] = "monat"
     has_auto_insurance: bool = False
 
     # ── Step 5: Daily life
@@ -283,11 +294,24 @@ def _now() -> datetime:
     return datetime.now(tz=timezone.utc)
 
 
+def _mortgage_interest(p: WizardCompletePayload) -> float:
+    pairs = [
+        (m.debt_value, m.mortgage_rate)
+        for m in p.mortgage_entries
+        if m.debt_value > 0
+    ]
+    if not pairs and p.outstanding_debt > 0:
+        pairs = [(p.outstanding_debt, p.mortgage_rate)]
+    return mortgage_interest_monthly(pairs)
+
+
 def _compute_monthly_expenses(p: WizardCompletePayload) -> float:
     housing = (
         p.monthly_rent + p.nebenkosten
         if p.housing_mode == "miete"
-        else p.monthly_amortization
+        # Wohneigentum: Amortisation, Nebenkosten und Hypothekarzins sind drei
+        # getrennte Posten — der Zins ergibt sich aus den Tranchen in Schritt 6.
+        else p.monthly_amortization + p.nebenkosten + _mortgage_interest(p)
     )
     transport = (
         p.monthly_fuel + p.parking + p.car_amortization
@@ -298,10 +322,18 @@ def _compute_monthly_expenses(p: WizardCompletePayload) -> float:
         housing
         + p.groceries
         + transport
-        + p.health_insurance_per_person
+        + health_insurance_monthly(
+            p.health_insurance_per_person,
+            p.health_insurance_mode,
+            p.health_insurance_premiums,
+        )
         + p.zusatzversicherung
         + p.hausrat
-        + (p.autoversicherung if p.has_auto_insurance else 0.0)
+        + (
+            monthly_amount(p.autoversicherung, p.autoversicherung_period)
+            if p.has_auto_insurance
+            else 0.0
+        )
         + p.subscription_total
         + p.freizeit
         + p.kleidung
@@ -614,17 +646,30 @@ async def wizard_complete(
     # Housing
     if payload.housing_mode == "miete":
         add_budget(payload.monthly_rent, "Miete")
-        add_budget(payload.nebenkosten, "Nebenkosten (Strom/Heizung)")
+        add_budget(payload.nebenkosten, "Nebenkosten")
     else:
         add_budget(payload.monthly_amortization, "Hypothek Amortisation")
+        add_budget(payload.nebenkosten, "Nebenkosten")
+        add_budget(_mortgage_interest(payload), "Hypothekarzins")
 
     # Insurance
-    add_budget(payload.health_insurance_per_person, "Krankenkasse")
+    add_budget(
+        health_insurance_monthly(
+            payload.health_insurance_per_person,
+            payload.health_insurance_mode,
+            payload.health_insurance_premiums,
+        ),
+        "Krankenkasse",
+    )
     if payload.zusatzversicherung > 0:
         add_budget(payload.zusatzversicherung, "Zusatzversicherung")
     add_budget(payload.hausrat, "Hausrat & Haftpflicht")
     if payload.has_auto_insurance:
-        add_budget(payload.autoversicherung, "Autoversicherung")
+        # Budgets sind durchgehend monatlich — Jahresprämie wird umgerechnet.
+        add_budget(
+            monthly_amount(payload.autoversicherung, payload.autoversicherung_period),
+            "Autoversicherung",
+        )
 
     # Daily life
     add_budget(payload.groceries, "Lebensmittel")

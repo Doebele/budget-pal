@@ -37,7 +37,6 @@ interface CategoryGaugeChartProps {
 // ── Constants ──────────────────────────────────────────────────
 const SA = 225;   // startAngle  — lower-left  (standard speedometer)
 const EA = -45;   // endAngle    — lower-right
-const TRACK = "#1a1b23";   // empty-track background
 
 // ── Helpers ────────────────────────────────────────────────────
 function pctLabel(actual: number, ref: number): string {
@@ -58,6 +57,9 @@ function fmtCompact(v: number): string {
 function makeOption(row: GaugeRow, hasPeer: boolean, colors: ThemePalette): any {
   const { sc, actual, planned, peer } = row;
   const hasPeerVal = hasPeer && (peer ?? 0) > 0;
+
+  // Leerer Ring-Track — muss dem Theme folgen, sonst bleibt er im Lightmode schwarz.
+  const track = colors.bgElevated;
 
   // Scale: peer anchored at exactly 50% of gauge max
   const gaugeMax = hasPeerVal
@@ -95,7 +97,7 @@ function makeOption(row: GaugeRow, hasPeer: boolean, colors: ThemePalette): any 
     startAngle: SA, endAngle: EA,
     min: 0, max: gaugeMax,
     progress: { show: true, width: 12, roundCap: true, overlap: false },
-    axisLine: { lineStyle: { width: 12, color: [[1, TRACK]] } },
+    axisLine: { lineStyle: { width: 12, color: [[1, track]] } },
     splitLine: { show: false },
     axisTick: { show: false },
     axisLabel: { show: false },
@@ -122,7 +124,7 @@ function makeOption(row: GaugeRow, hasPeer: boolean, colors: ThemePalette): any 
       startAngle: SA, endAngle: EA,
       min: 0, max: gaugeMax,
       progress: { show: true, width: 11, roundCap: true, overlap: false },
-      axisLine: { lineStyle: { width: 11, color: [[1, TRACK]] } },
+      axisLine: { lineStyle: { width: 11, color: [[1, track]] } },
       splitLine: { show: false },
       axisTick: { show: false },
       axisLabel: { show: false },
@@ -150,7 +152,7 @@ function makeOption(row: GaugeRow, hasPeer: boolean, colors: ThemePalette): any 
       startAngle: SA, endAngle: EA,
       min: 0, max: gaugeMax,
       progress: { show: true, width: 10, roundCap: true, overlap: false },
-      axisLine: { lineStyle: { width: 10, color: [[1, TRACK]] } },
+      axisLine: { lineStyle: { width: 10, color: [[1, track]] } },
       splitLine: { show: false },
       axisTick: { show: false },
       axisLabel: { show: false },
