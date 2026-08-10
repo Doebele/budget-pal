@@ -31,6 +31,7 @@ import StepIndicator from "@/components/wizard/StepIndicator";
 import PeerGroupCard from "@/components/wizard/PeerGroupCard";
 import Step5AccordionExpenses from "@/components/wizard/Step5AccordionExpenses";
 import type { SelectedExpenseEntry, CustomExpenseEntry } from "@/components/wizard/Step5AccordionExpenses";
+import { useTranslation } from "react-i18next";
 
 // ── Wizard data shape ──────────────────────────────────────────
 
@@ -484,17 +485,18 @@ function SummaryCard({ label, value, sub }: { label: string; value: string; sub?
 // ── Step 1: Demografie ─────────────────────────────────────────
 
 function Step1({ data, update }: { data: WizardData; update: (p: Partial<WizardData>) => void }) {
+  const { t } = useTranslation();
   const HAUSHALT_OPTIONS: { value: WizardData["haushalt"]; label: string; Icon: React.ComponentType<{ className?: string }> }[] = [
-    { value: "single",        label: "Einzelperson",   Icon: User },
-    { value: "couple",        label: "Paar",            Icon: Group },
-    { value: "family",        label: "Familie",         Icon: Community },
-    { value: "single-parent", label: "Alleinerziehend", Icon: UserXmark },
+    { value: "single",        label: t("pages:wizard.w300"),   Icon: User },
+    { value: "couple",        label: t("pages:wizard.w301"),            Icon: Group },
+    { value: "family",        label: t("pages:wizard.w302"),         Icon: Community },
+    { value: "single-parent", label: t("pages:wizard.w303"), Icon: UserXmark },
   ];
   const BESCHAEFTIGUNG_OPTIONS: { value: WizardData["beschaeftigung"]; label: string; Icon: React.ComponentType<{ className?: string }> }[] = [
-    { value: "employed",      label: "Angestellt",  Icon: Suitcase },
-    { value: "self-employed", label: "Selbständig", Icon: Laptop },
-    { value: "mixed",         label: "Beides",      Icon: Shuffle },
-    { value: "retired",       label: "Pensioniert", Icon: Sofa },
+    { value: "employed",      label: t("pages:wizard.w304"),  Icon: Suitcase },
+    { value: "self-employed", label: t("pages:wizard.w17"), Icon: Laptop },
+    { value: "mixed",         label: t("pages:wizard.w305"),      Icon: Shuffle },
+    { value: "retired",       label: t("pages:wizard.w306"), Icon: Sofa },
   ];
 
   return (
@@ -505,27 +507,27 @@ function Step1({ data, update }: { data: WizardData; update: (p: Partial<WizardD
         </div>
         <div>
           <h1 className="text-2xl font-display font-semibold text-text-primary">
-            Willkommen bei Budget<span className="text-accent">Pal</span>
+            {t("pages:wizard.w183")}<span className="text-accent">Pal</span>
           </h1>
           <p className="text-text-secondary text-sm mt-1.5 max-w-sm mx-auto leading-relaxed">
-            Dein persönlicher Schweizer Finanzplan — basierend auf echten BFS-Daten für deine Peer-Gruppe.
+            {t("pages:wizard.w184")}
           </p>
         </div>
       </div>
 
-      <Section title="Persönliche Angaben">
-        <Field label="Vorname">
+      <Section title={t("pages:wizard.w18")}>
+        <Field label={t("pages:wizard.w166")}>
           <input
             type="text"
             className="input"
-            placeholder="z.B. Maria"
+            placeholder={t("pages:wizard.w173")}
             value={data.vorname}
             onChange={(e) => update({ vorname: e.target.value })}
           />
         </Field>
 
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Geburtsjahr">
+          <Field label={t("pages:wizard.w126")}>
             <input
               type="number"
               className="input"
@@ -535,7 +537,7 @@ function Step1({ data, update }: { data: WizardData; update: (p: Partial<WizardD
               onChange={(e) => update({ geburtsjahr: parseInt(e.target.value) || 1985 })}
             />
           </Field>
-          <Field label="Kanton">
+          <Field label={t("pages:wizard.w139")}>
             <select
               className="input"
               value={data.kanton}
@@ -549,7 +551,7 @@ function Step1({ data, update }: { data: WizardData; update: (p: Partial<WizardD
         </div>
       </Section>
 
-      <Section title="Haushalt">
+      <Section title={t("pages:wizard.w131")}>
         <div className="seg-row">
           {HAUSHALT_OPTIONS.map((opt) => (
             <button
@@ -566,7 +568,7 @@ function Step1({ data, update }: { data: WizardData; update: (p: Partial<WizardD
         </div>
       </Section>
 
-      <Section title="Beschäftigungsstatus">
+      <Section title={t("pages:wizard.w19")}>
         <div className="seg-row">
           {BESCHAEFTIGUNG_OPTIONS.map((opt) => (
             <button
@@ -589,6 +591,7 @@ function Step1({ data, update }: { data: WizardData; update: (p: Partial<WizardD
 // ── Step 2: Einkommen ──────────────────────────────────────────
 
 function Step2({ data, update }: { data: WizardData; update: (p: Partial<WizardData>) => void }) {
+  const { t } = useTranslation();
   const netto = computeNettoEinkommen(data);
 
   const INCOME_SOURCES = [
@@ -598,12 +601,12 @@ function Step2({ data, update }: { data: WizardData; update: (p: Partial<WizardD
       show: true,
     },
     {
-      icon: <Building className="w-4 h-4 text-text-tertiary" />, label: "Selbständiges Einkommen", sublabel: "Monatlicher Durchschnitt",
+      icon: <Building className="w-4 h-4 text-text-tertiary" />, label: t("pages:wizard.w20"), sublabel: t("pages:wizard.w21"),
       enabledKey: "selbstaendigEnabled" as const, valueKey: "selbstaendig" as const,
       show: true,
     },
     {
-      icon: <GraphUp className="w-4 h-4 text-text-tertiary" />, label: "Dividenden & Kapitalerträge", sublabel: "Monatlicher Durchschnitt",
+      icon: <GraphUp className="w-4 h-4 text-text-tertiary" />, label: t("pages:wizard.w22"), sublabel: t("pages:wizard.w21"),
       enabledKey: "dividendenEnabled" as const, valueKey: "dividenden" as const,
       show: true,
     },
@@ -613,12 +616,12 @@ function Step2({ data, update }: { data: WizardData; update: (p: Partial<WizardD
       show: true,
     },
     {
-      icon: <Globe className="w-4 h-4 text-text-tertiary" />, label: "Auslandeinkommen", sublabel: "Monatlicher Durchschnitt (CHF-Equivalent)",
+      icon: <Globe className="w-4 h-4 text-text-tertiary" />, label: "Auslandeinkommen", sublabel: t("pages:wizard.w23"),
       enabledKey: "auslandeinkommenEnabled" as const, valueKey: "auslandeinkommen" as const,
       show: true,
     },
     {
-      icon: <PiggyBank className="w-4 h-4 text-text-tertiary" />, label: "AHV / Rente", sublabel: "Monatliche Rentenzahlung",
+      icon: <PiggyBank className="w-4 h-4 text-text-tertiary" />, label: "AHV / Rente", sublabel: t("pages:wizard.w24"),
       enabledKey: "ahvRenteEnabled" as const, valueKey: "ahvRente" as const,
       show: data.beschaeftigung === "retired",
     },
@@ -627,7 +630,7 @@ function Step2({ data, update }: { data: WizardData; update: (p: Partial<WizardD
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-text-primary font-semibold text-lg">Einkommensquellen</h2>
+        <h2 className="text-text-primary font-semibold text-lg">{t("pages:wizard.w119")}</h2>
         <p className="text-text-secondary text-sm mt-1">
           Aktiviere alle zutreffenden Quellen und gib die monatlichen Beträge an.
         </p>
@@ -657,7 +660,7 @@ function Step2({ data, update }: { data: WizardData; update: (p: Partial<WizardD
         <div className="card border-gain/20 bg-gain/5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-text-tertiary text-xs uppercase tracking-wide">Geschätztes Nettoeinkommen</p>
+              <p className="text-text-tertiary text-xs uppercase tracking-wide">{t("pages:wizard.w00")}</p>
               <p className="text-gain font-mono font-semibold text-2xl mt-0.5">{chf(netto)}</p>
               <p className="text-text-tertiary text-xs mt-1">
                 pro Monat — nach AHV/ALV-Abzügen und Steuerschätzung
@@ -686,6 +689,7 @@ function Step3({
   data: WizardData;
   update: (p: Partial<WizardData>) => void;
 }) {
+  const { t } = useTranslation();
   const profile: PeerGroupProfile = {
     ageGroup: (() => {
       const age = new Date().getFullYear() - data.geburtsjahr;
@@ -732,7 +736,7 @@ function Step3({
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-text-primary font-semibold text-lg">Deine Peer-Gruppe</h2>
+        <h2 className="text-text-primary font-semibold text-lg">{t("pages:wizard.w01")}</h2>
         <p className="text-text-secondary text-sm mt-1">
           Basierend auf deinem Profil haben wir passende BFS-Vergleichswerte gefunden.
         </p>
@@ -752,18 +756,19 @@ function Step3({
 // ── Step 4: Wohnkosten & Versicherungen ───────────────────────
 
 function Step4({ data, update }: { data: WizardData; update: (p: Partial<WizardData>) => void }) {
+  const { t } = useTranslation();
   const FRANCHISE_OPTIONS = [300, 500, 1000, 1500, 2000, 2500] as const;
 
   return (
     <div className="space-y-7">
       <div>
-        <h2 className="text-text-primary font-semibold text-lg">Wohnkosten & Versicherungen</h2>
+        <h2 className="text-text-primary font-semibold text-lg">{t("pages:wizard.w168")}</h2>
         <p className="text-text-secondary text-sm mt-1">
           Gib deine monatlichen Wohn- und Versicherungskosten an.
         </p>
       </div>
 
-      <Section title="Wohnsituation">
+      <Section title={t("pages:wizard.w169")}>
         <Segmented
           value={data.housingMode}
           options={[
@@ -775,22 +780,22 @@ function Step4({ data, update }: { data: WizardData; update: (p: Partial<WizardD
 
         {data.housingMode === "miete" ? (
           <div className="space-y-3">
-            <Field label="Monatliche Miete">
+            <Field label={t("pages:wizard.w25")}>
               <ChfInput value={data.monthlyRent} onChange={(v) => update({ monthlyRent: v })} />
             </Field>
-            <Field label="Nebenkosten (Strom, Heizung, etc.)">
+            <Field label={t("pages:wizard.w147")}>
               <ChfInput value={data.nebenkosten} onChange={(v) => update({ nebenkosten: v })} />
             </Field>
           </div>
         ) : (
           <div className="space-y-3">
             <Field
-              label="Amortisation & Rücklagen (CHF/Monat)"
-              hint="Ohne Hypothekarzins — dieser wird aus den Tranchen in Schritt 6 berechnet."
+              label={t("pages:wizard.w111")}
+              hint={t("pages:wizard.w26")}
             >
               <ChfInput value={data.monthlyAmortization} onChange={(v) => update({ monthlyAmortization: v })} />
             </Field>
-            <Field label="Nebenkosten (Strom, Heizung, etc.)">
+            <Field label={t("pages:wizard.w147")}>
               <ChfInput value={data.nebenkosten} onChange={(v) => update({ nebenkosten: v })} />
             </Field>
             <div className="rounded border border-white/8 px-3 py-2 text-xs text-text-secondary">
@@ -804,8 +809,8 @@ function Step4({ data, update }: { data: WizardData; update: (p: Partial<WizardD
         )}
       </Section>
 
-      <Section title="Krankenversicherung">
-        <Field label="Erfassung">
+      <Section title={t("pages:wizard.w141")}>
+        <Field label={t("pages:wizard.w120")}>
           <Segmented
             value={data.healthInsuranceMode}
             options={[
@@ -817,7 +822,7 @@ function Step4({ data, update }: { data: WizardData; update: (p: Partial<WizardD
         </Field>
 
         {data.healthInsuranceMode === "total" ? (
-          <Field label="Prämie Haushalt total (CHF/Monat)" hint="Grundversicherung Krankenkasse">
+          <Field label={t("pages:wizard.w152")} hint={t("pages:wizard.w130")}>
             <ChfInput
               value={data.healthInsurancePerPerson}
               onChange={(v) => update({ healthInsurancePerPerson: v })}
@@ -825,7 +830,7 @@ function Step4({ data, update }: { data: WizardData; update: (p: Partial<WizardD
           </Field>
         ) : (
           <Field
-            label="Prämie je Person (CHF/Monat)"
+            label={t("pages:wizard.w153")}
             hint={`Grundversicherung Krankenkasse — Total: ${chf(
               Math.round(healthInsuranceMonthly(data))
             )}/Mo`}
@@ -846,7 +851,7 @@ function Step4({ data, update }: { data: WizardData; update: (p: Partial<WizardD
                   <button
                     type="button"
                     className="text-text-tertiary hover:text-loss disabled:opacity-30 disabled:hover:text-text-tertiary p-1.5"
-                    title="Person entfernen"
+                    title={t("pages:wizard.w151")}
                     disabled={healthPremiums(data).length <= 1}
                     onClick={() =>
                       update({
@@ -871,7 +876,7 @@ function Step4({ data, update }: { data: WizardData; update: (p: Partial<WizardD
           </Field>
         )}
 
-        <Field label="Franchise">
+        <Field label={t("pages:wizard.w124")}>
           <Segmented
             value={data.franchise}
             options={FRANCHISE_OPTIONS.map((f) => ({ value: f, label: chf(f) }))}
@@ -879,7 +884,7 @@ function Step4({ data, update }: { data: WizardData; update: (p: Partial<WizardD
           />
         </Field>
 
-        <Field label="Zusatzversicherung (falls vorhanden)">
+        <Field label={t("pages:wizard.w172")}>
           <ChfInput
             value={data.zusatzversicherung}
             onChange={(v) => update({ zusatzversicherung: v })}
@@ -888,13 +893,13 @@ function Step4({ data, update }: { data: WizardData; update: (p: Partial<WizardD
         </Field>
       </Section>
 
-      <Section title="Weitere Versicherungen">
+      <Section title={t("pages:wizard.w167")}>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field label="Hausrat & Haftpflicht">
+          <Field label={t("pages:wizard.w132")}>
             <ChfInput value={data.hausrat} onChange={(v) => update({ hausrat: v })} />
           </Field>
           <div className="space-y-1.5">
-            <label className="label">Autoversicherung</label>
+            <label className="label">{t("pages:wizard.w116")}</label>
             <div className="flex items-center gap-3">
               <button
                 type="button"
@@ -916,8 +921,8 @@ function Step4({ data, update }: { data: WizardData; update: (p: Partial<WizardD
                 <Segmented
                   value={data.autoversicherungPeriod}
                   options={[
-                    { value: "monat", label: "pro Monat" },
-                    { value: "jahr", label: "pro Jahr" },
+                    { value: "monat", label: t("pages:wizard.w27") },
+                    { value: "jahr", label: t("pages:wizard.w28") },
                   ] as const}
                   onChange={(v) => update({ autoversicherungPeriod: v })}
                 />
@@ -939,6 +944,7 @@ function Step4({ data, update }: { data: WizardData; update: (p: Partial<WizardD
 // ── Step 5: Alltag & Abonnements ──────────────────────────────
 
 function Step5({ data, update }: { data: WizardData; update: (p: Partial<WizardData>) => void }) {
+  const { t } = useTranslation();
   const selectedSet = new Set(data.selectedSubscriptions);
   const subscriptionTotal = COMMON_SUBSCRIPTIONS
     .filter((s) => selectedSet.has(s.name))
@@ -965,24 +971,24 @@ function Step5({ data, update }: { data: WizardData; update: (p: Partial<WizardD
   return (
     <div className="space-y-7">
       <div>
-        <h2 className="text-text-primary font-semibold text-lg">Alltag & Abonnements</h2>
+        <h2 className="text-text-primary font-semibold text-lg">{t("pages:wizard.w110")}</h2>
         <p className="text-text-secondary text-sm mt-1">
           Konfiguriere deine monatlichen Alltagsausgaben.
         </p>
       </div>
 
-      <Section title="Lebensmittel">
-        <Field label="Monatliches Budget Lebensmittel (Supermarkt)">
+      <Section title={t("pages:wizard.w142")}>
+        <Field label={t("pages:wizard.w146")}>
           <ChfInput value={data.groceries} onChange={(v) => update({ groceries: v })} />
         </Field>
       </Section>
 
-      <Section title="Mobilität">
+      <Section title={t("pages:wizard.w29")}>
         <div className="grid grid-cols-3 gap-2">
           {([
             { value: "ov", label: "Nur ÖV", icon: <Train className="w-4 h-4" /> },
             { value: "car", label: "Nur Auto", icon: <Car className="w-4 h-4" /> },
-            { value: "both", label: "Beides", icon: null },
+            { value: "both", label: t("pages:wizard.w305"), icon: null },
           ] as const).map((opt) => (
             <button
               key={opt.value}
@@ -1002,7 +1008,7 @@ function Step5({ data, update }: { data: WizardData; update: (p: Partial<WizardD
 
         {(data.transportMode === "ov" || data.transportMode === "both") && (
           <div className="space-y-2">
-            <p className="text-text-tertiary text-xs font-medium uppercase tracking-wide mt-3">ÖV-Abonnement</p>
+            <p className="text-text-tertiary text-xs font-medium uppercase tracking-wide mt-3">{t("pages:wizard.w02")}</p>
             <div className="flex gap-2 flex-wrap">
               {[
                 { key: "hasSbbHalbtax" as const, label: "SBB Halbtax", price: 19 },
@@ -1028,20 +1034,20 @@ function Step5({ data, update }: { data: WizardData; update: (p: Partial<WizardD
 
         {(data.transportMode === "car" || data.transportMode === "both") && (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 mt-3">
-            <Field label="Benzin/Strom">
+            <Field label={t("pages:wizard.w117")}>
               <ChfInput value={data.monthlyFuel} onChange={(v) => update({ monthlyFuel: v })} />
             </Field>
-            <Field label="Parkplatz">
+            <Field label={t("pages:wizard.w150")}>
               <ChfInput value={data.parking} onChange={(v) => update({ parking: v })} />
             </Field>
-            <Field label="Amortisation Auto">
+            <Field label={t("pages:wizard.w112")}>
               <ChfInput value={data.carAmortization} onChange={(v) => update({ carAmortization: v })} />
             </Field>
           </div>
         )}
       </Section>
 
-      <Section title="Abonnements & Services">
+      <Section title={t("pages:wizard.w104")}>
         <div className="card-elevated space-y-4">
           {Object.entries(byCategory).map(([category, subs]) => (
             <div key={category}>
@@ -1083,14 +1089,14 @@ function Step5({ data, update }: { data: WizardData; update: (p: Partial<WizardD
           ))}
 
           <div className="pt-3 border-t border-white/8 flex items-center justify-between">
-            <span className="text-text-secondary text-sm">Total Abonnements</span>
+            <span className="text-text-secondary text-sm">{t("pages:wizard.w162")}</span>
             <span className="font-mono font-semibold text-text-primary">{chf(subscriptionTotal)}/Mo</span>
           </div>
         </div>
       </Section>
 
-      <Section title="Freizeit & Gastronomie">
-        <Field label="Restaurant, Takeaway & Freizeit (CHF/Monat)">
+      <Section title={t("pages:wizard.w125")}>
+        <Field label={t("pages:wizard.w155")}>
           <ChfInput value={data.freizeit} onChange={(v) => update({ freizeit: v })} />
         </Field>
         <Slider
@@ -1109,6 +1115,7 @@ function Step5({ data, update }: { data: WizardData; update: (p: Partial<WizardD
 // ── Step 6: Vermögen & Anlagen ─────────────────────────────────
 
 function Step6({ data, update }: { data: WizardData; update: (p: Partial<WizardData>) => void }) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const saronRefPct = user?.saron_reference_annual_pct ?? DEFAULT_SARON_REFERENCE_ANNUAL_PCT;
 
@@ -1159,10 +1166,10 @@ function Step6({ data, update }: { data: WizardData; update: (p: Partial<WizardD
     {
       icon: <Bank className="w-4 h-4 text-text-tertiary" />,
       label: "Bankkonto / Sparkonto",
-      sublabel: "Gesamtsaldo aller Konten",
+      sublabel: t("pages:wizard.w30"),
       enabledKey: "bankEnabled" as const,
       children: (
-        <Field label="Gesamtsaldo">
+        <Field label={t("pages:wizard.w129")}>
           <ChfInput value={data.bankBalance} onChange={(v) => update({ bankBalance: v })} />
         </Field>
       ),
@@ -1174,7 +1181,7 @@ function Step6({ data, update }: { data: WizardData; update: (p: Partial<WizardD
       enabledKey: "stocksEnabled" as const,
       children: (
         <>
-          <Field label="Aktueller Depotwert">
+          <Field label={t("pages:wizard.w106")}>
             <ChfInput value={data.stocksValue} onChange={(v) => update({ stocksValue: v })} />
           </Field>
           <p className="text-text-tertiary text-xs flex items-center gap-1.5 mt-1">
@@ -1187,15 +1194,15 @@ function Step6({ data, update }: { data: WizardData; update: (p: Partial<WizardD
     {
       icon: <Building className="w-4 h-4 text-text-tertiary" />,
       label: "Immobilien",
-      sublabel: "Marktwert abzüglich Hypothek",
+      sublabel: t("pages:wizard.w31"),
       enabledKey: "propertyAssetEnabled" as const,
       children: (
         <div className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Field label="Marktwert">
+            <Field label={t("pages:wizard.w145")}>
               <ChfInput value={data.propertyAssetValue} onChange={(v) => update({ propertyAssetValue: v })} />
             </Field>
-            <Field label="Total Hypothekenwert">
+            <Field label={t("pages:wizard.w163")}>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary text-sm pointer-events-none">
                   CHF
@@ -1213,7 +1220,7 @@ function Step6({ data, update }: { data: WizardData; update: (p: Partial<WizardD
           </div>
 
           <div className="space-y-2">
-            <p className="label">Hypothekenangaben</p>
+            <p className="label">{t("pages:wizard.w135")}</p>
 
             <div className="space-y-2">
               {mortgageEntries.map((entry, idx) => (
@@ -1229,7 +1236,7 @@ function Step6({ data, update }: { data: WizardData; update: (p: Partial<WizardD
                   </span>
 
                   <div className="shrink-0 w-full sm:w-auto sm:min-w-[9.5rem]">
-                    <label className="label text-[10px] leading-tight">Art</label>
+                    <label className="label text-[10px] leading-tight">{t("pages:wizard.w114")}</label>
                     <div className="flex rounded border border-white/10 overflow-hidden">
                       {(["fix", "saron"] as const).map((kind) => (
                         <button
@@ -1304,7 +1311,7 @@ function Step6({ data, update }: { data: WizardData; update: (p: Partial<WizardD
                   </div>
 
                   <div className="flex-1 min-w-[10rem]">
-                    <label className="label text-[10px] leading-tight">Hypothekenwert</label>
+                    <label className="label text-[10px] leading-tight">{t("pages:wizard.w136")}</label>
                     <ChfInput
                       className="[&_input]:py-1.5 [&_input]:text-sm"
                       value={entry.debtValue}
@@ -1316,7 +1323,7 @@ function Step6({ data, update }: { data: WizardData; update: (p: Partial<WizardD
                     <div className="flex justify-end sm:justify-start shrink-0 pb-0.5">
                       <button
                         type="button"
-                        title="Hypothek entfernen"
+                        title={t("pages:wizard.w134")}
                         onClick={() => removeMortgageEntry(idx)}
                         className="p-2 rounded-md text-text-tertiary hover:text-loss hover:bg-loss/10 transition-colors"
                       >
@@ -1343,11 +1350,11 @@ function Step6({ data, update }: { data: WizardData; update: (p: Partial<WizardD
     },
     {
       icon: <Coins className="w-4 h-4 text-text-tertiary" />,
-      label: "Kryptowährungen",
+      label: t("pages:wizard.w32"),
       sublabel: "Aktueller Marktwert (CHF)",
       enabledKey: "cryptoEnabled" as const,
       children: (
-        <Field label="Aktueller Wert">
+        <Field label={t("pages:wizard.w107")}>
           <ChfInput value={data.cryptoValue} onChange={(v) => update({ cryptoValue: v })} />
         </Field>
       ),
@@ -1358,7 +1365,7 @@ function Step6({ data, update }: { data: WizardData; update: (p: Partial<WizardD
       sublabel: "Obligationen, Fonds, Private Equity, etc.",
       enabledKey: "otherAssetsEnabled" as const,
       children: (
-        <Field label="Geschätzter Wert">
+        <Field label={t("pages:wizard.w33")}>
           <ChfInput value={data.otherAssetsValue} onChange={(v) => update({ otherAssetsValue: v })} />
         </Field>
       ),
@@ -1368,7 +1375,7 @@ function Step6({ data, update }: { data: WizardData; update: (p: Partial<WizardD
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-text-primary font-semibold text-lg">Vermögen & Anlagen</h2>
+        <h2 className="text-text-primary font-semibold text-lg">{t("pages:wizard.w03")}</h2>
         <p className="text-text-secondary text-sm mt-1">
           Erfasse dein aktuelles Vermögen für die Finanzplan-Berechnung.
         </p>
@@ -1391,7 +1398,7 @@ function Step6({ data, update }: { data: WizardData; update: (p: Partial<WizardD
 
       {totalAssets > 0 && (
         <div className="card border-accent/15">
-          <p className="text-text-tertiary text-xs uppercase tracking-wide">Gesamtvermögen (geschätzt)</p>
+          <p className="text-text-tertiary text-xs uppercase tracking-wide">{t("pages:wizard.w04")}</p>
           <p className="text-text-primary font-mono font-bold text-2xl mt-1">{chf(totalAssets)}</p>
         </div>
       )}
@@ -1402,6 +1409,7 @@ function Step6({ data, update }: { data: WizardData; update: (p: Partial<WizardD
 // ── Step 7: Vorsorge ───────────────────────────────────────────
 
 function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardData>) => void }) {
+  const { t } = useTranslation();
   const currentYear = new Date().getFullYear();
   const age = currentYear - data.geburtsjahr;
   const yearsToRetirement = Math.max(data.bvgRentenalter - age, 0);
@@ -1433,7 +1441,7 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
   return (
     <div className="space-y-7">
       <div>
-        <h2 className="text-text-primary font-semibold text-lg">Vorsorge — 3 Säulen</h2>
+        <h2 className="text-text-primary font-semibold text-lg">{t("pages:wizard.w05")}</h2>
         <p className="text-text-secondary text-sm mt-1">
           Erfasse deine Vorsorgesituation für eine vollständige Rentenprojektion.
         </p>
@@ -1445,11 +1453,11 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
           <div className="w-7 h-7 rounded-sm bg-red-500/15 flex items-center justify-center shrink-0">
             <ShieldCheck className="w-4 h-4 text-red-400" />
           </div>
-          <h3 className="text-text-primary font-medium text-sm">Säule 1 — AHV / IV</h3>
+          <h3 className="text-text-primary font-medium text-sm">{t("pages:wizard.w06")}</h3>
         </div>
 
         <div className="space-y-4">
-          <Field label="AHV-Beitragsjahre bisher">
+          <Field label={t("pages:wizard.w101")}>
             <Slider
               value={data.ahvBeitragsjahre}
               min={0}
@@ -1460,8 +1468,8 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
           </Field>
 
           <Field
-            label="Durchschnittlicher Jahreslohn (für AHV-Berechnung)"
-            hint="Massgebend für die Rentenhöhe — aus dem AHV-Auszug"
+            label={t("pages:wizard.w34")}
+            hint={t("pages:wizard.w35")}
           >
             <ChfInput
               value={data.ahvDurchschnittsLohn}
@@ -1471,12 +1479,12 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
 
           <div className="bg-white/3 rounded-md p-3 flex items-center justify-between">
             <div>
-              <p className="text-text-tertiary text-xs">Geschätzte AHV-Rente</p>
+              <p className="text-text-tertiary text-xs">{t("pages:wizard.w07")}</p>
               <p className="text-text-primary font-mono font-semibold text-xl mt-0.5">{chf(ahvRente)}</p>
-              <p className="text-text-tertiary text-xs mt-0.5">pro Monat bei Rentenalter 65</p>
+              <p className="text-text-tertiary text-xs mt-0.5">{t("pages:wizard.w08")}</p>
             </div>
             <div className="text-right">
-              <p className="text-text-tertiary text-xs">Vollständig bei</p>
+              <p className="text-text-tertiary text-xs">{t("pages:wizard.w09")}</p>
               <p className="text-text-secondary text-sm font-medium">44 Beitragsjahren</p>
             </div>
           </div>
@@ -1489,19 +1497,19 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
           <div className="w-7 h-7 rounded-sm bg-blue-500/15 flex items-center justify-center shrink-0">
             <Building className="w-4 h-4 text-blue-400" />
           </div>
-          <h3 className="text-text-primary font-medium text-sm">Säule 2 — BVG / Pensionskasse</h3>
+          <h3 className="text-text-primary font-medium text-sm">{t("pages:wizard.w10")}</h3>
         </div>
 
         <div className="space-y-4">
-          <Field label="Aktuelles BVG-Guthaben" hint="Aus dem letzten Pensionskassen-Ausweis">
+          <Field label={t("pages:wizard.w108")} hint={t("pages:wizard.w115")}>
             <ChfInput value={data.bvgGuthaben} onChange={(v) => update({ bvgGuthaben: v })} />
           </Field>
 
-          <Field label="Jährlicher Sparbeitrag (Arbeitnehmer + Arbeitgeber)">
+          <Field label={t("pages:wizard.w36")}>
             <ChfInput value={data.bvgJahresbeitrag} onChange={(v) => update({ bvgJahresbeitrag: v })} />
           </Field>
 
-          <Field label="Geplantes Rentenalter">
+          <Field label={t("pages:wizard.w128")}>
             <Slider
               value={data.bvgRentenalter}
               min={63}
@@ -1517,9 +1525,9 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
               <p className="text-accent font-mono font-semibold text-lg mt-0.5">{chf(bvgKapital)}</p>
             </div>
             <div>
-              <p className="text-text-tertiary text-xs">Geschätzte BVG-Rente</p>
+              <p className="text-text-tertiary text-xs">{t("pages:wizard.w11")}</p>
               <p className="text-text-primary font-mono font-semibold text-lg mt-0.5">{chf(bvgRente)}/Mo</p>
-              <p className="text-text-tertiary text-xs">Umwandlungssatz 6.8%</p>
+              <p className="text-text-tertiary text-xs">{t("pages:wizard.w165")}</p>
             </div>
           </div>
         </div>
@@ -1531,7 +1539,7 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
           <div className="w-7 h-7 rounded-sm bg-green-500/15 flex items-center justify-center shrink-0">
             <Cash className="w-4 h-4 text-green-400" />
           </div>
-          <h3 className="text-text-primary font-medium text-sm">Säule 3a — Gebundene Vorsorge</h3>
+          <h3 className="text-text-primary font-medium text-sm">{t("pages:wizard.w12")}</h3>
         </div>
 
         <div className="space-y-3">
@@ -1551,32 +1559,32 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="Anbieter">
+                <Field label={t("pages:wizard.w113")}>
                   <input
                     type="text"
                     className="input"
-                    placeholder="z.B. VIAC, Frankly, PostFinance"
+                    placeholder={t("pages:wizard.w174")}
                     value={acc.provider}
                     onChange={(e) => updateAccount(idx, { provider: e.target.value })}
                   />
                 </Field>
-                <Field label="Aktuelles Guthaben">
+                <Field label={t("pages:wizard.w109")}>
                   <ChfInput value={acc.balance} onChange={(v) => updateAccount(idx, { balance: v })} />
                 </Field>
-                <Field label="Jahresbeitrag">
+                <Field label={t("pages:wizard.w138")}>
                   <ChfInput
                     value={acc.annualContribution}
                     onChange={(v) => updateAccount(idx, { annualContribution: v })}
                   />
                 </Field>
-                <Field label="Strategie">
+                <Field label={t("pages:wizard.w159")}>
                   <select
                     className="input"
                     value={acc.strategy}
                     onChange={(e) => updateAccount(idx, { strategy: e.target.value as "interest" | "funds" })}
                   >
-                    <option value="interest">Zinssparen (konservativ)</option>
-                    <option value="funds">Fondssparen (Aktien)</option>
+                    <option value="interest">{t("pages:wizard.w171")}</option>
+                    <option value="funds">{t("pages:wizard.w123")}</option>
                   </select>
                 </Field>
               </div>
@@ -1589,21 +1597,21 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
               className="btn-secondary w-full py-2 text-sm"
               onClick={addAccount}
             >
-              + Weiteres 3a-Konto hinzufügen
+              {t("pages:wizard.w401")}
             </button>
           )}
 
           <div className="flex items-start gap-2 p-3 rounded-md bg-gain/5 border border-gain/15">
             <ShieldCheck className="w-4 h-4 text-gain shrink-0 mt-0.5" />
             <p className="text-text-secondary text-xs leading-relaxed">
-              <strong className="text-gain">Steueroptimierung:</strong> Gestaffelte Bezüge auf mehrere 3a-Konten
+              <strong className="text-gain">{t("pages:wizard.w158")}</strong> Gestaffelte Bezüge auf mehrere 3a-Konten
               empfohlen — spart erhebliche Kapitalleistungssteuer. Verteile auf 3–5 Konten.
             </p>
           </div>
 
           {pillar3aTotal > 0 && (
             <div className="flex items-center justify-between text-sm pt-1">
-              <span className="text-text-secondary">Total 3a-Guthaben</span>
+              <span className="text-text-secondary">{t("pages:wizard.w161")}</span>
               <span className="font-mono font-semibold text-text-primary">{chf(pillar3aTotal)}</span>
             </div>
           )}
@@ -1615,22 +1623,22 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
         enabled={data.hasLifeInsurance}
         onToggle={() => update({ hasLifeInsurance: !data.hasLifeInsurance })}
         icon="🛡️"
-        label="Lebensversicherung"
-        sublabel="Kapital-, Risiko- oder gemischte Police"
+        label={t("pages:wizard.w144")}
+        sublabel={t("pages:wizard.w37")}
       >
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 mt-2">
-          <Field label="Typ">
+          <Field label={t("pages:wizard.w164")}>
             <select
               className="input"
               value={data.lifeInsuranceType}
               onChange={(e) => update({ lifeInsuranceType: e.target.value as "kapital" | "risiko" | "gemischt" })}
             >
-              <option value="kapital">Kapitalversicherung</option>
-              <option value="risiko">Risikoversicherung</option>
-              <option value="gemischt">Gemischte Police</option>
+              <option value="kapital">{t("pages:wizard.w140")}</option>
+              <option value="risiko">{t("pages:wizard.w156")}</option>
+              <option value="gemischt">{t("pages:wizard.w127")}</option>
             </select>
           </Field>
-          <Field label="Ablaufdatum">
+          <Field label={t("pages:wizard.w102")}>
             <input
               type="date"
               className="input"
@@ -1638,7 +1646,7 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
               onChange={(e) => update({ lifeInsuranceAblauf: e.target.value })}
             />
           </Field>
-          <Field label="Ablaufleistung / Versicherungssumme">
+          <Field label={t("pages:wizard.w103")}>
             <ChfInput
               value={data.lifeInsuranceLeistung}
               onChange={(v) => update({ lifeInsuranceLeistung: v })}
@@ -1653,24 +1661,25 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
 // ── Step 8: Finanzplan-Ziele ───────────────────────────────────
 
 function Step8({ data, update }: { data: WizardData; update: (p: Partial<WizardData>) => void }) {
+  const { t } = useTranslation();
   const SCENARIOS: { key: "scenarioMortgage" | "scenarioSavings" | "scenarioEarlyRetirement" | "scenarioCare"; icon: React.ReactNode; label: string; sub: string }[] = [
-    { key: "scenarioMortgage",      icon: <GraphDown className="w-4 h-4" />, label: "Hypothek amortisieren",        sub: "Planmässige Schuldenreduktion bis zur Pensionierung" },
-    { key: "scenarioSavings",       icon: <PiggyBank className="w-4 h-4" />,    label: "Sparplan erhöhen",             sub: "Optimierung der monatlichen Sparquote" },
-    { key: "scenarioEarlyRetirement", icon: <Airplane className="w-4 h-4" />,      label: "Frühpensionierung (vor 65)",   sub: "Analyse der Finanzierbarkeit einer Frühpensionierung" },
-    { key: "scenarioCare",          icon: <Heart className="w-4 h-4" />,        label: "Pflegekosten einplanen (ab 80)", sub: "Szenario für Pflegebedarf im hohen Alter" },
+    { key: "scenarioMortgage",      icon: <GraphDown className="w-4 h-4" />, label: "Hypothek amortisieren",        sub: t("pages:wizard.w38") },
+    { key: "scenarioSavings",       icon: <PiggyBank className="w-4 h-4" />,    label: t("pages:wizard.w13"),             sub: t("pages:wizard.w39") },
+    { key: "scenarioEarlyRetirement", icon: <Airplane className="w-4 h-4" />,      label: t("pages:wizard.w40"),   sub: t("pages:wizard.w41") },
+    { key: "scenarioCare",          icon: <Heart className="w-4 h-4" />,        label: "Pflegekosten einplanen (ab 80)", sub: t("pages:wizard.w42") },
   ];
 
   return (
     <div className="space-y-7">
       <div>
-        <h2 className="text-text-primary font-semibold text-lg">Finanzplan-Ziele</h2>
+        <h2 className="text-text-primary font-semibold text-lg">{t("pages:wizard.w121")}</h2>
         <p className="text-text-secondary text-sm mt-1">
           Definiere deine Ziele für die Finanzplanung und Rentenprojektion.
         </p>
       </div>
 
-      <Section title="Rentenplanung">
-        <Field label="Ziel-Rentenalter">
+      <Section title={t("pages:wizard.w154")}>
+        <Field label={t("pages:wizard.w170")}>
           <Slider
             value={data.zielRentenalter}
             min={60}
@@ -1680,7 +1689,7 @@ function Step8({ data, update }: { data: WizardData; update: (p: Partial<WizardD
           />
         </Field>
 
-        <Field label="Lebenserwartung für Planung" hint="Konservativ: höher ansetzen vermindert Langlebigkeitsrisiko">
+        <Field label={t("pages:wizard.w43")} hint={t("pages:wizard.w44")}>
           <Slider
             value={data.lebenserwartung}
             min={70}
@@ -1690,7 +1699,7 @@ function Step8({ data, update }: { data: WizardData; update: (p: Partial<WizardD
           />
         </Field>
 
-        <Field label="Lebensstil im Alter (% des jetzigen Nettoeinkommens)">
+        <Field label={t("pages:wizard.w143")}>
           <Slider
             value={data.lifestylePercent}
             min={50}
@@ -1702,7 +1711,7 @@ function Step8({ data, update }: { data: WizardData; update: (p: Partial<WizardD
         </Field>
       </Section>
 
-      <Section title="Szenarien aktivieren">
+      <Section title={t("pages:wizard.w160")}>
         <div className="space-y-2.5">
           {SCENARIOS.map((sc) => (
             <button
@@ -1738,10 +1747,10 @@ function Step8({ data, update }: { data: WizardData; update: (p: Partial<WizardD
         </div>
       </Section>
 
-      <Section title="Inflationsannahme">
+      <Section title={t("pages:wizard.w137")}>
         <Field
-          label="Jährliche Inflation"
-          hint="Historischer CH-Durchschnitt: ~1.0–2.0%. SNB-Ziel: <2%"
+          label={t("pages:wizard.w45")}
+          hint={t("pages:wizard.w133")}
         >
           <Slider
             value={data.inflation}
@@ -1760,6 +1769,7 @@ function Step8({ data, update }: { data: WizardData; update: (p: Partial<WizardD
 // ── Review Screen ──────────────────────────────────────────────
 
 function ReviewScreen({ data }: { data: WizardData }) {
+  const { t } = useTranslation();
   const netto = computeNettoEinkommen(data);
   const age = new Date().getFullYear() - data.geburtsjahr;
   const yearsToRetirement = Math.max(data.zielRentenalter - age, 0);
@@ -1803,21 +1813,21 @@ function ReviewScreen({ data }: { data: WizardData }) {
           {data.vorname ? `Fast fertig, ${data.vorname}!` : "Zusammenfassung"}
         </h2>
         <p className="text-text-secondary text-sm max-w-sm mx-auto">
-          Überprüfe deine Angaben. Unten rechts kannst du den Finanzplan erstellen — dein Fortschritt
+          {t("pages:wizard.w309")}
           bleibt bei jedem Schritt gespeichert.
         </p>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <SummaryCard label="Nettoeinkommen" value={`${chf(netto)}/Mo`} sub="Geschätzt nach Abzügen" />
-        <SummaryCard label="Monatl. Ausgaben" value={chf(monthlyExpenses)} sub="Fixe + variable Kosten" />
+        <SummaryCard label={t("pages:wizard.w149")} value={`${chf(netto)}/Mo`} sub={t("pages:wizard.w46")} />
+        <SummaryCard label={t("pages:wizard.w47")} value={chf(monthlyExpenses)} sub={t("pages:wizard.w122")} />
         <SummaryCard
-          label="Sparquote"
+          label={t("pages:wizard.w157")}
           value={netto > 0 ? `${Math.round(((netto - monthlyExpenses) / netto) * 100)}%` : "—"}
-          sub="Netto-Sparrate"
+          sub={t("pages:wizard.w148")}
         />
-        <SummaryCard label="Gesamtvermögen" value={chf(totalAssets)} sub="Eigenkapital (Net Worth)" />
-        <SummaryCard label="3a-Guthaben" value={chf(pillar3aTotal)} sub="Säule 3a total" />
+        <SummaryCard label={t("pages:wizard.w48")} value={chf(totalAssets)} sub={t("pages:wizard.w118")} />
+        <SummaryCard label={t("pages:wizard.w100")} value={chf(pillar3aTotal)} sub={t("pages:wizard.w49")} />
         <SummaryCard
           label="Rente bei {age}"
           value={chf(ahvRente + bvgRente)}
@@ -1826,7 +1836,7 @@ function ReviewScreen({ data }: { data: WizardData }) {
       </div>
 
       <div className="card border-accent/20 bg-accent/5">
-        <h4 className="text-text-primary font-medium text-sm mb-3">Aktivierte Szenarien</h4>
+        <h4 className="text-text-primary font-medium text-sm mb-3">{t("pages:wizard.w105")}</h4>
         <div className="flex flex-wrap gap-2">
           {data.scenarioMortgage && (
             <span className="badge bg-accent/15 text-accent flex items-center gap-1"><GraphDown className="w-3 h-3" /> Hypothek amortisieren</span>
@@ -1841,7 +1851,7 @@ function ReviewScreen({ data }: { data: WizardData }) {
             <span className="badge bg-accent/15 text-accent flex items-center gap-1"><Heart className="w-3 h-3" /> Pflegekosten</span>
           )}
           {!data.scenarioMortgage && !data.scenarioSavings && !data.scenarioEarlyRetirement && !data.scenarioCare && (
-            <span className="text-text-tertiary text-xs">Keine Szenarien ausgewählt</span>
+            <span className="text-text-tertiary text-xs">{t("pages:wizard.w15")}</span>
           )}
         </div>
       </div>
@@ -1929,6 +1939,7 @@ function persistWizardDraft(data: WizardData) {
 }
 
 export default function Wizard() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
   const [wizardData, setWizardData] = useState<WizardData>(loadDraft);
@@ -2058,7 +2069,7 @@ export default function Wizard() {
       navigate("/finanzplan");
     } catch (err) {
       console.error("Wizard submit failed:", err);
-      setSubmitError("Der Finanzplan konnte nicht erstellt werden. Bitte versuche es erneut.");
+      setSubmitError(t("pages:wizard.w50"));
       setIsSubmitting(false);
     }
   }
@@ -2086,7 +2097,7 @@ export default function Wizard() {
             <span className="font-display font-semibold text-text-primary text-sm">
               Budget<span className="text-accent">Pal</span>
             </span>
-            <span className="ml-auto text-text-tertiary text-xs">Empirische Angaben</span>
+            <span className="ml-auto text-text-tertiary text-xs">{t("pages:wizard.w16")}</span>
           </div>
 
           {isReview ? (
@@ -2150,7 +2161,7 @@ export default function Wizard() {
               disabled={animating || isSubmitting}
             >
               <NavArrowLeft className="w-4 h-4" />
-              {isReview ? "Zurück zu den Zielen" : "Zurück"}
+              {isReview ? t("pages:wizard.w51") : t("pages:wizard.w52")}
             </button>
           )}
           {!(isReview || currentStep > 1) && <div />}
@@ -2180,11 +2191,11 @@ export default function Wizard() {
             >
               {currentStep === TOTAL_STEPS ? (
                 <>
-                  Weiter zur Übersicht <ArrowRight className="w-4 h-4" />
+                  {t("pages:wizard.w400")} <ArrowRight className="w-4 h-4" />
                 </>
               ) : (
                 <>
-                  Weiter <NavArrowRight className="w-4 h-4" />
+                  {t("pages:wizard.w308")} <NavArrowRight className="w-4 h-4" />
                 </>
               )}
             </button>
@@ -2202,7 +2213,7 @@ export default function Wizard() {
                 </>
               ) : (
                 <>
-                  Finanzplan erstellen <ArrowRight className="w-4 h-4" />
+                  {t("pages:wizard.w307")} <ArrowRight className="w-4 h-4" />
                 </>
               )}
             </button>

@@ -1,17 +1,19 @@
 import { Check } from "@/lib/icons";
 import { clsx } from "clsx";
+import { useTranslation } from "react-i18next";
 
 // ── Step labels ────────────────────────────────────────────────
 
+// i18n-Schluessel — erst beim Rendern uebersetzt
 const STEP_LABELS = [
-  "Profil",
-  "Einkommen",
-  "Peer-Gruppe",
-  "Wohnen",
-  "Alltag",
-  "Vermögen",
-  "Vorsorge",
-  "Ziele",
+  "pages:wizard.w175",
+  "pages:wizard.w176",
+  "pages:wizard.w177",
+  "pages:wizard.w178",
+  "pages:wizard.w179",
+  "pages:wizard.w180",
+  "pages:wizard.w181",
+  "pages:wizard.w182",
 ];
 
 interface StepIndicatorProps {
@@ -28,6 +30,7 @@ export default function StepIndicator({
   className,
   onStepClick,
 }: StepIndicatorProps) {
+  const { t } = useTranslation();
   const clickable = Boolean(onStepClick);
 
   return (
@@ -51,7 +54,7 @@ export default function StepIndicator({
                   isActive && "cursor-default",
                 )}
                 onClick={() => clickable && !isActive && onStepClick?.(step)}
-                title={clickable ? STEP_LABELS[i] : undefined}
+                title={clickable ? t(STEP_LABELS[i]) : undefined}
                 role={clickable && !isActive ? "button" : undefined}
                 tabIndex={clickable && !isActive ? 0 : undefined}
                 onKeyDown={(e) => {
@@ -86,7 +89,7 @@ export default function StepIndicator({
                     isPending && clickable && "group-hover:text-text-secondary",
                   )}
                 >
-                  {STEP_LABELS[i]}
+                  {t(STEP_LABELS[i])}
                 </span>
               </div>
 
@@ -118,7 +121,7 @@ export default function StepIndicator({
                 onClick={() => clickable && !isActive && onStepClick?.(step)}
                 role={clickable && !isActive ? "button" : undefined}
                 tabIndex={clickable && !isActive ? 0 : undefined}
-                title={clickable ? STEP_LABELS[i] : undefined}
+                title={clickable ? t(STEP_LABELS[i]) : undefined}
                 className={clsx(
                   "rounded-full transition-all duration-300",
                   clickable && !isActive && "cursor-pointer",
@@ -137,7 +140,7 @@ export default function StepIndicator({
           <span className="text-text-primary font-semibold">{currentStep}</span>{" "}
           von <span className="text-text-primary font-semibold">{totalSteps}</span>
           {" "}—{" "}
-          <span className="text-text-secondary">{STEP_LABELS[currentStep - 1]}</span>
+          <span className="text-text-secondary">{t(STEP_LABELS[currentStep - 1])}</span>
         </span>
       </div>
     </>
