@@ -24,6 +24,7 @@ import { formatAmount, formatCurrencyCompact } from "@/lib/theme";
 import { useAuth } from "@/lib/auth";
 import ProviderBrandIcon from "@/components/wizard/ProviderBrandIcon";
 import { getBankByName } from "@/data/banks-with-logos";
+import { useTranslation } from "react-i18next";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -443,6 +444,7 @@ function EntryChip({
   providerId, ScIcon, scColor, scLabel,
   planDisplayAmt, refCcy,
 }: EntryChipProps) {
+  const { t } = useTranslation();
   const [hovering, setHovering] = useState(false);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chipRef = useRef<HTMLButtonElement | null>(null);
@@ -486,8 +488,8 @@ function EntryChip({
           "text-text-tertiary hover:text-text-primary border-r border-border/30 bg-transparent",
           dndBusy && "opacity-40 pointer-events-none cursor-not-allowed"
         )}
-        title="In anderen Monat ziehen. Mit Wahltaste (⌥) beim Loslassen kopieren."
-        aria-label="Eintrag in anderen Monat ziehen; mit Wahltaste kopieren"
+        title={t("pages:budgetplan.dragHint")}
+        aria-label={t("pages:budgetplan.dragHintShort")}
       >
         <Drag className="w-3.5 h-3.5" aria-hidden />
       </button>
@@ -565,6 +567,7 @@ function BudgetplanCategoryPicker({
   categories,
   isExpense,
 }: CategoryPickerProps) {
+  const { t } = useTranslation();
   const { resolveSuperCategoryForRow } = useTaxonomy();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -623,7 +626,7 @@ function BudgetplanCategoryPicker({
             <span className="flex-1 truncate">{plainCategoryLabel(selectedCat.name)}</span>
           </>
         ) : (
-          <span className="flex-1 text-text-tertiary">Keine Kategorie</span>
+          <span className="flex-1 text-text-tertiary">{t("pages:budgetplan.noCategory")}</span>
         )}
         <NavArrowDown className={clsx("w-4 h-4 shrink-0 text-text-tertiary transition-transform", open && "rotate-180")} />
       </button>
@@ -638,7 +641,7 @@ function BudgetplanCategoryPicker({
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Kategorie suchen…"
+                placeholder={t("pages:budgetplan.searchCategory")}
                 className="flex-1 bg-transparent text-sm text-text-primary placeholder-text-tertiary focus:outline-none"
               />
               {search && (
@@ -659,7 +662,7 @@ function BudgetplanCategoryPicker({
                   !value && "bg-accent/10"
                 )}
               >
-                <span className="text-text-tertiary text-xs flex-1">Keine Kategorie</span>
+                <span className="text-text-tertiary text-xs flex-1">{t("pages:budgetplan.noCategory")}</span>
               </button>
             )}
             {showOrphanAssigned && !search && selectedCat && (
@@ -684,7 +687,7 @@ function BudgetplanCategoryPicker({
               </div>
             )}
             {filteredOptions.length === 0 && (
-              <p className="px-3 py-2 text-xs text-text-tertiary">Keine Kategorien gefunden.</p>
+              <p className="px-3 py-2 text-xs text-text-tertiary">{t("pages:budgetplan.noCategoriesFound")}</p>
             )}
             {filteredOptions.map((group) => (
               <div key={group.label} className="border-t border-border/40 first:border-t-0">
@@ -774,6 +777,14 @@ function entryToForm(e: RecurringPlanEntry): FormState {
 // ── Main page ─────────────────────────────────────────────────
 
 export default function Budgetplan() {
+  const { t, i18n } = useTranslation();
+  // Monatsnamen aus Intl statt fester Liste — folgt der UI-Sprache.
+  const monthNames = useMemo(
+    () => Array.from({ length: 12 }, (_, i) =>
+      new Intl.DateTimeFormat(i18n.language, { month: "long" }).format(new Date(2000, i, 1)),
+    ),
+    [i18n.language],
+  );
   const qc = useQueryClient();
   const { user } = useAuth();
   const refCcy = user?.currency ?? "CHF";
@@ -970,13 +981,13 @@ export default function Budgetplan() {
   const createMut = useMutation({
     mutationFn: (data: Record<string, unknown>) => recurringPlanApi.create(data),
     onSuccess: () => { invalidate(); closeEditor(); },
-    onError: (e: unknown) => setFormError(String((e as { message?: string })?.message ?? "Fehler beim Speichern")),
+    onError: (e: unknown) => setFormError(String((e as { message?: string })?.message ?? t("pages:budgetplan.saveError"))),
   });
   const updateMut = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Record<string, unknown> }) =>
       recurringPlanApi.update(id, data),
     onSuccess: () => { invalidate(); closeEditor(); },
-    onError: (e: unknown) => setFormError(String((e as { message?: string })?.message ?? "Fehler beim Speichern")),
+    onError: (e: unknown) => setFormError(String((e as { message?: string })?.message ?? t("pages:budgetplan.saveError"))),
   });
   const deleteMut = useMutation({
     mutationFn: (id: number) => recurringPlanApi.delete(id),
@@ -1080,7 +1091,7 @@ export default function Budgetplan() {
   function handleSave() {
     const absVal = parseFloat(form.amountAbs);
     if (!form.description.trim()) { setFormError("Bezeichnung erforderlich"); return; }
-    if (isNaN(absVal) || absVal <= 0) { setFormError("Gültiger Betrag erforderlich"); return; }
+    if (isNaN(absVal) || absVal <= 0) { setFormError(t("pages:budgetplan.validAmountRequired")); return; }
     if (!form.start_date) { setFormError("Startdatum erforderlich"); return; }
 
     const payload: Record<string, unknown> = {
@@ -1196,7 +1207,7 @@ export default function Budgetplan() {
       optionByKey.set(dedupKey, existing ? pickPreferredCategory(existing, cat) : cat);
     }
 
-    const superCategoryGroupOrder = [...superCategories.map((sc) => sc.label), "Weitere Kategorien"];
+    const superCategoryGroupOrder = [...superCategories.map((sc) => sc.label), t("pages:budgetplan.moreCategories")];
 
     for (const cat of optionByKey.values()) {
       const label = superCategoryGroupLabel(cat);
@@ -1273,12 +1284,12 @@ export default function Budgetplan() {
             className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md mx-4 bg-bg-surface border border-border rounded-xl shadow-2xl z-[80] p-5"
           >
             <h3 id="clear-month-title" className="text-text-primary font-semibold text-base mb-2">
-              {MONTH_NAMES[clearMonthDialog - 1]} {year} leeren?
+              {t("pages:budgetplan.clearMonthQuestion", { month: monthNames[clearMonthDialog - 1], year })}
             </h3>
             <p className="text-sm text-text-secondary mb-3">
               Die Posten werden in diesem Monat nicht mehr angezeigt. Wiederkehrende Einträge werden, soweit möglich,{" "}
-              <span className="text-text-primary font-medium">aufgeteilt oder begrenzt</span>, damit sie in den anderen
-              Monaten bestehen bleiben. Komplett nur in diesem Monat vorkommende Zeilen werden entfernt.
+              <span className="text-text-primary font-medium">{t("pages:budgetplan.splitOrCapped")}</span>, damit sie in den anderen
+              {t("pages:budgetplan.viewMonths")}n bestehen bleiben. Komplett nur in diesem Monat vorkommende Zeilen werden entfernt.
             </p>
             <p className="text-xs text-text-tertiary mb-4">
               Betroffene Planzeilen:{" "}
@@ -1317,7 +1328,7 @@ export default function Budgetplan() {
       <div className="flex flex-wrap items-center gap-3 mb-5">
         <div className="flex items-center gap-2">
           <Calendar className="w-5 h-5 text-accent" />
-          <h1 className="text-text-primary font-semibold text-lg">Budgetplan</h1>
+          <h1 className="text-text-primary font-semibold text-lg">{t("pages:budgetplan.title")}</h1>
         </div>
 
         {/* Year nav */}
@@ -1351,7 +1362,7 @@ export default function Budgetplan() {
                 filter === f && "active"
               )}
             >
-              {f === "all" ? "Alle" : f === "expense" ? "Nur Ausgaben" : "Nur Einnahmen"}
+              {f === "all" ? t("pages:budgetplan.all") : f === "expense" ? t("pages:budgetplan.onlyExpenses") : t("pages:budgetplan.onlyIncome")}
             </button>
           ))}
 
@@ -1377,7 +1388,7 @@ export default function Budgetplan() {
                 <button
                   onClick={() => setCatFilter(new Set())}
                   className="px-2 py-1 rounded-full text-[11px] text-text-disabled hover:text-text-tertiary transition-colors"
-                  title="Filter zurücksetzen"
+                  title={t("pages:budgetplan.resetFilter")}
                 >
                   ✕ Filter
                 </button>
@@ -1401,10 +1412,10 @@ export default function Budgetplan() {
               localStorage.setItem("budgetplan_sort", v);
             }}
           >
-            <option value="manual">Individuell</option>
-            <option value="amount_desc">Betrag ↓</option>
-            <option value="amount_asc">Betrag ↑</option>
-            <option value="category">Kategorie A–Z</option>
+            <option value="manual">{t("pages:budgetplan.custom")}</option>
+            <option value="amount_desc">{t("pages:budgetplan.amountDesc")}</option>
+            <option value="amount_asc">{t("pages:budgetplan.amountAsc")}</option>
+            <option value="category">{t("pages:budgetplan.categoryAZ")}</option>
           </select>
         </div>
 
@@ -1414,13 +1425,13 @@ export default function Budgetplan() {
             onClick={() => setViewPersist("calendar")}
             className={clsx("toggle-btn", view === "calendar" && "active")}
           >
-            Kalender
+            {t("pages:budgetplan.viewCalendar")}
           </button>
           <button
             onClick={() => setViewPersist("accordion")}
             className={clsx("toggle-btn", view === "accordion" && "active")}
           >
-            Monate
+            {t("pages:budgetplan.viewMonths")}
           </button>
         </div>
 
@@ -1430,7 +1441,7 @@ export default function Budgetplan() {
           className="flex items-center gap-1.5 px-3 py-1.5 bg-bg-surface2 hover:bg-bg-surface border border-border text-text-secondary hover:text-text-primary rounded-lg text-sm font-medium transition-colors"
         >
           <Sparks className="w-4 h-4" />
-          Vorbefüllen
+          {t("pages:budgetplan.prefill")}
         </button>
 
         {/* Add button */}
@@ -1439,7 +1450,7 @@ export default function Budgetplan() {
           className="flex items-center gap-1.5 px-3 py-1.5 bg-accent hover:bg-accent/90 text-white rounded-lg text-sm font-medium transition-colors"
         >
           <Plus className="w-4 h-4" />
-          Eintrag
+          {t("pages:budgetplan.entryButton")}
         </button>
       </div>
 
@@ -1465,7 +1476,7 @@ export default function Budgetplan() {
       {!isLoading && view === "calendar" && (
         <div className="flex-1 overflow-x-auto overflow-y-hidden">
           <div className="flex gap-3 h-full min-w-max pb-2">
-            {MONTH_NAMES.map((name, idx) => {
+            {monthNames.map((name, idx) => {
               const m = idx + 1;
               const list = monthEntries[m];
               const { income, expense } = monthSummary(m);
@@ -1487,7 +1498,7 @@ export default function Budgetplan() {
                       {list.length > 0 && (
                         <button
                           type="button"
-                          title="Einträge in diesem Monat aus dem Plan entfernen"
+                          title={t("pages:budgetplan.clearMonthTitle")}
                           disabled={clearMonthMut.isPending}
                           onClick={(e) => {
                             e.preventDefault();
@@ -1518,7 +1529,7 @@ export default function Budgetplan() {
                           {(income > 0 || expense > 0) && (
                             <div className="w-full mt-1.5 pt-1.5 border-t border-border/25 text-right">
                               <p className="text-[10px] font-medium uppercase tracking-wide text-text-tertiary mb-0.5">
-                                Saldo
+                                {t("pages:budgetplan.balance")}
                               </p>
                               <p
                                 className={clsx(
@@ -1539,7 +1550,7 @@ export default function Budgetplan() {
                   {/* Entry chips */}
                   <div className="flex-1 overflow-y-auto scrollbar-hide p-2 space-y-1.5">
                     {list.length === 0 && (
-                      <p className="text-text-tertiary text-xs text-center py-2">Keine Einträge</p>
+                      <p className="text-text-tertiary text-xs text-center py-2">{t("pages:budgetplan.noEntries")}</p>
                     )}
                     {list.map((entry) => {
                       const cat = categories.find((c) => c.id === entry.category_id);
@@ -1578,7 +1589,7 @@ export default function Budgetplan() {
                       className="w-full flex items-center justify-center gap-1 py-1.5 text-text-tertiary hover:text-text-primary hover:bg-bg-surface2 rounded-lg text-xs transition-colors"
                     >
                       <Plus className="w-3 h-3" />
-                      Hinzufügen
+                      {t("pages:budgetplan.add")}
                     </button>
                   </div>
                 </div>
@@ -1591,7 +1602,7 @@ export default function Budgetplan() {
       {/* ── Accordion view ── */}
       {!isLoading && view === "accordion" && (
         <div className="flex-1 overflow-y-auto space-y-2">
-          {MONTH_NAMES.map((name, idx) => {
+          {monthNames.map((name, idx) => {
             const m = idx + 1;
             const list = monthEntries[m];
             const { income, expense, count } = monthSummary(m);
@@ -1614,7 +1625,7 @@ export default function Budgetplan() {
                   >
                     <span className="text-text-primary font-semibold text-sm w-20 sm:w-24 shrink-0">{name}</span>
                     <span className="text-text-tertiary text-xs shrink-0 hidden sm:inline">
-                      {count} {count === 1 ? "Eintrag" : "Einträge"}
+                      {count} {count === 1 ? t("pages:budgetplan.entryOne") : t("pages:budgetplan.entryMany")}
                     </span>
                     <div className="flex flex-wrap gap-2 sm:gap-3 ml-auto text-xs justify-end">
                       {income > 0 && <span className="text-gain font-medium">+{formatCurrencyCompact(income, refCcy)}</span>}
@@ -1635,7 +1646,7 @@ export default function Budgetplan() {
                   {count > 0 && (
                     <button
                       type="button"
-                      title="Einträge in diesem Monat aus dem Plan entfernen"
+                      title={t("pages:budgetplan.clearMonthTitle")}
                       disabled={clearMonthMut.isPending}
                       onClick={(e) => {
                         e.preventDefault();
@@ -1653,14 +1664,14 @@ export default function Budgetplan() {
                 {isOpen && (
                   <div className="border-t border-border/30 px-4 py-3">
                     {list.length === 0 ? (
-                      <p className="text-text-tertiary text-sm py-2">Keine Einträge in diesem Monat.</p>
+                      <p className="text-text-tertiary text-sm py-2">{t("pages:budgetplan.noEntriesThisMonth")}</p>
                     ) : (
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="text-text-tertiary text-xs uppercase tracking-wide">
                             <th className="text-left pb-2 font-medium">Bezeichnung</th>
                             <th className="text-right pb-2 font-medium">Betrag</th>
-                            <th className="text-left pb-2 font-medium pl-4">Periodizität</th>
+                            <th className="text-left pb-2 font-medium pl-4">{t("pages:budgetplan.periodicityLabel")}</th>
                             <th className="text-left pb-2 font-medium pl-4 hidden sm:table-cell">Kategorie</th>
                             <th className="w-8" />
                           </tr>
@@ -1699,7 +1710,7 @@ export default function Budgetplan() {
                       className="mt-3 flex items-center gap-1 text-text-tertiary hover:text-accent text-xs transition-colors"
                     >
                       <Plus className="w-3.5 h-3.5" />
-                      Eintrag hinzufügen
+                      {t("pages:budgetplan.addEntry")}
                     </button>
                   </div>
                 )}
@@ -1720,7 +1731,7 @@ export default function Budgetplan() {
             {/* Sidebar header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-border/50">
               <h2 className="text-text-primary font-semibold text-base">
-                {editEntry ? "Eintrag bearbeiten" : "Neuer Eintrag"}
+                {editEntry ? t("pages:budgetplan.editEntry") : t("pages:budgetplan.newEntry")}
               </h2>
               <button onClick={closeEditor} className="text-text-tertiary hover:text-text-primary transition-colors">
                 <Xmark className="w-5 h-5" />
@@ -1787,12 +1798,12 @@ export default function Budgetplan() {
                           </button>
                         </div>
                         <p className="text-[11px] text-text-tertiary mt-1.5">
-                          Vorschlag übernehmen, Werte anpassen und als neuen Eintrag für{" "}
+                          {t("pages:budgetplan.suggestionHint")}{" "}
                           <span className="font-semibold text-text-primary">{year}</span> speichern.
                         </p>
                       </div>
                       <div>
-                        <label className="block text-xs text-text-tertiary mb-1.5">Vorschläge</label>
+                        <label className="block text-xs text-text-tertiary mb-1.5">{t("pages:budgetplan.suggestions")}</label>
                         {editorSuggestLoading && (
                           <div className="space-y-1.5">
                             {[1, 2, 3].map((i) => (
@@ -1839,7 +1850,7 @@ export default function Budgetplan() {
                               <>
                                 {selected.map((s) => renderBtn(s, false))}
                                 {rest.length > 0 && selected.length > 0 && (
-                                  <p className="text-[10px] text-text-disabled px-1 pt-1">Weitere verfügbare Abonnements</p>
+                                  <p className="text-[10px] text-text-disabled px-1 pt-1">{t("pages:budgetplan.moreSubscriptions")}</p>
                                 )}
                                 {rest.map((s) => renderBtn(s, true))}
                               </>
@@ -1913,7 +1924,7 @@ export default function Budgetplan() {
 
               {/* Amount + currency + periodicity in one row */}
               <div>
-                <label className="block text-xs text-text-tertiary mb-1">Betrag &amp; Periodizität</label>
+                <label className="block text-xs text-text-tertiary mb-1">{t("pages:budgetplan.amountAndPeriodicity")}</label>
                 <div className="flex gap-2">
                   <input
                     type="number"
@@ -1969,7 +1980,7 @@ export default function Budgetplan() {
 
               {/* Category */}
               <div>
-                <label className="block text-xs text-text-tertiary mb-1">Kategorie (optional)</label>
+                <label className="block text-xs text-text-tertiary mb-1">{t("pages:budgetplan.categoryOptional")}</label>
                 <BudgetplanCategoryPicker
                   value={form.category_id}
                   onChange={(category_id) => setForm((f) => ({ ...f, category_id }))}
@@ -1982,7 +1993,7 @@ export default function Budgetplan() {
 
               {/* Account */}
               <div>
-                <label className="block text-xs text-text-tertiary mb-1">Konto (optional)</label>
+                <label className="block text-xs text-text-tertiary mb-1">{t("pages:budgetplan.accountOptional")}</label>
                 <select
                   className="w-full bg-bg-surface2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-accent"
                   value={form.account_id}
@@ -1997,7 +2008,7 @@ export default function Budgetplan() {
                     }));
                   }}
                 >
-                  <option value="">Kein Konto</option>
+                  <option value="">{t("pages:budgetplan.noAccount")}</option>
                   {accounts.map((a) => (
                     <option key={a.id} value={String(a.id)}>
                       {a.name}{a.currency && a.currency.toUpperCase() !== "CHF" ? ` (${a.currency.toUpperCase()})` : ""}
@@ -2009,8 +2020,8 @@ export default function Budgetplan() {
               {/* is_future toggle */}
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-text-primary">Geplanter Eintrag</p>
-                  <p className="text-xs text-text-tertiary">Deaktivieren für historische/empirische Einträge</p>
+                  <p className="text-sm text-text-primary">{t("pages:budgetplan.plannedEntry")}</p>
+                  <p className="text-xs text-text-tertiary">{t("pages:budgetplan.plannedEntryHint")}</p>
                 </div>
                 <button
                   type="button"
@@ -2070,7 +2081,7 @@ export default function Budgetplan() {
                 disabled={createMut.isPending || updateMut.isPending}
                 className="px-4 py-2 text-sm font-medium bg-accent hover:bg-accent/90 text-white rounded-lg transition-colors disabled:opacity-60"
               >
-                {createMut.isPending || updateMut.isPending ? "Speichern…" : "Speichern"}
+                {createMut.isPending || updateMut.isPending ? t("pages:budgetplan.savingEllipsis") : "Speichern"}
               </button>
             </div>
           </div>
@@ -2158,7 +2169,7 @@ export default function Budgetplan() {
                 {!suggestLoading && suggestions.length === 0 && (
                   <div className="px-4 py-6 text-center text-text-tertiary text-sm rounded-xl border border-border/30">
                     {prefillSource === "empirical"
-                      ? "Keine Wizard-Daten gefunden. Bitte zuerst die Empirischen Angaben ausfüllen."
+                      ? t("pages:budgetplan.noWizardData")
                       : "Keine wiederkehrenden Transaktionen im Quelljahr gefunden."}
                   </div>
                 )}
@@ -2201,7 +2212,7 @@ export default function Budgetplan() {
               </div>
 
               {prefillMut.isError && (
-                <p className="text-loss text-sm">Fehler beim Erstellen der Einträge.</p>
+                <p className="text-loss text-sm">{t("pages:budgetplan.createError")}</p>
               )}
             </div>
 
@@ -2220,7 +2231,7 @@ export default function Budgetplan() {
                 className="px-4 py-2 text-sm font-medium bg-accent hover:bg-accent/90 text-white rounded-lg transition-colors disabled:opacity-60"
               >
                 {prefillMut.isPending
-                  ? "Übernehmen…"
+                  ? t("pages:budgetplan.applyEllipsis")
                   : `${prefillSelected.size} Einträge übernehmen`}
               </button>
             </div>
