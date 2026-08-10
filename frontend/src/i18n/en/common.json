@@ -61,7 +61,8 @@
     "quarterly": "Quarterly",
     "halfyearly": "Semi-annually",
     "yearly": "Annually",
-    "once": "One-time"
+    "once": "One-time",
+    "quarterlyAlt": "Quarterly"
   },
   "table": {
     "date": "Date",

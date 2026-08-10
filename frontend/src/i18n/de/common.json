@@ -61,7 +61,8 @@
     "quarterly": "Vierteljährlich",
     "halfyearly": "Halbjährlich",
     "yearly": "Jährlich",
-    "once": "Einmalig"
+    "once": "Einmalig",
+    "quarterlyAlt": "Quartalsweise"
   },
   "table": {
     "date": "Datum",

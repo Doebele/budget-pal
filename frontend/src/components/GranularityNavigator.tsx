@@ -7,6 +7,7 @@ import {
   isCurrentPeriod,
   isRollingWindow,
 } from "@/lib/granularity";
+import { useTranslation } from "react-i18next";
 
 /** Left-to-right: Max → 2J → YTD → J → H → Q → M */
 const TABS: { value: TimeGranularity; label: string; title: string }[] = [
@@ -26,6 +27,7 @@ interface Props {
 }
 
 export default function GranularityNavigator({ granularity, anchor, onChange }: Props) {
+  const { t } = useTranslation();
   const range = computeDateRange(granularity, anchor);
   const current = isCurrentPeriod(granularity, anchor);
   const rolling = isRollingWindow(granularity);
@@ -77,7 +79,7 @@ export default function GranularityNavigator({ granularity, anchor, onChange }: 
                 onClick={() => onChange(granularity, new Date())}
                 className={clsx("toggle-btn", current && "active cursor-default")}
               >
-                Aktuell
+                {t("filters.current")}
               </button>
             </div>
           </>

@@ -23,6 +23,7 @@ import type { SuperCategory } from "@/lib/categories";
 import { resolveSuperCategoryFromList, useTaxonomySuperCategories } from "@/lib/categories";
 import { formatCHF, themePalettes, type ThemePalette } from "@/lib/theme";
 import { useThemeColors } from "@/hooks/useThemeColors";
+import { useTranslation } from "react-i18next";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -772,6 +773,7 @@ export default function BudgetStackedBarChart({
   const hasBudgetPlan = (budgetPlanMonths?.length ?? 0) > 0 && budgetPlanByMonth != null;
   const superCategories = useTaxonomySuperCategories();
   const { colors: themeColors } = useThemeColors();
+  const { t } = useTranslation();
   const chartSc = useMemo(
     () =>
       CHART_SC_ORDER
@@ -919,15 +921,15 @@ export default function BudgetStackedBarChart({
 
   // Status label under the chart title
   const sourceLabel = useMemo(() => {
-    if (activeMode === "budgetplan") return "Budgetplan · Wiederkehrende Einträge nach Superkategorie";
+    if (activeMode === "budgetplan") return t("pages:budget.srcBudgetplan");
     if (activeMode === "historical") {
       return histFirstForecastIdx >= 0
-        ? "Ist-Daten + Prognose aus wiederkehrenden Zahlungen (Ø 12 Mt.)"
-        : "Ist-Daten aus realen Transaktionen";
+        ? t("pages:budget.srcActualPlusForecast")
+        : t("pages:budget.actualFromTxns");
     }
-    if (wizardData) return "Empirische Angaben · Steuern fix";
+    if (wizardData) return t("pages:budget.srcEmpirical");
     if (Object.keys(recurringPatterns.monthlyAvg).length > 0)
-      return "Wiederkehrende Zahlungen · Ø letzte 12 Monate";
+      return t("pages:budget.srcRecurring");
     return "KI-Prognose · Steuern auf histor. Ø begrenzt";
   }, [activeMode, histFirstForecastIdx, wizardData, recurringPatterns]);
 
