@@ -14,6 +14,8 @@ import {
   type Frequency, type SupportedCurrency,
 } from "@/services/faviconService";
 import type { CustomExpenseEntry, ExpenseCategory } from "./Step5AccordionExpenses";
+import { catalogText } from "./catalogI18n";
+import { useTranslation } from "react-i18next";
 
 // ── helpers ────────────────────────────────────────────────────
 
@@ -46,6 +48,7 @@ export default function CustomProviderSidebar({
   onSave,
   onDelete,
 }: Props) {
+  const { t } = useTranslation();
   const isEditing = entry != null;
 
   // Local form state — seeded from entry when editing
@@ -155,7 +158,7 @@ export default function CustomProviderSidebar({
           <input
             type="text"
             className="input text-sm w-full"
-            placeholder="z.B. Zeitungsabo, Vereinsmitgliedschaft…"
+            placeholder={t("pages:step5.s15")}
             value={name}
             onChange={e => setName(e.target.value)}
             autoFocus
@@ -203,7 +206,7 @@ export default function CustomProviderSidebar({
             onChange={e => setCategoryId(e.target.value)}
           >
             {categories.map(cat => (
-              <option key={cat.id} value={cat.id}>{cat.label}</option>
+              <option key={cat.id} value={cat.id}>{catalogText(cat.label)}</option>
             ))}
           </select>
         </div>
@@ -288,7 +291,7 @@ export default function CustomProviderSidebar({
           <input
             type="text"
             className="input text-sm w-full"
-            placeholder="z.B. Jahresabo, geteilter Account…"
+            placeholder={t("pages:step5.s14")}
             value={note}
             onChange={e => setNote(e.target.value)}
           />

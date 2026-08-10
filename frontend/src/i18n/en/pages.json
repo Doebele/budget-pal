@@ -292,5 +292,23 @@
     "w309": "Review your details. You can create the financial plan at the bottom right — your progress",
     "w400": "Continue to summary",
     "w401": "+ Add another pillar 3a account"
+  },
+  "step5": {
+    "s00": "Everyday & subscriptions",
+    "s01": "Search provider…",
+    "s02": "Create your own provider",
+    "s03": "Custom provider",
+    "s04": "POPULAR",
+    "s05": "Amount",
+    "s06": "Monthly amount",
+    "s07": "Note",
+    "s08": "Tariff / plan",
+    "s09": "Select this provider first",
+    "s10": "Payment cycle",
+    "s11": "Reset",
+    "s12": "e.g. family plan, shared with partner…",
+    "s13": "e.g. annual plan, shared account…",
+    "s14": "e.g. annual plan, shared account…",
+    "s15": "e.g. newspaper subscription, club membership…"
   }
 }

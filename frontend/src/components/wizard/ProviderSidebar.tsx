@@ -15,6 +15,8 @@ import {
   type Frequency, type SupportedCurrency,
 } from "@/services/faviconService";
 import type { ExpenseProvider, ExpenseCategory, SelectedExpenseEntry, ProviderVariant } from "./Step5AccordionExpenses";
+import { catalogText } from "./catalogI18n";
+import { useTranslation } from "react-i18next";
 
 // ── helpers ────────────────────────────────────────────────────
 
@@ -52,6 +54,7 @@ interface Props {
 export default function ProviderSidebar({
   provider, category, entry, onClose, onSelect, onDeselect, onUpdate,
 }: Props) {
+  const { t } = useTranslation();
   const [viewMode, setViewMode] = useState<"simple" | "individual">(
     entry?.viewMode ?? "simple"
   );
@@ -72,7 +75,7 @@ export default function ProviderSidebar({
         <ProviderBrandIcon providerId={provider.id} size={24} />
         <div className="flex-1 min-w-0">
           <div className="text-text-primary font-semibold text-sm truncate">{provider.name}</div>
-          <div className="text-text-tertiary text-[11px] truncate">{category.label}</div>
+          <div className="text-text-tertiary text-[11px] truncate">{catalogText(category.label)}</div>
         </div>
 
         {/* View toggle */}
@@ -108,7 +111,7 @@ export default function ProviderSidebar({
       <div className="flex-1 overflow-y-auto scrollbar-hide p-4 space-y-4 min-h-0">
 
         {/* Tagline */}
-        <p className="text-text-secondary text-xs leading-relaxed">{provider.tagline}</p>
+        <p className="text-text-secondary text-xs leading-relaxed">{catalogText(provider.tagline)}</p>
 
         {/* Peer popularity */}
         {(provider.peerPopularity ?? 0) > 0 && (
@@ -124,7 +127,7 @@ export default function ProviderSidebar({
         {viewMode === "simple" && (
           <>
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">Tarif / Plan</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">{t("pages:step5.s08")}</p>
               <div className="space-y-1.5">
                 {provider.variants.map(variant => {
                   const isActive = entry?.variantId === variant.id && entry?.customPrice == null;
@@ -151,13 +154,13 @@ export default function ProviderSidebar({
                         </div>
                         <div className="min-w-0">
                           <div className="font-medium flex items-center gap-1 flex-wrap">
-                            {variant.label}
+                            {catalogText(variant.label)}
                             {variant.popular && (
-                              <span className="text-[9px] bg-gain/15 text-gain px-1.5 py-px rounded-full font-semibold">BELIEBT</span>
+                              <span className="text-[9px] bg-gain/15 text-gain px-1.5 py-px rounded-full font-semibold">{t("pages:step5.s04")}</span>
                             )}
                           </div>
                           {variant.description && (
-                            <div className="text-text-tertiary text-[10px] mt-0.5">{variant.description}</div>
+                            <div className="text-text-tertiary text-[10px] mt-0.5">{catalogText(variant.description)}</div>
                           )}
                         </div>
                       </div>
@@ -219,7 +222,7 @@ export default function ProviderSidebar({
                                 type="button"
                                 onClick={() => onUpdate({ customPrice: undefined })}
                                 className="text-text-tertiary hover:text-loss transition-colors ml-1"
-                                title="Zurücksetzen"
+                                title={t("pages:step5.s11")}
                               >
                                 <Xmark className="w-3.5 h-3.5" />
                               </button>
@@ -235,18 +238,18 @@ export default function ProviderSidebar({
                 })()}
               </div>
               {!entry && (
-                <p className="text-text-tertiary text-[10px] mt-2 text-center">Wähle diesen Anbieter zuerst aus</p>
+                <p className="text-text-tertiary text-[10px] mt-2 text-center">{t("pages:step5.s09")}</p>
               )}
             </div>
 
             {/* Note */}
             {entry && (
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">Notiz</p>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">{t("pages:step5.s07")}</p>
                 <input
                   type="text"
                   className="input text-sm w-full"
-                  placeholder="z.B. Family-Plan, geteilt mit Partner…"
+                  placeholder={t("pages:step5.s12")}
                   value={entry.note ?? ""}
                   onChange={e => onUpdate({ note: e.target.value || undefined })}
                 />
@@ -260,7 +263,7 @@ export default function ProviderSidebar({
           <>
             {/* Amount + Currency */}
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">Betrag</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">{t("pages:step5.s05")}</p>
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <input
@@ -293,7 +296,7 @@ export default function ProviderSidebar({
 
             {/* Frequency */}
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">Zahlungsrhythmus</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">{t("pages:step5.s10")}</p>
               <div className="grid grid-cols-2 gap-1.5">
                 {FREQUENCIES.map(freq => (
                   <button
@@ -330,11 +333,11 @@ export default function ProviderSidebar({
 
             {/* Note */}
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">Notiz</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">{t("pages:step5.s07")}</p>
               <input
                 type="text"
                 className="input text-sm w-full"
-                placeholder="z.B. Jahresabo, shared account…"
+                placeholder={t("pages:step5.s13")}
                 value={entry.note ?? ""}
                 onChange={e => onUpdate({ note: e.target.value || undefined })}
               />
@@ -384,7 +387,7 @@ export default function ProviderSidebar({
         <footer className="flex-shrink-0 border-t border-border/50 bg-bg-surface2 px-4 py-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-text-tertiary text-[10px] uppercase tracking-wide font-semibold">Monatlicher Betrag</p>
+              <p className="text-text-tertiary text-[10px] uppercase tracking-wide font-semibold">{t("pages:step5.s06")}</p>
               {viewMode === "individual" && entry.frequency && entry.frequency !== "monthly" && (
                 <p className="text-text-tertiary text-[10px]">{FREQUENCY_LABELS[entry.frequency ?? "monthly"]}</p>
               )}

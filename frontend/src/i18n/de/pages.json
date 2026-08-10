@@ -292,5 +292,23 @@
     "w309": "Überprüfe deine Angaben. Unten rechts kannst du den Finanzplan erstellen — dein Fortschritt",
     "w400": "Weiter zur Übersicht",
     "w401": "+ Weiteres 3a-Konto hinzufügen"
+  },
+  "step5": {
+    "s00": "Alltag & Abonnements",
+    "s01": "Anbieter suchen…",
+    "s02": "Eigenen Anbieter anlegen",
+    "s03": "Eigener Anbieter",
+    "s04": "BELIEBT",
+    "s05": "Betrag",
+    "s06": "Monatlicher Betrag",
+    "s07": "Notiz",
+    "s08": "Tarif / Plan",
+    "s09": "Wähle diesen Anbieter zuerst aus",
+    "s10": "Zahlungsrhythmus",
+    "s11": "Zurücksetzen",
+    "s12": "z.B. Family-Plan, geteilt mit Partner…",
+    "s13": "z.B. Jahresabo, shared account…",
+    "s14": "z.B. Jahresabo, geteilter Account…",
+    "s15": "z.B. Zeitungsabo, Vereinsmitgliedschaft…"
   }
 }
