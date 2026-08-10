@@ -19,6 +19,8 @@ import {
   recurrenceFilterToApiParams,
   type RecurrenceFilterValue,
 } from "@/lib/recurrenceFilter";
+import { translateCategory } from "@/lib/categoryLabel";
+import { useTranslation } from "react-i18next";
 
 type RecurrenceType = "weekly" | "monthly" | "quarterly" | "halfyearly" | "yearly";
 
@@ -66,6 +68,7 @@ interface BudgetAnalysis {
 }
 
 export default function Transactions() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const refCcy = user?.currency ?? "CHF";
   const superCategories = useTaxonomySuperCategories();
@@ -767,7 +770,7 @@ export default function Transactions() {
                                 }}
                               >
                                 <sc.icon className="w-3 h-3 shrink-0" />
-                                {txn.category || "Unkategorisiert"}
+                                {txn.category ? translateCategory(txn.category) : t("txn.uncategorized")}
                               </span>
                             );
                           })()}

@@ -51,5 +51,8 @@
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
     "more": "More"
+  },
+  "txn": {
+    "uncategorized": "Uncategorized"
   }
 }

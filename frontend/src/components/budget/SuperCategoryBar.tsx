@@ -11,6 +11,7 @@ import { clsx } from "clsx";
 import { NavArrowRight, WarningTriangle } from "@/lib/icons";
 import { formatCHF } from "@/lib/theme";
 import type { SuperCategory } from "@/lib/categories";
+import { translateCategory } from "@/lib/categoryLabel";
 
 export interface SubItem {
   label: string;
@@ -129,7 +130,7 @@ export default function SuperCategoryBar({
         <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5">
           {subItems.slice(0, 4).map((sub) => (
             <span key={sub.label} className="flex items-baseline gap-1 text-xs">
-              <span className="text-text-disabled truncate max-w-[120px]">{sub.label}</span>
+              <span className="text-text-disabled truncate max-w-[120px]">{translateCategory(sub.label)}</span>
               {sub.actual !== undefined && sub.actual > 0 && (
                 <span className="text-text-disabled/60 font-mono tabular-nums shrink-0">
                   {formatCHF(sub.actual)}

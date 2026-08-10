@@ -10,10 +10,12 @@ import type { IconComponent } from "@/lib/icons";
 import { Bank, Cart, Component, GraduationCap, Home, Movie, PiggyBank, ShieldCheck, ShoppingBag, SmartphoneDevice, Train } from "@/lib/icons";
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/auth";
 import { taxonomyApi } from "@/lib/api";
 
 import taxonomyJson from "../../../shared/taxonomy.json";
+import { translateSuperCategory } from "@/lib/categoryLabel";
 
 // ── Lucide icons by supercategory id (not in JSON) ─────────────
 
@@ -33,7 +35,10 @@ const SUPER_ICONS: Record<string, IconComponent> = {
 
 export interface SuperCategory {
   id: string;
+  /** Anzeigename in der aktuellen UI-Sprache. */
   label: string;
+  /** Kanonisches deutsches Label — bleibt Matching-Schlüssel, unabhängig von der Sprache. */
+  labelDe: string;
   icon: IconComponent;
   emoji: string;
   color: string;
@@ -55,7 +60,8 @@ interface TaxonomyJsonRow {
 export function buildSuperCategoriesFromRows(rows: TaxonomyJsonRow[]): SuperCategory[] {
   return rows.map((row) => ({
     id: row.id,
-    label: row.label,
+    label: translateSuperCategory(row.id, row.label),
+    labelDe: row.label,
     icon: SUPER_ICONS[row.id] ?? Component,
     emoji: row.emoji,
     color: row.color,
@@ -86,9 +92,15 @@ export function useTaxonomySuperCategories(): SuperCategory[] {
     placeholderData: BUNDLED_SUPER_CATEGORIES,
     staleTime: 60_000,
   });
+  // i18n abonnieren, damit ein Sprachwechsel die Labels neu übersetzt.
+  const { i18n } = useTranslation();
   // Never return an empty list — fall back to bundled snapshot if API
   // returned nothing (e.g. during startup when taxonomy.json was unavailable).
-  return (data && data.length > 0) ? data : BUNDLED_SUPER_CATEGORIES;
+  const list = (data && data.length > 0) ? data : BUNDLED_SUPER_CATEGORIES;
+  return useMemo(
+    () => list.map((sc) => ({ ...sc, label: translateSuperCategory(sc.id, sc.labelDe) })),
+    [list, i18n.language],
+  );
 }
 
 export function useTaxonomy() {
@@ -175,7 +187,9 @@ export function compareSubLabelsByTaxonomy(
 
 export function getSuperCategoryByLabel(list: SuperCategory[], label: string): SuperCategory | undefined {
   const lower = label.toLowerCase();
-  return list.find((sc) => sc.label.toLowerCase() === lower);
+  return list.find(
+    (sc) => sc.labelDe.toLowerCase() === lower || sc.label.toLowerCase() === lower,
+  );
 }
 
 export function getSuperCategoryFromList(list: SuperCategory[], txnCategory: string): SuperCategory | undefined {
@@ -202,7 +216,9 @@ export function resolveSuperCategoryFromList(
 ): SuperCategory {
   const lower = name.toLowerCase();
 
-  const byLabel = list.find((sc) => sc.label.toLowerCase() === lower);
+  const byLabel = list.find(
+    (sc) => sc.labelDe.toLowerCase() === lower || sc.label.toLowerCase() === lower,
+  );
   if (byLabel) return byLabel;
 
   const byId = list.find((sc) => sc.id === lower);

@@ -11,6 +11,7 @@ import { WarningTriangle, Xmark } from "@/lib/icons";
 import { clsx } from "clsx";
 import { formatCHF } from "@/lib/theme";
 import type { SuperCategory } from "@/lib/categories";
+import { translateCategory } from "@/lib/categoryLabel";
 
 export interface ExpenseTxnEntry {
   amount: number;
@@ -177,7 +178,7 @@ export default function ExpenseDetailPanel({
                     return (
                       <div key={sub.label} className="flex items-center gap-3">
                         <span className="text-text-tertiary text-xs truncate flex-1 min-w-0">
-                          {sub.label}
+                          {translateCategory(sub.label)}
                         </span>
                         <div className="flex items-center gap-2 shrink-0">
                           {/* Mini bar */}

@@ -16,6 +16,7 @@ import { clsx } from "clsx";
 import { formatCHF } from "@/lib/theme";
 import type { SuperCategory } from "@/lib/categories";
 import type { SubItem } from "./SuperCategoryBar";
+import { translateCategory } from "@/lib/categoryLabel";
 
 export interface DrillDownTransaction {
   id: number;
@@ -247,7 +248,7 @@ export default function CategoryDrillDown({
                       return (
                         <div key={sub.label}>
                           <div className="flex items-center justify-between mb-1 gap-2">
-                            <span className="text-text-secondary text-xs truncate flex-1">{sub.label}</span>
+                            <span className="text-text-secondary text-xs truncate flex-1">{translateCategory(sub.label)}</span>
                             <div className="flex items-center gap-2 shrink-0 text-xs font-mono">
                               {sharePct !== null && (
                                 <span className="text-text-disabled tabular-nums">{sharePct}%</span>
