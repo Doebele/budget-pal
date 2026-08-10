@@ -20,6 +20,7 @@ import { useUiStore, type UiLanguage } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { authApi } from "@/lib/api";
 import NotificationBell from "./NotificationBell";
+import PortalTooltip from "@/components/ui/PortalTooltip";
 import { NAV_ITEMS, SETTINGS_ITEM, isNavItemActive } from "./navItems";
 import i18n from "@/i18n";
 import deFlagUrl from "round-flag-icons/flags/de.svg?url";
@@ -41,31 +42,35 @@ function FlagIcon({ lang, size = 15 }: { lang: UiLanguage; size?: number }) {
 }
 
 // ── Tooltip bei eingeklappter Rail ────────────────────────────
-function RailTooltip({ label, visible }: { label: string; visible: boolean }) {
+// Muss per Portal raus: `.rail` hat `overflow: hidden`, ein absolut
+// positionierter Tooltip neben der 52px schmalen Rail wäre komplett weggeschnitten.
+function RailTooltip({
+  label,
+  visible,
+  anchorRef,
+}: {
+  label: string;
+  visible: boolean;
+  anchorRef: React.RefObject<HTMLElement | null>;
+}) {
   return (
-    <div
-      style={{
-        position: "absolute",
-        left: RAIL_COLLAPSED + 8,
-        top: "50%",
-        transform: "translateY(-50%)",
-        background: "var(--surface-2)",
-        border: "1px solid var(--border)",
-        borderRadius: 6,
-        padding: "5px 10px",
-        fontSize: 12,
-        fontWeight: 600,
-        color: "var(--fg-1)",
-        whiteSpace: "nowrap",
-        pointerEvents: "none",
-        zIndex: 200,
-        boxShadow: "var(--shadow-card)",
-        opacity: visible ? 1 : 0,
-        transition: "opacity 0.12s ease",
-      }}
-    >
-      {label}
-    </div>
+    <PortalTooltip anchorRef={anchorRef} visible={visible} placement="right">
+      <div
+        style={{
+          background: "var(--surface-2)",
+          border: "1px solid var(--border)",
+          borderRadius: 6,
+          padding: "5px 10px",
+          fontSize: 12,
+          fontWeight: 600,
+          color: "var(--fg-1)",
+          whiteSpace: "nowrap",
+          boxShadow: "var(--shadow-card)",
+        }}
+      >
+        {label}
+      </div>
+    </PortalTooltip>
   );
 }
 
@@ -86,6 +91,7 @@ function RailBtn({
   badge?: string | number;
 }) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
   const [tooltipVisible, setTooltipVisible] = useState(false);
 
   const handleMouseEnter = () => {
@@ -101,6 +107,7 @@ function RailBtn({
   return (
     <div style={{ position: "relative" }}>
       <button
+        ref={btnRef}
         className={"rail-btn" + (active ? " active" : "")}
         onClick={onClick}
         onMouseEnter={handleMouseEnter}
@@ -119,7 +126,7 @@ function RailBtn({
         )}
         {open && badge != null && <span className="rail-badge">{badge}</span>}
       </button>
-      {!open && <RailTooltip label={label} visible={tooltipVisible} />}
+      {!open && <RailTooltip label={label} visible={tooltipVisible} anchorRef={btnRef} />}
     </div>
   );
 }

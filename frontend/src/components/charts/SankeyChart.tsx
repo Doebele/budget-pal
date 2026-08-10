@@ -248,6 +248,8 @@ export default function SankeyChart({
       tooltip: {
         trigger: "item",
         triggerOn: "mousemove",
+        // Am Chart-Rand sonst vom Container beschnitten.
+        appendToBody: true,
         backgroundColor: colors.bgElevated,
         borderColor: colors.border,
         borderWidth: 1,

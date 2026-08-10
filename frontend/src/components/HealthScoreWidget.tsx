@@ -12,6 +12,7 @@ import { useQuery } from "@tanstack/react-query";
 import { healthApi } from "@/lib/api";
 import { clsx } from "clsx";
 import { Activity, GraphUp, NavArrowDown, NavArrowUp, Xmark } from "@/lib/icons";
+import PortalTooltip from "@/components/ui/PortalTooltip";
 
 // ── Colour helpers ────────────────────────────────────────────
 
@@ -51,16 +52,15 @@ function Tooltip({ text, children }: { text: string; children: React.ReactNode }
       onMouseLeave={() => setVisible(false)}
     >
       {children}
-      {visible && (
-        <div
-          className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 rounded-lg bg-bg-surface border border-border shadow-xl px-3 py-2 pointer-events-none"
-          style={{ fontSize: 11 }}
-        >
-          <p className="text-text-secondary leading-snug">{text}</p>
-          {/* Arrow */}
-          <div className="absolute top-full left-1/2 -translate-x-1/2 w-2 h-2 bg-bg-surface border-r border-b border-border rotate-45 -mt-1" />
-        </div>
-      )}
+      <PortalTooltip
+        anchorRef={ref}
+        visible={visible}
+        placement="top"
+        className="w-56 rounded-lg bg-bg-surface border border-border shadow-xl px-3 py-2"
+        style={{ fontSize: 11 }}
+      >
+        <p className="text-text-secondary leading-snug whitespace-pre-line">{text}</p>
+      </PortalTooltip>
     </div>
   );
 }

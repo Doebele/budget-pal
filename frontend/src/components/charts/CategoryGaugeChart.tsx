@@ -175,6 +175,9 @@ function makeOption(row: GaugeRow, hasPeer: boolean, colors: ThemePalette): any 
     backgroundColor: "transparent",
     tooltip: {
       trigger: "item",
+      // Der Gauge-Container ist nur ~205×150px — ohne appendToBody schneidet
+      // ECharts den Tooltip an dessen Rand ab.
+      appendToBody: true,
       backgroundColor: colors.bgElevated,
       borderColor: colors.border,
       borderWidth: 1,

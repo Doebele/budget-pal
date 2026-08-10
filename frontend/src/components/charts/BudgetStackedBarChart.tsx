@@ -21,7 +21,8 @@ import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import ReactECharts from "echarts-for-react";
 import type { SuperCategory } from "@/lib/categories";
 import { resolveSuperCategoryFromList, useTaxonomySuperCategories } from "@/lib/categories";
-import { formatCHF } from "@/lib/theme";
+import { formatCHF, themePalettes, type ThemePalette } from "@/lib/theme";
+import { useThemeColors } from "@/hooks/useThemeColors";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -438,6 +439,7 @@ function buildOption(
   layers: ChartLayers,
   subsByMonth: SubCatDetail,
   firstForecastIdx = -1,
+  theme: ThemePalette = themePalettes.dark,
 ) {
   const { keys, labels, colors, data, singleScMode, subCatColors, orderedSc } = layers;
   const axisColor = "#64748b";
@@ -551,10 +553,10 @@ function buildOption(
     tooltip: {
       trigger: "item" as const,
       appendToBody: true,
-      backgroundColor: "#1e293b",
-      borderColor: "#334155",
+      backgroundColor: theme.bgElevated,
+      borderColor: theme.border,
       borderWidth: 1,
-      textStyle: { color: "#e2e8f0", fontSize: 12 },
+      textStyle: { color: theme.textPrimary, fontSize: 12 },
       formatter: tooltipFormatter,
     },
     legend: { bottom: 0, textStyle: { color: labelColor, fontSize: 11 }, data: legendData },
@@ -769,6 +771,7 @@ export default function BudgetStackedBarChart({
   const activeMode = embedded ? "historical" : mode;
   const hasBudgetPlan = (budgetPlanMonths?.length ?? 0) > 0 && budgetPlanByMonth != null;
   const superCategories = useTaxonomySuperCategories();
+  const { colors: themeColors } = useThemeColors();
   const chartSc = useMemo(
     () =>
       CHART_SC_ORDER
@@ -891,8 +894,8 @@ export default function BudgetStackedBarChart({
   );
 
   const option = useMemo(
-    () => buildOption(activeMonths, layers, activeSubs, activeFirstForecastIdx),
-    [activeMonths, layers, activeSubs, activeFirstForecastIdx],
+    () => buildOption(activeMonths, layers, activeSubs, activeFirstForecastIdx, themeColors),
+    [activeMonths, layers, activeSubs, activeFirstForecastIdx, themeColors],
   );
 
   // ── Ribbon polygon injection ───────────────────────────────────
