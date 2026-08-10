@@ -505,7 +505,7 @@ function buildOption(
 
     let html = `<div style="font-weight:600;margin-bottom:4px;font-size:13px;color:#f1f5f9">${first.name ?? fmtMonth(monthKey)}</div>`;
     if (isFuture) {
-      html += `<div style="margin-bottom:6px"><span style="background:#7c3aed22;border:1px solid #7c3aed55;color:#a78bfa;font-size:10px;padding:1px 6px;border-radius:9999px">Prognose (Periodizität)</span></div>`;
+      html += `<div style="margin-bottom:6px"><span style="background:#7c3aed22;border:1px solid #7c3aed55;color:#a78bfa;font-size:10px;padding:1px 6px;border-radius:9999px">{t("pages:misc.r12")}</span></div>`;
     }
     for (const p of visible) {
       const pct = total > 0 ? ((p.value / total) * 100).toFixed(1) : "0.0";

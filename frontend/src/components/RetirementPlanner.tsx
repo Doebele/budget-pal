@@ -20,6 +20,7 @@ import {
 import { ArrowRight, Calendar, Coins, GraphUp, ShieldCheck, WarningTriangle } from "@/lib/icons";
 import { projectionsApi, api } from "@/lib/api";
 import { formatCHF } from "@/lib/theme";
+import { useTranslation } from "react-i18next";
 
 interface Props {
   /** Current total net worth from accounts */
@@ -41,6 +42,7 @@ const PILLAR_COLORS = {
 } as const;
 
 export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dateOfBirth }: Props) {
+  const { t } = useTranslation();
   const [retirementAge, setRetirementAge] = useState(65);
   const [annualIncome, setAnnualIncome] = useState(90_000);
   const [meanReturn, setMeanReturn] = useState(0.07);
@@ -169,7 +171,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
       {/* Summary KPIs — style matches Finanzplan cashflow cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
-          label="Vermögen bei Rente"
+          label={t("pages:misc.r02")}
           value={formatCHF(wealthAtRetirement)}
           sub={`in ${Math.max(yearsToRetirement, 0)} Jahren`}
           icon={<GraphUp className="w-4 h-4" style={{ color: "#10b981" }} />}
@@ -194,7 +196,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
           valueColor={isSurplus ? "#10b981" : "#f87171"}
         />
         <KPICard
-          label="Säulen-Struktur"
+          label={t("pages:misc.r01")}
           value={`${Math.round((ahvMonthly / (totalPensionMonthly || 1)) * 100)}% AHV`}
           sub={`${Math.round((bvgMonthly / (totalPensionMonthly || 1)) * 100)}% BVG · ${Math.round((pillar3aMonthly / (totalPensionMonthly || 1)) * 100)}% 3a · ${Math.round((pillar3bMonthly / (totalPensionMonthly || 1)) * 100)}% 3b`}
           icon={<ShieldCheck className="w-4 h-4" style={{ color: PILLAR_COLORS.ahv }} />}

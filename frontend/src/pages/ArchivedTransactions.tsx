@@ -8,6 +8,7 @@ import {
   recurrenceFilterToApiParams,
   type RecurrenceFilterValue,
 } from "@/lib/recurrenceFilter";
+import { useTranslation } from "react-i18next";
 
 interface ArchivedApiRow {
   id: number;
@@ -24,6 +25,7 @@ interface ArchivedApiRow {
 }
 
 export default function ArchivedTransactions() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [accountFilter, setAccountFilter] = useState<string>("");
   const [recurrenceFilter, setRecurrenceFilter] = useState<RecurrenceFilterValue>("");
@@ -90,17 +92,17 @@ export default function ArchivedTransactions() {
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-display text-text-primary">Archiv</h1>
-          <p className="text-text-tertiary text-sm mt-0.5">Wiederherstellung weich gelöschter Transaktionen</p>
+          <p className="text-text-tertiary text-sm mt-0.5">{t("pages:misc.r22")}</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-4 sm:items-end">
           <div className="flex flex-col gap-1">
-            <label className="label text-xs text-text-tertiary">Konto filtern</label>
+            <label className="label text-xs text-text-tertiary">{t("pages:misc.r21")}</label>
             <select
               className="input w-full sm:w-64"
               value={accountFilter}
               onChange={(e) => setAccountFilter(e.target.value)}
             >
-              <option value="">Alle Konten</option>
+              <option value="">{t("filters.allAccounts")}</option>
               {(accounts || []).map((a: { id: number; name: string }) => (
                 <option key={a.id} value={String(a.id)}>
                   {a.name}
@@ -131,7 +133,7 @@ export default function ArchivedTransactions() {
       {isLoading && (
         <div className="card flex items-center gap-3 p-6">
           <div className="w-8 h-8 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
-          <span className="text-text-secondary text-sm">Archiv wird geladen…</span>
+          <span className="text-text-secondary text-sm">{t("pages:misc.r19")}</span>
         </div>
       )}
 
@@ -152,7 +154,7 @@ export default function ArchivedTransactions() {
                 <WarningTriangle className="w-5 h-5 text-red-400" />
               </div>
               <div>
-                <h3 className="text-text-primary font-semibold">Endgültig löschen?</h3>
+                <h3 className="text-text-primary font-semibold">{t("pages:misc.r20")}</h3>
                 <p className="text-text-tertiary text-sm mt-1">
                   Diese Transaktion wird unwiderruflich aus der Datenbank entfernt. Diese Aktion kann nicht
                   rückgängig gemacht werden.
@@ -162,7 +164,7 @@ export default function ArchivedTransactions() {
                 type="button"
                 onClick={() => setPurgeId(null)}
                 className="p-1 text-text-tertiary hover:text-text-primary ml-auto"
-                aria-label="Schließen"
+                aria-label={t("pages:misc.r16")}
               >
                 <Xmark className="w-5 h-5" />
               </button>

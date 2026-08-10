@@ -10,6 +10,7 @@ import { clsx } from "clsx";
 import { format, parseISO } from "date-fns";
 import { de } from "date-fns/locale";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 type GoalType = "savings" | "debt_payoff" | "emergency_fund" | "purchase" | "retirement" | "other";
 
@@ -51,6 +52,7 @@ const DEFAULT_FORM = {
 };
 
 export default function Goals() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
@@ -276,7 +278,7 @@ export default function Goals() {
       {!isLoading && goals.length === 0 && (
         <div className="card flex flex-col items-center justify-center py-16 text-center">
           <Position className="w-12 h-12 text-text-tertiary mb-3" />
-          <p className="text-text-primary font-medium mb-1">Noch keine Ziele</p>
+          <p className="text-text-primary font-medium mb-1">{t("pages:misc.r27")}</p>
           <p className="text-text-tertiary text-sm mb-4">
             Erstelle dein erstes Sparziel und verfolge deinen Fortschritt.
           </p>

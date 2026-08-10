@@ -619,7 +619,7 @@ export default function Budget() {
         {/* Exclude-transfers toggle */}
         <button
           type="button"
-          title="Kontoüberträge ein-/ausschließen"
+          title={t("pages:misc.r23")}
           onClick={toggleExcludeTransfers}
           className={clsx(
             "px-3 py-1.5 rounded-lg text-xs border transition-colors",
@@ -674,7 +674,7 @@ export default function Budget() {
           className="card flex flex-col gap-2 text-left hover:ring-1 hover:ring-accent/30 transition-all cursor-pointer"
         >
           <div className="flex items-center justify-between">
-            <span className="text-text-tertiary text-xs uppercase tracking-wide">Ausgaben</span>
+            <span className="text-text-tertiary text-xs uppercase tracking-wide">{t("pages:dashboard.expenses")}</span>
             <div className="w-8 h-8 rounded-lg bg-bg-surface2 flex items-center justify-center">
               <Wallet className="w-4 h-4 text-text-tertiary" />
             </div>
@@ -969,7 +969,7 @@ export default function Budget() {
             <table className="w-full text-sm min-w-[520px]">
               <thead>
                 <tr className="border-b border-border/60 text-[11px] text-text-tertiary uppercase tracking-wide">
-                  <th className="px-4 py-2.5 text-left font-medium w-40">Kategorie</th>
+                  <th className="px-4 py-2.5 text-left font-medium w-40">{t("table.category")}</th>
                   <th className="px-3 py-2.5 text-right font-medium">Ist</th>
                   <th className="px-3 py-2.5 text-right font-medium">Soll</th>
                   <th className="px-3 py-2.5 text-right font-medium">vs. Soll</th>

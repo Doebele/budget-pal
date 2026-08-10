@@ -5,6 +5,7 @@ import { clsx } from "clsx";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { useBulkDelete } from "@/hooks/useBulkDelete";
+import { useTranslation } from "react-i18next";
 
 /**
  * Bulk archive / purge for the selected account on the transactions overview.
@@ -17,6 +18,7 @@ export function TransactionOverviewHeader({
   accountId: number;
   accountName: string;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
 
   const {
@@ -60,7 +62,7 @@ export function TransactionOverviewHeader({
         type="button"
         onClick={() => setOpen(true)}
         className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium bg-amber-600/90 hover:bg-amber-600 text-white shadow-md transition-colors"
-        title="Alle Transaktionen dieses Kontos archivieren"
+        title={t("pages:misc.r15")}
       >
         <span className="relative inline-flex">
           <Archive className="w-4 h-4" />
@@ -101,7 +103,7 @@ export function TransactionOverviewHeader({
                     if (!dismissLocked) closeModal();
                   }}
                   className="ml-auto p-1 rounded text-text-disabled hover:text-text-primary"
-                  aria-label="Schließen"
+                  aria-label={t("pages:misc.r16")}
                 >
                   <Xmark className="w-5 h-5" />
                 </button>

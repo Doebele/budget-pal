@@ -494,7 +494,7 @@ export default function Finanzplan() {
       {assets.length > 0 && (
         <section className="bg-bg-surface2 rounded-xl border border-border/40 overflow-hidden">
           <div className="px-5 py-4 border-b border-border/40 flex items-center justify-between">
-            <h2 className="text-text-primary font-semibold text-sm">Vermögen</h2>
+            <h2 className="text-text-primary font-semibold text-sm">{t("pages:wizard.w105")}</h2>
             <span className="text-text-tertiary text-xs font-mono">{fmtCHF(totalAssets)}</span>
           </div>
           <div className="divide-y divide-border/30">

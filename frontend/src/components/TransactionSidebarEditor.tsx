@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { clsx } from "clsx";
 import { Check, Dollar, FloppyDisk, Label, NavArrowRight, Refresh, Undo, WarningCircle, Xmark } from "@/lib/icons";
+import { useTranslation } from "react-i18next";
 
 type RecurrenceType = "weekly" | "monthly" | "quarterly" | "halfyearly" | "yearly";
 
@@ -41,6 +42,7 @@ const PERIODICITY_LABELS_FULL: Record<RecurrenceType, string> = {
 };
 
 export default function TransactionSidebarEditor({ transactions, periodLabel, onClose }: Props) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -205,7 +207,7 @@ export default function TransactionSidebarEditor({ transactions, periodLabel, on
           <div className="flex gap-2 mt-3">
             <input
               type="text"
-              placeholder="Suchen…"
+              placeholder={t("pages:misc.r05")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="flex-1 bg-bg-elevated/60 border border-border-strong rounded-lg px-3 py-1.5 text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent/50"
@@ -215,7 +217,7 @@ export default function TransactionSidebarEditor({ transactions, periodLabel, on
               onChange={(e) => setCategoryFilter(e.target.value)}
               className="bg-bg-elevated/60 border border-border-strong rounded-lg px-2 py-1.5 text-sm text-text-primary focus:outline-none focus:border-accent/50 max-w-[140px]"
             >
-              <option value="all">Alle Kat.</option>
+              <option value="all">{t("pages:misc.r03")}</option>
               {txnCategories.map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}
@@ -226,7 +228,7 @@ export default function TransactionSidebarEditor({ transactions, periodLabel, on
         {/* ── Scrollable transaction list ────────────────────── */}
         <div ref={listRef} className="flex-1 overflow-y-auto">
           {filtered.length === 0 ? (
-            <p className="text-text-tertiary text-sm text-center py-10">Keine Transaktionen gefunden</p>
+            <p className="text-text-tertiary text-sm text-center py-10">{t("pages:misc.r04")}</p>
           ) : (
             <div className="divide-y divide-border-subtle">
               {filtered.map((txn) => {
@@ -325,7 +327,7 @@ export default function TransactionSidebarEditor({ transactions, periodLabel, on
                   onChange={(e) => updateDraft({ category: e.target.value })}
                   className="w-full bg-bg-elevated border border-border-strong rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent"
                 >
-                  <option value="">— Keine Kategorie —</option>
+                  <option value="">{t("pages:misc.r06")}</option>
                   {categories.map((c) => (
                     <option key={c} value={c}>{c}</option>
                   ))}

@@ -10,6 +10,7 @@ import { transactionsApi } from "@/lib/api";
 import { formatAmount } from "@/lib/theme";
 import { Check, Plus, Scissor, Trash, WarningCircle, Xmark } from "@/lib/icons";
 import { clsx } from "clsx";
+import { useTranslation } from "react-i18next";
 
 interface SplitEntry {
   id: string;
@@ -40,6 +41,7 @@ function newId() {
 }
 
 export default function SplitTransactionModal({ transaction, onClose }: Props) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const displayName = transaction.merchant_normalized || transaction.description;
   const ccy = transaction.currency || transaction.account_currency || "CHF";
@@ -160,7 +162,7 @@ export default function SplitTransactionModal({ transaction, onClose }: Props) {
                 />
                 <input
                   type="text"
-                  placeholder="Kategorie"
+                  placeholder={t("table.category")}
                   className="input text-sm"
                   value={entry.category}
                   onChange={(e) => updateEntry(entry.id, "category", e.target.value)}

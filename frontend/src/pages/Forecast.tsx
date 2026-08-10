@@ -30,6 +30,7 @@ import { useTaxonomySuperCategories, resolveSuperCategoryFromList } from "@/lib/
 import ForecastCard from "@/components/ForecastCard";
 import RetirementPlanner from "@/components/RetirementPlanner";
 import { useAuth } from "@/lib/auth";
+import { useTranslation } from "react-i18next";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -165,6 +166,7 @@ function categoryColor(name: string): string {
 // ── Main component ───────────────────────────────────────────
 
 export default function Forecast() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const superCategories = useTaxonomySuperCategories();
   const [tab, setTab] = useState<TabKey>("overview");
@@ -546,7 +548,7 @@ export default function Forecast() {
               </select>
             </div>
             <div>
-              <label className="text-text-tertiary text-[11px] mb-1 block">Beschäftigung</label>
+              <label className="text-text-tertiary text-[11px] mb-1 block">{t("pages:misc.r25")}</label>
               <select
                 value={peerProfile.employment_status}
                 onChange={(e) => setPeerProfile((p) => ({ ...p, employment_status: e.target.value }))}
@@ -603,7 +605,7 @@ export default function Forecast() {
         <div className="card h-72 flex items-center justify-center animate-pulse">
           <div className="text-center space-y-2">
             <Brain className="w-8 h-8 text-accent mx-auto animate-pulse" />
-            <p className="text-text-secondary text-sm">Prognose wird berechnet…</p>
+            <p className="text-text-secondary text-sm">{t("pages:misc.r26")}</p>
             <p className="text-text-tertiary text-xs">
               Zeitreihen-Analyse · Saisonalität · Peer-Kalibrierung
             </p>
@@ -762,7 +764,7 @@ export default function Forecast() {
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-border">
-                <th className="text-left py-2 pr-4 text-text-tertiary font-medium">Kategorie</th>
+                <th className="text-left py-2 pr-4 text-text-tertiary font-medium">{t("table.category")}</th>
                 {(forecast?.forecast ?? []).slice(0, 12).map((f) => (
                   <th key={f.month} className="text-right py-2 px-2 text-text-tertiary font-medium whitespace-nowrap">
                     {formatMonthShort(f.month)}

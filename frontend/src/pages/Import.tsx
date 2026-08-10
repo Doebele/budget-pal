@@ -833,7 +833,7 @@ export default function Import() {
                                 onChange={(e) => handleCategoryChange(row.id, idx, e.target.value)}
                                 className="flex-1 min-w-0 bg-bg-surface2 border border-border rounded px-1.5 py-1 text-text-secondary text-[11px]"
                               >
-                                <option value="">↩ Zurücksetzen</option>
+                                <option value="">{t("pages:misc.r29")}</option>
                                 {pdfCategoryOptions.map((name) => (
                                   <option key={name} value={name}>{name}</option>
                                 ))}
@@ -1081,7 +1081,7 @@ export default function Import() {
                         value={manualMapping.date_col || ""}
                         onChange={(e) => setManualMapping({ ...manualMapping, date_col: e.target.value })}
                       >
-                        <option value="">-- Wählen --</option>
+                        <option value="">{t("pages:misc.r28")}</option>
                         {availableColumns.map((col) => (
                           <option key={col} value={col}>{col}</option>
                         ))}
@@ -1096,7 +1096,7 @@ export default function Import() {
                         value={manualMapping.description_col || ""}
                         onChange={(e) => setManualMapping({ ...manualMapping, description_col: e.target.value })}
                       >
-                        <option value="">-- Wählen --</option>
+                        <option value="">{t("pages:misc.r28")}</option>
                         {availableColumns.map((col) => (
                           <option key={col} value={col}>{col}</option>
                         ))}
@@ -1109,7 +1109,7 @@ export default function Import() {
                         value={manualMapping.amount_col || ""}
                         onChange={(e) => setManualMapping({ ...manualMapping, amount_col: e.target.value })}
                       >
-                        <option value="">-- Wählen --</option>
+                        <option value="">{t("pages:misc.r28")}</option>
                         {availableColumns.map((col) => (
                           <option key={col} value={col}>{col}</option>
                         ))}
@@ -1122,7 +1122,7 @@ export default function Import() {
                         value={manualMapping.debit_col || ""}
                         onChange={(e) => setManualMapping({ ...manualMapping, debit_col: e.target.value })}
                       >
-                        <option value="">-- Wählen --</option>
+                        <option value="">{t("pages:misc.r28")}</option>
                         {availableColumns.map((col) => (
                           <option key={col} value={col}>{col}</option>
                         ))}
@@ -1135,7 +1135,7 @@ export default function Import() {
                         value={manualMapping.credit_col || ""}
                         onChange={(e) => setManualMapping({ ...manualMapping, credit_col: e.target.value })}
                       >
-                        <option value="">-- Wählen --</option>
+                        <option value="">{t("pages:misc.r28")}</option>
                         {availableColumns.map((col) => (
                           <option key={col} value={col}>{col}</option>
                         ))}
@@ -1148,7 +1148,7 @@ export default function Import() {
                         value={manualMapping.balance_col || ""}
                         onChange={(e) => setManualMapping({ ...manualMapping, balance_col: e.target.value })}
                       >
-                        <option value="">-- Wählen --</option>
+                        <option value="">{t("pages:misc.r28")}</option>
                         {availableColumns.map((col) => (
                           <option key={col} value={col}>{col}</option>
                         ))}

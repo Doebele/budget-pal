@@ -175,14 +175,14 @@ export default function Dashboard() {
           colorClass="text-text-primary"
         />
         <StatCard
-          label="Einnahmen"
+          label={t("pages:dashboard.income")}
           periodHint={range.label}
           value={formatCHF(stats?.total_income || 0)}
           icon={ArrowUpRight}
           colorClass="text-gain"
         />
         <StatCard
-          label="Ausgaben"
+          label={t("pages:dashboard.expenses")}
           periodHint={range.label}
           value={formatCHF(stats?.total_expenses || 0)}
           icon={ArrowDownRight}
@@ -385,7 +385,7 @@ export default function Dashboard() {
               );
             })}
             {(!recentTxns || recentTxns.length === 0) && (
-              <p className="text-text-tertiary text-xs text-center py-8">Keine Transaktionen</p>
+              <p className="text-text-tertiary text-xs text-center py-8">{t("pages:misc.r24")}</p>
             )}
           </div>
         </div>

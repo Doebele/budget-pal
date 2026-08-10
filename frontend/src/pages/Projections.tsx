@@ -10,6 +10,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
 import { Refresh } from "@/lib/icons";
+import { useTranslation } from "react-i18next";
 
 /** Match backend `projection._project_pensions` fallback age when DOB is missing. */
 function currentAgeFromProfileBirth(iso: string | undefined): number {
@@ -40,6 +41,7 @@ const PILLAR_COLORS = {
 } as const;
 
 export default function Projections() {
+  const { t } = useTranslation();
   const { colors } = useThemeColors();
   const { user } = useAuth();
   const [horizon, setHorizon] = useState<HorizonKey>("10yr");
@@ -132,7 +134,7 @@ export default function Projections() {
         <h2 className="text-text-primary font-semibold text-sm mb-4">Simulationsparameter</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
-            <label className="label">Aktuelles Nettovermögen</label>
+            <label className="label">{t("pages:misc.r30")}</label>
             <input
               type="number"
               className="input"
@@ -141,7 +143,7 @@ export default function Projections() {
             />
           </div>
           <div>
-            <label className="label">Jährliche Ersparnisse</label>
+            <label className="label">{t("pages:misc.r32")}</label>
             <input
               type="number"
               className="input"
@@ -178,7 +180,7 @@ export default function Projections() {
             />
           </div>
           <div>
-            <label className="label">Volatilität (σ)</label>
+            <label className="label">{t("pages:misc.r37")}</label>
             <input
               type="number"
               step="0.01"
@@ -204,7 +206,7 @@ export default function Projections() {
       <div className="card">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-text-primary font-semibold text-sm">Schweizer Rente (3-Säulen)</h2>
+            <h2 className="text-text-primary font-semibold text-sm">{t("pages:misc.r34")}</h2>
             <p className="text-text-tertiary text-xs mt-0.5">
               AHV (Säule 1) · BVG/Pensionskasse (Säule 2) · Säule 3a · 3b/LV — reale CHF (inflationsbereinigt)
             </p>
@@ -299,8 +301,8 @@ export default function Projections() {
             {/* Total */}
             <div className="flex items-center justify-between bg-accent/8 border border-accent/20 rounded-lg px-4 py-3">
               <div>
-                <p className="text-text-secondary text-xs font-semibold">Gesamtrente (alle Säulen)</p>
-                <p className="text-text-tertiary text-[10px] mt-0.5">Vereinfachtes Modell · reale CHF inflationsbereinigt · keine offizielle BSV-Rechnung</p>
+                <p className="text-text-secondary text-xs font-semibold">{t("pages:misc.r31")}</p>
+                <p className="text-text-tertiary text-[10px] mt-0.5">{t("pages:misc.r36")}</p>
               </div>
               <div className="text-right">
                 <p className="font-mono font-bold text-xl text-accent">{formatCHF(totalPensionAnnual / 12)}</p>
@@ -336,7 +338,7 @@ export default function Projections() {
       <div className="card">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-text-primary font-semibold text-sm">Nettovermögen Prognose</h2>
+            <h2 className="text-text-primary font-semibold text-sm">{t("pages:misc.r33")}</h2>
             <p className="text-text-tertiary text-xs mt-0.5">
               {(10000).toLocaleString()} Monte Carlo Simulationen · Reale CHF (inflationsbereinigt)
             </p>
@@ -354,7 +356,7 @@ export default function Projections() {
           <div className="h-80 flex items-center justify-center">
             <div className="flex items-center gap-3 text-text-tertiary">
               <Refresh className="w-5 h-5 animate-spin" />
-              <span className="text-sm">Simulation läuft...</span>
+              <span className="text-sm">{t("pages:misc.r35")}</span>
             </div>
           </div>
         ) : projection ? (

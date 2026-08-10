@@ -548,7 +548,7 @@ export default function Settings() {
           <div>
             <label className="label">
               Geburtsdatum
-              <span className="text-text-tertiary font-normal ml-1 text-xs">(für Peer-Gruppe &amp; Pensionsberechnung)</span>
+              <span className="text-text-tertiary font-normal ml-1 text-xs">{t("pages:misc.r38")}</span>
             </label>
             <div className="flex items-center gap-3">
               <input
@@ -636,8 +636,8 @@ export default function Settings() {
         {/* Übersicht: Superkategorie ↔ empirische vs. reale Kategorien (farbkodiert) */}
         <div className="rounded-xl border border-border/50 overflow-hidden mb-4">
           <p className="text-[11px] text-text-tertiary px-3 py-2 bg-bg-surface2/40 border-b border-border/30">
-            Zuordnung aus der Taxonomie: <span className="text-text-secondary">empirische Angaben</span> (Wizard-Deckel) und{" "}
-            <span className="text-text-secondary">reale Angaben</span> (Transaktionskategorien) — Farbe = Superkategorie.
+            Zuordnung aus der Taxonomie: <span className="text-text-secondary">{t("pages:misc.r39")}</span> (Wizard-Deckel) und{" "}
+            <span className="text-text-secondary">{t("pages:misc.r40")}</span> (Transaktionskategorien) — Farbe = Superkategorie.
           </p>
           <div className="overflow-x-auto">
             <table className="w-full text-xs min-w-[640px]">
@@ -1343,7 +1343,7 @@ export default function Settings() {
                                 value={catReassignTo}
                                 onChange={(e) => setCatReassignTo(e.target.value ? Number(e.target.value) : "")}
                               >
-                                <option value="">— Keine Zuweisung (Kategorie-ID wird geleert) —</option>
+                                <option value="">{t("pages:misc.r41")}</option>
                                 {ownCats
                                   .filter((c) => c.id !== cat.id)
                                   .map((c) => (

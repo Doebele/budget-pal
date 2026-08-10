@@ -3,6 +3,7 @@ import { de } from "date-fns/locale";
 import { Archive, Trash, Undo } from "@/lib/icons";
 import { formatCHF, PERIODICITY_LABELS } from "@/lib/theme";
 import { clsx } from "clsx";
+import { useTranslation } from "react-i18next";
 
 export interface DeletedTransactionRow {
   id: number;
@@ -30,6 +31,7 @@ export function DeletedTransactionsView({
   onDeletePermanently,
   busyId = null,
 }: DeletedTransactionsViewProps) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
@@ -37,7 +39,7 @@ export function DeletedTransactionsView({
           <Archive className="w-5 h-5 text-text-tertiary" />
         </div>
         <div>
-          <h2 className="text-text-primary font-semibold text-xl">Gelöschte Transaktionen (Archiv)</h2>
+          <h2 className="text-text-primary font-semibold text-xl">{t("pages:misc.r14")}</h2>
           <p className="text-text-tertiary text-sm">
             Weich gelöschte Buchungen wiederherstellen oder endgültig entfernen.
           </p>
@@ -49,13 +51,13 @@ export function DeletedTransactionsView({
           <table className="w-full text-sm">
             <thead className="bg-bg-surface2 text-text-tertiary text-xs uppercase tracking-wide">
               <tr>
-                <th className="text-left px-4 py-3 font-medium">Datum</th>
-                <th className="text-left px-4 py-3 font-medium">Konto</th>
+                <th className="text-left px-4 py-3 font-medium">{t("table.date")}</th>
+                <th className="text-left px-4 py-3 font-medium">{t("table.account")}</th>
                 <th className="text-left px-4 py-3 font-medium">Beschreibung</th>
-                <th className="text-left px-4 py-3 font-medium">Kategorie</th>
+                <th className="text-left px-4 py-3 font-medium">{t("table.category")}</th>
                 <th className="text-left px-4 py-3 font-medium">Rhythmus</th>
-                <th className="text-right px-4 py-3 font-medium">Betrag</th>
-                <th className="text-left px-4 py-3 font-medium">Gelöscht am</th>
+                <th className="text-right px-4 py-3 font-medium">{t("table.amount")}</th>
+                <th className="text-left px-4 py-3 font-medium">{t("pages:misc.r13")}</th>
                 <th className="text-right px-4 py-3 font-medium">Aktionen</th>
               </tr>
             </thead>

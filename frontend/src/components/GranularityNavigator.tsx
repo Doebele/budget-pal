@@ -69,7 +69,7 @@ export default function GranularityNavigator({ granularity, anchor, onChange }: 
             <button
               onClick={() => onChange(granularity, navigatePeriod(granularity, anchor, 1))}
               className="p-1.5 rounded hover:bg-bg-surface2 text-text-tertiary hover:text-text-primary transition-colors"
-              title="Nächste Periode"
+              title={t("pages:misc.r00")}
             >
               <NavArrowRight className="w-4 h-4" />
             </button>

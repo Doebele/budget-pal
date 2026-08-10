@@ -12,6 +12,7 @@ import { clsx } from "clsx";
 import { formatCHF } from "@/lib/theme";
 import type { SuperCategory } from "@/lib/categories";
 import { translateCategory } from "@/lib/categoryLabel";
+import { useTranslation } from "react-i18next";
 
 export interface ExpenseTxnEntry {
   amount: number;
@@ -43,6 +44,7 @@ export default function ExpenseDetailPanel({
   excludeTransfers,
   onClose,
 }: Props) {
+  const { t } = useTranslation();
   // Close on Escape
   useEffect(() => {
     const fn = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -94,7 +96,7 @@ export default function ExpenseDetailPanel({
         <div className="shrink-0 px-5 py-4 border-b border-border bg-bg-surface2/90">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <h2 className="text-text-primary font-semibold text-base">Ausgaben-Aufschlüsselung</h2>
+              <h2 className="text-text-primary font-semibold text-base">{t("pages:misc.r07")}</h2>
               <p className="text-text-tertiary text-xs mt-0.5">{periodLabel}</p>
             </div>
             <button
@@ -111,7 +113,7 @@ export default function ExpenseDetailPanel({
               {formatCHF(grandTotal)}
             </span>
             {excludeTransfers && (
-              <span className="txt-warning text-xs">Kontoüberträge ausgeblendet</span>
+              <span className="txt-warning text-xs">{t("pages:misc.r08")}</span>
             )}
           </div>
 
@@ -209,7 +211,7 @@ export default function ExpenseDetailPanel({
         {/* ── Footer total ─────────────────────── */}
         <div className="shrink-0 border-t border-border bg-bg-surface2 px-5 py-3">
           <div className="flex items-center justify-between text-sm font-semibold">
-            <span className="text-text-secondary">Total Ausgaben</span>
+            <span className="text-text-secondary">{t("pages:misc.r09")}</span>
             <span className="text-text-primary font-mono">{formatCHF(grandTotal)}</span>
           </div>
           {groups.some((g) => g.isSavings) && !excludeTransfers && (

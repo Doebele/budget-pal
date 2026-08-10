@@ -1670,9 +1670,9 @@ export default function Budgetplan() {
                         <thead>
                           <tr className="text-text-tertiary text-xs uppercase tracking-wide">
                             <th className="text-left pb-2 font-medium">Bezeichnung</th>
-                            <th className="text-right pb-2 font-medium">Betrag</th>
+                            <th className="text-right pb-2 font-medium">{t("table.amount")}</th>
                             <th className="text-left pb-2 font-medium pl-4">{t("pages:budgetplan.periodicityLabel")}</th>
-                            <th className="text-left pb-2 font-medium pl-4 hidden sm:table-cell">Kategorie</th>
+                            <th className="text-left pb-2 font-medium pl-4 hidden sm:table-cell">{t("table.category")}</th>
                             <th className="w-8" />
                           </tr>
                         </thead>

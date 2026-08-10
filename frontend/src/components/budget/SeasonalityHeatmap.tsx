@@ -18,6 +18,7 @@ import { clsx } from "clsx";
 import { format, parseISO, subMonths, startOfMonth } from "date-fns";
 import { de } from "date-fns/locale";
 import { useTaxonomy } from "@/lib/categories";
+import { useTranslation } from "react-i18next";
 
 interface MonthlyCategoryItem {
   month: string;   // "2025-01"
@@ -28,6 +29,7 @@ interface MonthlyCategoryItem {
 const TOP_N = 10; // number of categories to show
 
 export default function SeasonalityHeatmap() {
+  const { t } = useTranslation();
   const { resolveSuperCategory } = useTaxonomy();
 
   // Build last 13 months so we always have a complete trailing 12
@@ -124,7 +126,7 @@ export default function SeasonalityHeatmap() {
     <div className="card overflow-x-auto">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="text-text-primary font-semibold text-sm">Saisonalitäts-Heatmap</h3>
+          <h3 className="text-text-primary font-semibold text-sm">{t("pages:misc.r11")}</h3>
           <p className="text-text-tertiary text-xs mt-0.5">
             Ausgaben pro Kategorie — letzte 12 Monate · Farbe = relativ zum Kategoriemax.
           </p>
@@ -214,7 +216,7 @@ export default function SeasonalityHeatmap() {
             ))}
           </div>
           <span className="text-[10px] text-text-tertiary">Hoch</span>
-          <span className="text-[10px] text-text-tertiary ml-4">* relativ zum Monatsmax je Kategorie</span>
+          <span className="text-[10px] text-text-tertiary ml-4">{t("pages:misc.r10")}</span>
         </div>
       </div>
     </div>
