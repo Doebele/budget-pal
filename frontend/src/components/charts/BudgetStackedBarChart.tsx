@@ -43,10 +43,16 @@ export interface WizardSnapshot {
   nebenkosten?: number;
   monthlyAmortization?: number;
   healthInsurancePerPerson?: number;
+  healthInsuranceMode?: string;
+  healthInsurancePremiums?: number[];
   zusatzversicherung?: number;
   hausrat?: number;
   autoversicherung?: number;
+  autoversicherungPeriod?: string;
   hasAutoInsurance?: boolean;
+  mortgageEntries?: { debtValue?: number; mortgageRate?: number }[];
+  outstandingDebt?: number;
+  mortgageRate?: number;
   groceries?: number;
   monthlyFuel?: number;
   parking?: number;
@@ -284,16 +290,31 @@ function capToHistoricalAvg(
 // ── 4. Wizard → flat monthly amounts ─────────────────────────────
 
 function wizardToMonthly(w: WizardSnapshot): Record<string, number> {
+  // Wohneigentum: Amortisation + Nebenkosten + Hypothekarzins aus den Tranchen
+  const tranches = (w.mortgageEntries ?? []).filter((m) => (m.debtValue ?? 0) > 0);
+  const mortgageInterest =
+    (tranches.length
+      ? tranches.reduce((s, m) => s + (m.debtValue ?? 0) * (m.mortgageRate ?? 0) / 100, 0)
+      : (w.outstandingDebt ?? 0) * (w.mortgageRate ?? 0) / 100) / 12;
+
   const housing =
     w.housingMode === "hypothek"
-      ? (w.monthlyAmortization ?? 0)
+      ? (w.monthlyAmortization ?? 0) + (w.nebenkosten ?? 0) + mortgageInterest
       : (w.monthlyRent ?? 0) + (w.nebenkosten ?? 0);
 
+  const premiums = w.healthInsurancePremiums ?? [];
+  const health =
+    w.healthInsuranceMode === "total" || !premiums.length
+      ? (w.healthInsurancePerPerson ?? 0)
+      : premiums.reduce((s, p) => s + (p ?? 0), 0);
+
   const insurance =
-    (w.healthInsurancePerPerson ?? 0) +
+    health +
     (w.zusatzversicherung ?? 0) +
     (w.hausrat ?? 0) +
-    (w.hasAutoInsurance ? (w.autoversicherung ?? 0) : 0);
+    (w.hasAutoInsurance
+      ? (w.autoversicherungPeriod === "jahr" ? (w.autoversicherung ?? 0) / 12 : (w.autoversicherung ?? 0))
+      : 0);
 
   const mobility =
     (w.monthlyFuel ?? 0) +

@@ -544,6 +544,47 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
   box-shadow: 0 1px 3px rgba(0,0,0,0.18);
 }
 
+/* Gleiche Segmented-Optik wie die Rail-Toggles, nur grösser — für Formulare */
+.seg-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  padding: 3px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.seg-btn {
+  /* Gleiche Basis für alle → auf breiten Layouts gleich breit, sonst Umbruch
+     in eine zweite Zeile statt abgeschnittener Labels. */
+  flex: 1 1 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 9px 10px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--fg-3);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
+}
+.seg-btn:hover {
+  color: var(--fg-1);
+}
+.seg-btn.active {
+  background: var(--surface);
+  color: var(--fg-1);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+}
+
 .rail-user {
   display: flex;
   align-items: center;

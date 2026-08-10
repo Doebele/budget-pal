@@ -4,7 +4,40 @@ Laufendes Änderungsprotokoll aller bedeutenden Erweiterungen und Bugfixes.
 
 ---
 
-## Neueste Änderungen (April 2026)
+## Neueste Änderungen (August 2026)
+
+### Wizard — Hypothekarzins, Jahresprämien, Gauge-Theming ([PR #9](https://github.com/Doebele/budget-pal/pull/9))
+
+**`backend/app/services/wizard_derive.py`** (neu)
+- Zentrale Ableitungen aus den Wizard-Rohdaten, vorher an vier Stellen separat (teils inkonsistent) berechnet:
+  - `mortgage_interest_monthly()` / `mortgage_tranches_from_wizard()` — Hypothekarzins aus den Tranchen (Schritt 6), fällt auf die Einzelhypothek zurück wenn keine Tranchen erfasst sind
+  - `monthly_amount()` — Jahres- auf Monatsbeträge umrechnen (z.B. jährliche Autoversicherung)
+  - `health_insurance_monthly()` — Haushaltsprämie: Summe individueller Personen-Prämien oder direkter Haushaltstotal, je nach Modus
+- Genutzt von `wizard.py` (`/wizard/complete`), `recurring_plan.py` (`/recurring-plan/suggestions`) und `budget_multimodal.py` (`/budget/multi-analysis`)
+
+**`backend/app/api/wizard.py`**
+- Wohneigentum-Budget berücksichtigt jetzt Nebenkosten und Hypothekarzins zusätzlich zur Amortisation (vorher fehlten beide komplett)
+- `WizardCompletePayload`: `health_insurance_mode` ("person" | "total"), `health_insurance_premiums: List[float]` (ersetzt den reinen Pro-Kopf-Betrag), `autoversicherung_period` ("monat" | "jahr")
+- Bugfix: Nebenkosten-Budget-Vermerk von `"Nebenkosten (Strom/Heizung)"` auf `"Nebenkosten"` gekürzt — die längere Variante matchte keinen Taxonomy-Schlüssel und landete unter "Sonstiges" statt "Wohnen"
+
+**`frontend/src/pages/Wizard.tsx`**
+- Krankenkasse: Umschalter "Pro Person" (Liste mit Hinzufügen/Entfernen individueller Prämien) vs. "Total Haushalt"
+- Autoversicherung: Umschalter "pro Monat" / "pro Jahr" mit Live-Umrechnung
+- Wohneigentum: Nebenkosten-Feld ergänzt, Hypothekarzins wird live aus den Tranchen berechnet und angezeigt
+- Alle Auswahlfelder (Wohnsituation, Krankenkassen-Erfassung, Franchise, Autoversicherung-Periode, Haushalt, Beschäftigungsstatus) auf `Segmented`-Toggle-Komponente umgestellt — gleiche Optik wie die Rail-Umschalter (Sprache/Dichte), nur grösser; Beschäftigungsstatus hat neu Iconoir-Icons (`Suitcase`, `Laptop`, `Shuffle`, `Sofa`)
+
+**`frontend/src/index.css`**
+- `.seg-row` / `.seg-btn` — wiederverwendbare Segmented-Toggle-Klassen im Rail-Stil, `flex-wrap` statt Textabschneidung auf schmalen Viewports
+
+**`frontend/src/components/charts/CategoryGaugeChart.tsx`**
+- Bugfix: leerer Ring-Track war als dunkler Hex-Wert (`#1a1b23`) hartkodiert und blieb im Lightmode schwarz — folgt jetzt `colors.bgElevated` aus der Theme-Palette
+
+**`frontend/src/components/charts/BudgetStackedBarChart.tsx`**
+- `wizardToMonthly()` an dieselbe Hypothekarzins-/Jahresprämien-/Krankenkassen-Logik angeglichen wie die Backend-Ableitungen
+
+---
+
+## Frühere Änderungen (April 2026)
 
 ### Taxonomy-System — Komplettüberarbeitung
 
@@ -71,7 +104,7 @@ Laufendes Änderungsprotokoll aller bedeutenden Erweiterungen und Bugfixes.
 
 ---
 
-## Frühere Änderungen
+## Ältere Änderungen
 
 ### Referenzwährung (CHF / EUR / USD)
 

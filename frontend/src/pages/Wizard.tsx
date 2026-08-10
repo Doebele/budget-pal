@@ -15,7 +15,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Airplane, ArrowRight, Bank, BitcoinCircle, Building, Car, Cash, Check, Coins, Community, Globe, GraphDown, GraphUp, Group, Heart, Home, NavArrowLeft, NavArrowRight, OpenBook, PiggyBank, Reports, ShieldCheck, StatsReport, Suitcase, Train, Trash, User, UserXmark, Wallet } from "@/lib/icons";
+import { Airplane, ArrowRight, Bank, BitcoinCircle, Building, Car, Cash, Check, Coins, Community, Globe, GraphDown, GraphUp, Group, Heart, Home, Laptop, NavArrowLeft, NavArrowRight, OpenBook, PiggyBank, Reports, ShieldCheck, Shuffle, Sofa, StatsReport, Suitcase, Train, Trash, User, UserXmark, Wallet } from "@/lib/icons";
 import { clsx } from "clsx";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -81,10 +81,14 @@ interface WizardData {
   outstandingDebt: number;
   monthlyAmortization: number;
   healthInsurancePerPerson: number;
+  healthInsuranceMode: "person" | "total";
+  /** Eine Prämie je versicherter Person (nur im Modus "person"). */
+  healthInsurancePremiums: number[];
   franchise: 300 | 500 | 1000 | 1500 | 2000 | 2500;
   zusatzversicherung: number;
   hausrat: number;
   autoversicherung: number;
+  autoversicherungPeriod: "monat" | "jahr";
   hasAutoInsurance: boolean;
 
   // Step 5 — daily life
@@ -169,10 +173,13 @@ const DEFAULT_WIZARD_DATA: WizardData = {
   outstandingDebt: 600_000,
   monthlyAmortization: 1_000,
   healthInsurancePerPerson: 420,
+  healthInsuranceMode: "person",
+  healthInsurancePremiums: [],
   franchise: 300,
   zusatzversicherung: 0,
   hausrat: 70,
   autoversicherung: 0,
+  autoversicherungPeriod: "monat",
   hasAutoInsurance: false,
 
   groceries: 500,
@@ -241,6 +248,27 @@ function computeNettoEinkommen(data: WizardData): number {
   const isRetired = data.beschaeftigung === "retired";
   const deductionRate = isRetired ? 0.05 : 0.28;
   return Math.round(gross * (1 - deductionRate));
+}
+
+/** Hypothekarzins pro Monat aus den Tranchen (Schritt 6) — ohne Amortisation. */
+function mortgageInterestMonthly(data: WizardData): number {
+  const tranches = (data.mortgageEntries ?? []).filter((m) => (m.debtValue || 0) > 0);
+  const annual = tranches.length
+    ? tranches.reduce((sum, m) => sum + m.debtValue * (m.mortgageRate || 0) / 100, 0)
+    : (data.outstandingDebt || 0) * (data.mortgageRate || 0) / 100;
+  return annual / 12;
+}
+
+/** Prämien je Person — leere Liste fällt auf den Einzelbetrag zurück (Altdaten). */
+function healthPremiums(data: WizardData): number[] {
+  const list = data.healthInsurancePremiums ?? [];
+  return list.length ? list : [data.healthInsurancePerPerson || 0];
+}
+
+/** Krankenkassenprämie des Haushalts pro Monat. */
+function healthInsuranceMonthly(data: WizardData): number {
+  if (data.healthInsuranceMode === "total") return data.healthInsurancePerPerson;
+  return healthPremiums(data).reduce((sum, p) => sum + (p || 0), 0);
 }
 
 function computeAhvRente(beitragsjahre: number, avgLohn: number): number {
@@ -312,6 +340,36 @@ function ChfInput({
         placeholder={placeholder}
         onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
       />
+    </div>
+  );
+}
+
+// ── Segmented switch ───────────────────────────────────────────
+
+/** Toggle-Leiste im Stil der Rail-Umschalter (Sprache/Dichte). */
+function Segmented<T extends string | number>({
+  value,
+  options,
+  onChange,
+}: {
+  value: T;
+  options: readonly { value: T; label: string; Icon?: React.ComponentType<{ className?: string }> }[];
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div className="seg-row">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          title={o.label}
+          className={clsx("seg-btn", value === o.value && "active")}
+          onClick={() => onChange(o.value)}
+        >
+          {o.Icon && <o.Icon className="w-4 h-4 shrink-0" />}
+          <span>{o.label}</span>
+        </button>
+      ))}
     </div>
   );
 }
@@ -432,11 +490,11 @@ function Step1({ data, update }: { data: WizardData; update: (p: Partial<WizardD
     { value: "family",        label: "Familie",         Icon: Community },
     { value: "single-parent", label: "Alleinerziehend", Icon: UserXmark },
   ];
-  const BESCHAEFTIGUNG_OPTIONS: { value: WizardData["beschaeftigung"]; label: string }[] = [
-    { value: "employed",      label: "Angestellt" },
-    { value: "self-employed", label: "Selbständig" },
-    { value: "mixed",         label: "Beides" },
-    { value: "retired",       label: "Pensioniert" },
+  const BESCHAEFTIGUNG_OPTIONS: { value: WizardData["beschaeftigung"]; label: string; Icon: React.ComponentType<{ className?: string }> }[] = [
+    { value: "employed",      label: "Angestellt",  Icon: Suitcase },
+    { value: "self-employed", label: "Selbständig", Icon: Laptop },
+    { value: "mixed",         label: "Beides",      Icon: Shuffle },
+    { value: "retired",       label: "Pensioniert", Icon: Sofa },
   ];
 
   return (
@@ -492,46 +550,34 @@ function Step1({ data, update }: { data: WizardData; update: (p: Partial<WizardD
       </Section>
 
       <Section title="Haushalt">
-        <div className="grid grid-cols-2 gap-2.5">
+        <div className="seg-row">
           {HAUSHALT_OPTIONS.map((opt) => (
             <button
               key={opt.value}
               type="button"
-              className={clsx(
-                "rounded-md border p-3.5 text-left transition-all duration-150",
-                data.haushalt === opt.value
-                  ? "border-accent/50 bg-accent/10"
-                  : "border-white/8 bg-white/2 hover:border-white/20 hover:bg-white/5"
-              )}
+              title={opt.label}
+              className={clsx("seg-btn", data.haushalt === opt.value && "active")}
               onClick={() => update({ haushalt: opt.value })}
             >
-              <div className="w-8 h-8 rounded-sm bg-white/5 flex items-center justify-center mb-2">
-                <opt.Icon className={clsx("w-4 h-4", data.haushalt === opt.value ? "text-accent" : "text-text-tertiary")} />
-              </div>
-              <span className={clsx(
-                "text-sm font-medium",
-                data.haushalt === opt.value ? "text-accent" : "text-text-secondary"
-              )}>{opt.label}</span>
+              <opt.Icon className="w-4 h-4 shrink-0" />
+              <span>{opt.label}</span>
             </button>
           ))}
         </div>
       </Section>
 
       <Section title="Beschäftigungsstatus">
-        <div className="grid grid-cols-2 gap-2">
+        <div className="seg-row">
           {BESCHAEFTIGUNG_OPTIONS.map((opt) => (
             <button
               key={opt.value}
               type="button"
-              className={clsx(
-                "rounded border py-2.5 px-3 text-sm font-medium transition-all duration-150",
-                data.beschaeftigung === opt.value
-                  ? "border-accent/50 bg-accent/10 text-accent"
-                  : "border-white/8 bg-white/2 text-text-secondary hover:border-white/20"
-              )}
+              title={opt.label}
+              className={clsx("seg-btn", data.beschaeftigung === opt.value && "active")}
               onClick={() => update({ beschaeftigung: opt.value })}
             >
-              {opt.label}
+              <opt.Icon className="w-4 h-4 shrink-0" />
+              <span>{opt.label}</span>
             </button>
           ))}
         </div>
@@ -718,27 +764,14 @@ function Step4({ data, update }: { data: WizardData; update: (p: Partial<WizardD
       </div>
 
       <Section title="Wohnsituation">
-        <div className="flex gap-2">
-          {(["miete", "hypothek"] as const).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              className={clsx(
-                "flex-1 rounded border py-2.5 text-sm font-medium transition-all",
-                data.housingMode === mode
-                  ? "border-accent/50 bg-accent/10 text-accent"
-                  : "border-white/8 text-text-secondary hover:border-white/20"
-              )}
-              onClick={() => update({ housingMode: mode })}
-            >
-              {mode === "miete" ? (
-                <><Home className="w-4 h-4 inline mr-1.5" />Miete</>
-              ) : (
-                <><Building className="w-4 h-4 inline mr-1.5" />Wohneigentum</>
-              )}
-            </button>
-          ))}
-        </div>
+        <Segmented
+          value={data.housingMode}
+          options={[
+            { value: "miete", label: "Miete", Icon: Home },
+            { value: "hypothek", label: "Wohneigentum", Icon: Building },
+          ] as const}
+          onChange={(v) => update({ housingMode: v })}
+        />
 
         {data.housingMode === "miete" ? (
           <div className="space-y-3">
@@ -752,41 +785,98 @@ function Step4({ data, update }: { data: WizardData; update: (p: Partial<WizardD
         ) : (
           <div className="space-y-3">
             <Field
-              label="Monatliche Immobilienkosten"
-              hint="Enthält Amortisation, Rücklagen für Reparaturen und Hypothekenzahlung."
+              label="Amortisation & Rücklagen (CHF/Monat)"
+              hint="Ohne Hypothekarzins — dieser wird aus den Tranchen in Schritt 6 berechnet."
             >
               <ChfInput value={data.monthlyAmortization} onChange={(v) => update({ monthlyAmortization: v })} />
             </Field>
+            <Field label="Nebenkosten (Strom, Heizung, etc.)">
+              <ChfInput value={data.nebenkosten} onChange={(v) => update({ nebenkosten: v })} />
+            </Field>
+            <div className="rounded border border-white/8 px-3 py-2 text-xs text-text-secondary">
+              Hypothekarzins:{" "}
+              <span className="text-text-primary font-medium">
+                {chf(Math.round(mortgageInterestMonthly(data)))}/Mo
+              </span>{" "}
+              — automatisch aus den Hypotheken in Schritt 6.
+            </div>
           </div>
         )}
       </Section>
 
       <Section title="Krankenversicherung">
-        <Field label="Prämie pro Person (CHF/Monat)" hint="Grundversicherung Krankenkasse">
-          <ChfInput
-            value={data.healthInsurancePerPerson}
-            onChange={(v) => update({ healthInsurancePerPerson: v })}
+        <Field label="Erfassung">
+          <Segmented
+            value={data.healthInsuranceMode}
+            options={[
+              { value: "person", label: "Pro Person" },
+              { value: "total", label: "Total Haushalt" },
+            ] as const}
+            onChange={(v) => update({ healthInsuranceMode: v })}
           />
         </Field>
 
-        <Field label="Franchise">
-          <div className="grid grid-cols-3 gap-2">
-            {FRANCHISE_OPTIONS.map((f) => (
+        {data.healthInsuranceMode === "total" ? (
+          <Field label="Prämie Haushalt total (CHF/Monat)" hint="Grundversicherung Krankenkasse">
+            <ChfInput
+              value={data.healthInsurancePerPerson}
+              onChange={(v) => update({ healthInsurancePerPerson: v })}
+            />
+          </Field>
+        ) : (
+          <Field
+            label="Prämie je Person (CHF/Monat)"
+            hint={`Grundversicherung Krankenkasse — Total: ${chf(
+              Math.round(healthInsuranceMonthly(data))
+            )}/Mo`}
+          >
+            <div className="space-y-2">
+              {healthPremiums(data).map((premium, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <span className="text-text-tertiary text-xs w-16 shrink-0">Person {i + 1}</span>
+                  <ChfInput
+                    className="flex-1"
+                    value={premium}
+                    onChange={(v) => {
+                      const next = [...healthPremiums(data)];
+                      next[i] = v;
+                      update({ healthInsurancePremiums: next });
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="text-text-tertiary hover:text-loss disabled:opacity-30 disabled:hover:text-text-tertiary p-1.5"
+                    title="Person entfernen"
+                    disabled={healthPremiums(data).length <= 1}
+                    onClick={() =>
+                      update({
+                        healthInsurancePremiums: healthPremiums(data).filter((_, j) => j !== i),
+                      })
+                    }
+                  >
+                    <Trash className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
               <button
-                key={f}
                 type="button"
-                className={clsx(
-                  "rounded border py-2 text-sm font-medium transition-all",
-                  data.franchise === f
-                    ? "border-accent/50 bg-accent/10 text-accent"
-                    : "border-white/8 text-text-secondary hover:border-white/15"
-                )}
-                onClick={() => update({ franchise: f })}
+                className="text-accent text-xs font-medium hover:underline"
+                onClick={() =>
+                  update({ healthInsurancePremiums: [...healthPremiums(data), 0] })
+                }
               >
-                {chf(f)}
+                + Person hinzufügen
               </button>
-            ))}
-          </div>
+            </div>
+          </Field>
+        )}
+
+        <Field label="Franchise">
+          <Segmented
+            value={data.franchise}
+            options={FRANCHISE_OPTIONS.map((f) => ({ value: f, label: chf(f) }))}
+            onChange={(v) => update({ franchise: v })}
+          />
         </Field>
 
         <Field label="Zusatzversicherung (falls vorhanden)">
@@ -822,7 +912,22 @@ function Step4({ data, update }: { data: WizardData; update: (p: Partial<WizardD
               <span className="text-text-secondary text-sm">{data.hasAutoInsurance ? "Ja" : "Nein"}</span>
             </div>
             {data.hasAutoInsurance && (
-              <ChfInput value={data.autoversicherung} onChange={(v) => update({ autoversicherung: v })} />
+              <div className="space-y-1.5">
+                <Segmented
+                  value={data.autoversicherungPeriod}
+                  options={[
+                    { value: "monat", label: "pro Monat" },
+                    { value: "jahr", label: "pro Jahr" },
+                  ] as const}
+                  onChange={(v) => update({ autoversicherungPeriod: v })}
+                />
+                <ChfInput value={data.autoversicherung} onChange={(v) => update({ autoversicherung: v })} />
+                {data.autoversicherungPeriod === "jahr" && data.autoversicherung > 0 && (
+                  <p className="text-text-tertiary text-xs">
+                    Entspricht {chf(Math.round(data.autoversicherung / 12))}/Mo im Budget.
+                  </p>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -1668,11 +1773,18 @@ function ReviewScreen({ data }: { data: WizardData }) {
     .reduce((sum, s) => sum + s.price, 0);
 
   const monthlyExpenses =
-    (data.housingMode === "miete" ? data.monthlyRent + data.nebenkosten : data.monthlyAmortization) +
+    (data.housingMode === "miete"
+      ? data.monthlyRent + data.nebenkosten
+      : data.monthlyAmortization + data.nebenkosten + mortgageInterestMonthly(data)) +
     data.groceries +
     data.freizeit +
     subscriptionTotal +
-    data.healthInsurancePerPerson;
+    healthInsuranceMonthly(data) +
+    (data.hasAutoInsurance
+      ? data.autoversicherungPeriod === "jahr"
+        ? data.autoversicherung / 12
+        : data.autoversicherung
+      : 0);
 
   const totalAssets =
     (data.bankEnabled ? data.bankBalance : 0) +

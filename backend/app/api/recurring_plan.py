@@ -27,6 +27,11 @@ from app.core.database import get_db
 from app.core.security import get_current_user
 from app.core.taxonomy import default_transaction_category_for_wizard_label, load_merged_taxonomy_for_user
 from app.models.models import Account, Category, RecurringPlan, Transaction, User, UserWizardConfig
+from app.services.wizard_derive import (
+    health_insurance_monthly,
+    mortgage_interest_monthly,
+    mortgage_tranches_from_wizard,
+)
 from app.services.currency_service import (
     currency_service,
     normalize_reference_currency,
@@ -435,17 +440,34 @@ async def _suggest_empirical(
             data.get("monthlyAmortization") or 0,
             wizard_hint="hypothek & amortisation",
         )
+        _expense("Nebenkosten", data.get("nebenkosten") or 0, wizard_hint="nebenkosten")
+        _expense(
+            "Hypothekarzins",
+            mortgage_interest_monthly(mortgage_tranches_from_wizard(data)),
+            wizard_hint="hypothekarzins",
+        )
 
     # ── Insurance ─────────────────────────────────────────────
-    _expense("Krankenkasse", data.get("healthInsurancePerPerson") or 0, wizard_hint="krankenkasse")
+    _expense(
+        "Krankenkasse",
+        health_insurance_monthly(
+            data.get("healthInsurancePerPerson"),
+            data.get("healthInsuranceMode"),
+            data.get("healthInsurancePremiums"),
+        ),
+        wizard_hint="krankenkasse",
+    )
     zusatz = data.get("zusatzversicherung") or 0
     if zusatz > 0:
         _expense("Zusatzversicherung", zusatz, wizard_hint="zusatzversicherung")
     _expense("Hausrat & Haftpflicht", data.get("hausrat") or 0, wizard_hint="hausrat & haftpflicht")
     if data.get("hasAutoInsurance"):
+        # Jahresprämie bleibt hier ein Jahresposten — der Budgetplan kennt "yearly".
+        auto_yearly = data.get("autoversicherungPeriod") == "jahr"
         _expense(
             "Autoversicherung",
             data.get("autoversicherung") or 0,
+            "yearly" if auto_yearly else "monthly",
             wizard_hint="autoversicherung",
         )
 

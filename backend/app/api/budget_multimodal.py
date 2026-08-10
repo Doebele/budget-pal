@@ -42,6 +42,12 @@ from app.services.currency_service import (
     normalize_reference_currency,
     convert_with_eur_rates,
 )
+from app.services.wizard_derive import (
+    health_insurance_monthly,
+    monthly_amount,
+    mortgage_interest_monthly,
+    mortgage_tranches_from_wizard,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -791,12 +797,28 @@ async def budget_health_score(
             if d.get("housingMode") == "miete":
                 _add("wohnen", (d.get("monthlyRent") or 0) + (d.get("nebenkosten") or 0))
             else:
-                _add("wohnen", d.get("monthlyAmortization") or 0)
-            _add("krankenkasse", d.get("healthInsurancePerPerson") or 0)
+                # Wohneigentum: Amortisation + Nebenkosten + Hypothekarzins
+                _add(
+                    "wohnen",
+                    (d.get("monthlyAmortization") or 0)
+                    + (d.get("nebenkosten") or 0)
+                    + mortgage_interest_monthly(mortgage_tranches_from_wizard(d)),
+                )
+            _add(
+                "krankenkasse",
+                health_insurance_monthly(
+                    d.get("healthInsurancePerPerson"),
+                    d.get("healthInsuranceMode"),
+                    d.get("healthInsurancePremiums"),
+                ),
+            )
             _add("zusatzversicherung", d.get("zusatzversicherung") or 0)
             _add("hausrat", d.get("hausrat") or 0)
             if d.get("hasAutoInsurance"):
-                _add("autoversicherung", d.get("autoversicherung") or 0)
+                _add(
+                    "autoversicherung",
+                    monthly_amount(d.get("autoversicherung"), d.get("autoversicherungPeriod")),
+                )
             _add("lebensmittel", d.get("groceries") or 0)
             _add("freizeit", d.get("freizeit") or 0)
             _add("kleidung", d.get("kleidung") or 0)
