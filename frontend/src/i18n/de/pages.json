@@ -1,0 +1,47 @@
+{
+  "transactions": {
+    "title": "Reale Angaben",
+    "monthlyIncome": "Monatliches Einkommen",
+    "deleteEntry": "Eintrag löschen"
+  },
+  "finanzplan": {
+    "loadError": "Finanzplan konnte nicht geladen werden.",
+    "expensesPerMonth": "Ausgaben/Mo",
+    "netWorth": "Gesamtvermögen",
+    "liabilities": "Verpflichtungen",
+    "monthlyBudgetPlan": "Monatlicher Budgetplan",
+    "assets": "Vermögen",
+    "estimatedPension": "Geschätzte Rente",
+    "estimatedTotalPension": "Geschätzte Gesamtrente bei Pensionierung",
+    "liabilitiesAndDebt": "Verpflichtungen & Schulden",
+    "pillar3a": "Säule 3a — Gebundene Vorsorge",
+    "pillar3b": "Säule 3b — Lebensversicherung",
+    "crypto": "Kryptowährungen",
+    "realEstate": "Immobilien (Vermögen)",
+    "pillar1": "Säule 1 — AHV/IV",
+    "pillar2": "Säule 2 — Pensionskasse (BVG)",
+    "assetStock": "Aktien & ETFs",
+    "assetProperty": "Immobilien",
+    "assetCrypto": "Kryptowährungen",
+    "assetSavings": "Sparkonto / Bank",
+    "assetBond": "Obligationen",
+    "assetPension": "Pensionskasse",
+    "assetOther": "Sonstiges"
+  },
+  "dashboard": {
+    "topExpenseCategories": "Top Ausgaben-Kategorien",
+    "netWorth": "Gesamtvermögen",
+    "income": "Einnahmen",
+    "expenses": "Ausgaben",
+    "actualData": "Reale Angaben",
+    "viewAllAndFilter": "Alle ansehen & filtern",
+    "empiricalData": "Empirische Angaben",
+    "surplus": "Überschuss",
+    "surplusUncategorized": "Überschuss (nicht kategorisiert)",
+    "wizardDesc": "Profil & Planungsdaten",
+    "goalsDesc": "Ziele verwalten",
+    "forecasts": "Prognosen",
+    "forecastsDesc": "Monte Carlo & Rente",
+    "importDesc": "CSV / PDF hochladen"
+  }
+}

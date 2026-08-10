@@ -15,6 +15,7 @@ import { computeDateRange, TimeGranularity } from "@/lib/granularity";
 import { clsx } from "clsx";
 import { useTaxonomy, type SuperCategory } from "@/lib/categories";
 import { deduplicateWizardBatch } from "@/lib/wizardUtils";
+import { useTranslation } from "react-i18next";
 
 // ── Stat card ─────────────────────────────────────────────────
 
@@ -62,6 +63,7 @@ function StatCard({
 // ── Main Dashboard ────────────────────────────────────────────
 
 export default function Dashboard() {
+  const { t } = useTranslation();
   const { resolveSuperCategory, superCategories } = useTaxonomy();
   const [granularity, setGranularity] = useState<TimeGranularity>("ytd");
   const [anchor, setAnchor] = useState<Date>(() => new Date());
@@ -167,7 +169,7 @@ export default function Dashboard() {
       {/* Stat cards */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard
-          label="Gesamtvermögen"
+          label={t("pages:dashboard.netWorth")}
           value={formatCHF(totalBalance, true)}
           icon={Wallet}
           colorClass="text-text-primary"
@@ -301,7 +303,7 @@ export default function Dashboard() {
         {stats?.top_categories && stats.top_categories.length > 0 && (
           <div className="card">
             <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between mb-4">
-              <h2 className="text-text-primary font-semibold text-sm">Top Ausgaben-Kategorien</h2>
+              <h2 className="text-text-primary font-semibold text-sm">{t("pages:dashboard.topExpenseCategories")}</h2>
               <span className="text-text-tertiary text-xs">{range.label}</span>
             </div>
             <div className="space-y-3">
@@ -439,11 +441,11 @@ export default function Dashboard() {
       {/* Quick nav */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         {[
-          { to: "/transactions", label: "Reale Angaben",     desc: "Alle ansehen & filtern", Icon: Reports  },
-          { to: "/wizard",       label: "Empirische Angaben", desc: "Profil & Planungsdaten", Icon: MagicWand      },
-          { to: "/goals",        label: "Sparziele",          desc: "Ziele verwalten",         Icon: Position     },
-          { to: "/projections",  label: "Prognosen",         desc: "Monte Carlo & Rente",     Icon: GraphUp },
-          { to: "/import",       label: "Import",            desc: "CSV / PDF hochladen",     Icon: PageUp     },
+          { to: "/transactions", label: t("pages:dashboard.actualData"), desc: t("pages:dashboard.viewAllAndFilter"), Icon: Reports },
+          { to: "/wizard", label: t("pages:dashboard.empiricalData"), desc: t("pages:dashboard.wizardDesc"), Icon: MagicWand },
+          { to: "/goals", label: t("nav.goals"), desc: t("pages:dashboard.goalsDesc"), Icon: Position },
+          { to: "/projections", label: t("pages:dashboard.forecasts"), desc: t("pages:dashboard.forecastsDesc"), Icon: GraphUp },
+          { to: "/import", label: t("nav.import"), desc: t("pages:dashboard.importDesc"), Icon: PageUp },
         ].map(({ to, label, desc, Icon }) => (
           <Link
             key={to}

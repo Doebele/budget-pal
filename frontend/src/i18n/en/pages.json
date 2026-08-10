@@ -1,0 +1,47 @@
+{
+  "transactions": {
+    "title": "Actual Data",
+    "monthlyIncome": "Monthly income",
+    "deleteEntry": "Delete entry"
+  },
+  "finanzplan": {
+    "loadError": "Financial plan could not be loaded.",
+    "expensesPerMonth": "Expenses/mo",
+    "netWorth": "Net worth",
+    "liabilities": "Liabilities",
+    "monthlyBudgetPlan": "Monthly budget plan",
+    "assets": "Assets",
+    "estimatedPension": "Estimated pension",
+    "estimatedTotalPension": "Estimated total pension at retirement",
+    "liabilitiesAndDebt": "Liabilities & debt",
+    "pillar3a": "Pillar 3a — Restricted pension",
+    "pillar3b": "Pillar 3b — Life insurance",
+    "crypto": "Cryptocurrencies",
+    "realEstate": "Real estate (assets)",
+    "pillar1": "Pillar 1 — OASI/DI",
+    "pillar2": "Pillar 2 — Pension fund (BVG)",
+    "assetStock": "Stocks & ETFs",
+    "assetProperty": "Real estate",
+    "assetCrypto": "Cryptocurrencies",
+    "assetSavings": "Savings / Bank",
+    "assetBond": "Bonds",
+    "assetPension": "Pension fund",
+    "assetOther": "Other"
+  },
+  "dashboard": {
+    "topExpenseCategories": "Top expense categories",
+    "netWorth": "Net worth",
+    "income": "Income",
+    "expenses": "Expenses",
+    "actualData": "Actual Data",
+    "viewAllAndFilter": "View all & filter",
+    "empiricalData": "Empirical Data",
+    "surplus": "Surplus",
+    "surplusUncategorized": "Surplus (uncategorized)",
+    "wizardDesc": "Profile & planning data",
+    "goalsDesc": "Manage goals",
+    "forecasts": "Forecasts",
+    "forecastsDesc": "Monte Carlo & pension",
+    "importDesc": "Upload CSV / PDF"
+  }
+}

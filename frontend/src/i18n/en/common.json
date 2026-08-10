@@ -54,5 +54,31 @@
   },
   "txn": {
     "uncategorized": "Uncategorized"
+  },
+  "periodicity": {
+    "weekly": "Weekly",
+    "monthly": "Monthly",
+    "quarterly": "Quarterly",
+    "halfyearly": "Semi-annually",
+    "yearly": "Annually",
+    "once": "One-time"
+  },
+  "table": {
+    "date": "Date",
+    "description": "Description",
+    "account": "Account",
+    "category": "Category",
+    "recurring": "Recurring",
+    "amount": "Amount",
+    "reference": "Reference",
+    "monthlyEquiv": "Monthly equiv."
+  },
+  "filters": {
+    "search": "Search...",
+    "allCategories": "All categories",
+    "allAccounts": "All accounts",
+    "filterByCategory": "Filter by category",
+    "overview": "Overview:",
+    "current": "Current"
   }
 }

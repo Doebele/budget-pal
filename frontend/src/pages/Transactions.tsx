@@ -277,7 +277,7 @@ export default function Transactions() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-display text-text-primary">Reale Angaben</h1>
+          <h1 className="text-2xl font-display text-text-primary">{t("pages:transactions.title")}</h1>
           <p className="text-text-tertiary text-sm mt-0.5">
             {range.label} · {transactions?.length || 0} Einträge
           </p>
@@ -310,7 +310,7 @@ export default function Transactions() {
             <div>
               <h2 className="text-text-primary text-lg font-medium">
                 {viewMode === "all"
-                  ? "Alle Konten"
+                  ? t("filters.allAccounts")
                   : selectedAccount?.name || "Konto"}
               </h2>
               <p className="text-text-tertiary text-xs">
@@ -339,7 +339,7 @@ export default function Transactions() {
               <PercentageCircle className="w-4 h-4" />
               <span className="hidden sm:inline">Budget-Analyse</span>
             </button>
-            <span className="text-text-tertiary text-sm hidden sm:inline">Übersicht:</span>
+            <span className="text-text-tertiary text-sm hidden sm:inline">{t("filters.overview")}</span>
 
             {/* Custom Account Dropdown with Logos */}
             <div className="relative">
@@ -350,14 +350,14 @@ export default function Transactions() {
                 {viewMode === "all" ? (
                   <>
                     <ViewGrid className="w-4 h-4 text-accent" />
-                    <span>Alle Konten</span>
+                    <span>{t("filters.allAccounts")}</span>
                   </>
                 ) : (
                   (() => {
                     const acc = accounts?.find(
                       (a: AccountRow) => String(a.id) === String(viewMode)
                     );
-                    if (!acc) return <span>Konto</span>;
+                    if (!acc) return <span>{t("table.account")}</span>;
                     const bank = getBankByName(acc.bank);
                     return (
                       <>
@@ -404,7 +404,7 @@ export default function Transactions() {
                       <div className="w-6 h-6 rounded bg-accent/20 flex items-center justify-center flex-shrink-0">
                         <ViewGrid className="w-3.5 h-3.5 text-accent" />
                       </div>
-                      <span className="text-text-primary">Alle Konten</span>
+                      <span className="text-text-primary">{t("filters.allAccounts")}</span>
                       {viewMode === "all" && (
                         <Check className="w-4 h-4 text-accent ml-auto" />
                       )}
@@ -471,7 +471,7 @@ export default function Transactions() {
           {/* Summary Cards — Beträge in Referenzwährung */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="bg-bg-surface rounded-lg p-3">
-              <p className="text-text-tertiary text-xs mb-1">Monatliches Einkommen</p>
+              <p className="text-text-tertiary text-xs mb-1">{t("pages:transactions.monthlyIncome")}</p>
               <p className="text-gain font-mono text-lg">
                 +{formatAmount(budgetAnalysis.total_monthly_income, budgetAnalysis.reference_currency || refCcy)}
               </p>
@@ -516,8 +516,8 @@ export default function Transactions() {
                     <tr>
                       <th className="text-left px-3 py-2">Beschreibung</th>
                       <th className="text-left px-3 py-2">Periode</th>
-                      <th className="text-right px-3 py-2">Betrag</th>
-                      <th className="text-right px-3 py-2">Monatl. Äquiv.</th>
+                      <th className="text-right px-3 py-2">{t("table.amount")}</th>
+                      <th className="text-right px-3 py-2">{t("table.monthlyEquiv")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border-subtle">
@@ -600,7 +600,7 @@ export default function Transactions() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary" />
           <input
             type="text"
-            placeholder="Suchen..."
+            placeholder={t("filters.search")}
             className="input pl-9"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -610,9 +610,9 @@ export default function Transactions() {
           className="input w-auto min-w-[14rem]"
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
-          aria-label="Nach Kategorie filtern"
+          aria-label={t("filters.filterByCategory")}
         >
-          <option value="">Alle Kategorien</option>
+          <option value="">{t("filters.allCategories")}</option>
           {ALL_CAT_GROUPS.map(({ sc, cats }) => (
             <optgroup key={sc.id} label={`${sc.emoji} ${sc.label}`}>
               {cats.map((cat) => (
@@ -650,7 +650,7 @@ export default function Transactions() {
           <table className="w-full">
             <thead className="sticky top-0 z-10 bg-bg-surface">
               <tr className="border-b border-border/50">
-                {["Datum", "Beschreibung", "Konto", "Kategorie", "Wiederkehrend", "Betrag", "Referenz", ""].map((h, colIdx) => (
+                {[t("table.date"), t("table.description"), t("table.account"), t("table.category"), t("table.recurring"), t("table.amount"), t("table.reference"), ""].map((h, colIdx) => (
                   <th
                     key={h || "actions"}
                     className={clsx(
@@ -796,11 +796,11 @@ export default function Transactions() {
                           className="bg-transparent border-none outline-none cursor-pointer text-xs appearance-none"
                         >
                           <option value="">—</option>
-                          <option value="weekly">Wöchentlich</option>
-                          <option value="monthly">Monatlich</option>
-                          <option value="quarterly">Vierteljährlich</option>
-                          <option value="halfyearly">Halbjährlich</option>
-                          <option value="yearly">Jährlich</option>
+                          <option value="weekly">{t("periodicity.weekly")}</option>
+                          <option value="monthly">{t("periodicity.monthly")}</option>
+                          <option value="quarterly">{t("periodicity.quarterly")}</option>
+                          <option value="halfyearly">{t("periodicity.halfyearly")}</option>
+                          <option value="yearly">{t("periodicity.yearly")}</option>
                         </select>
                       </div>
                     </td>
@@ -855,7 +855,7 @@ export default function Transactions() {
                           <button
                             onClick={() => setConfirmingDeleteId(txn.id)}
                             className="text-text-tertiary hover:text-loss transition-colors"
-                            title="Eintrag löschen"
+                            title={t("pages:transactions.deleteEntry")}
                           >
                             <Trash className="w-3.5 h-3.5" />
                           </button>
