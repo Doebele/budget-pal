@@ -500,12 +500,10 @@ export default function Forecast() {
 
       {/* ── Data quality banner ── */}
       {forecast && (
-        <div className={`flex items-start gap-2 px-4 py-2.5 rounded-lg text-xs ${
-          (forecast.data_months ?? 0) < 3
-            ? "bg-amber-500/10 border border-amber-500/30 text-amber-300"
-            : "bg-green-500/10 border border-green-500/20 text-green-300"
+        <div className={`msg ${
+          (forecast.data_months ?? 0) < 3 ? "msg-warning" : "msg-success"
         }`}>
-          <InfoCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+          <InfoCircle />
           <span>
             {(forecast.data_months ?? 0) < 3
               ? `Nur ${forecast.data_months} Monate Transaktionsdaten — Peer-Gruppe-Werte werden stärker gewichtet.`

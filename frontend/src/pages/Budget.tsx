@@ -621,7 +621,7 @@ export default function Budget() {
           className={clsx(
             "px-3 py-1.5 rounded-lg text-xs border transition-colors",
             excludeTransfers
-              ? "bg-amber-500/15 border-amber-500/40 text-amber-400"
+              ? "msg-warning"
               : "bg-bg-surface2 border-border text-text-tertiary hover:text-text-primary",
           )}
         >
@@ -629,7 +629,7 @@ export default function Budget() {
         </button>
 
         {!ALL_FREQS_SELECTED ? (
-          <span className="text-amber-400 text-xs self-center ml-1 flex items-center gap-1">
+          <span className="txt-warning text-xs self-center ml-1 flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
             Alle Werte gefiltert nach Wiederkehrend
           </span>

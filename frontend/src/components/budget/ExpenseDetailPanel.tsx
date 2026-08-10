@@ -110,14 +110,14 @@ export default function ExpenseDetailPanel({
               {formatCHF(grandTotal)}
             </span>
             {excludeTransfers && (
-              <span className="text-amber-400 text-xs">Kontoüberträge ausgeblendet</span>
+              <span className="txt-warning text-xs">Kontoüberträge ausgeblendet</span>
             )}
           </div>
 
           {/* Warning if stats API total differs */}
           {hasDiscrepancy && (
-            <div className="mt-2 flex items-start gap-1.5 text-xs text-amber-400/80 bg-amber-500/10 rounded-lg px-2.5 py-1.5">
-              <WarningTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+            <div className="msg msg-warning mt-2">
+              <WarningTriangle />
               <span>
                 KPI-Kachel zeigt {formatCHF(statsExpenses!)} (aus der Stats-API inkl. alle Transaktionen).
                 Diese Ansicht basiert auf den zuletzt geladenen {transactions.length} Transaktionen.
@@ -151,7 +151,7 @@ export default function ExpenseDetailPanel({
                       {sc.label}
                     </span>
                     {isSavings && (
-                      <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 shrink-0">
+                      <span className="text-xs px-1.5 py-0.5 rounded-full border msg-warning shrink-0">
                         Kontoübertrag / Sparen
                       </span>
                     )}
@@ -212,7 +212,7 @@ export default function ExpenseDetailPanel({
             <span className="text-text-primary font-mono">{formatCHF(grandTotal)}</span>
           </div>
           {groups.some((g) => g.isSavings) && !excludeTransfers && (
-            <p className="text-amber-400/70 text-xs mt-1">
+            <p className="txt-warning text-xs mt-1">
               Inkl. {formatCHF(groups.find((g) => g.isSavings)!.total)} Kontoüberträge/Sparen — Toggle aktivieren um diese auszublenden.
             </p>
           )}

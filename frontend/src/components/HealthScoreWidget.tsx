@@ -20,7 +20,7 @@ const GRADE_COLOR: Record<string, string> = {
   A: "text-gain",
   B: "text-gain/80",
   C: "text-warning",
-  D: "text-orange-400",
+  D: "txt-warning",
   F: "text-loss",
 };
 

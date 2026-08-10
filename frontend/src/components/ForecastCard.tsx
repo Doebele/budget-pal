@@ -103,7 +103,7 @@ export default function ForecastCard({ data, isSelected, onClick }: Props) {
 
       {/* Uncertainty level */}
       {uncertainty > 20 && (
-        <p className="text-[10px] text-amber-400/80 mt-2 flex items-center gap-1">
+        <p className="text-[10px] txt-warning mt-2 flex items-center gap-1">
           <span>⚠</span> Hohe Unsicherheit ({Math.round(uncertainty)}%)
         </p>
       )}

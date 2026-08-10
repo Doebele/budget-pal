@@ -264,7 +264,7 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
                       {months > 1 && (
                         <div className="shrink-0 text-right">
                           <p className="text-xs text-text-tertiary mb-1">× {months} Monate</p>
-                          <p className="text-sm font-mono text-violet-400">{formatCHF(periodVal)}</p>
+                          <p className="text-sm font-mono txt-info">{formatCHF(periodVal)}</p>
                         </div>
                       )}
 
@@ -304,7 +304,7 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
                 <span className="text-text-tertiary">
                   {activeSc ? "Kategorie-Summe" : "Gesamtausgaben"} / Periode ({months} Monate)
                 </span>
-                <span className="font-mono text-violet-400">{formatCHF(periodTotal)}</span>
+                <span className="font-mono txt-info">{formatCHF(periodTotal)}</span>
               </div>
             )}
 

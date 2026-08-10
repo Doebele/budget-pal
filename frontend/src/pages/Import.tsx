@@ -637,17 +637,17 @@ export default function Import() {
                   <div className="rounded-lg bg-bg-surface2 px-3 py-2 text-text-secondary">
                     Bank: <span className="text-text-primary font-semibold">{pdfPreview.bank.toUpperCase()}</span>
                   </div>
-                  <div className="rounded-lg bg-green-900/30 border border-green-800/40 px-3 py-2 text-text-secondary">
-                    Erkannt: <span className="text-green-300 font-semibold">{pdfPreview.parsed_rows}</span>
+                  <div className="rounded-lg border px-3 py-2 msg-success">
+                    Erkannt: <span className="font-semibold">{pdfPreview.parsed_rows}</span>
                   </div>
                   <div className="rounded-lg bg-bg-surface2 px-3 py-2 text-text-secondary">
-                    Wiederkehrend: <span className="text-violet-300 font-semibold">{recurringCount > 0 ? `${recurringCount} Zahlungen` : "–"}</span>
+                    Wiederkehrend: <span className="txt-info font-semibold">{recurringCount > 0 ? `${recurringCount} Zahlungen` : "–"}</span>
                   </div>
                   <div className="rounded-lg bg-bg-surface2 px-3 py-2 text-text-secondary">
-                    Duplikate: <span className="text-amber-300 font-semibold">{pdfPreview.rows.filter((r) => r.duplicate_kind !== "none").length}</span>
+                    Duplikate: <span className="txt-warning font-semibold">{pdfPreview.rows.filter((r) => r.duplicate_kind !== "none").length}</span>
                   </div>
                   <div className="rounded-lg bg-bg-surface2 px-3 py-2 text-text-secondary">
-                    Fehler: <span className={pdfPreview.error_rows > 0 ? "text-red-300 font-semibold" : "text-text-tertiary"}>{pdfPreview.error_rows}</span>
+                    Fehler: <span className={pdfPreview.error_rows > 0 ? "txt-error font-semibold" : "text-text-tertiary"}>{pdfPreview.error_rows}</span>
                   </div>
                 </div>
                 {pdfPreview.total_rows === 0 && (
@@ -689,7 +689,7 @@ export default function Import() {
                   </p>
                 )}
                 {pdfPreview.ai_extracted && (
-                  <p className="text-amber-300 text-[11px] mt-2 flex items-start gap-1.5">
+                  <p className="txt-warning text-[11px] mt-2 flex items-start gap-1.5">
                     <WarningCircle className="w-3.5 h-3.5 shrink-0 mt-px" />
                     <span>
                       Unbekanntes PDF-Format — diese Zeilen wurden per KI aus dem Text
@@ -752,7 +752,7 @@ export default function Import() {
                           <td className="px-2 py-2 align-middle">
                             <div className="flex flex-col gap-0.5">
                               {row.duplicate_kind === "database" && (
-                                <span className="inline-flex rounded px-1.5 py-0.5 bg-amber-900/60 text-amber-200 text-[10px] font-medium leading-tight">
+                                <span className="inline-flex rounded px-1.5 py-0.5 msg-warning text-[10px] font-medium leading-tight">
                                   Konto
                                 </span>
                               )}
@@ -816,8 +816,8 @@ export default function Import() {
                               className={clsx(
                                 "bg-bg-surface2 border rounded px-2 py-1 text-right w-full font-mono font-semibold text-xs",
                                 isExpense
-                                  ? "border-red-800/50 text-red-300"
-                                  : "border-green-800/50 text-green-300"
+                                  ? "border-red-800/50 txt-error"
+                                  : "border-green-800/50 txt-success"
                               )}
                             />
                           </td>
@@ -954,7 +954,7 @@ export default function Import() {
                   {previewData.error_rows > 0 && (
                     <>
                       <span className="text-text-disabled">|</span>
-                      <span className="text-red-400 flex items-center gap-1">
+                      <span className="txt-error flex items-center gap-1">
                         <WarningTriangle className="w-3 h-3" />
                         {previewData.error_rows} Fehler
                       </span>
@@ -1157,15 +1157,15 @@ export default function Import() {
 
                 {/* Warnings */}
                 {mappingWarnings.length > 0 && (
-                  <div className="bg-red-900/30 border border-red-500/30 rounded-lg p-3">
+                  <div className="msg msg-error flex-col gap-0 p-3">
                     <div className="flex items-center gap-2 mb-2">
-                      <WarningTriangle className="w-4 h-4 text-red-400" />
-                      <span className="text-red-300 font-medium text-sm">Zuweisungs-Probleme</span>
+                      <WarningTriangle className="w-4 h-4" />
+                      <span className="font-medium text-sm">Zuweisungs-Probleme</span>
                     </div>
                     <ul className="space-y-1">
                       {mappingWarnings.map((warn, idx) => (
-                        <li key={idx} className="text-red-300/80 text-xs flex items-start gap-2">
-                          <span className="text-red-400">•</span>
+                        <li key={idx} className="text-xs flex items-start gap-2">
+                          <span>•</span>
                           {warn}
                         </li>
                       ))}
@@ -1224,7 +1224,7 @@ export default function Import() {
                           OK
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-xs" title={row.errors.join(", ")}>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border msg-error text-xs" title={row.errors.join(", ")}>
                           <WarningTriangle className="w-3 h-3" />
                           Fehler
                         </span>
@@ -1396,7 +1396,7 @@ export default function Import() {
             {selectedImport.rows_imported > 0 ? (
               <>
                 <p className="text-text-secondary mb-4">
-                  <strong className="text-red-400">
+                  <strong className="txt-error">
                     ALLE {selectedImport.rows_imported} Transaktionen
                   </strong>{" "}
                   aus diesem Import werden gelöscht.

@@ -702,7 +702,7 @@ export default function Finanzplan() {
                     <div className="ml-6">
                       <div className="flex justify-between text-[10px] text-text-tertiary mb-1">
                         <span>Belehnungsgrad (LTV)</span>
-                        <span className={ltvRatio > 80 ? "text-loss font-semibold" : ltvRatio > 65 ? "text-amber-400" : "text-gain"}>
+                        <span className={ltvRatio > 80 ? "text-loss font-semibold" : ltvRatio > 65 ? "txt-warning" : "text-gain"}>
                           {ltvRatio.toFixed(1)}%
                         </span>
                       </div>

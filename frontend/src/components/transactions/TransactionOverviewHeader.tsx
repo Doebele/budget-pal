@@ -151,7 +151,7 @@ export function TransactionOverviewHeader({
                     </p>
                   )}
                   {count === 0 && (
-                    <p className="text-amber-200/90 text-sm pt-1">
+                    <p className="txt-warning text-sm pt-1">
                       Es gibt keine aktiven Transaktionen mehr für dieses Konto (alle archiviert oder
                       leer). Archivieren oder Hard-Delete ist nicht möglich.
                     </p>
@@ -162,12 +162,12 @@ export function TransactionOverviewHeader({
                 </div>
               )}
 
-              <div className="rounded-lg border border-red-500/25 bg-red-950/30 p-4 space-y-3">
-                <p className="text-loss text-sm font-medium flex items-center gap-2">
+              <div className="msg msg-error flex-col gap-0 p-4 space-y-3">
+                <p className="text-sm font-medium flex items-center gap-2">
                   <Trash className="w-4 h-4" />
                   Löschen ohne Archivierung (Hard-Delete)
                 </p>
-                <p className="text-red-200/80 text-xs">
+                <p className="text-xs">
                   Entfernt die Datensätze unwiderruflich aus der Datenbank. Nur verwenden, wenn Sie
                   sicher sind.
                 </p>

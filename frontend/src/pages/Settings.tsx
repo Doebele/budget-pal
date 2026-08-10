@@ -1578,7 +1578,7 @@ export default function Settings() {
               <p>Konten: +{String(importResult.accounts_created ?? 0)} · Transaktionen: +{String(importResult.transactions_created ?? 0)} übersprungen: {String(importResult.transactions_skipped ?? 0)}</p>
               <p>Wiederkehrend: +{String(importResult.recurring_plan_created ?? 0)} · Säulen: +{String(importResult.pension_created ?? 0)} · Assets: +{String(importResult.assets_created ?? 0)}</p>
               {(importResult.warnings as string[] | undefined)?.length ? (
-                <p className="text-amber-400">⚠ {(importResult.warnings as string[]).join("; ")}</p>
+                <p className="txt-warning">⚠ {(importResult.warnings as string[]).join("; ")}</p>
               ) : null}
             </div>
           )}
