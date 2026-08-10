@@ -302,6 +302,7 @@ budget-pal/
 │   │   └── services/
 │   │       ├── categorization.py     # 5-stufige KI-Pipeline
 │   │       ├── projection.py         # Monte Carlo + AHV/BVG
+│   │       ├── wizard_derive.py      # Wizard-Ableitungen (Hypothekarzins, Jahresbeträge, Krankenkasse)
 │   │       ├── peer_group_seed.py    # System-Kategorie Seeding + Migrationen
 │   │       └── import_parsers/       # UBS, N26, Revolut, comdirect
 │   ├── alembic/
@@ -314,7 +315,8 @@ budget-pal/
 │   │   ├── test_transactions.py
 │   │   └── services/
 │   │       ├── test_categorization.py  # 5-stufige Pipeline
-│   │       └── test_projection.py      # Monte Carlo + Rentensäulen
+│   │       ├── test_projection.py      # Monte Carlo + Rentensäulen
+│   │       └── test_wizard_derive.py   # Hypothekarzins, Jahres-/Monatsumrechnung, Krankenkasse
 │   ├── Dockerfile
 │   └── requirements.txt
 │
