@@ -74,6 +74,7 @@ interface CategoryMapping {
 }
 
 export default function Settings() {
+  const { t } = useTranslation();
   const { user, refreshUser } = useAuth();
   const queryClient = useQueryClient();
   const SUPER_CATEGORIES = useTaxonomySuperCategories();
@@ -475,20 +476,20 @@ export default function Settings() {
   return (
     <div className="space-y-6 animate-fade-in max-w-4xl">
       <div>
-        <h1 className="text-2xl font-display text-text-primary">Einstellungen</h1>
-        <p className="text-text-tertiary text-sm mt-0.5">Profil und Konfiguration</p>
+        <h1 className="text-2xl font-display text-text-primary">{t("pages:settings2.g08")}</h1>
+        <p className="text-text-tertiary text-sm mt-0.5">{t("pages:settings2.g34")}</p>
       </div>
 
       {/* Profile */}
       <div className="card">
-        <h2 className="text-text-primary font-semibold text-sm mb-4">Profil</h2>
+        <h2 className="text-text-primary font-semibold text-sm mb-4">{t("pages:settings2.g33")}</h2>
         <div className="space-y-4">
           <div>
-            <label className="label">Name</label>
+            <label className="label">{t("pages:settings2.g25")}</label>
             <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <div>
-            <label className="label">E-Mail</label>
+            <label className="label">{t("pages:settings2.g06")}</label>
             <input className="input" value={user?.email || ""} disabled readOnly />
           </div>
 
@@ -504,9 +505,9 @@ export default function Settings() {
               value={referenceCurrency}
               onChange={(e) => setReferenceCurrency(e.target.value as "CHF" | "EUR" | "USD")}
             >
-              <option value="CHF">Schweizer Franken (CHF)</option>
-              <option value="EUR">Euro (EUR)</option>
-              <option value="USD">US-Dollar (USD)</option>
+              <option value="CHF">{t("pages:settings2.g36")}</option>
+              <option value="EUR">{t("pages:settings2.g12")}</option>
+              <option value="USD">{t("pages:settings2.g42")}</option>
             </select>
           </div>
 
@@ -603,7 +604,7 @@ export default function Settings() {
             <MagicWand className="w-4 h-4 text-accent" />
           </div>
           <div className="flex-1">
-            <h2 className="text-text-primary font-semibold text-sm">Empirische Angaben erneut erfassen</h2>
+            <h2 className="text-text-primary font-semibold text-sm">{t("pages:settings2.g10")}</h2>
             <p className="text-text-tertiary text-xs mt-0.5 mb-3">
               Aktualisiere deine Basisdaten, Peer-Gruppe, Vorsorge (AHV/BVG/3a) und Finanzplan-Ziele.
             </p>
@@ -618,7 +619,7 @@ export default function Settings() {
       {/* Supercategory taxonomy */}
       <div className="card">
         <div className="mb-4">
-          <h2 className="text-text-primary font-semibold text-sm">Superkategorie-Taxonomie</h2>
+          <h2 className="text-text-primary font-semibold text-sm">{t("pages:settings2.g40")}</h2>
           <p className="text-text-tertiary text-xs mt-0.5">
             Übersicht, welche Transaktionskategorien (Reale Angaben) und Wizard-Labels (Empirische Angaben) jeder Superkategorie zugeordnet sind — inkl. gespeichertem Peer-Ø.
           </p>
@@ -642,9 +643,9 @@ export default function Settings() {
             <table className="w-full text-xs min-w-[640px]">
               <thead>
                 <tr className="text-text-tertiary text-[11px] uppercase tracking-wide border-b border-border/30">
-                  <th className="text-left py-2.5 px-3 w-[22%]">Superkategorie</th>
-                  <th className="text-left py-2.5 px-3 w-[39%]">Empirische Angaben</th>
-                  <th className="text-left py-2.5 px-3 w-[39%]">Reale Angaben (Ist)</th>
+                  <th className="text-left py-2.5 px-3 w-[22%]">{t("pages:settings2.g39")}</th>
+                  <th className="text-left py-2.5 px-3 w-[39%]">{t("pages:settings2.g09")}</th>
+                  <th className="text-left py-2.5 px-3 w-[39%]">{t("pages:settings2.g35")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -698,7 +699,7 @@ export default function Settings() {
                                 ))}
                                 <button
                                   type="button"
-                                  title="Neues Wizard-Label hinzufügen"
+                                  title={t("pages:settings2.g30")}
                                   onClick={() => setTaxoAdd({ scId: sc.id, type: "wizard", value: "" })}
                                   className="w-5 h-5 flex items-center justify-center rounded text-text-tertiary hover:text-accent hover:bg-accent/10 transition-colors shrink-0"
                                 >
@@ -743,7 +744,7 @@ export default function Settings() {
                                 ))}
                                 <button
                                   type="button"
-                                  title="Neue Transaktionskategorie hinzufügen"
+                                  title={t("pages:settings2.g28")}
                                   onClick={() => setTaxoAdd({ scId: sc.id, type: "txn", value: "" })}
                                   className="w-5 h-5 flex items-center justify-center rounded text-text-tertiary hover:text-accent hover:bg-accent/10 transition-colors shrink-0"
                                 >
@@ -850,7 +851,7 @@ export default function Settings() {
                               className="flex items-center justify-between px-3 py-1.5 font-semibold"
                               style={{ backgroundColor: sc.color + "15" }}
                             >
-                              <span style={{ color: sc.color }}>Gesamt Peer-Ø</span>
+                              <span style={{ color: sc.color }}>{t("pages:settings2.g16")}</span>
                               <span className="font-mono" style={{ color: sc.color }}>{fmtCHF(peer)}/Mo</span>
                             </div>
                           )}
@@ -863,7 +864,7 @@ export default function Settings() {
                           <Group className="w-3 h-3" />
                           Peer-Gruppe (BFS HABE 2021)
                         </p>
-                        <span className="text-text-disabled italic">Kein Peer-Ø für diese Kategorie verfügbar</span>
+                        <span className="text-text-disabled italic">{t("pages:settings2.g20")}</span>
                       </div>
                     )}
 
@@ -877,7 +878,7 @@ export default function Settings() {
                           </p>
                           <button
                             type="button"
-                            title="Neues Label hinzufügen"
+                            title={t("pages:settings2.g29")}
                             onClick={() => setTaxoAdd({ scId: sc.id, type: "wizard", value: "" })}
                             className="w-5 h-5 flex items-center justify-center rounded text-text-tertiary hover:text-accent hover:bg-accent/10 transition-colors"
                           >
@@ -886,7 +887,7 @@ export default function Settings() {
                         </div>
                         <div className="flex flex-wrap gap-1">
                           {sc.wizardLabels.filter((l) => !isLabelHidden(sc.id, l, "wl") && !ownCats.some((oc) => oc.icon === "wl:" + sc.id && oc.name.toLowerCase() === l.toLowerCase())).length === 0 && ownCats.filter((cat) => cat.icon === "wl:" + sc.id).length === 0 ? (
-                            <span className="text-text-disabled italic text-[11px]">Keine</span>
+                            <span className="text-text-disabled italic text-[11px]">{t("pages:settings2.g21")}</span>
                           ) : (
                             <>
                               {sc.wizardLabels.filter((l) => !isLabelHidden(sc.id, l, "wl") && !ownCats.some((oc) => oc.icon === "wl:" + sc.id && oc.name.toLowerCase() === l.toLowerCase())).map((l) => (
@@ -919,7 +920,7 @@ export default function Settings() {
                                       >
                                         {taxoDelete.txnCount > 0 ? "Migrieren & Ausblenden" : "Ausblenden"}
                                       </button>
-                                      <button type="button" onClick={() => setTaxoDelete(null)} className="text-text-tertiary hover:text-text-primary">Abbrechen</button>
+                                      <button type="button" onClick={() => setTaxoDelete(null)} className="text-text-tertiary hover:text-text-primary">{t("pages:settings2.g00")}</button>
                                     </div>
                                   </div>
                                 ) : (
@@ -931,7 +932,7 @@ export default function Settings() {
                                   {l}
                                   <button
                                     type="button"
-                                    title="Ausblenden / Migrieren"
+                                    title={t("pages:settings2.g03")}
                                     onClick={() => openTaxoDelete(sc.id, l, "wizard")}
                                     className="opacity-0 group-hover:opacity-100 ml-0.5 w-3.5 h-3.5 flex items-center justify-center rounded-full hover:bg-loss/20 text-text-tertiary hover:text-loss transition-all"
                                   >
@@ -971,7 +972,7 @@ export default function Settings() {
                           </p>
                           <button
                             type="button"
-                            title="Neue Kategorie hinzufügen"
+                            title={t("pages:settings2.g27")}
                             onClick={() => setTaxoAdd({ scId: sc.id, type: "txn", value: "" })}
                             className="w-5 h-5 flex items-center justify-center rounded text-text-tertiary hover:text-accent hover:bg-accent/10 transition-colors"
                           >
@@ -1016,7 +1017,7 @@ export default function Settings() {
                                   >
                                     {taxoDelete.txnCount > 0 ? "Migrieren & Ausblenden" : "Ausblenden"}
                                   </button>
-                                  <button type="button" onClick={() => setTaxoDelete(null)} className="text-text-tertiary hover:text-text-primary">Abbrechen</button>
+                                  <button type="button" onClick={() => setTaxoDelete(null)} className="text-text-tertiary hover:text-text-primary">{t("pages:settings2.g00")}</button>
                                 </div>
                               </div>
                             ) : (
@@ -1028,7 +1029,7 @@ export default function Settings() {
                                 {c}
                                 <button
                                   type="button"
-                                  title="Entfernen / Migrieren"
+                                  title={t("pages:settings2.g11")}
                                   onClick={() => openTaxoDelete(sc.id, c, "txn")}
                                   className="opacity-0 group-hover:opacity-100 ml-0.5 w-3.5 h-3.5 flex items-center justify-center rounded-full hover:bg-loss/20 text-text-tertiary hover:text-loss transition-all"
                                 >
@@ -1043,7 +1044,7 @@ export default function Settings() {
                               key={cat.id}
                               className="group flex items-center gap-0.5 px-1.5 py-0.5 rounded border text-text-secondary"
                               style={{ backgroundColor: sc.color + "18", borderColor: sc.color + "44" }}
-                              title="Eigene Kategorie"
+                              title={t("pages:settings2.g07")}
                             >
                               {cat.name}
                               <button
@@ -1056,7 +1057,7 @@ export default function Settings() {
                             </span>
                           ))}
                           {sc.txnCategories.filter((c) => !ownCats.some((oc) => oc.icon === sc.id && oc.name.toLowerCase() === c.toLowerCase())).length === 0 && ownCats.filter((cat) => cat.icon === sc.id).length === 0 && (
-                            <span className="text-text-disabled italic text-[11px]">Keine — fällt in Sonstiges</span>
+                            <span className="text-text-disabled italic text-[11px]">{t("pages:settings2.g22")}</span>
                           )}
                         </div>
                         {renderTaxonomyAddForm(sc, "txn")}
@@ -1080,19 +1081,19 @@ export default function Settings() {
                               <button
                                 key={`txn:${l}`}
                                 type="button"
-                                title="Wieder einblenden (Transaktionskategorie)"
+                                title={t("pages:settings2.g45")}
                                 onClick={() => unhideLabelMutation.mutate({ sc_id: sc.id, label: l, label_type: "txn" })}
                                 className="px-1.5 py-0.5 rounded text-[11px] text-text-disabled border border-dashed border-border/40 hover:border-text-tertiary hover:text-text-secondary transition-colors"
                               >
                                 {l}
-                                <span className="ml-1 text-[10px] opacity-60">Ist</span>
+                                <span className="ml-1 text-[10px] opacity-60">{t("pages:settings2.g18")}</span>
                               </button>
                             ))}
                             {hiddenWl.map((l) => (
                               <button
                                 key={`wl:${l}`}
                                 type="button"
-                                title="Wieder einblenden (Wizard-Label)"
+                                title={t("pages:settings2.g46")}
                                 onClick={() => unhideLabelMutation.mutate({ sc_id: sc.id, label: l, label_type: "wl" })}
                                 className="px-1.5 py-0.5 rounded text-[11px] text-text-disabled border border-dashed border-border/40 hover:border-text-tertiary hover:text-text-secondary transition-colors"
                               >
@@ -1116,7 +1117,7 @@ export default function Settings() {
       <div className="card">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-text-primary font-semibold text-sm">Kategorie-Zuordnung</h2>
+            <h2 className="text-text-primary font-semibold text-sm">{t("pages:settings2.g19")}</h2>
             <p className="text-text-tertiary text-xs mt-0.5">
               Ordnet jedes Budget-Label aus empirischen Angaben einer Superkategorie zu.
               Die Budgetanalyse nutzt daraus die passende Ist-Transaktionskategorie und Peer-Gruppe.
@@ -1127,7 +1128,7 @@ export default function Settings() {
             onClick={() => resetMappingsMutation.mutate()}
             disabled={resetMappingsMutation.isPending}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/60 text-text-secondary text-xs hover:bg-bg-surface2 transition-colors disabled:opacity-40"
-            title="Auf Standardzuordnungen zurücksetzen"
+            title={t("pages:settings2.g02")}
           >
             <Undo className="w-3 h-3" />
             Zurücksetzen auf Standard
@@ -1135,7 +1136,7 @@ export default function Settings() {
         </div>
 
         {mappingsLoading ? (
-          <p className="text-text-tertiary text-sm py-4">Wird geladen…</p>
+          <p className="text-text-tertiary text-sm py-4">{t("pages:settings2.g47")}</p>
         ) : !mappingsData?.wizard_labels?.length ? (
           <p className="text-text-tertiary text-sm py-4">
             Keine Budgets aus empirischen Angaben gefunden. Bitte zuerst unter «Empirische Angaben» abschliessen.
@@ -1146,8 +1147,8 @@ export default function Settings() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border/50 text-text-tertiary text-xs">
-                    <th className="text-left py-2 pr-4">Label aus empirischen Angaben</th>
-                    <th className="text-left py-2">Superkategorie</th>
+                    <th className="text-left py-2 pr-4">{t("pages:settings2.g23")}</th>
+                    <th className="text-left py-2">{t("pages:settings2.g39")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/20">
@@ -1164,7 +1165,7 @@ export default function Settings() {
                           }}
                           className="input w-full max-w-md"
                         >
-                          <option value="">Taxonomie-Standard (automatisch)</option>
+                          <option value="">{t("pages:settings2.g41")}</option>
                           {SUPER_CATEGORIES.map((sc) => (
                             <option key={sc.id} value={sc.id}>
                               {sc.emoji} {sc.label}
@@ -1196,7 +1197,7 @@ export default function Settings() {
                 {mappingSaved ? "✓ Gespeichert!" : saveMappingsMutation.isPending ? "Speichern..." : "Zuordnungen speichern"}
               </button>
               {mappingDirty && (
-                <span className="text-xs text-warning">Ungespeicherte Änderungen</span>
+                <span className="text-xs text-warning">{t("pages:settings2.g44")}</span>
               )}
             </div>
           </>
@@ -1228,17 +1229,17 @@ export default function Settings() {
         {/* Add form */}
         {catAddForm && (
           <div className="mb-4 p-3 rounded-lg border border-accent/30 bg-accent/5 space-y-3">
-            <p className="text-text-primary text-xs font-semibold">Neue Kategorie erstellen</p>
+            <p className="text-text-primary text-xs font-semibold">{t("pages:settings2.g26")}</p>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-text-tertiary text-[11px] mb-1 block">Name</label>
+                <label className="text-text-tertiary text-[11px] mb-1 block">{t("pages:settings2.g25")}</label>
                 <input
                   type="text"
                   autoFocus
                   className="input-field text-sm w-full"
                   value={catAddForm.name}
                   onChange={(e) => setCatAddForm((f) => f ? { ...f, name: e.target.value } : null)}
-                  placeholder="z.B. Kontoübertrag"
+                  placeholder={t("pages:settings2.g48")}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && catAddForm.name.trim()) createCatMutation.mutate(catAddForm);
                     if (e.key === "Escape") setCatAddForm(null);
@@ -1246,7 +1247,7 @@ export default function Settings() {
                 />
               </div>
               <div>
-                <label className="text-text-tertiary text-[11px] mb-1 block">Superkategorie</label>
+                <label className="text-text-tertiary text-[11px] mb-1 block">{t("pages:settings2.g39")}</label>
                 <select
                   className="input-field text-sm w-full"
                   value={catAddForm.super_id}
@@ -1259,7 +1260,7 @@ export default function Settings() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <label className="text-text-tertiary text-[11px]">Farbe:</label>
+              <label className="text-text-tertiary text-[11px]">{t("pages:settings2.g14")}</label>
               <input
                 type="color"
                 value={catAddForm.color}
@@ -1285,13 +1286,13 @@ export default function Settings() {
               </button>
             </div>
             {createCatMutation.isError && (
-              <p className="text-loss text-xs">Fehler beim Erstellen.</p>
+              <p className="text-loss text-xs">{t("pages:settings2.g15")}</p>
             )}
           </div>
         )}
 
         {catsLoading && (
-          <p className="text-text-tertiary text-sm py-4">Wird geladen…</p>
+          <p className="text-text-tertiary text-sm py-4">{t("pages:settings2.g47")}</p>
         )}
 
         {!catsLoading && ownCats.length === 0 && !catAddForm && (
@@ -1416,7 +1417,7 @@ export default function Settings() {
                           )}
                           <button
                             type="button"
-                            title="Umbenennen"
+                            title={t("pages:settings2.g43")}
                             onClick={() => { setCatEditId(cat.id); setCatEditName(cat.name); }}
                             className="p-1.5 rounded text-text-tertiary hover:text-text-primary hover:bg-bg-surface2 transition-colors"
                           >
@@ -1424,7 +1425,7 @@ export default function Settings() {
                           </button>
                           <button
                             type="button"
-                            title="Löschen"
+                            title={t("pages:settings2.g24")}
                             onClick={() => { setCatDeleteId(cat.id); setCatReassignTo(""); }}
                             className="p-1.5 rounded text-text-tertiary hover:text-loss hover:bg-loss/10 transition-colors"
                           >
@@ -1451,10 +1452,10 @@ export default function Settings() {
       {/* Info */}
       {/* Darstellung / Display preferences */}
       <div className="card">
-        <h2 className="text-text-primary font-semibold text-sm mb-4">Darstellung</h2>
+        <h2 className="text-text-primary font-semibold text-sm mb-4">{t("pages:settings2.g05")}</h2>
         <div className="space-y-4">
           <div>
-            <label className="label mb-2 block">Standard-Ansicht Budgetanalyse</label>
+            <label className="label mb-2 block">{t("pages:settings2.g38")}</label>
             <div className="toggle-group">
               <button
                 type="button"
@@ -1493,7 +1494,7 @@ export default function Settings() {
 
         {/* Export */}
         <div className="space-y-2">
-          <h3 className="text-text-secondary text-xs font-medium uppercase tracking-wide">Export</h3>
+          <h3 className="text-text-secondary text-xs font-medium uppercase tracking-wide">{t("pages:settings2.g13")}</h3>
           <p className="text-text-tertiary text-xs">
             Exportiert alle deine Daten als JSON-Backup: Transaktionen, Konten, Budgets,
             Wiederkehrende Einträge, Wizard-Konfiguration, Säulen 1–3a und Assets.
@@ -1518,7 +1519,7 @@ export default function Settings() {
 
         {/* Import */}
         <div className="space-y-3">
-          <h3 className="text-text-secondary text-xs font-medium uppercase tracking-wide">Import / Wiederherstellen</h3>
+          <h3 className="text-text-secondary text-xs font-medium uppercase tracking-wide">{t("pages:settings2.g17")}</h3>
           <p className="text-text-tertiary text-xs">
             Stellt Daten aus einem vorherigen JSON-Backup wieder her. Bestehende Einträge werden
             nicht überschrieben — nur fehlende Daten werden ergänzt.
@@ -1541,7 +1542,7 @@ export default function Settings() {
           {/* Options */}
           {importFile && (
             <div className="space-y-2 text-xs text-text-secondary">
-              <p className="text-text-tertiary font-medium">Optionen:</p>
+              <p className="text-text-tertiary font-medium">{t("pages:settings2.g31")}</p>
               {([
                 ["import_transactions", "Transaktionen importieren"],
                 ["import_recurring_plan", "Wiederkehrende Einträge importieren"],
@@ -1591,10 +1592,10 @@ export default function Settings() {
       </div>
 
       <div className="card">
-        <h2 className="text-text-primary font-semibold text-sm mb-4">About</h2>
+        <h2 className="text-text-primary font-semibold text-sm mb-4">{t("pages:settings2.g01")}</h2>
         <div className="space-y-3 text-sm text-text-secondary">
-          <p>Budget-Pal v1.0.0 · Persönliche Finanzplanung</p>
-          <p>Schweizer Kontext · CHF · AHV/BVG/3a Rentenrechner</p>
+          <p>{t("pages:settings2.g04")}</p>
+          <p>{t("pages:settings2.g37")}</p>
           <p className="flex items-center gap-2">
             Domain:
             <a href="https://budgetpal.doebele12.de" target="_blank" rel="noopener" className="text-accent hover:text-accent-light flex items-center gap-1">
