@@ -27,6 +27,8 @@ from app.core.database import get_db
 from app.core.security import get_current_user
 from app.core.taxonomy import default_transaction_category_for_wizard_label, load_merged_taxonomy_for_user
 from app.models.models import Account, Category, RecurringPlan, Transaction, User, UserWizardConfig
+from app.services.pdf_duplicate_detection import _descriptions_match
+from app.services.plan_schedule import applicable_months, occurrences_per_month
 from app.services.wizard_derive import (
     health_insurance_monthly,
     mortgage_interest_monthly,
@@ -629,6 +631,137 @@ async def prefill_recurring_plan(
 
     await db.commit()
     return PrefillResponse(created=created, skipped=skipped)
+
+
+# ── Plan-Ist-Abgleich ─────────────────────────────────────────
+
+class ReconciliationEntry(BaseModel):
+    """Eine Planzeile in einem konkreten Monat, abgeglichen gegen die Realität."""
+
+    plan_id: int
+    description: str
+    month: int
+    periodicity: str
+    expected: float                  # erwarteter Betrag (Vorzeichen wie im Plan)
+    actual: Optional[float] = None   # tatsächlich gebuchte Summe
+    status: Literal["booked", "deviating", "open", "overdue"]
+    matched_transaction_ids: List[int] = []
+
+
+class ReconciliationResponse(BaseModel):
+    year: int
+    entries: List[ReconciliationEntry]
+    booked_count: int
+    open_count: int
+    overdue_count: int
+    deviating_count: int
+
+
+#: Ab welcher relativen Abweichung ein Treffer als "abweichend" gilt.
+RECONCILE_AMOUNT_TOLERANCE = 0.15
+
+
+@router.get("/reconciliation", response_model=ReconciliationResponse)
+async def reconcile_plan(
+    year: int = Query(..., description="Kalenderjahr"),
+    month: Optional[int] = Query(None, ge=1, le=12, description="Nur dieser Monat"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Gleicht Planzeilen gegen tatsächlich gebuchte Transaktionen ab.
+
+    Für jede Fälligkeit im Jahr wird eine passende Transaktion gesucht:
+    gleiches Vorzeichen, im selben Monat, ähnlicher Buchungstext. Die
+    Textähnlichkeit nutzt dieselbe Logik wie die Duplikaterkennung beim
+    Import (`normalize_for_match` / `_descriptions_match`) — verschiedene
+    Quellen schreiben denselben Empfänger unterschiedlich.
+
+    Status je Fälligkeit:
+      booked    — Treffer, Betrag innerhalb der Toleranz
+      deviating — Treffer, Betrag ausserhalb der Toleranz
+      open      — kein Treffer, Monat liegt noch nicht in der Vergangenheit
+      overdue   — kein Treffer, Monat ist vorbei
+    """
+    plan_result = await db.execute(
+        select(RecurringPlan).where(RecurringPlan.user_id == current_user.id)
+    )
+    plans = list(plan_result.scalars().all())
+
+    txn_result = await db.execute(
+        select(Transaction)
+        .join(Account)
+        .where(
+            Account.user_id == current_user.id,
+            Transaction.is_deleted.isnot(True),
+            Transaction.date >= datetime(year, 1, 1),
+            Transaction.date <= datetime(year, 12, 31, 23, 59, 59),
+        )
+    )
+    transactions = list(txn_result.scalars().all())
+
+    # Jede Transaktion darf hoechstens eine Planzeile bedienen.
+    used_txn_ids: set[int] = set()
+    today = date.today()
+    entries: List[ReconciliationEntry] = []
+
+    for plan in plans:
+        months = applicable_months(
+            plan.periodicity, plan.start_date, plan.end_date, year
+        )
+        if month is not None:
+            months = [m for m in months if m == month]
+        per_month = occurrences_per_month(plan.periodicity)
+
+        for m in months:
+            expected = plan.amount * per_month
+            candidates = [
+                t for t in transactions
+                if t.id not in used_txn_ids
+                and t.date.month == m
+                and (t.amount < 0) == (plan.amount < 0)
+                and _descriptions_match(plan.description, t.description or "")
+            ]
+            matched_ids = [t.id for t in candidates]
+            for t in candidates:
+                used_txn_ids.add(t.id)
+
+            if candidates:
+                actual = sum(t.amount for t in candidates)
+                deviation = (
+                    abs(actual - expected) / abs(expected) if expected else 0.0
+                )
+                status_value = (
+                    "deviating" if deviation > RECONCILE_AMOUNT_TOLERANCE else "booked"
+                )
+            else:
+                actual = None
+                month_is_past = (year, m) < (today.year, today.month)
+                status_value = "overdue" if month_is_past else "open"
+
+            entries.append(
+                ReconciliationEntry(
+                    plan_id=plan.id,
+                    description=plan.description,
+                    month=m,
+                    periodicity=plan.periodicity,
+                    expected=round(expected, 2),
+                    actual=round(actual, 2) if actual is not None else None,
+                    status=status_value,
+                    matched_transaction_ids=matched_ids,
+                )
+            )
+
+    def count(value: str) -> int:
+        return sum(1 for e in entries if e.status == value)
+
+    return ReconciliationResponse(
+        year=year,
+        entries=entries,
+        booked_count=count("booked"),
+        open_count=count("open"),
+        overdue_count=count("overdue"),
+        deviating_count=count("deviating"),
+    )
 
 
 @router.get("", response_model=List[RecurringPlanResponse])
