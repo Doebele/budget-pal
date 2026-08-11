@@ -295,7 +295,16 @@
     "reviewIntro": "Review your details. You can create the financial plan at the bottom right — your progress is saved at every step.",
     "pensionAtAge": "Pension at {{age}}",
     "almostDone": "Almost done, {{name}}!",
-    "summary": "Summary"
+    "summary": "Summary",
+    "salaryGross": "Salary / wages (gross)",
+    "monthly": "Monthly",
+    "rentalIncome": "Rental income",
+    "monthlyNet": "Monthly net",
+    "foreignIncome": "Foreign income",
+    "ahvPension": "OASI / pension",
+    "rent": "Rent",
+    "ownership": "Home ownership",
+    "years": "{{count}} years"
   },
   "step5": {
     "s00": "Everyday & subscriptions",

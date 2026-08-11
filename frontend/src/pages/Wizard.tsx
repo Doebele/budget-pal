@@ -596,7 +596,7 @@ function Step2({ data, update }: { data: WizardData; update: (p: Partial<WizardD
 
   const INCOME_SOURCES = [
     {
-      icon: <Suitcase className="w-4 h-4 text-text-tertiary" />, label: "Lohn / Gehalt (brutto)", sublabel: "Monatlich",
+      icon: <Suitcase className="w-4 h-4 text-text-tertiary" />, label: t("pages:wizard.salaryGross"), sublabel: t("pages:wizard.monthly"),
       enabledKey: "lohnEnabled" as const, valueKey: "lohn" as const,
       show: true,
     },
@@ -611,17 +611,17 @@ function Step2({ data, update }: { data: WizardData; update: (p: Partial<WizardD
       show: true,
     },
     {
-      icon: <Home className="w-4 h-4 text-text-tertiary" />, label: "Mieteinnahmen", sublabel: "Monatlich netto",
+      icon: <Home className="w-4 h-4 text-text-tertiary" />, label: t("pages:wizard.rentalIncome"), sublabel: t("pages:wizard.monthlyNet"),
       enabledKey: "mieteinnahmenEnabled" as const, valueKey: "mieteinnahmen" as const,
       show: true,
     },
     {
-      icon: <Globe className="w-4 h-4 text-text-tertiary" />, label: "Auslandeinkommen", sublabel: t("pages:wizard.w23"),
+      icon: <Globe className="w-4 h-4 text-text-tertiary" />, label: t("pages:wizard.foreignIncome"), sublabel: t("pages:wizard.w23"),
       enabledKey: "auslandeinkommenEnabled" as const, valueKey: "auslandeinkommen" as const,
       show: true,
     },
     {
-      icon: <PiggyBank className="w-4 h-4 text-text-tertiary" />, label: "AHV / Rente", sublabel: t("pages:wizard.w24"),
+      icon: <PiggyBank className="w-4 h-4 text-text-tertiary" />, label: t("pages:wizard.ahvPension"), sublabel: t("pages:wizard.w24"),
       enabledKey: "ahvRenteEnabled" as const, valueKey: "ahvRente" as const,
       show: data.beschaeftigung === "retired",
     },
@@ -771,8 +771,8 @@ function Step4({ data, update }: { data: WizardData; update: (p: Partial<WizardD
         <Segmented
           value={data.housingMode}
           options={[
-            { value: "miete", label: "Miete", Icon: Home },
-            { value: "hypothek", label: "Wohneigentum", Icon: Building },
+            { value: "miete", label: t("pages:wizard.rent"), Icon: Home },
+            { value: "hypothek", label: t("pages:wizard.ownership"), Icon: Building },
           ] as const}
           onChange={(v) => update({ housingMode: v })}
         />
@@ -1462,7 +1462,7 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
               min={0}
               max={44}
               onChange={(v) => update({ ahvBeitragsjahre: v })}
-              format={(v) => `${v} Jahre`}
+              format={(v) => t("pages:wizard.years", { count: v })}
             />
           </Field>
 
@@ -1514,7 +1514,7 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
               min={63}
               max={70}
               onChange={(v) => update({ bvgRentenalter: v })}
-              format={(v) => `${v} Jahre`}
+              format={(v) => t("pages:wizard.years", { count: v })}
             />
           </Field>
 
@@ -1662,10 +1662,10 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
 function Step8({ data, update }: { data: WizardData; update: (p: Partial<WizardData>) => void }) {
   const { t } = useTranslation();
   const SCENARIOS: { key: "scenarioMortgage" | "scenarioSavings" | "scenarioEarlyRetirement" | "scenarioCare"; icon: React.ReactNode; label: string; sub: string }[] = [
-    { key: "scenarioMortgage",      icon: <GraphDown className="w-4 h-4" />, label: "Hypothek amortisieren",        sub: t("pages:wizard.w38") },
+    { key: "scenarioMortgage",      icon: <GraphDown className="w-4 h-4" />, label: t("pages:ui.hypothek_amortisieren"),        sub: t("pages:wizard.w38") },
     { key: "scenarioSavings",       icon: <PiggyBank className="w-4 h-4" />,    label: t("pages:wizard.w13"),             sub: t("pages:wizard.w39") },
     { key: "scenarioEarlyRetirement", icon: <Airplane className="w-4 h-4" />,      label: t("pages:wizard.w40"),   sub: t("pages:wizard.w41") },
-    { key: "scenarioCare",          icon: <Heart className="w-4 h-4" />,        label: "Pflegekosten einplanen (ab 80)", sub: t("pages:wizard.w42") },
+    { key: "scenarioCare",          icon: <Heart className="w-4 h-4" />,        label: t("pages:ui.pflegekosten_einplanen_ab_80"), sub: t("pages:wizard.w42") },
   ];
 
   return (
@@ -1684,7 +1684,7 @@ function Step8({ data, update }: { data: WizardData; update: (p: Partial<WizardD
             min={60}
             max={70}
             onChange={(v) => update({ zielRentenalter: v })}
-            format={(v) => `${v} Jahre`}
+            format={(v) => t("pages:wizard.years", { count: v })}
           />
         </Field>
 
@@ -1694,7 +1694,7 @@ function Step8({ data, update }: { data: WizardData; update: (p: Partial<WizardD
             min={70}
             max={100}
             onChange={(v) => update({ lebenserwartung: v })}
-            format={(v) => `${v} Jahre`}
+            format={(v) => t("pages:wizard.years", { count: v })}
           />
         </Field>
 

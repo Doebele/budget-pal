@@ -295,7 +295,16 @@
     "reviewIntro": "Überprüfe deine Angaben. Unten rechts kannst du den Finanzplan erstellen — dein Fortschritt bleibt bei jedem Schritt gespeichert.",
     "pensionAtAge": "Rente mit {{age}}",
     "almostDone": "Fast fertig, {{name}}!",
-    "summary": "Zusammenfassung"
+    "summary": "Zusammenfassung",
+    "salaryGross": "Lohn / Gehalt (brutto)",
+    "monthly": "Monatlich",
+    "rentalIncome": "Mieteinnahmen",
+    "monthlyNet": "Monatlich netto",
+    "foreignIncome": "Auslandeinkommen",
+    "ahvPension": "AHV / Rente",
+    "rent": "Miete",
+    "ownership": "Wohneigentum",
+    "years": "{{count}} Jahre"
   },
   "step5": {
     "s00": "Alltag & Abonnements",
