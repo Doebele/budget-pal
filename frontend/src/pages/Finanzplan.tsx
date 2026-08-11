@@ -361,7 +361,7 @@ export default function Finanzplan() {
         <div>
           <h1 className="text-text-primary font-display font-bold text-2xl mb-2">Kein Finanzplan vorhanden</h1>
           <p className="text-text-secondary text-sm leading-relaxed">
-            Erstelle deinen persönlichen Finanzplan mit dem Wizard — basierend auf echten BFS-Daten für deine Peer-Gruppe.
+            {t("pages:ui.erstelle_deinen_persoenlichen_finanzplan_mit")}
           </p>
         </div>
         <Link
@@ -383,7 +383,7 @@ export default function Finanzplan() {
         <div>
           <h1 className="text-text-primary font-display font-bold text-2xl mb-1">Finanzplan</h1>
           <p className="text-text-secondary text-sm">
-            Empirische Angaben — Monatliche Übersicht
+            {t("pages:ui.empirische_angaben_monatliche_uebersicht")}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -426,7 +426,7 @@ export default function Finanzplan() {
         <div className="bg-bg-surface2 rounded-xl border border-border/40 px-4 py-3">
           <p className="text-text-tertiary text-[11px] uppercase tracking-widest font-semibold mb-1">Vorsorgekapital</p>
           <p className="font-mono font-bold text-xl" style={{ color: "#a78bfa" }}>{fmtCHF(totalPension)}</p>
-          <p className="text-text-tertiary text-xs mt-1">{pension.length} Einträge</p>
+          <p className="text-text-tertiary text-xs mt-1">{t("pages:ui.entriesCount", { count: pension.length })}</p>
         </div>
         <div className="bg-bg-surface2 rounded-xl border border-border/40 px-4 py-3">
           <p className="text-text-tertiary text-[11px] uppercase tracking-widest font-semibold mb-1">{t("pages:finanzplan.liabilities")}</p>
@@ -527,7 +527,7 @@ export default function Finanzplan() {
       {pension.length > 0 && (
         <section className="bg-bg-surface2 rounded-xl border border-border/40 overflow-hidden">
           <div className="px-5 py-4 border-b border-border/40 flex items-center justify-between">
-            <h2 className="text-text-primary font-semibold text-sm">Vorsorge</h2>
+            <h2 className="text-text-primary font-semibold text-sm">{t("pages:ui.vorsorge")}</h2>
             <span className="text-text-tertiary text-xs font-mono">{fmtCHF(totalPension)} Kapital</span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-border/30">
@@ -578,7 +578,7 @@ export default function Finanzplan() {
                             </span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-text-tertiary text-xs">Ø Jahreslohn</span>
+                            <span className="text-text-tertiary text-xs">{t("pages:ui.jahreslohn")}</span>
                             <span className="font-mono text-xs text-text-secondary">
                               {entries[0]?.average_insured_salary ? fmtCHF(entries[0].average_insured_salary) : "—"}
                             </span>
@@ -594,12 +594,12 @@ export default function Finanzplan() {
                             <span className="font-mono text-xs text-text-primary">{fmtCHF(totalBalance)}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-text-tertiary text-xs">Gesch. Rente</span>
+                            <span className="text-text-tertiary text-xs">{t("pages:ui.gesch_rente")}</span>
                             <span className="font-mono text-xs font-semibold" style={{ color }}>{fmtCHF(bvgMonthlyEst)}/Mo</span>
                           </div>
                           {totalContrib > 0 && (
                             <div className="flex justify-between">
-                              <span className="text-text-tertiary text-xs">Jahresbeitrag</span>
+                              <span className="text-text-tertiary text-xs">{t("pages:ui.jahresbeitrag")}</span>
                               <span className="font-mono text-xs text-text-secondary">{fmtCHF(totalContrib)}</span>
                             </div>
                           )}
@@ -615,7 +615,7 @@ export default function Finanzplan() {
                           </div>
                           {totalContrib > 0 && (
                             <div className="flex justify-between">
-                              <span className="text-text-tertiary text-xs">Jahresbeitrag</span>
+                              <span className="text-text-tertiary text-xs">{t("pages:ui.jahresbeitrag")}</span>
                               <span className="font-mono text-xs text-text-secondary">{fmtCHF(totalContrib)}</span>
                             </div>
                           )}
@@ -677,9 +677,9 @@ export default function Finanzplan() {
           {/* Summary table header */}
           <div className="px-5 py-2 grid grid-cols-4 gap-2 border-b border-border/20 bg-bg-elevated/40">
             <span className="text-text-tertiary text-[10px] uppercase tracking-wide font-semibold">Position</span>
-            <span className="text-text-tertiary text-[10px] uppercase tracking-wide font-semibold text-right">Marktwert</span>
+            <span className="text-text-tertiary text-[10px] uppercase tracking-wide font-semibold text-right">{t("pages:ui.marktwert")}</span>
             <span className="text-text-tertiary text-[10px] uppercase tracking-wide font-semibold text-right">Eigenkapital</span>
-            <span className="text-text-tertiary text-[10px] uppercase tracking-wide font-semibold text-right">Hypothek</span>
+            <span className="text-text-tertiary text-[10px] uppercase tracking-wide font-semibold text-right">{t("pages:ui.hypothek")}</span>
           </div>
 
           <div className="divide-y divide-border/30">
@@ -747,7 +747,7 @@ export default function Finanzplan() {
           {/* Info note */}
           <div className="px-5 py-3 border-t border-border/20">
             <p className="text-text-tertiary text-[11px]">
-              LTV (Loan-to-Value) = Hypothek ÷ Marktwert. FINMA empfiehlt ≤ 65 % für langfristige Tragbarkeit.
+              {t("pages:ui.ltvExplain")}
               Amortisationspflicht: auf ≤ 65 % innerhalb von 15 Jahren.
             </p>
           </div>

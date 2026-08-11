@@ -112,7 +112,7 @@ export default function SeasonalityHeatmap() {
   if (topCategories.length === 0) {
     return (
       <div className="card text-center py-12 text-text-tertiary text-sm">
-        Keine Transaktionsdaten für die Heatmap verfügbar.
+        {t("pages:ui.keine_transaktionsdaten_fuer_die_heatmap_ver")}
       </div>
     );
   }
@@ -128,7 +128,7 @@ export default function SeasonalityHeatmap() {
         <div>
           <h3 className="text-text-primary font-semibold text-sm">{t("pages:misc.r11")}</h3>
           <p className="text-text-tertiary text-xs mt-0.5">
-            Ausgaben pro Kategorie — letzte 12 Monate · Farbe = relativ zum Kategoriemax.
+            {t("pages:ui.ausgaben_pro_kategorie_letzte_12_monate_farb")}
           </p>
         </div>
       </div>

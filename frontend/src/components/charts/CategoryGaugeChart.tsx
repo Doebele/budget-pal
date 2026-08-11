@@ -16,6 +16,7 @@ import { formatCHF, type ThemePalette } from "@/lib/theme";
 import { useThemeColors } from "@/hooks/useThemeColors";
 import type { SuperCategory } from "@/lib/categories";
 import { EyeClosed } from "@/lib/icons";
+import { useTranslation } from "react-i18next";
 
 // ── Public types ───────────────────────────────────────────────
 export interface GaugeRow {
@@ -209,6 +210,7 @@ function makeOption(row: GaugeRow, hasPeer: boolean, colors: ThemePalette): any 
 
 // ── Component ──────────────────────────────────────────────────
 export default function CategoryGaugeChart({ rows, hasPeer, onToggleHide }: CategoryGaugeChartProps) {
+  const { t } = useTranslation();
   const { colors } = useThemeColors();
   const visibleRows = useMemo(
     () => rows.filter((r) => !r.hidden),
@@ -222,7 +224,7 @@ export default function CategoryGaugeChart({ rows, hasPeer, onToggleHide }: Cate
   if (visibleRows.length === 0 && hiddenRows.length === 0) {
     return (
       <div className="py-10 text-center text-text-tertiary text-sm">
-        Keine Daten verfügbar
+        {t("pages:ui.keine_daten_verfuegbar")}
       </div>
     );
   }
@@ -238,7 +240,7 @@ export default function CategoryGaugeChart({ rows, hasPeer, onToggleHide }: Cate
         {hasPeer && (
           <span className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-full inline-block bg-bg-elevated" />
-            Peer-Ø — immer bei 50 %
+            {t("pages:ui.peer_immer_bei_50")}
           </span>
         )}
         <span className="flex items-center gap-1.5">
@@ -304,7 +306,7 @@ export default function CategoryGaugeChart({ rows, hasPeer, onToggleHide }: Cate
         </div>
       ) : (
         <p className="text-center text-text-tertiary text-sm py-6">
-          Alle Kategorien ausgeblendet — nutze die Filter-Chips oben um Kategorien einzublenden.
+          {t("pages:ui.alle_kategorien_ausgeblendet_nutze_die_filte")}
         </p>
       )}
     </div>

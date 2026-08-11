@@ -920,7 +920,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
         <div>
           <h2 className="text-text-primary font-semibold text-lg">{t("pages:step5.s00")}</h2>
           <p className="text-text-secondary text-sm mt-1">
-            Wähle deine Anbieter aus — klicke auf eine Zeile um Details zu konfigurieren.
+            {t("pages:ui.waehle_deine_anbieter_aus_klicke_auf_eine_ze")}
           </p>
         </div>
 
@@ -1151,7 +1151,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
                       className="w-full flex items-center gap-2 px-4 py-2.5 text-text-tertiary hover:text-text-secondary hover:bg-white/[0.02] text-xs transition-colors border-t border-border/40"
                     >
                       <Plus className="w-3.5 h-3.5" />
-                      Anbieter hinzufügen
+                      {t("pages:ui.anbieter_hinzufuegen")}
                     </button>
                   )}
                 </div>

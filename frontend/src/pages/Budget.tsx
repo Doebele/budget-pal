@@ -634,7 +634,7 @@ export default function Budget() {
         {!ALL_FREQS_SELECTED ? (
           <span className="txt-warning text-xs self-center ml-1 flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
-            Alle Werte gefiltert nach Wiederkehrend
+            {t("pages:ui.alle_werte_gefiltert_nach_wiederkehrend")}
           </span>
         ) : (
           <span className="text-text-disabled text-xs self-center ml-1">
@@ -792,7 +792,7 @@ export default function Budget() {
                 </button>
                 <button
                   type="button"
-                  title="Monatlicher Verlauf (Stacked Bar)"
+                  title={t("pages:ui.monatlicher_verlauf_stacked_bar")}
                   onClick={() => handleSetView("stacked")}
                   className={clsx(
                     "px-2 py-1.5 border-l border-border transition-colors",
@@ -1147,9 +1147,9 @@ export default function Budget() {
               {peerData.peer_info && (
                 <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-text-tertiary border-b border-border pb-3">
                   <span>Altersgruppe: <strong className="text-text-secondary">{peerData.peer_info.age_range}</strong></span>
-                  <span>Haushalt: <strong className="text-text-secondary">{peerData.peer_info.household_type}</strong></span>
+                  <span>{t("pages:ui.haushalt_2")} <strong className="text-text-secondary">{peerData.peer_info.household_type}</strong></span>
                   <span>Medianeinkommen: <strong className="text-text-secondary">{fmtRef(peerData.peer_info.median_income)}/Monat</strong></span>
-                  <span>Sparquote Peers: <strong className="text-text-secondary">{peerData.peer_info.savings_rate_pct}%</strong></span>
+                  <span>{t("pages:ui.sparquote_peers")} <strong className="text-text-secondary">{peerData.peer_info.savings_rate_pct}%</strong></span>
                 </div>
               )}
               <div className="space-y-3">
@@ -1202,7 +1202,7 @@ export default function Budget() {
               {peerData.opportunities && peerData.opportunities.length > 0 && (
                 <div className="border-t border-border pt-3">
                   <p className="text-text-tertiary text-xs font-semibold uppercase tracking-wide mb-2">
-                    Einspar-Potenzial
+                    {t("pages:ui.einspar_potenzial")}
                   </p>
                   <div className="space-y-2">
                     {peerData.opportunities.slice(0, 3).map((opp) => (

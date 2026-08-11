@@ -198,7 +198,7 @@ export default function CustomProviderSidebar({
         {/* Kategorie */}
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">
-            Kategorie
+            {t("pages:ui.kategorie")}
           </p>
           <select
             className="input text-sm w-full cursor-pointer"
@@ -214,7 +214,7 @@ export default function CustomProviderSidebar({
         {/* Betrag */}
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">
-            Betrag
+            {t("pages:ui.betrag")}
           </p>
           <div className="flex gap-2">
             <input
@@ -239,7 +239,7 @@ export default function CustomProviderSidebar({
           {currency !== "CHF" && parsedAmount > 0 && (
             <p className="text-text-tertiary text-[10px] mt-1 flex items-center gap-1">
               <Refresh className="w-2.5 h-2.5" />
-              Indikativer Kurs · Angaben ohne Gewähr
+              {t("pages:ui.indikativer_kurs_angaben_ohne_gewaehr")}
             </p>
           )}
         </div>
@@ -306,7 +306,7 @@ export default function CustomProviderSidebar({
               className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-loss/30 bg-loss/8 text-loss hover:bg-loss/15 px-3 py-2 text-xs font-medium transition-all"
             >
               <Trash className="w-3 h-3" />
-              Anbieter löschen
+              {t("pages:ui.anbieter_loeschen")}
             </button>
           </div>
         )}
@@ -317,7 +317,7 @@ export default function CustomProviderSidebar({
         <div className="flex items-center justify-between">
           <div>
             <p className="text-text-tertiary text-[10px] uppercase tracking-wide font-semibold">
-              Monatlicher Betrag
+              {t("pages:ui.monatlicher_betrag")}
             </p>
             {frequency !== "monthly" && (
               <p className="text-text-tertiary text-[10px]">{FREQUENCY_LABELS[frequency]}</p>

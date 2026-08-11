@@ -133,7 +133,7 @@ export default function ExpenseDetailPanel({
         <div className="flex-1 overflow-y-auto divide-y divide-border-subtle">
           {groups.length === 0 && (
             <p className="text-text-tertiary text-sm text-center py-12">
-              Keine Ausgaben im gewählten Zeitraum.
+              {t("pages:ui.keine_ausgaben_im_gewaehlten_zeitraum")}
             </p>
           )}
 
@@ -155,7 +155,7 @@ export default function ExpenseDetailPanel({
                     </span>
                     {isSavings && (
                       <span className="text-xs px-1.5 py-0.5 rounded-full border msg-warning shrink-0">
-                        Kontoübertrag / Sparen
+                        {t("pages:ui.kontouebertrag_sparen")}
                       </span>
                     )}
                   </div>

@@ -279,7 +279,7 @@ export default function Transactions() {
         <div>
           <h1 className="text-2xl font-display text-text-primary">{t("pages:transactions.title")}</h1>
           <p className="text-text-tertiary text-sm mt-0.5">
-            {range.label} · {transactions?.length || 0} Einträge
+            {range.label} · {t("pages:ui.entriesCount", { count: transactions?.length || 0 })}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -616,14 +616,14 @@ export default function Transactions() {
           {ALL_CAT_GROUPS.map(({ sc, cats }) => (
             <optgroup key={sc.id} label={`${sc.emoji} ${sc.label}`}>
               {cats.map((cat) => (
-                <option key={cat} value={cat}>{titleCase(cat)}</option>
+                <option key={cat} value={cat}>{translateCategory(titleCase(cat))}</option>
               ))}
             </optgroup>
           ))}
           {orphanFilterCategories.length > 0 && (
-            <optgroup label="Weitere (in deinen Daten)">
+            <optgroup label={t("pages:ui.weitere_in_deinen_daten")}>
               {orphanFilterCategories.map((cat) => (
-                <option key={cat} value={cat}>{titleCase(cat)}</option>
+                <option key={cat} value={cat}>{translateCategory(titleCase(cat))}</option>
               ))}
             </optgroup>
           )}
@@ -634,11 +634,11 @@ export default function Transactions() {
           onChange={(e) =>
             setRecurrenceFilter(e.target.value as RecurrenceFilterValue)
           }
-          aria-label="Nach Wiederkehrend / Rhythmus filtern"
+          aria-label={t("pages:ui.nach_wiederkehrend_rhythmus_filtern")}
         >
           {RECURRENCE_FILTER_OPTIONS.map(({ value, label }) => (
             <option key={value || "all"} value={value}>
-              {label}
+              {t(label)}
             </option>
           ))}
         </select>
@@ -744,7 +744,7 @@ export default function Transactions() {
                             {ALL_CAT_GROUPS.map(({ sc, cats }) => (
                               <optgroup key={sc.id} label={`${sc.emoji}  ${sc.label}`}>
                                 {cats.map((cat) => (
-                                  <option key={cat} value={cat}>{titleCase(cat)}</option>
+                                  <option key={cat} value={cat}>{translateCategory(titleCase(cat))}</option>
                                 ))}
                               </optgroup>
                             ))}
@@ -832,7 +832,7 @@ export default function Transactions() {
                             disabled={deleteMutation.isPending}
                             className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-loss/20 text-loss border border-loss/30 hover:bg-loss/40 transition-colors whitespace-nowrap"
                           >
-                            Löschen
+                            {t("pages:ui.loeschen")}
                           </button>
                           <button
                             onClick={() => setConfirmingDeleteId(null)}
@@ -869,7 +869,7 @@ export default function Transactions() {
                   <td colSpan={8} className="px-4 py-12 text-center text-text-tertiary text-sm">
                     Keine Transaktionen für {range.label} gefunden.{" "}
                     <Link to="/import" className="text-accent hover:text-accent-light">
-                      CSV importieren
+                      {t("pages:ui.csv_importieren")}
                     </Link>
                   </td>
                 </tr>
@@ -883,7 +883,7 @@ export default function Transactions() {
       <div ref={sentinelRef} className="h-4" />
       {isFetchingNextPage && (
         <div className="flex justify-center py-4 text-text-tertiary text-sm animate-pulse">
-          Weitere Transaktionen laden…
+          {t("pages:ui.weitere_transaktionen_laden")}
         </div>
       )}
 

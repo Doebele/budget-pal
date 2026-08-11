@@ -191,7 +191,7 @@ export default function TransactionSidebarEditor({ transactions, periodLabel, on
         <div className="shrink-0 px-5 py-4 border-b border-border bg-bg-surface2/90 backdrop-blur-sm">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-text-primary font-semibold text-base">Transaktionen bearbeiten</h2>
+              <h2 className="text-text-primary font-semibold text-base">{t("pages:ui.transaktionen_bearbeiten")}</h2>
               <p className="text-text-tertiary text-xs mt-0.5">{periodLabel} · {mergedTransactions.length} Transaktionen</p>
             </div>
             <button
@@ -320,7 +320,7 @@ export default function TransactionSidebarEditor({ transactions, periodLabel, on
               {/* Category */}
               <div>
                 <label className="flex items-center gap-1.5 text-xs text-text-tertiary uppercase tracking-wide mb-1.5">
-                  <Label className="w-3.5 h-3.5" /> Kategorie
+                  <Label className="w-3.5 h-3.5" /> {t("pages:ui.kategorie")}
                 </label>
                 <select
                   value={draft.category ?? ""}
@@ -391,7 +391,7 @@ export default function TransactionSidebarEditor({ transactions, periodLabel, on
               {/* Amount */}
               <div>
                 <label className="flex items-center gap-1.5 text-xs text-text-tertiary uppercase tracking-wide mb-1.5">
-                  <Dollar className="w-3.5 h-3.5" /> Betrag (CHF)
+                  <Dollar className="w-3.5 h-3.5" /> {t("pages:ui.betrag_chf")}
                 </label>
                 <input
                   type="number"
@@ -425,7 +425,7 @@ export default function TransactionSidebarEditor({ transactions, periodLabel, on
               {saveMutation.isError && (
                 <div className="flex items-center gap-2 text-loss text-xs bg-loss/10 border border-loss/30 rounded-lg px-3 py-2">
                   <WarningCircle className="w-4 h-4 shrink-0" />
-                  Fehler beim Speichern. Bitte erneut versuchen.
+                  {t("pages:ui.fehler_beim_speichern_bitte_erneut_versuchen")}
                 </div>
               )}
             </div>

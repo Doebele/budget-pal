@@ -208,7 +208,7 @@ export default function Goals() {
               />
             </div>
             <div>
-              <label className="block text-xs text-text-tertiary mb-1">Monatliche Einlage (CHF)</label>
+              <label className="block text-xs text-text-tertiary mb-1">{t("pages:ui.monatliche_einlage_chf")}</label>
               <input
                 type="number"
                 min="0"
@@ -230,7 +230,7 @@ export default function Goals() {
             </div>
             <div className="md:col-span-2 flex justify-end gap-2 pt-2">
               <button type="button" onClick={resetForm} className="btn-secondary">
-                Abbrechen
+                {t("pages:ui.abbrechen")}
               </button>
               <button
                 type="submit"
@@ -280,7 +280,7 @@ export default function Goals() {
           <Position className="w-12 h-12 text-text-tertiary mb-3" />
           <p className="text-text-primary font-medium mb-1">{t("pages:misc.r27")}</p>
           <p className="text-text-tertiary text-sm mb-4">
-            Erstelle dein erstes Sparziel und verfolge deinen Fortschritt.
+            {t("pages:ui.erstelle_dein_erstes_sparziel_und_verfolge_d")}
           </p>
           <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
             <Plus className="w-4 h-4" /> Erstes Ziel erstellen
@@ -326,6 +326,7 @@ interface GoalCardProps {
 }
 
 function GoalCard({ goal, onEdit, onDelete, confirmDelete, onCancelDelete, onConfirmDelete }: GoalCardProps) {
+  const { t } = useTranslation();
   const meta = GOAL_TYPE_META[goal.goal_type] ?? GOAL_TYPE_META.other;
   const barColor = goal.is_achieved ? "#10b981" : meta.color;
 
@@ -352,7 +353,7 @@ function GoalCard({ goal, onEdit, onDelete, confirmDelete, onCancelDelete, onCon
           {confirmDelete ? (
             <>
               <button onClick={onConfirmDelete} className="text-[10px] px-1.5 py-0.5 rounded bg-loss/20 text-loss border border-loss/30 hover:bg-loss/40 whitespace-nowrap">
-                Löschen
+                {t("pages:ui.loeschen")}
               </button>
               <button onClick={onCancelDelete} className="text-text-tertiary hover:text-text-secondary p-1">
                 <Xmark className="w-3 h-3" />

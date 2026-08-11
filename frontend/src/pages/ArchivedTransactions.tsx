@@ -118,11 +118,11 @@ export default function ArchivedTransactions() {
               onChange={(e) =>
                 setRecurrenceFilter(e.target.value as RecurrenceFilterValue)
               }
-              aria-label="Archiv nach Rhythmus filtern"
+              aria-label={t("pages:ui.archiv_nach_rhythmus_filtern")}
             >
               {RECURRENCE_FILTER_OPTIONS.map(({ value, label }) => (
                 <option key={value || "all"} value={value}>
-                  {label}
+                  {t(label)}
                 </option>
               ))}
             </select>
@@ -171,7 +171,7 @@ export default function ArchivedTransactions() {
             </div>
             <div className="flex justify-end gap-2">
               <button type="button" className="btn-secondary" onClick={() => setPurgeId(null)}>
-                Abbrechen
+                {t("pages:ui.abbrechen")}
               </button>
               <button
                 type="button"

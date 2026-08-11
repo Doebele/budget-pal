@@ -12,12 +12,12 @@ import { useTranslation } from "react-i18next";
 /** Left-to-right: Max → 2J → YTD → J → H → Q → M */
 const TABS: { value: TimeGranularity; label: string; title: string }[] = [
   { value: "max",        label: "Max", title: "Gesamter Zeitraum" },
-  { value: "twoyears",   label: "2J",  title: "Letzte 2 Jahre" },
-  { value: "ytd",        label: "YTD", title: "Jahr bis heute" },
-  { value: "yearly",     label: "J",   title: "Jährlich" },
-  { value: "halfyearly", label: "H",   title: "Halbjährlich" },
-  { value: "quarterly",  label: "Q",   title: "Vierteljährlich" },
-  { value: "monthly",    label: "M",   title: "Monatlich" },
+  { value: "twoyears",   label: "2J",  title: "pages:ui.letzte_2_jahre" },
+  { value: "ytd",        label: "YTD", title: "pages:ui.jahr_bis_heute" },
+  { value: "yearly",     label: "J",   title: "pages:ui.jaehrlich" },
+  { value: "halfyearly", label: "H",   title: "pages:ui.halbjaehrlich" },
+  { value: "quarterly",  label: "Q",   title: "pages:ui.vierteljaehrlich" },
+  { value: "monthly",    label: "M",   title: "pages:ui.monatlich" },
 ];
 
 interface Props {
@@ -39,7 +39,7 @@ export default function GranularityNavigator({ granularity, anchor, onChange }: 
         {TABS.map((tab) => (
           <button
             key={tab.value}
-            title={tab.title}
+            title={t(tab.title)}
             onClick={() => onChange(tab.value, new Date())}
             className={clsx("toggle-btn", granularity === tab.value && "active")}
           >

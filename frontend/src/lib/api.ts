@@ -387,8 +387,19 @@ export const healthApi = {
     api.get<{
       score: number;
       grade: string;
-      components: Array<{ name: string; score: number; weight: number; detail: string }>;
-      top_levers: Array<{ title: string; body: string; potential: number }>;
+      components: Array<{
+        name: string; score: number; weight: number; detail: string;
+        // i18n-Schluessel des Backends; name/detail bleiben deutscher Rueckfall
+        name_key?: string | null;
+        detail_key?: string | null;
+        detail_params?: Record<string, string | number> | null;
+      }>;
+      top_levers: Array<{
+        title: string; body: string; potential: number;
+        title_key?: string | null;
+        body_key?: string | null;
+        body_params?: Record<string, string | number> | null;
+      }>;
     }>("/budget/health-score", { params }),
 };
 

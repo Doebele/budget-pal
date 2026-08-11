@@ -118,7 +118,7 @@ export default function ProviderSidebar({
           <div className="flex items-start gap-2 bg-accent/8 border border-accent/15 rounded-lg px-3 py-2">
             <Group className="w-3.5 h-3.5 text-accent flex-shrink-0 mt-0.5" />
             <p className="text-text-secondary text-xs leading-relaxed">
-              <strong className="text-accent">{provider.peerPopularity}%</strong> deiner Peer-Gruppe nutzen diesen Dienst
+              <strong className="text-accent">{provider.peerPopularity}%</strong> {t("pages:ui.deiner_peer_gruppe_nutzen_diesen_dienst")}
             </p>
           </div>
         )}
@@ -200,7 +200,7 @@ export default function ProviderSidebar({
                         <div className="flex-1 min-w-0">
                           <div className="font-medium flex items-center gap-1">
                             <EditPencil className="w-3 h-3" />
-                            Eigener Preis
+                            {t("pages:ui.eigener_preis")}
                           </div>
                           {isCustomActive && (
                             <div className="flex items-center gap-1.5 mt-1.5" onClick={e => e.stopPropagation()}>
@@ -289,7 +289,7 @@ export default function ProviderSidebar({
               {entry.currency && entry.currency !== "CHF" && entry.individualAmount && (
                 <p className="text-text-tertiary text-[10px] mt-1 flex items-center gap-1">
                   <Refresh className="w-2.5 h-2.5" />
-                  Indikativer Kurs · Angaben ohne Gewähr
+                  {t("pages:ui.indikativer_kurs_angaben_ohne_gewaehr")}
                 </p>
               )}
             </div>
@@ -354,7 +354,7 @@ export default function ProviderSidebar({
             className="flex items-center gap-1.5 text-accent hover:text-accent-light text-xs transition-colors"
           >
             <OpenNewWindow className="w-3 h-3" />
-            Webseite besuchen
+            {t("pages:ui.webseite_besuchen")}
           </a>
         )}
 
@@ -367,7 +367,7 @@ export default function ProviderSidebar({
               className="w-full flex items-center justify-center gap-1.5 rounded-md border border-loss/30 bg-loss/8 text-loss hover:bg-loss/15 px-3 py-2 text-xs font-medium transition-all"
             >
               <Trash className="w-3 h-3" />
-              Entfernen
+              {t("pages:ui.entfernen")}
             </button>
           ) : (
             <button
@@ -376,7 +376,7 @@ export default function ProviderSidebar({
               className="w-full btn-primary text-xs py-2 flex items-center justify-center gap-1"
             >
               <Check className="w-3 h-3" />
-              Hinzufügen
+              {t("pages:ui.hinzufuegen")}
             </button>
           )}
         </div>

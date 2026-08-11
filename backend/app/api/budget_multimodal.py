@@ -528,12 +528,20 @@ class HealthScoreComponent(BaseModel):
     score: float        # 0–100
     weight: float       # 0–1, sum = 1.0
     detail: str
+    # i18n: das Frontend uebersetzt ueber die Schluessel; `name`/`detail`
+    # bleiben als deutsche Rueckfallebene fuer aeltere Clients erhalten.
+    name_key: Optional[str] = None
+    detail_key: Optional[str] = None
+    detail_params: Optional[dict] = None
 
 
 class HealthScoreLever(BaseModel):
     title: str
     body: str
     potential: float    # CHF / month improvement potential
+    title_key: Optional[str] = None
+    body_key: Optional[str] = None
+    body_params: Optional[dict] = None
 
 
 class HealthScoreResponse(BaseModel):
@@ -606,12 +614,20 @@ def _compute_health_score(
         HealthScoreComponent(
             name="Sparquote", score=round(savings_score, 1), weight=0.30,
             detail=f"{savings_rate_pct:.1f}% Sparquote" if income > 0 else "Keine Einnahmen im Zeitraum",
+            name_key="savingsRate",
+            detail_key="savingsRateDetail" if income > 0 else "noIncomeInPeriod",
+            detail_params={"pct": f"{savings_rate_pct:.1f}"} if income > 0 else None,
         ),
         HealthScoreComponent(
             name="Budgettreue", score=round(adherence_score, 1), weight=0.25,
             detail=(
                 f"{round(expenses / planned_total * 100):.0f}% des Budgets ausgeschöpft"
                 if planned_total > 0 else "Kein Soll-Budget erfasst"
+            ),
+            name_key="budgetAdherence",
+            detail_key="budgetUsedDetail" if planned_total > 0 else "noTargetBudget",
+            detail_params=(
+                {"pct": f"{round(expenses / planned_total * 100):.0f}"} if planned_total > 0 else None
             ),
         ),
         HealthScoreComponent(
@@ -620,14 +636,24 @@ def _compute_health_score(
                 f"Einnahmen decken Ausgaben zu {round(income/expenses*100) if expenses > 0 else 100:.0f}%"
                 if income > 0 else "Keine Einnahmen erfasst"
             ),
+            name_key="cashflow",
+            detail_key="cashflowDetail" if income > 0 else "noIncomeRecorded",
+            detail_params=(
+                {"pct": f"{round(income/expenses*100) if expenses > 0 else 100:.0f}"} if income > 0 else None
+            ),
         ),
         HealthScoreComponent(
             name="Altersvorsorge", score=round(pension_score, 1), weight=0.15,
             detail="Vorsorgebeiträge erkannt" if has_pension else "Keine Säule-3a-Beiträge erkannt",
+            name_key="retirementProvision",
+            detail_key="pensionDetected" if has_pension else "noPillar3aDetected",
         ),
         HealthScoreComponent(
             name="Ausgabendiversität", score=round(diversity_score, 1), weight=0.10,
             detail=f"{len(cat_totals)} Kategorien im Zeitraum",
+            name_key="expenseDiversity",
+            detail_key="categoriesInPeriod",
+            detail_params={"count": len(cat_totals)},
         ),
     ]
 
@@ -637,27 +663,27 @@ def _compute_health_score(
     if savings_score < 70:
         gap = max(0, income * 0.20 - (income - expenses))
         levers.append(HealthScoreLever(
-            title="Sparquote erhöhen",
+            title="Sparquote erhöhen", title_key="increaseSavings", body_key="savingsLeverBody", body_params={"ref": ref, "amount": f"{gap/months_covered:,.0f}"},
             body=f"Ziel: 20% Sparquote. Spare zusätzlich ~{ref} {gap/months_covered:,.0f}/Monat.",
             potential=round(gap / months_covered, 0),
         ))
     if adherence_score < 70 and planned_total > 0:
         overspend = max(0.0, expenses - planned_total) / months_covered
         levers.append(HealthScoreLever(
-            title="Budgeteinhaltung verbessern",
+            title="Budgeteinhaltung verbessern", title_key="improveAdherence", body_key="adherenceLeverBody", body_params={"ref": ref, "amount": f"{overspend:,.0f}"},
             body=f"Ausgaben übersteigen das Budget um ~{ref} {overspend:,.0f}/Monat.",
             potential=round(overspend, 0),
         ))
     if pension_score < 70:
         levers.append(HealthScoreLever(
-            title="Säule 3a einrichten",
+            title="Säule 3a einrichten", title_key="setupPillar3a", body_key="pillar3aLeverBody", body_params=None,
             body="Zahle regelmässig in die Säule 3a ein. Max. CHF 7'056/Jahr (2024, unselbstständig).",
             potential=588.0,
         ))
     if cashflow_score < 80 and income > 0:
         deficit = max(0.0, expenses - income) / months_covered
         levers.append(HealthScoreLever(
-            title="Ausgaben senken",
+            title="Ausgaben senken", title_key="reduceExpenses", body_key="reduceLeverBody", body_params={"ref": ref, "amount": f"{deficit:,.0f}"},
             body=f"Ausgaben übersteigen Einnahmen um ~{ref} {deficit:,.0f}/Monat.",
             potential=round(deficit, 0),
         ))

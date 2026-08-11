@@ -119,7 +119,7 @@ export default function NotificationBell() {
           <div className="max-h-96 overflow-y-auto">
             {isLoading && (
               <div className="px-4 py-8 text-center text-text-tertiary text-xs animate-pulse">
-                Analysiere Transaktionen…
+                {t("pages:ui.analysiere_transaktionen")}
               </div>
             )}
             {!isLoading && findings.length === 0 && (
@@ -160,7 +160,7 @@ export default function NotificationBell() {
           {findings.length > 0 && (
             <div className="px-4 py-2.5 border-t border-border bg-bg-surface2/50">
               <p className="text-[10px] text-text-tertiary">
-                Basierend auf deinen letzten 90 Tagen · Aktualisiert alle 5 Min.
+                {t("pages:ui.basierend_auf_deinen_letzten_90_tagen_aktual")}
               </p>
             </div>
           )}

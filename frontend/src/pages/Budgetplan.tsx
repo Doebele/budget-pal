@@ -1304,7 +1304,7 @@ export default function Budgetplan() {
                 onClick={() => setClearMonthDialog(null)}
                 className="px-4 py-2 text-sm text-text-secondary hover:text-text-primary bg-bg-surface2 rounded-lg transition-colors disabled:opacity-50"
               >
-                Abbrechen
+                {t("pages:ui.abbrechen")}
               </button>
               <button
                 type="button"
@@ -1869,7 +1869,7 @@ export default function Budgetplan() {
                 <input
                   type="text"
                   className="w-full bg-bg-surface2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent"
-                  placeholder="z. B. Miete, Lohn, Netflix…"
+                  placeholder={t("pages:ui.z_b_miete_lohn_netflix")}
                   value={form.description}
                   onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                 />
@@ -2066,7 +2066,7 @@ export default function Budgetplan() {
                   className="flex items-center gap-1.5 px-3 py-2 text-sm text-loss hover:bg-loss/10 rounded-lg transition-colors"
                 >
                   <Trash className="w-4 h-4" />
-                  Löschen
+                  {t("pages:ui.loeschen")}
                 </button>
               )}
               <div className="flex-1" />
@@ -2074,7 +2074,7 @@ export default function Budgetplan() {
                 onClick={closeEditor}
                 className="px-4 py-2 text-sm text-text-secondary hover:text-text-primary bg-bg-surface2 rounded-lg transition-colors"
               >
-                Abbrechen
+                {t("pages:ui.abbrechen")}
               </button>
               <button
                 onClick={handleSave}
@@ -2099,7 +2099,7 @@ export default function Budgetplan() {
             <div className="flex items-center justify-between px-5 py-4 border-b border-border/50">
               <h2 className="text-text-primary font-semibold text-base flex items-center gap-2">
                 <Sparks className="w-4 h-4 text-accent" />
-                Budgetplan vorbefüllen
+                {t("pages:ui.budgetplan_vorbefuellen")}
               </h2>
               <button onClick={() => setPrefillOpen(false)} className="text-text-tertiary hover:text-text-primary transition-colors">
                 <Xmark className="w-5 h-5" />
@@ -2148,7 +2148,7 @@ export default function Budgetplan() {
                   </button>
                 </div>
                 <p className="text-xs text-text-tertiary mt-1.5">
-                  Einträge werden in <span className="font-semibold text-text-primary">{year}</span> erstellt.
+                  {t("pages:ui.eintraege_werden_in")} <span className="font-semibold text-text-primary">{year}</span> erstellt.
                 </p>
               </div>
 
@@ -2222,7 +2222,7 @@ export default function Budgetplan() {
                 onClick={() => setPrefillOpen(false)}
                 className="px-4 py-2 text-sm text-text-secondary hover:text-text-primary bg-bg-surface2 rounded-lg transition-colors"
               >
-                Abbrechen
+                {t("pages:ui.abbrechen")}
               </button>
               <div className="flex-1" />
               <button

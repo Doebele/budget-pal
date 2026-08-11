@@ -196,7 +196,7 @@ export default function SplitTransactionModal({ transaction, onClose }: Props) {
                 <button
                   className="underline decoration-dotted hover:text-text-primary"
                   onClick={fillRemaining}
-                  title="Differenz automatisch verteilen"
+                  title={t("pages:ui.differenz_automatisch_verteilen")}
                 >
                   {diff >= 0 ? "+" : ""}
                   {formatAmount(diff, ccy)} auffüllen
@@ -220,14 +220,14 @@ export default function SplitTransactionModal({ transaction, onClose }: Props) {
             className="flex items-center gap-1.5 text-xs text-text-secondary hover:text-text-primary transition-colors px-2 py-1.5 rounded-lg hover:bg-bg-surface2"
           >
             <Plus className="w-3.5 h-3.5" />
-            Teil hinzufügen
+            {t("pages:ui.teil_hinzufuegen")}
           </button>
           <div className="flex gap-2">
             <button
               onClick={onClose}
               className="px-3 py-1.5 text-sm text-text-secondary hover:text-text-primary rounded-lg hover:bg-bg-surface2 transition-colors"
             >
-              Abbrechen
+              {t("pages:ui.abbrechen")}
             </button>
             <button
               onClick={() => splitMutation.mutate()}

@@ -495,9 +495,9 @@ export default function Settings() {
 
           <div>
             <label className="label">
-              Referenzwährung
+              {t("pages:ui.referenzwaehrung")}
               <span className="text-text-tertiary font-normal ml-1 text-xs">
-                (Aggregationen in Budgetanalyse, Reale Angaben, Budgetplan, Prognose)
+                {t("pages:ui.aggregationen_in_budgetanalyse_reale_angaben")}
               </span>
             </label>
             <select
@@ -513,9 +513,9 @@ export default function Settings() {
 
           <div>
             <label className="label">
-              SARON-Referenzzins (jährlich, % p.a.)
+              {t("pages:ui.saron_referenzzins_jaehrlich_p_a")}
               <span className="text-text-tertiary font-normal ml-1 text-xs">
-                (für Hypothekenangaben im Wizard)
+                {t("pages:ui.fuer_hypothekenangaben_im_wizard")}
               </span>
             </label>
             <div className="flex flex-wrap items-center gap-3 max-w-md">
@@ -606,11 +606,11 @@ export default function Settings() {
           <div className="flex-1">
             <h2 className="text-text-primary font-semibold text-sm">{t("pages:settings2.g10")}</h2>
             <p className="text-text-tertiary text-xs mt-0.5 mb-3">
-              Aktualisiere deine Basisdaten, Peer-Gruppe, Vorsorge (AHV/BVG/3a) und Finanzplan-Ziele.
+              {t("pages:ui.aktualisiere_deine_basisdaten_peer_gruppe_vo")}
             </p>
             <Link to="/wizard" className="btn-primary inline-flex items-center gap-2 text-sm py-2">
               <MagicWand className="w-3.5 h-3.5" />
-              Zu empirischen Angaben
+              {t("pages:ui.zu_empirischen_angaben")}
             </Link>
           </div>
         </div>
@@ -636,7 +636,7 @@ export default function Settings() {
         {/* Übersicht: Superkategorie ↔ empirische vs. reale Kategorien (farbkodiert) */}
         <div className="rounded-xl border border-border/50 overflow-hidden mb-4">
           <p className="text-[11px] text-text-tertiary px-3 py-2 bg-bg-surface2/40 border-b border-border/30">
-            Zuordnung aus der Taxonomie: <span className="text-text-secondary">{t("pages:misc.r39")}</span> (Wizard-Deckel) und{" "}
+            {t("pages:ui.zuordnung_aus_der_taxonomie")} <span className="text-text-secondary">{t("pages:misc.r39")}</span> (Wizard-Deckel) und{" "}
             <span className="text-text-secondary">{t("pages:misc.r40")}</span> (Transaktionskategorien) — Farbe = Superkategorie.
           </p>
           <div className="overflow-x-auto">
@@ -765,7 +765,7 @@ export default function Settings() {
         </div>
 
         <p className="text-xs text-text-tertiary font-medium mt-6 mb-2">
-          Details: Peer-Ø, Ergänzungen und Bearbeitung (pro Superkategorie ausklappen)
+          {t("pages:ui.details_peer_ergaenzungen_und_bearbeitung_pr")}
         </p>
         <div className="space-y-1">
           {SUPER_CATEGORIES.filter((sc) => sc.id !== "sonstiges").map((sc) => {
@@ -968,7 +968,7 @@ export default function Settings() {
                       <div>
                         <div className="flex items-center justify-between mb-1.5">
                           <p className="text-text-tertiary font-semibold uppercase tracking-wide text-[11px]">
-                            Transaktionskategorien (Reale Angaben)
+                            {t("pages:ui.transaktionskategorien_reale_angaben")}
                           </p>
                           <button
                             type="button"
@@ -1074,7 +1074,7 @@ export default function Settings() {
                         <div className="pt-2 border-t border-border/20">
                           <p className="text-text-disabled text-[10px] uppercase tracking-wide mb-1 flex items-center gap-1">
                             <Eye className="w-2.5 h-2.5" />
-                            Ausgeblendete Labels — klicken zum Einblenden
+                            {t("pages:ui.ausgeblendete_labels_klicken_zum_einblenden")}
                           </p>
                           <div className="flex flex-wrap gap-1">
                             {hiddenTxn.map((l) => (
@@ -1131,7 +1131,7 @@ export default function Settings() {
             title={t("pages:settings2.g02")}
           >
             <Undo className="w-3 h-3" />
-            Zurücksetzen auf Standard
+            {t("pages:ui.zuruecksetzen_auf_standard")}
           </button>
         </div>
 
@@ -1139,7 +1139,7 @@ export default function Settings() {
           <p className="text-text-tertiary text-sm py-4">{t("pages:settings2.g47")}</p>
         ) : !mappingsData?.wizard_labels?.length ? (
           <p className="text-text-tertiary text-sm py-4">
-            Keine Budgets aus empirischen Angaben gefunden. Bitte zuerst unter «Empirische Angaben» abschliessen.
+            {t("pages:ui.keine_budgets_aus_empirischen_angaben_gefund")}
           </p>
         ) : (
           <>
@@ -1182,7 +1182,7 @@ export default function Settings() {
             {saveMappingsMutation.isError && (
               <div className="flex items-center gap-2 text-loss text-xs bg-loss/10 border border-loss/30 rounded-lg px-3 py-2 mt-3">
                 <WarningCircle className="w-4 h-4 shrink-0" />
-                Fehler beim Speichern.
+                {t("pages:ui.fehler_beim_speichern")}
               </div>
             )}
 
@@ -1210,10 +1210,10 @@ export default function Settings() {
           <div>
             <h2 className="text-text-primary font-semibold text-sm flex items-center gap-2">
               <Label className="w-4 h-4 text-accent" />
-              Eigene Kategorien
+              {t("pages:ui.eigene_kategorien")}
             </h2>
             <p className="text-text-tertiary text-xs mt-0.5">
-              Benutzerdefinierte Kategorien für Transaktionen — ergänzend zu den Systemkategorien.
+              {t("pages:ui.benutzerdefinierte_kategorien_fuer_transakti")}
             </p>
           </div>
           <button
@@ -1222,7 +1222,7 @@ export default function Settings() {
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/10 border border-accent/30 text-accent text-xs font-medium hover:bg-accent/20 transition-colors"
           >
             <Plus className="w-3 h-3" />
-            Neue Kategorie
+            {t("pages:ui.neue_kategorie")}
           </button>
         </div>
 
@@ -1297,7 +1297,7 @@ export default function Settings() {
 
         {!catsLoading && ownCats.length === 0 && !catAddForm && (
           <p className="text-text-tertiary text-sm py-4 text-center">
-            Noch keine eigenen Kategorien. Klicke auf «Neue Kategorie» um zu beginnen.
+            {t("pages:ui.noch_keine_eigenen_kategorien_klicke_auf_neu")}
           </p>
         )}
 
@@ -1359,14 +1359,14 @@ export default function Settings() {
                               disabled={deleteCatMutation.isPending}
                               className="text-[11px] px-2.5 py-1 rounded bg-loss/20 text-loss border border-loss/30 hover:bg-loss/30 transition-colors disabled:opacity-40"
                             >
-                              Endgültig löschen
+                              {t("pages:ui.endgueltig_loeschen")}
                             </button>
                             <button
                               type="button"
                               onClick={() => { setCatDeleteId(null); setCatReassignTo(""); }}
                               className="text-[11px] text-text-tertiary hover:text-text-primary"
                             >
-                              Abbrechen
+                              {t("pages:ui.abbrechen")}
                             </button>
                           </div>
                         </div>
@@ -1479,7 +1479,7 @@ export default function Settings() {
               </button>
             </div>
             <p className="text-text-disabled text-xs mt-1.5">
-              Wird beim Öffnen der Budgetanalyse als Standard verwendet.
+              {t("pages:ui.wird_beim_oeffnen_der_budgetanalyse_als_stan")}
             </p>
           </div>
         </div>

@@ -632,7 +632,7 @@ function Step2({ data, update }: { data: WizardData; update: (p: Partial<WizardD
       <div>
         <h2 className="text-text-primary font-semibold text-lg">{t("pages:wizard.w119")}</h2>
         <p className="text-text-secondary text-sm mt-1">
-          Aktiviere alle zutreffenden Quellen und gib die monatlichen Beträge an.
+          {t("pages:ui.aktiviere_alle_zutreffenden_quellen_und_gib_")}
         </p>
       </div>
 
@@ -663,7 +663,7 @@ function Step2({ data, update }: { data: WizardData; update: (p: Partial<WizardD
               <p className="text-text-tertiary text-xs uppercase tracking-wide">{t("pages:wizard.w00")}</p>
               <p className="text-gain font-mono font-semibold text-2xl mt-0.5">{chf(netto)}</p>
               <p className="text-text-tertiary text-xs mt-1">
-                pro Monat — nach AHV/ALV-Abzügen und Steuerschätzung
+                {t("pages:ui.pro_monat_nach_ahv_alv_abzuegen_und_steuersc")}
               </p>
             </div>
             <div className="w-10 h-10 rounded-xl bg-gain/15 flex items-center justify-center">
@@ -738,7 +738,7 @@ function Step3({
       <div>
         <h2 className="text-text-primary font-semibold text-lg">{t("pages:wizard.w01")}</h2>
         <p className="text-text-secondary text-sm mt-1">
-          Basierend auf deinem Profil haben wir passende BFS-Vergleichswerte gefunden.
+          {t("pages:ui.basierend_auf_deinem_profil_haben_wir_passen")}
         </p>
       </div>
 
@@ -764,7 +764,7 @@ function Step4({ data, update }: { data: WizardData; update: (p: Partial<WizardD
       <div>
         <h2 className="text-text-primary font-semibold text-lg">{t("pages:wizard.w168")}</h2>
         <p className="text-text-secondary text-sm mt-1">
-          Gib deine monatlichen Wohn- und Versicherungskosten an.
+          {t("pages:ui.gib_deine_monatlichen_wohn_und_versicherungs")}
         </p>
       </div>
 
@@ -870,7 +870,7 @@ function Step4({ data, update }: { data: WizardData; update: (p: Partial<WizardD
                   update({ healthInsurancePremiums: [...healthPremiums(data), 0] })
                 }
               >
-                + Person hinzufügen
+                {t("pages:ui.person_hinzufuegen")}
               </button>
             </div>
           </Field>
@@ -973,7 +973,7 @@ function Step5({ data, update }: { data: WizardData; update: (p: Partial<WizardD
       <div>
         <h2 className="text-text-primary font-semibold text-lg">{t("pages:wizard.w110")}</h2>
         <p className="text-text-secondary text-sm mt-1">
-          Konfiguriere deine monatlichen Alltagsausgaben.
+          {t("pages:ui.konfiguriere_deine_monatlichen_alltagsausgab")}
         </p>
       </div>
 
@@ -1186,7 +1186,7 @@ function Step6({ data, update }: { data: WizardData; update: (p: Partial<WizardD
           </Field>
           <p className="text-text-tertiary text-xs flex items-center gap-1.5 mt-1">
             <GraphUp className="w-3.5 h-3.5 text-accent" />
-            Tipp: Du kannst später Daten aus Portfolio-Tracker importieren.
+            {t("pages:ui.tipp_du_kannst_spaeter_daten_aus_portfolio_t")}
           </p>
         </>
       ),
@@ -1341,7 +1341,7 @@ function Step6({ data, update }: { data: WizardData; update: (p: Partial<WizardD
                 onClick={addMortgageEntry}
                 className="text-xs rounded border border-accent/30 text-accent px-2 py-1 hover:bg-accent/10 transition-colors"
               >
-                + Hypothek hinzufügen
+                {t("pages:ui.hypothek_hinzufuegen")}
               </button>
             </div>
           </div>
@@ -1377,7 +1377,7 @@ function Step6({ data, update }: { data: WizardData; update: (p: Partial<WizardD
       <div>
         <h2 className="text-text-primary font-semibold text-lg">{t("pages:wizard.w03")}</h2>
         <p className="text-text-secondary text-sm mt-1">
-          Erfasse dein aktuelles Vermögen für die Finanzplan-Berechnung.
+          {t("pages:ui.erfasse_dein_aktuelles_vermoegen_fuer_die_fi")}
         </p>
       </div>
 
@@ -1443,7 +1443,7 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
       <div>
         <h2 className="text-text-primary font-semibold text-lg">{t("pages:wizard.w05")}</h2>
         <p className="text-text-secondary text-sm mt-1">
-          Erfasse deine Vorsorgesituation für eine vollständige Rentenprojektion.
+          {t("pages:ui.erfasse_deine_vorsorgesituation_fuer_eine_vo")}
         </p>
       </div>
 
@@ -1553,7 +1553,7 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
                     className="text-loss text-xs hover:text-loss/80"
                     onClick={() => removeAccount(idx)}
                   >
-                    Entfernen
+                    {t("pages:ui.entfernen")}
                   </button>
                 )}
               </div>
@@ -1674,7 +1674,7 @@ function Step8({ data, update }: { data: WizardData; update: (p: Partial<WizardD
       <div>
         <h2 className="text-text-primary font-semibold text-lg">{t("pages:wizard.w121")}</h2>
         <p className="text-text-secondary text-sm mt-1">
-          Definiere deine Ziele für die Finanzplanung und Rentenprojektion.
+          {t("pages:ui.definiere_deine_ziele_fuer_die_finanzplanung")}
         </p>
       </div>
 
@@ -1810,11 +1810,10 @@ function ReviewScreen({ data }: { data: WizardData }) {
           <Check className="w-7 h-7 text-gain" />
         </div>
         <h2 className="text-text-primary font-semibold text-xl">
-          {data.vorname ? `Fast fertig, ${data.vorname}!` : "Zusammenfassung"}
+          {data.vorname ? t("pages:wizard.almostDone", { name: data.vorname }) : t("pages:wizard.summary")}
         </h2>
         <p className="text-text-secondary text-sm max-w-sm mx-auto">
-          {t("pages:wizard.w309")}
-          bleibt bei jedem Schritt gespeichert.
+          {t("pages:wizard.reviewIntro")}
         </p>
       </div>
 
@@ -1829,7 +1828,7 @@ function ReviewScreen({ data }: { data: WizardData }) {
         <SummaryCard label={t("pages:wizard.w48")} value={chf(totalAssets)} sub={t("pages:wizard.w118")} />
         <SummaryCard label={t("pages:wizard.w100")} value={chf(pillar3aTotal)} sub={t("pages:wizard.w49")} />
         <SummaryCard
-          label="Rente bei {age}"
+          label={t("pages:wizard.pensionAtAge", { age: data.zielRentenalter })}
           value={chf(ahvRente + bvgRente)}
           sub={`AHV ${chf(ahvRente)} + BVG ${chf(bvgRente)}`}
         />
@@ -1839,16 +1838,16 @@ function ReviewScreen({ data }: { data: WizardData }) {
         <h4 className="text-text-primary font-medium text-sm mb-3">{t("pages:wizard.w105")}</h4>
         <div className="flex flex-wrap gap-2">
           {data.scenarioMortgage && (
-            <span className="badge bg-accent/15 text-accent flex items-center gap-1"><GraphDown className="w-3 h-3" /> Hypothek amortisieren</span>
+            <span className="badge bg-accent/15 text-accent flex items-center gap-1"><GraphDown className="w-3 h-3" /> {t("pages:ui.hypothek_amortisieren")}</span>
           )}
           {data.scenarioSavings && (
-            <span className="badge bg-accent/15 text-accent flex items-center gap-1"><PiggyBank className="w-3 h-3" /> Sparplan erhöhen</span>
+            <span className="badge bg-accent/15 text-accent flex items-center gap-1"><PiggyBank className="w-3 h-3" /> {t("pages:ui.sparplan_erhoehen")}</span>
           )}
           {data.scenarioEarlyRetirement && (
-            <span className="badge bg-accent/15 text-accent flex items-center gap-1"><Airplane className="w-3 h-3" /> Frühpensionierung</span>
+            <span className="badge bg-accent/15 text-accent flex items-center gap-1"><Airplane className="w-3 h-3" /> {t("pages:ui.fruehpensionierung")}</span>
           )}
           {data.scenarioCare && (
-            <span className="badge bg-accent/15 text-accent flex items-center gap-1"><Heart className="w-3 h-3" /> Pflegekosten</span>
+            <span className="badge bg-accent/15 text-accent flex items-center gap-1"><Heart className="w-3 h-3" /> {t("pages:ui.pflegekosten")}</span>
           )}
           {!data.scenarioMortgage && !data.scenarioSavings && !data.scenarioEarlyRetirement && !data.scenarioCare && (
             <span className="text-text-tertiary text-xs">{t("pages:wizard.w15")}</span>
@@ -2102,7 +2101,7 @@ export default function Wizard() {
 
           {isReview ? (
             <p className="text-text-tertiary text-xs text-center md:text-left">
-              Zusammenfassung — alle Schritte ausgefüllt
+              {t("pages:ui.zusammenfassung_alle_schritte_ausgefuellt")}
             </p>
           ) : (
             <StepIndicator currentStep={currentStep} totalSteps={TOTAL_STEPS} onStepClick={goToStep} />
@@ -2175,7 +2174,7 @@ export default function Wizard() {
               onClick={goNext}
               disabled={animating}
             >
-              Überspringen
+              {t("pages:ui.ueberspringen")}
             </button>
           )}
 

@@ -136,7 +136,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
 
           <div>
             <label className="text-text-tertiary text-xs mb-1 block">
-              Jahreseinkommen (CHF)
+              {t("pages:ui.jahreseinkommen_chf")}
             </label>
             <input
               type="number"
@@ -178,7 +178,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
           valueColor="#10b981"
         />
         <KPICard
-          label="Rente/Monat"
+          label={t("pages:ui.rente_monat")}
           value={formatCHF(totalPensionMonthly)}
           sub="AHV + BVG + 3a + 3b"
           icon={<Coins className="w-4 h-4" style={{ color: PILLAR_COLORS.bvg }} />}
@@ -209,7 +209,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
         <div className="card">
           <h3 className="text-text-primary font-semibold text-sm mb-4 flex items-center gap-2">
             <ArrowRight className="w-4 h-4 text-accent" />
-            Monatliche Rente nach Säule (CHF, real)
+            {t("pages:ui.monatliche_rente_nach_saeule_chf_real")}
           </h3>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={pensionBarData} margin={{ top: 8, right: 16, bottom: 0, left: 16 }}>
@@ -234,7 +234,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
             </BarChart>
           </ResponsiveContainer>
           <p className="text-text-tertiary text-[11px] mt-2">
-            Rote Linie = geschätzte monatliche Ausgaben im Ruhestand (80 % des aktuellen Niveaus)
+            {t("pages:ui.rote_linie_geschaetzte_monatliche_ausgaben_i")}
           </p>
         </div>
       )}
@@ -242,7 +242,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
       {/* Wealth Monte Carlo */}
       <div className="card">
         <h3 className="text-text-primary font-semibold text-sm mb-4">
-          Vermögensentwicklung (Monte Carlo — p10 / p50 / p90)
+          {t("pages:ui.vermoegensentwicklung_monte_carlo_p10_p50_p9")}
         </h3>
         {isLoading ? (
           <div className="h-56 flex items-center justify-center text-text-tertiary text-sm animate-pulse">

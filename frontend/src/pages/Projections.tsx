@@ -25,11 +25,11 @@ function currentAgeFromProfileBirth(iso: string | undefined): number {
 type HorizonKey = "1yr" | "5yr" | "10yr" | "retirement" | "age90";
 
 const HORIZONS: Array<{ key: HorizonKey; label: string; years: number }> = [
-  { key: "1yr", label: "1 Jahr", years: 1 },
-  { key: "5yr", label: "5 Jahre", years: 5 },
-  { key: "10yr", label: "10 Jahre", years: 10 },
-  { key: "retirement", label: "Bis Rente", years: 25 },
-  { key: "age90", label: "Bis 90", years: 50 },
+  { key: "1yr", label: "pages:ui.1_jahr", years: 1 },
+  { key: "5yr", label: "pages:ui.5_jahre", years: 5 },
+  { key: "10yr", label: "pages:ui.10_jahre", years: 10 },
+  { key: "retirement", label: "pages:ui.bis_rente", years: 25 },
+  { key: "age90", label: "pages:ui.bis_90", years: 50 },
 ];
 
 // Consistent pillar palette (matches Finanzplan / RetirementPlanner)
@@ -108,7 +108,7 @@ export default function Projections() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-display text-text-primary">Finanzprognosen</h1>
-          <p className="text-text-tertiary text-sm mt-0.5">Monte Carlo Simulation · Schweizer Rente (AHV/BVG/3a)</p>
+          <p className="text-text-tertiary text-sm mt-0.5">{t("pages:ui.monte_carlo_simulation_schweizer_rente_ahv_b")}</p>
         </div>
         <button onClick={() => refetch()} className="btn-secondary flex items-center gap-2" disabled={isLoading}>
           <Refresh className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
@@ -124,7 +124,7 @@ export default function Projections() {
             onClick={() => setHorizon(h.key)}
             className={clsx("toggle-btn", horizon === h.key && "active")}
           >
-            {h.label}
+            {t(h.label)}
           </button>
         ))}
       </div>
@@ -152,7 +152,7 @@ export default function Projections() {
             />
           </div>
           <div>
-            <label className="label">Jahreseinkommen</label>
+            <label className="label">{t("pages:ui.jahreseinkommen")}</label>
             <input
               type="number"
               className="input"
@@ -208,7 +208,7 @@ export default function Projections() {
           <div>
             <h2 className="text-text-primary font-semibold text-sm">{t("pages:misc.r34")}</h2>
             <p className="text-text-tertiary text-xs mt-0.5">
-              AHV (Säule 1) · BVG/Pensionskasse (Säule 2) · Säule 3a · 3b/LV — reale CHF (inflationsbereinigt)
+              {t("pages:ui.ahv_saeule_1_bvg_pensionskasse_saeule_2_saeu")}
             </p>
             <p className="text-text-tertiary text-[11px] mt-1 max-w-3xl leading-relaxed">
               Vor dem Rentenalter ({params.retirement_age}): AHV = 0; BVG, 3a und 3b zeigen das projizierte{" "}
@@ -283,17 +283,17 @@ export default function Projections() {
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
-                { label: "AHV (Säule 1)", annual: ahvAtRet, color: PILLAR_COLORS.ahv },
-                { label: "BVG (Säule 2)", annual: bvgAtRet, color: PILLAR_COLORS.bvg },
-                { label: "Säule 3a", annual: p3aAtRet, color: PILLAR_COLORS["3a"] },
-                { label: "Säule 3b / LV", annual: p3bAtRet, color: PILLAR_COLORS["3b"] },
+                { label: t("pages:ui.ahv_saeule_1"), annual: ahvAtRet, color: PILLAR_COLORS.ahv },
+                { label: t("pages:ui.bvg_saeule_2"), annual: bvgAtRet, color: PILLAR_COLORS.bvg },
+                { label: t("pages:ui.saeule_3a"), annual: p3aAtRet, color: PILLAR_COLORS["3a"] },
+                { label: t("pages:ui.saeule_3b_lv"), annual: p3bAtRet, color: PILLAR_COLORS["3b"] },
               ].map(({ label, annual, color }) => (
                 <div key={label} className="bg-bg-elevated rounded-lg px-4 py-3 border border-border/30">
                   <p className="text-text-tertiary text-[11px] mb-1">{label}</p>
                   <p className="font-mono font-bold text-lg" style={{ color }}>
                     {formatCHF(annual / 12)}
                   </p>
-                  <p className="text-text-tertiary text-[10px] mt-0.5">/ Monat (real CHF)</p>
+                  <p className="text-text-tertiary text-[10px] mt-0.5">{t("pages:ui.monat_real_chf")}</p>
                   <p className="text-text-tertiary text-[10px]">{formatCHF(annual)} / Jahr</p>
                 </div>
               ))}
@@ -321,9 +321,9 @@ export default function Projections() {
         {/* Reference values */}
         <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-border/50">
           {[
-            { label: "AHV (Säule 1)", value: "bis CHF 2'520/Mo", desc: "Max. 2024 bei 44 Vollbeitragsjahren", color: PILLAR_COLORS.ahv },
-            { label: "BVG (Säule 2)", value: "Kapital × 6.8% ÷ 12", desc: "Umwandlungssatz 2024 im Modell", color: PILLAR_COLORS.bvg },
-            { label: "Säule 3a", value: `max. CHF 7'056/Jahr`, desc: "Beitragsgrenze (Lohnabhängige, 2024)", color: PILLAR_COLORS["3a"] },
+            { label: t("pages:ui.ahv_saeule_1"), value: "bis CHF 2'520/Mo", desc: t("pages:ui.max_2024_bei_44_vollbeitragsjahren"), color: PILLAR_COLORS.ahv },
+            { label: t("pages:ui.bvg_saeule_2"), value: "Kapital × 6.8% ÷ 12", desc: t("pages:ui.umwandlungssatz_2024_im_modell"), color: PILLAR_COLORS.bvg },
+            { label: t("pages:ui.saeule_3a"), value: `max. CHF 7'056/Jahr`, desc: t("pages:ui.beitragsgrenze_lohnabhaengige_2024"), color: PILLAR_COLORS["3a"] },
           ].map(({ label, value, desc, color }) => (
             <div key={label} className="card-elevated">
               <p className="text-text-tertiary text-xs">{label}</p>

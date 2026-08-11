@@ -41,7 +41,7 @@ export function DeletedTransactionsView({
         <div>
           <h2 className="text-text-primary font-semibold text-xl">{t("pages:misc.r14")}</h2>
           <p className="text-text-tertiary text-sm">
-            Weich gelöschte Buchungen wiederherstellen oder endgültig entfernen.
+            {t("pages:ui.weich_geloeschte_buchungen_wiederherstellen_")}
           </p>
         </div>
       </div>
@@ -115,7 +115,7 @@ export function DeletedTransactionsView({
                         className="inline-flex items-center gap-1.5 bg-red-600/90 hover:bg-red-600 disabled:opacity-50 text-white rounded-md px-3 py-1.5 font-medium text-xs transition-colors"
                       >
                         <Trash className="w-3.5 h-3.5" />
-                        Endgültig löschen
+                        {t("pages:ui.endgueltig_loeschen")}
                       </button>
                     </div>
                   </td>
@@ -128,7 +128,7 @@ export function DeletedTransactionsView({
 
       {transactions.length === 0 && (
         <p className="text-text-tertiary text-center py-12 text-sm">
-          Keine gelöschten Transaktionen vorhanden.
+          {t("pages:ui.keine_geloeschten_transaktionen_vorhanden")}
         </p>
       )}
     </div>

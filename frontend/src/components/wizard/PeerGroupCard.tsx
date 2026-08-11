@@ -140,7 +140,7 @@ function IncomeComparison({
         </span>
       </div>
       <div className="flex items-center gap-3">
-        <span className="text-text-tertiary text-xs w-24 shrink-0">Peer-Median</span>
+        <span className="text-text-tertiary text-xs w-24 shrink-0">{t("pages:ui.peer_median")}</span>
         <div className="flex-1 h-2.5 bg-white/8 rounded-full overflow-hidden">
           <div
             className="h-full bg-white/30 rounded-full transition-all duration-700 ease-out"
@@ -272,7 +272,7 @@ export default function PeerGroupCard({
       <div className="card">
         <h4 className="text-text-primary text-sm font-medium mb-1">Vorgeschlagene Budgetwerte</h4>
         <p className="text-text-tertiary text-xs mb-4">
-          Basierend auf BFS-Daten für dein Profil. Klicke auf einen Wert, um ihn anzupassen.
+          {t("pages:ui.basierend_auf_bfs_daten_fuer_dein_profil_kli")}
         </p>
 
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
@@ -338,7 +338,7 @@ export default function PeerGroupCard({
         className="btn-primary w-full py-3 text-base font-semibold"
         onClick={onAccept}
       >
-        Diese Defaults übernehmen
+        {t("pages:ui.diese_defaults_uebernehmen")}
       </button>
 
       <style>{`

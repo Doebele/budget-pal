@@ -239,7 +239,7 @@ export default function Accounts() {
           }}
           className="btn-primary flex items-center gap-2"
         >
-          <Plus className="w-4 h-4" /> Konto hinzufügen
+          <Plus className="w-4 h-4" /> {t("pages:ui.konto_hinzufuegen")}
         </button>
       </div>
 
@@ -284,7 +284,7 @@ export default function Accounts() {
             </div>
             {/* Position 3: Kontoname */}
             <div>
-              <label className="label">Kontoname *</label>
+              <label className="label">{t("pages:ui.kontoname")}</label>
               <input
                 type="text"
                 className="input"
@@ -432,7 +432,7 @@ export default function Accounts() {
             </div>
             {/* Position 5: Kontotyp */}
             <div>
-              <label className="label">Kontotyp *</label>
+              <label className="label">{t("pages:ui.kontotyp")}</label>
               <select
                 className="input"
                 value={form.account_type}
@@ -462,7 +462,7 @@ export default function Accounts() {
                 : "Erstellen"}
             </button>
             <button onClick={resetForm} className="btn-secondary">
-              Abbrechen
+              {t("pages:ui.abbrechen")}
             </button>
             {editingAccountId && (
               <button
@@ -498,21 +498,21 @@ export default function Accounts() {
                 <Trash className="w-5 h-5 text-red-500" />
               </div>
               <h3 className="text-lg font-semibold text-text-primary">
-                Konto löschen?
+                {t("pages:ui.konto_loeschen")}
               </h3>
             </div>
             <p className="text-text-secondary mb-2">
-              Möchtest du das Konto <strong className="text-text-primary">"{accountToDelete.name}"</strong> wirklich löschen?
+              {t("pages:ui.moechtest_du_das_konto")} <strong className="text-text-primary">"{accountToDelete.name}"</strong> {t("pages:ui.wirklich_loeschen")}
             </p>
             <p className="text-sm text-text-disabled">
-              Diese Aktion kann nicht rückgängig gemacht werden!
+              {t("pages:ui.diese_aktion_kann_nicht_rueckgaengig_gemacht")}
             </p>
             <div className="mt-6 flex justify-end gap-3">
               <button
                 onClick={() => setShowDeleteModal(false)}
                 className="btn-secondary"
               >
-                Abbrechen
+                {t("pages:ui.abbrechen")}
               </button>
               <button
                 onClick={confirmDelete}

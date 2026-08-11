@@ -24,6 +24,7 @@ import { resolveSuperCategoryFromList, useTaxonomySuperCategories } from "@/lib/
 import { formatCHF, themePalettes, type ThemePalette } from "@/lib/theme";
 import { useThemeColors } from "@/hooks/useThemeColors";
 import { useTranslation } from "react-i18next";
+import i18n from "@/i18n";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -100,11 +101,13 @@ export const CHART_SC_ORDER = [
 
 // ── Month helpers ─────────────────────────────────────────────────
 
-const MONTH_NAMES_SHORT = ["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
 
 function fmtMonth(m: string): string {
+  // Monatskuerzel aus Intl — folgt der UI-Sprache ohne eigene Uebersetzung.
   const [y, mo] = m.split("-");
-  return `${MONTH_NAMES_SHORT[parseInt(mo, 10) - 1]} ${y.slice(2)}`;
+  const name = new Intl.DateTimeFormat(i18n.language, { month: "short" })
+    .format(new Date(Number(y), parseInt(mo, 10) - 1, 1));
+  return `${name} ${y.slice(2)}`;
 }
 
 /** Returns "YYYY-MM" for the month that is `n` months before today */
@@ -767,13 +770,13 @@ export default function BudgetStackedBarChart({
   hiddenScIds,
   sortOrder = "default",
 }: Props) {
+  const { t } = useTranslation();
   const [mode, setMode] = useState<"historical" | "forecast" | "budgetplan">("historical");
   // In embedded mode always show historical data (no forecast toggle)
   const activeMode = embedded ? "historical" : mode;
   const hasBudgetPlan = (budgetPlanMonths?.length ?? 0) > 0 && budgetPlanByMonth != null;
   const superCategories = useTaxonomySuperCategories();
   const { colors: themeColors } = useThemeColors();
-  const { t } = useTranslation();
   const chartSc = useMemo(
     () =>
       CHART_SC_ORDER
@@ -1018,7 +1021,7 @@ export default function BudgetStackedBarChart({
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-text-primary font-semibold text-sm">
-            Ausgaben nach Kategorie
+            {t("pages:ui.ausgaben_nach_kategorie")}
           </h2>
           <p className="text-text-tertiary text-[11px] mt-0.5">{sourceLabel}</p>
         </div>

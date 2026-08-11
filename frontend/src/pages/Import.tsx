@@ -649,7 +649,7 @@ export default function Import() {
                     Duplikate: <span className="txt-warning font-semibold">{pdfPreview.rows.filter((r) => r.duplicate_kind !== "none").length}</span>
                   </div>
                   <div className="rounded-lg bg-bg-surface2 px-3 py-2 text-text-secondary">
-                    Fehler: <span className={pdfPreview.error_rows > 0 ? "txt-error font-semibold" : "text-text-tertiary"}>{pdfPreview.error_rows}</span>
+                    {t("pages:ui.fehler_2")} <span className={pdfPreview.error_rows > 0 ? "txt-error font-semibold" : "text-text-tertiary"}>{pdfPreview.error_rows}</span>
                   </div>
                 </div>
                 {pdfPreview.total_rows === 0 && (
@@ -710,7 +710,7 @@ export default function Import() {
                 )}
                 {hasDuplicates && (
                   <p className="text-text-disabled text-[11px] mt-2">
-                    Konto-Duplikate: überschreiben, behalten oder löschen. PDF-Duplikate: importieren oder überspringen.
+                    {t("pages:ui.konto_duplikate_ueberschreiben_behalten_oder")}
                   </p>
                 )}
               </div>
@@ -755,7 +755,7 @@ export default function Import() {
                             <div className="flex flex-col gap-0.5">
                               {row.duplicate_kind === "database" && (
                                 <span className="inline-flex rounded px-1.5 py-0.5 msg-warning text-[10px] font-medium leading-tight">
-                                  Konto
+                                  {t("pages:ui.konto")}
                                 </span>
                               )}
                               {row.duplicate_kind === "pdf" && (
@@ -1074,7 +1074,7 @@ export default function Import() {
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     <div>
                       <label className="label text-xs flex items-center gap-1">
-                        <span className="text-red-400">*</span> Datum
+                        <span className="text-red-400">*</span> {t("pages:ui.datum")}
                       </label>
                       <select
                         className="input text-xs"
@@ -1181,7 +1181,7 @@ export default function Import() {
                     <span className="text-accent">💡</span>
                     <span>
                       <strong className="text-text-secondary">{t("pages:import.i39")}</strong> Wähle "Belastung" und "Gutschrift" für separate Spalten,
-                      oder "Betrag" für eine kombinierte Spalte mit +/- Vorzeichen. Felder mit <span className="text-red-400">*</span> sind erforderlich.
+                      oder "Betrag" für eine kombinierte Spalte mit +/- Vorzeichen. Felder mit <span className="text-red-400">*</span> {t("pages:ui.sind_erforderlich")}
                     </span>
                   </p>
                 </div>
@@ -1228,7 +1228,7 @@ export default function Import() {
                       ) : (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border msg-error text-xs" title={row.errors.join(", ")}>
                           <WarningTriangle className="w-3 h-3" />
-                          Fehler
+                          {t("pages:ui.fehler")}
                         </span>
                       )}
                     </td>
@@ -1262,7 +1262,7 @@ export default function Import() {
               }}
               className="px-4 py-2 rounded-lg bg-bg-elevated text-text-secondary hover:bg-bg-elevated transition-colors text-sm"
             >
-              Abbrechen
+              {t("pages:ui.abbrechen")}
             </button>
             <button
               onClick={handleCsvImport}
@@ -1325,7 +1325,7 @@ export default function Import() {
               title={t("pages:import.i28")}
             >
               <Trash className="w-3.5 h-3.5" />
-              Letzten Import rückgängig machen
+              {t("pages:ui.letzten_import_rueckgaengig_machen")}
             </button>
           )}
         </div>
@@ -1345,7 +1345,7 @@ export default function Import() {
               <div className="flex-1 min-w-0">
                 <p className="text-text-primary text-xs font-medium truncate">{log.filename}</p>
                 <p className="text-text-tertiary text-xs">
-                  {log.bank?.toUpperCase()} · {log.rows_imported} Einträge · {format(new Date(log.created_at), "dd.MM.yyyy HH:mm")}
+                  {log.bank?.toUpperCase()} · {t("pages:ui.entriesCount", { count: log.rows_imported })} · {format(new Date(log.created_at), "dd.MM.yyyy HH:mm")}
                 </p>
               </div>
               {/* Jeder Eintrag einzeln entfernbar — nicht nur der letzte. Bei
@@ -1393,7 +1393,7 @@ export default function Import() {
               </h3>
             </div>
             <p className="text-text-secondary mb-2">
-              Der Import <strong className="text-text-primary">"{selectedImport.filename}"</strong> wird entfernt.
+              Der Import <strong className="text-text-primary">"{selectedImport.filename}"</strong> {t("pages:ui.wird_entfernt")}
             </p>
             {selectedImport.rows_imported > 0 ? (
               <>
@@ -1404,7 +1404,7 @@ export default function Import() {
                   aus diesem Import werden gelöscht.
                 </p>
                 <p className="text-sm text-text-disabled">
-                  Diese Aktion kann nicht rückgängig gemacht werden!
+                  {t("pages:ui.diese_aktion_kann_nicht_rueckgaengig_gemacht")}
                 </p>
               </>
             ) : (
@@ -1422,7 +1422,7 @@ export default function Import() {
                 }}
                 className="btn-secondary"
               >
-                Abbrechen
+                {t("pages:ui.abbrechen")}
               </button>
               <button
                 onClick={() => importToDelete && deleteMutation.mutate(importToDelete)}

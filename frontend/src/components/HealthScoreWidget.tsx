@@ -13,6 +13,7 @@ import { healthApi } from "@/lib/api";
 import { clsx } from "clsx";
 import { Activity, GraphUp, NavArrowDown, NavArrowUp, Xmark } from "@/lib/icons";
 import PortalTooltip from "@/components/ui/PortalTooltip";
+import { useTranslation } from "react-i18next";
 
 // ── Colour helpers ────────────────────────────────────────────
 
@@ -128,17 +129,13 @@ function Ring({
 
 // ── Component tooltips ────────────────────────────────────────
 
+// Schluessel des Backends -> Tooltip-Text (i18n)
 const COMPONENT_TOOLTIPS: Record<string, string> = {
-  "Sparquote":
-    "Anteil des Einkommens, der gespart wird. Ziel: ≥ 20%. Score 100 = 25%+ gespart. Berechnung: (Einnahmen − Ausgaben) / Einnahmen × 100.",
-  "Budgettreue":
-    "Wie gut du dein geplantes Budget einhältst. Score 100 = innerhalb des Plans. Über 120% des Budgets → Score 0.",
-  "Cashflow":
-    "Deckungsgrad der Ausgaben durch Einnahmen. Score 100 = Einnahmen ≥ Ausgaben. Je grösser das Defizit, desto tiefer der Score.",
-  "Altersvorsorge":
-    "Erkennt Säule-3a-Beiträge oder BVG-Zahlungen. Score 100 = Vorsorgebeiträge vorhanden, Score 30 = keine erkannt.",
-  "Ausgabendiversität":
-    "Wie breit deine Ausgaben über Kategorien verteilt sind (Herfindahl-Index). Breite Streuung = gesundes Konsummuster.",
+  savingsRate: "pages:health.tipSavingsRate",
+  budgetAdherence: "pages:health.tipBudgetAdherence",
+  cashflow: "pages:health.tipCashflow",
+  retirementProvision: "pages:health.tipRetirementProvision",
+  expenseDiversity: "pages:health.tipExpenseDiversity",
 };
 
 // ── Mode definitions ──────────────────────────────────────────
@@ -148,24 +145,25 @@ type ScoreMode = "historical" | "empirical" | "plan";
 const MODES: { id: ScoreMode; label: string; tooltip: string }[] = [
   {
     id: "historical",
-    label: "Historisch",
-    tooltip: "Berechnung basiert auf deinen realen Banktransaktionen.",
+    label: "pages:health.modeHistorical",
+    tooltip: "pages:health.tipModeHistorical",
   },
   {
     id: "empirical",
-    label: "Empirisch",
-    tooltip: "Berechnung basiert auf deinen Angaben aus dem Finanz-Wizard.",
+    label: "pages:health.modeEmpirical",
+    tooltip: "pages:health.tipModeEmpirical",
   },
   {
     id: "plan",
-    label: "Plan",
-    tooltip: "Berechnung basiert auf deinem Budgetplan (Wiederkehrende Einträge).",
+    label: "pages:health.modePlan",
+    tooltip: "pages:health.tipModePlan",
   },
 ];
 
 // ── Main export ───────────────────────────────────────────────
 
 export default function HealthScoreWidget() {
+  const { t } = useTranslation();
   const [showLevers, setShowLevers] = useState(false);
   const [mode, setMode] = useState<ScoreMode>("historical");
 
@@ -211,19 +209,19 @@ export default function HealthScoreWidget() {
       <div className="flex items-center gap-3 flex-wrap">
         <div className="flex items-center gap-2 text-text-tertiary text-xs uppercase tracking-widest flex-1">
           <Activity className="w-3.5 h-3.5" />
-          Budget-Gesundheit
+          {t("pages:ui.budget_gesundheit")}
         </div>
 
         {/* Mode toggle pills */}
         <div className="toggle-group">
           {MODES.map((m) => (
-            <Tooltip key={m.id} text={m.tooltip}>
+            <Tooltip key={m.id} text={t(m.tooltip)}>
               <button
                 type="button"
                 onClick={() => setMode(m.id)}
                 className={clsx("toggle-btn", mode === m.id && "active")}
               >
-                {m.label}
+                {t(m.label)}
               </button>
             </Tooltip>
           ))}
@@ -244,7 +242,7 @@ export default function HealthScoreWidget() {
             sublabel={String(Math.round(score))}
             labelClass={clsx("text-2xl", GRADE_COLOR[grade] ?? "text-text-primary")}
           />
-          <span className="text-[10px] text-text-tertiary">Gesamt</span>
+          <span className="text-[10px] text-text-tertiary">{t("pages:health.total")}</span>
         </div>
 
         {/* Divider */}
@@ -253,9 +251,14 @@ export default function HealthScoreWidget() {
         {/* 5 component rings */}
         <div className="flex items-end gap-3 flex-1 justify-around">
           {components.map((c) => {
-            const tooltipText = COMPONENT_TOOLTIPS[c.name]
-              ? `${COMPONENT_TOOLTIPS[c.name]}\n\nAktuell: ${c.detail}`
+            const cName = c.name_key ? t(`pages:health.${c.name_key}`) : c.name;
+            const cDetail = c.detail_key
+              ? t(`pages:health.${c.detail_key}`, c.detail_params ?? {})
               : c.detail;
+            const tip = COMPONENT_TOOLTIPS[c.name_key ?? ""];
+            const tooltipText = tip
+              ? `${t(tip)}\n\n${t("pages:health.currently")}: ${cDetail}`
+              : cDetail;
             return (
               <Tooltip key={c.name} text={tooltipText}>
                 <div className="flex flex-col items-center gap-1.5 min-w-0 cursor-default">
@@ -270,10 +273,10 @@ export default function HealthScoreWidget() {
                   <span
                     className="text-xs text-text-tertiary text-center leading-tight max-w-[72px]"
                   >
-                    {c.name}
+                    {cName}
                   </span>
-                  <span className="text-[10px] text-text-disabled text-center leading-tight max-w-[72px] truncate" title={c.detail}>
-                    {c.detail}
+                  <span className="text-[10px] text-text-disabled text-center leading-tight max-w-[72px] truncate" title={cDetail}>
+                    {cDetail}
                   </span>
                 </div>
               </Tooltip>
@@ -291,7 +294,7 @@ export default function HealthScoreWidget() {
             className="flex items-center gap-1.5 text-[11px] text-text-tertiary hover:text-text-secondary transition-colors w-full"
           >
             <GraphUp className="w-3 h-3 text-accent" />
-            <span className="flex-1 text-left">Verbesserungspotenzial</span>
+            <span className="flex-1 text-left">{t("pages:ui.verbesserungspotenzial")}</span>
             {showLevers ? <NavArrowUp className="w-3 h-3" /> : <NavArrowDown className="w-3 h-3" />}
           </button>
 
@@ -299,8 +302,8 @@ export default function HealthScoreWidget() {
             <div className="mt-2 space-y-1.5 animate-fade-in">
               {top_levers.map((lever, i) => (
                 <div key={i} className="bg-accent/5 border border-accent/15 rounded-lg px-2.5 py-1.5">
-                  <p className="text-[11px] font-medium text-text-secondary">{lever.title}</p>
-                  <p className="text-[10px] text-text-tertiary mt-0.5">{lever.body}</p>
+                  <p className="text-[11px] font-medium text-text-secondary">{lever.title_key ? t(`pages:health.${lever.title_key}`) : lever.title}</p>
+                  <p className="text-[10px] text-text-tertiary mt-0.5">{lever.body_key ? t(`pages:health.${lever.body_key}`, lever.body_params ?? {}) : lever.body}</p>
                 </div>
               ))}
             </div>
