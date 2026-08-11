@@ -9,7 +9,11 @@ Tests for:
 
 import numpy as np
 import pytest
-from app.services.projection import BVG_CONTRIBUTION_RATES, ProjectionService
+from app.services.projection import (
+    BVG_CONTRIBUTION_RATES,
+    ProjectionService,
+    build_annual_flows,
+)
 
 # ── Monte Carlo Tests ─────────────────────────────────────────
 
@@ -823,3 +827,167 @@ class TestProjectionIntegration:
         # All results should be positive (no crashes)
         for result in results:
             assert all(v > 0.0 for v in result)
+
+
+# ── Szenario-Cashflows ────────────────────────────────────────
+
+
+class TestBuildAnnualFlows:
+    """`build_annual_flows` ist eine reine Funktion — kein DB-Zugriff, keine
+    Fixtures. Sie uebersetzt die Wizard-Szenarien in nominale Jahres-Deltas."""
+
+    def test_no_scenarios_means_no_flows(self):
+        flows = build_annual_flows([], years=10, current_age=40, retirement_age=65)
+        assert flows == [0.0] * 10
+
+    def test_early_retirement_only_affects_the_gap_years(self):
+        """Modelliert wird die DIFFERENZ zwischen vorgezogenem und geplantem
+        Ruhestand. Davor arbeitet man in beiden Welten, danach ist man in
+        beiden pensioniert — nur dazwischen unterscheiden sie sich."""
+        flows = build_annual_flows(
+            ["early_retirement"], years=30, current_age=40, retirement_age=62,
+            planned_retirement_age=65,
+            annual_savings=20_000, annual_expenses=60_000, inflation_rate=0.0,
+        )
+        assert all(f == 0.0 for f in flows[:22])   # bis Alter 61: identisch
+        assert all(f < 0 for f in flows[22:25])    # Alter 62-64: das Fenster
+        assert all(f == 0.0 for f in flows[25:])   # ab 65: wieder identisch
+
+    def test_early_retirement_cancels_the_savings_rate(self):
+        """Der Abzug muss exakt dem entsprechen, was die Jahresschleife in
+        run() addiert — sonst spart der Nutzer im Ruhestand weiter."""
+        infl = 0.02
+        flows = build_annual_flows(
+            ["early_retirement"], years=5, current_age=60, retirement_age=62,
+            planned_retirement_age=65,
+            annual_savings=10_000, annual_expenses=0.0, lifestyle_factor=0.0,
+            inflation_rate=infl,
+        )
+        assert flows[0] == flows[1] == 0.0
+        for yr in (2, 3, 4):
+            assert flows[yr] == pytest.approx(-10_000 * (1 + infl) ** yr)
+
+    def test_early_retirement_adds_pension_income(self):
+        common = dict(
+            years=5, current_age=60, retirement_age=62, planned_retirement_age=65,
+            annual_savings=0.0, annual_expenses=50_000, lifestyle_factor=1.0,
+            inflation_rate=0.0,
+        )
+        base = build_annual_flows(["early_retirement"], **common)
+        with_pension = build_annual_flows(
+            ["early_retirement"],
+            pension_series=[0, 0, 30_000, 30_000, 30_000],
+            **common,
+        )
+        assert with_pension[2] == pytest.approx(base[2] + 30_000)
+
+    def test_care_costs_start_at_eighty(self):
+        flows = build_annual_flows(
+            ["care_costs_at_80"], years=10, current_age=75, retirement_age=65,
+            care_cost_annual=60_000, inflation_rate=0.0,
+        )
+        assert all(f == 0.0 for f in flows[:5])       # Alter 75-79
+        assert all(f == pytest.approx(-60_000) for f in flows[5:])  # ab 80
+
+    def test_care_costs_grow_with_inflation(self):
+        infl = 0.02
+        flows = build_annual_flows(
+            ["care_costs_at_80"], years=3, current_age=80, retirement_age=65,
+            care_cost_annual=50_000, inflation_rate=infl,
+        )
+        assert flows[2] == pytest.approx(-50_000 * (1 + infl) ** 2)
+
+    def test_mortgage_amortisation_repays_the_whole_debt(self):
+        """Die Summe der Tilgungsanteile muss die Schuld genau treffen."""
+        flows = build_annual_flows(
+            ["mortgage_amortization"], years=15, current_age=40, retirement_age=65,
+            mortgage_debt=300_000, mortgage_rate_pct=0.0, amortization_years=15,
+        )
+        assert sum(flows) == pytest.approx(-300_000)
+
+    def test_mortgage_saves_interest_after_payoff(self):
+        flows = build_annual_flows(
+            ["mortgage_amortization"], years=20, current_age=40, retirement_age=65,
+            mortgage_debt=300_000, mortgage_rate_pct=2.0, amortization_years=10,
+        )
+        # Nach der Tilgung faellt der volle Zins weg: 300'000 x 2 %
+        assert flows[15] == pytest.approx(6_000)
+
+    def test_scenarios_add_up(self):
+        """`active_scenarios` ist eine Liste — mehrere wirken gemeinsam."""
+        care = build_annual_flows(
+            ["care_costs_at_80"], years=5, current_age=80, retirement_age=65,
+            care_cost_annual=40_000, inflation_rate=0.0,
+        )
+        mortgage = build_annual_flows(
+            ["mortgage_amortization"], years=5, current_age=80, retirement_age=65,
+            mortgage_debt=100_000, mortgage_rate_pct=0.0, amortization_years=5,
+        )
+        both = build_annual_flows(
+            ["care_costs_at_80", "mortgage_amortization"], years=5,
+            current_age=80, retirement_age=65, care_cost_annual=40_000,
+            mortgage_debt=100_000, mortgage_rate_pct=0.0, amortization_years=5,
+            inflation_rate=0.0,
+        )
+        for yr in range(5):
+            assert both[yr] == pytest.approx(care[yr] + mortgage[yr])
+
+
+class TestRunWithAnnualFlows:
+    def test_default_path_is_unchanged(self):
+        """Ohne annual_flows darf sich nichts aendern — die bestehenden Tests
+        dieser Datei sind die eigentliche Regression, hier nur die Signatur."""
+        service = ProjectionService()
+        result = service.run(
+            current_net_worth=100_000, annual_savings=10_000, annual_income=80_000,
+            years=10, runs=200, annual_flows=None,
+        )
+        assert len(result["p50"]) == 11
+
+    def test_negative_flows_lower_the_median(self):
+        service = ProjectionService()
+        common = dict(
+            current_net_worth=500_000, annual_savings=0.0, annual_income=80_000,
+            years=10, runs=400, volatility=0.0,
+        )
+        base = service.run(**common)
+        drained = service.run(**common, annual_flows=[-20_000] * 10)
+        assert drained["p50"][-1] < base["p50"][-1]
+
+    def test_portfolio_never_goes_negative_with_flows(self):
+        """Ohne Deckel wuerde ein negatives Portfolio mit der Rendite
+        weiterwachsen — betragsmaessig immer groesser statt kleiner."""
+        service = ProjectionService()
+        result = service.run(
+            current_net_worth=10_000, annual_savings=0.0, annual_income=0.0,
+            years=10, runs=200, volatility=0.0,
+            annual_flows=[-50_000] * 10,
+        )
+        assert min(result["p10"]) >= 0.0
+        assert min(result["p50"]) >= 0.0
+
+
+class TestAhvEarlyWithdrawal:
+    """Vorbezug kuerzt die AHV lebenslang um 6.8 % je Jahr. Ohne diesen Abzug
+    sieht das Szenario "Fruehpensionierung" wie ein Gratisgewinn aus."""
+
+    def _ahv_at(self, retirement_age: int) -> float:
+        service = ProjectionService()
+        return service._project_ahv(
+            age_at_year=retirement_age,
+            retirement_age=retirement_age,
+            record={"contribution_years": 40, "average_insured_salary": 85_000},
+            annual_income=85_000,
+            current_age=retirement_age,
+        )
+
+    def test_early_withdrawal_reduces_the_pension(self):
+        assert self._ahv_at(62) < self._ahv_at(65)
+
+    def test_reduction_is_68_percent_per_year(self):
+        full, early = self._ahv_at(65), self._ahv_at(62)
+        assert early == pytest.approx(full * (1 - 0.068 * 3), rel=1e-6)
+
+    def test_regular_age_is_unreduced(self):
+        service = ProjectionService()
+        assert self._ahv_at(65) > 0

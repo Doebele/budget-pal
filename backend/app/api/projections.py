@@ -19,7 +19,12 @@ from app.core.database import get_db
 from app.core.security import get_current_user
 from app.core.config import settings
 from app.models.models import Scenario, PensionData, User
-from app.services.projection import ProjectionService
+from app.services.projection import (
+    AMORTIZATION_YEARS_DEFAULT,
+    CARE_COST_ANNUAL_DEFAULT,
+    ProjectionService,
+    build_annual_flows,
+)
 
 router = APIRouter()
 projection_service = ProjectionService()
@@ -54,6 +59,9 @@ class ProjectionResult(BaseModel):
     pension_bvg: List[float]
     pension_3a: List[float]
     pension_3b: List[float] = []   # Säule 3b / Lebensversicherung (optional — zero for old cached results)
+    # run() liefert das seit jeher, das Schema hat es verschluckt — das
+    # Frontend (RetirementPlanner.tsx:75) las darum immer undefined.
+    retirement_idx: Optional[int] = None
     inflation_adjusted: bool
     computed_at: str
     runs: int
@@ -125,6 +133,23 @@ def _params_from_scenario(parameters_json: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
+def _flow_inputs(parameters_json: Dict[str, Any]) -> Dict[str, Any]:
+    """Rohwerte fuer `build_annual_flows` — getrennt von den run()-Argumenten,
+    weil sie nicht direkt an die Simulation gehen."""
+    p = parameters_json or {}
+    monthly_expenses = p.get("monthly_expenses_base", p.get("monthly_expenses")) or 0.0
+    return {
+        "active_scenarios": p.get("active_scenarios") or [],
+        "annual_expenses": float(monthly_expenses) * 12,
+        "lifestyle_factor": float(p.get("lifestyle_factor") or 0.8),
+        "care_cost_annual": float(p.get("care_cost_annual") or CARE_COST_ANNUAL_DEFAULT),
+        "mortgage_debt": float(p.get("mortgage_debt") or 0.0),
+        "mortgage_rate_pct": float(p.get("mortgage_rate_pct") or 0.0),
+        "amortization_years": int(p.get("amortization_years") or AMORTIZATION_YEARS_DEFAULT),
+        "early_retirement_years": int(p.get("early_retirement_years") or 3),
+    }
+
+
 # ── Routes ────────────────────────────────────────────────────
 
 @router.post("/run", response_model=ProjectionResult)
@@ -146,6 +171,7 @@ async def run_projection(
     # dafuer, dass nur ausdruecklich gesendete Felder das Szenario uebersteuern
     # — Pydantic-Defaults duerfen es nicht ueberschreiben.
     merged: Dict[str, Any] = {}
+    flow_inputs: Dict[str, Any] = {}
     if scenario_id:
         scenario_row = await db.execute(
             select(Scenario).where(
@@ -157,6 +183,7 @@ async def run_projection(
         if not scenario:
             raise HTTPException(status_code=404, detail="Scenario not found.")
         merged.update(_params_from_scenario(scenario.parameters_json))
+        flow_inputs = _flow_inputs(scenario.parameters_json)
     merged.update(params.model_dump(exclude_unset=True))
 
     # Pflichtwerte pruefen — die Validierung an der Vertrauensgrenze bleibt,
@@ -190,6 +217,61 @@ async def run_projection(
         years_to_project = max(1, int(merged["life_expectancy"] - current_age))
     years_to_project = years_to_project or 30
 
+    pension_payload = [
+        {
+            "pillar": r.pillar.value,
+            "current_balance": r.current_balance,
+            "annual_contribution": r.annual_contribution,
+            "expected_return_rate": r.expected_return_rate,
+            "retirement_age": r.retirement_age,
+            "contribution_years": r.contribution_years,
+            "average_insured_salary": r.average_insured_salary,
+        }
+        for r in pension_records
+    ]
+
+    # Szenario-Cashflows (Fruehpensionierung, Pflegekosten, Amortisation).
+    # Ohne aktive Szenarien bleibt annual_flows None und der Simulationspfad
+    # ist bit-identisch zum Verhalten ohne Szenario.
+    annual_flows = None
+    if flow_inputs.get("active_scenarios"):
+        current_age = 40
+        if date_of_birth:
+            try:
+                current_age = datetime.now().year - datetime.fromisoformat(date_of_birth).year
+            except ValueError:
+                pass
+        inflation = merged.get("inflation_rate", 0.015)
+        planned_retirement = merged.get("retirement_age", 65)
+        early_years = flow_inputs.pop("early_retirement_years", 3)
+        # Frueher in Rente heisst: weniger Beitragsjahre, also auch weniger
+        # Rente. Deshalb geht das vorgezogene Alter in BEIDE Rechnungen.
+        retirement = (
+            planned_retirement - early_years
+            if "early_retirement" in flow_inputs["active_scenarios"]
+            else planned_retirement
+        )
+        # Rentenserie vorab, damit die Entnahmephase die Rente als Einkommen
+        # gegenrechnen kann. Rein rechnerisch, kein Monte Carlo.
+        pension_series = projection_service.project_pension_series(
+            pension_records=pension_payload,
+            years=years_to_project,
+            annual_income=merged["annual_income"],
+            date_of_birth=date_of_birth,
+            retirement_age=retirement,
+            inflation_rate=inflation,
+        )
+        annual_flows = build_annual_flows(
+            years=years_to_project,
+            current_age=current_age,
+            retirement_age=retirement,
+            annual_savings=merged["annual_savings"],
+            pension_series=pension_series,
+            inflation_rate=inflation,
+            planned_retirement_age=planned_retirement,
+            **flow_inputs,
+        )
+
     # Run simulation
     result_data = projection_service.run(
         current_net_worth=merged["current_net_worth"],
@@ -199,21 +281,11 @@ async def run_projection(
         mean_return=merged.get("mean_return", 0.07),
         volatility=merged.get("return_volatility", 0.12),
         inflation_rate=merged.get("inflation_rate", 0.015),
-        pension_records=[
-            {
-                "pillar": r.pillar.value,
-                "current_balance": r.current_balance,
-                "annual_contribution": r.annual_contribution,
-                "expected_return_rate": r.expected_return_rate,
-                "retirement_age": r.retirement_age,
-                "contribution_years": r.contribution_years,
-                "average_insured_salary": r.average_insured_salary,
-            }
-            for r in pension_records
-        ],
+        pension_records=pension_payload,
         date_of_birth=date_of_birth,
         retirement_age=merged.get("retirement_age", 65),
         runs=settings.monte_carlo_runs,
+        annual_flows=annual_flows,
     )
 
     result_dict = result_data.copy()
