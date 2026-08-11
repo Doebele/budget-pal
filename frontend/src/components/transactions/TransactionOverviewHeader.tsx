@@ -141,9 +141,7 @@ export function TransactionOverviewHeader({
                 <div className="rounded-lg bg-bg-surface2/80 border border-border p-4 space-y-2">
                   <p className="text-text-primary font-medium">{count} Transaktionen betroffen</p>
                   <p className="text-text-tertiary text-sm">
-                    Nach dem Archivieren erscheinen diese Buchungen nicht mehr in der
-                    Transaktionsübersicht (Soft-Delete). Daten bleiben in der Datenbank für
-                    Nachvollziehbarkeit.
+                    {t("pages:hints.archiveNote")}
                   </p>
                   {count > 0 && preview.date_range.from && preview.date_range.to && (
                     <p className="text-xs text-text-disabled">
@@ -154,8 +152,7 @@ export function TransactionOverviewHeader({
                   )}
                   {count === 0 && (
                     <p className="txt-warning text-sm pt-1">
-                      Es gibt keine aktiven Transaktionen mehr für dieses Konto (alle archiviert oder
-                      leer). Archivieren oder Hard-Delete ist nicht möglich.
+                      {t("pages:hints.noActiveTxns")}
                     </p>
                   )}
                   <p className="text-sm text-text-secondary font-mono">
@@ -170,8 +167,7 @@ export function TransactionOverviewHeader({
                   {t("pages:ui.loeschen_ohne_archivierung_hard_delete")}
                 </p>
                 <p className="text-xs">
-                  Entfernt die Datensätze unwiderruflich aus der Datenbank. Nur verwenden, wenn Sie
-                  sicher sind.
+                  {t("pages:hints.hardDeleteWarning")}
                 </p>
                 <label className="flex items-center gap-2 cursor-pointer text-sm text-text-secondary">
                   <input

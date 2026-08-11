@@ -415,7 +415,10 @@
     "g45": "Show again (transaction category)",
     "g46": "Show again (wizard label)",
     "g47": "Loading…",
-    "g48": "e.g. account transfer"
+    "g48": "e.g. account transfer",
+    "saved": "✓ Saved!",
+    "saving": "Saving...",
+    "saveMappings": "Save mappings"
   },
   "misc": {
     "r00": "Next period",
@@ -726,5 +729,34 @@
     "tipModeHistorical": "Calculation is based on your real bank transactions.",
     "tipModeEmpirical": "Calculation is based on your entries from the financial wizard.",
     "tipModePlan": "Calculation is based on your budget plan (recurring entries)."
+  },
+  "hints": {
+    "pensionChartHint": "Before retirement age ({{age}}): OASI = 0; BVG, 3a and 3b show the projected capital. From then on: OASI and BVG pension, and for 3a/3b a pension formula with 2% residual interest over a 20-year payout period. OASI contribution years are projected up to retirement age (max. 44 years).",
+    "saronHint": "Reference value for displaying SARON mortgages (not a live daily rate). Source and details:",
+    "birthdate": "Date of birth",
+    "yearsOld": "{{age}} years",
+    "pensionAround": "· pension around {{year}}",
+    "retirementAge": "Retirement age",
+    "target": "(target)",
+    "taxonomyOverview": "Overview of which transaction categories (actual data) and wizard labels (empirical data) are assigned to each supercategory — including the stored peer average.",
+    "peerGroupLabel": "Peer group:",
+    "taxonomyMapping": "Mapping from the taxonomy: <0>{{empirical}}</0> (wizard labels) and <1>{{actual}}</1> (transaction categories) — colour = supercategory.",
+    "pensionAtRetirement": "Expected pension at retirement {{year}} — monthly amounts",
+    "horizonTooShort": "Retirement around {{year}} lies outside the selected horizon ({{years}} yrs) — choose a longer time horizon to see the pension amounts.",
+    "privacyNote": "Your data is stored encrypted and used only to calculate your personal financial plan. BudgetPal does not pass any data to third parties. This information does not replace professional financial advice.",
+    "netIncomeNote": "Net income is estimated automatically — based on typical deductions in {{canton}}. The exact tax calculation happens in the financial plan.",
+    "correspondsToMonthly": "Equals {{amount}}/mo in the budget.",
+    "hardDeleteWarning": "Removes the records irreversibly from the database. Use only if you are certain.",
+    "noActiveTxns": "There are no active transactions left for this account (all archived or empty). Archiving or hard delete is not possible.",
+    "archiveNote": "After archiving, these entries no longer appear in the transaction overview (soft delete). The data stays in the database for traceability.",
+    "permanentDeleteNote": "This transaction will be removed irreversibly from the database. This action cannot be undone.",
+    "exportNote": "Exports all your data as a JSON backup: transactions, accounts, budgets, recurring entries, wizard configuration, pillars 1–3a and assets.",
+    "restoreNote": "Restores data from a previous JSON backup. Existing entries are not overwritten — only missing data is added.",
+    "mappingNote": "Assigns each budget label from the empirical data to a supercategory. Budget Analysis uses this to pick the matching actual transaction category and peer group.",
+    "transfersIncluded": "Incl. {{amount}} account transfers/savings — enable the toggle to hide them.",
+    "first12Months": "Shows the first 12 months. Switch to “Monthly” for all {{count}} months.",
+    "amortisationDuty": "Amortisation obligation: down to ≤ 65% within 15 years.",
+    "importCreatedNothing": "This import created no transactions — only the history entry disappears.",
+    "kpiMismatch": "The KPI tile shows {{amount}} (from the stats API incl. all transactions). This view is based on the {{count}} most recently loaded transactions."
   }
 }

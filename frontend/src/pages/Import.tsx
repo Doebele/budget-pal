@@ -1410,8 +1410,7 @@ export default function Import() {
             ) : (
               /* Gescheiterte oder leere Importe haben nichts angelegt */
               <p className="text-text-secondary mb-4">
-                Dieser Import hat keine Transaktionen angelegt — es verschwindet nur
-                der Eintrag aus der Historie.
+                {t("pages:hints.importCreatedNothing")}
               </p>
             )}
             <div className="mt-6 flex justify-end gap-3">

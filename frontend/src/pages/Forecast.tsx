@@ -817,7 +817,7 @@ export default function Forecast() {
           </table>
           {(forecast?.forecast?.length ?? 0) > 12 && (
             <p className="text-text-tertiary text-[11px] mt-3">
-              Zeigt die ersten 12 Monate. Wechsle zu «Monatlich» für alle {forecast!.forecast.length} Monate.
+              {t("pages:hints.first12Months", { count: forecast!.forecast.length })}
             </p>
           )}
         </div>

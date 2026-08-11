@@ -156,8 +156,7 @@ export default function ArchivedTransactions() {
               <div>
                 <h3 className="text-text-primary font-semibold">{t("pages:misc.r20")}</h3>
                 <p className="text-text-tertiary text-sm mt-1">
-                  Diese Transaktion wird unwiderruflich aus der Datenbank entfernt. Diese Aktion kann nicht
-                  rückgängig gemacht werden.
+                  {t("pages:hints.permanentDeleteNote")}
                 </p>
               </div>
               <button

@@ -748,7 +748,7 @@ export default function Finanzplan() {
           <div className="px-5 py-3 border-t border-border/20">
             <p className="text-text-tertiary text-[11px]">
               {t("pages:ui.ltvExplain")}
-              Amortisationspflicht: auf ≤ 65 % innerhalb von 15 Jahren.
+              {t("pages:hints.amortisationDuty")}
             </p>
           </div>
         </section>

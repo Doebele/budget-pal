@@ -671,8 +671,7 @@ function Step2({ data, update }: { data: WizardData; update: (p: Partial<WizardD
             </div>
           </div>
           <p className="text-text-tertiary text-xs mt-3 pt-3 border-t border-gain/15">
-            Nettoeinkommen wird automatisch geschätzt — basierend auf typischen Abzügen in {data.kanton}.
-            Die genaue Steuerberechnung erfolgt im Finanzplan.
+            {t("pages:hints.netIncomeNote", { canton: data.kanton })}
           </p>
         </div>
       )}
@@ -929,7 +928,7 @@ function Step4({ data, update }: { data: WizardData; update: (p: Partial<WizardD
                 <ChfInput value={data.autoversicherung} onChange={(v) => update({ autoversicherung: v })} />
                 {data.autoversicherungPeriod === "jahr" && data.autoversicherung > 0 && (
                   <p className="text-text-tertiary text-xs">
-                    Entspricht {chf(Math.round(data.autoversicherung / 12))}/Mo im Budget.
+                    {t("pages:hints.correspondsToMonthly", { amount: chf(Math.round(data.autoversicherung / 12)) })}
                   </p>
                 )}
               </div>
@@ -1856,9 +1855,7 @@ function ReviewScreen({ data }: { data: WizardData }) {
       </div>
 
       <p className="text-text-tertiary text-xs text-center leading-relaxed px-4">
-        Deine Daten werden verschlüsselt gespeichert und nur zur Berechnung deines persönlichen
-        Finanzplans verwendet. BudgetPal gibt keine Daten an Dritte weiter.
-        Diese Angaben ersetzen keine professionelle Finanzberatung.
+        {t("pages:hints.privacyNote")}
       </p>
     </div>
   );

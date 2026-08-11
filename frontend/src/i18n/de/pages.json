@@ -415,7 +415,10 @@
     "g45": "Wieder einblenden (Transaktionskategorie)",
     "g46": "Wieder einblenden (Wizard-Label)",
     "g47": "Wird geladen…",
-    "g48": "z.B. Kontoübertrag"
+    "g48": "z.B. Kontoübertrag",
+    "saved": "✓ Gespeichert!",
+    "saving": "Speichern...",
+    "saveMappings": "Zuordnungen speichern"
   },
   "misc": {
     "r00": "Nächste Periode",
@@ -726,5 +729,34 @@
     "tipModeHistorical": "Berechnung basiert auf deinen realen Banktransaktionen.",
     "tipModeEmpirical": "Berechnung basiert auf deinen Angaben aus dem Finanz-Wizard.",
     "tipModePlan": "Berechnung basiert auf deinem Budgetplan (Wiederkehrende Einträge)."
+  },
+  "hints": {
+    "pensionChartHint": "Vor dem Rentenalter ({{age}}): AHV = 0; BVG, 3a und 3b zeigen das projizierte Kapital. Ab dann: AHV- und BVG-Rente bzw. bei 3a/3b eine Rentenformel mit 2 % Restverzinsung über 20 Jahre Auszahlungsdauer. AHV-Beitragsjahre werden bis zum Rentenalter fortgeschrieben (max. 44 Jahre).",
+    "saronHint": "Referenzwert zur Darstellung von SARON-Hypotheken (kein Live-Tageszins). Quelle und Details:",
+    "birthdate": "Geburtsdatum",
+    "yearsOld": "{{age}} Jahre",
+    "pensionAround": "· Rente ca. {{year}}",
+    "retirementAge": "Rentenalter",
+    "target": "(Ziel)",
+    "taxonomyOverview": "Übersicht, welche Transaktionskategorien (Reale Angaben) und Wizard-Labels (Empirische Angaben) jeder Superkategorie zugeordnet sind — inkl. gespeichertem Peer-Ø.",
+    "peerGroupLabel": "Peer-Gruppe:",
+    "taxonomyMapping": "Zuordnung aus der Taxonomie: <0>{{empirical}}</0> (Wizard-Labels) und <1>{{actual}}</1> (Transaktionskategorien) — Farbe = Superkategorie.",
+    "pensionAtRetirement": "Voraussichtliche Rente bei Pensionierung {{year}} — Monatliche Beträge",
+    "horizonTooShort": "Rentenbeginn ca. {{year}} liegt ausserhalb des gewählten Horizonts ({{years}} J.) — wähle einen längeren Zeithorizont für die Rentenbetragsanzeige.",
+    "privacyNote": "Deine Daten werden verschlüsselt gespeichert und nur zur Berechnung deines persönlichen Finanzplans verwendet. BudgetPal gibt keine Daten an Dritte weiter. Diese Angaben ersetzen keine professionelle Finanzberatung.",
+    "netIncomeNote": "Nettoeinkommen wird automatisch geschätzt — basierend auf typischen Abzügen in {{canton}}. Die genaue Steuerberechnung erfolgt im Finanzplan.",
+    "correspondsToMonthly": "Entspricht {{amount}}/Mo im Budget.",
+    "hardDeleteWarning": "Entfernt die Datensätze unwiderruflich aus der Datenbank. Nur verwenden, wenn Sie sicher sind.",
+    "noActiveTxns": "Es gibt keine aktiven Transaktionen mehr für dieses Konto (alle archiviert oder leer). Archivieren oder Hard-Delete ist nicht möglich.",
+    "archiveNote": "Nach dem Archivieren erscheinen diese Buchungen nicht mehr in der Transaktionsübersicht (Soft-Delete). Daten bleiben in der Datenbank für Nachvollziehbarkeit.",
+    "permanentDeleteNote": "Diese Transaktion wird unwiderruflich aus der Datenbank entfernt. Diese Aktion kann nicht rückgängig gemacht werden.",
+    "exportNote": "Exportiert alle deine Daten als JSON-Backup: Transaktionen, Konten, Budgets, Wiederkehrende Einträge, Wizard-Konfiguration, Säulen 1–3a und Assets.",
+    "restoreNote": "Stellt Daten aus einem vorherigen JSON-Backup wieder her. Bestehende Einträge werden nicht überschrieben — nur fehlende Daten werden ergänzt.",
+    "mappingNote": "Ordnet jedes Budget-Label aus empirischen Angaben einer Superkategorie zu. Die Budgetanalyse nutzt daraus die passende Ist-Transaktionskategorie und Peer-Gruppe.",
+    "transfersIncluded": "Inkl. {{amount}} Kontoüberträge/Sparen — Toggle aktivieren um diese auszublenden.",
+    "first12Months": "Zeigt die ersten 12 Monate. Wechsle zu «Monatlich» für alle {{count}} Monate.",
+    "amortisationDuty": "Amortisationspflicht: auf ≤ 65 % innerhalb von 15 Jahren.",
+    "importCreatedNothing": "Dieser Import hat keine Transaktionen angelegt — es verschwindet nur der Eintrag aus der Historie.",
+    "kpiMismatch": "KPI-Kachel zeigt {{amount}} (aus der Stats-API inkl. alle Transaktionen). Diese Ansicht basiert auf den zuletzt geladenen {{count}} Transaktionen."
   }
 }

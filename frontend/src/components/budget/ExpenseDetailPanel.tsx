@@ -122,8 +122,7 @@ export default function ExpenseDetailPanel({
             <div className="msg msg-warning mt-2">
               <WarningTriangle />
               <span>
-                KPI-Kachel zeigt {formatCHF(statsExpenses!)} (aus der Stats-API inkl. alle Transaktionen).
-                Diese Ansicht basiert auf den zuletzt geladenen {transactions.length} Transaktionen.
+                {t("pages:hints.kpiMismatch", { amount: formatCHF(statsExpenses!), count: transactions.length })}
               </span>
             </div>
           )}
@@ -216,7 +215,7 @@ export default function ExpenseDetailPanel({
           </div>
           {groups.some((g) => g.isSavings) && !excludeTransfers && (
             <p className="txt-warning text-xs mt-1">
-              Inkl. {formatCHF(groups.find((g) => g.isSavings)!.total)} Kontoüberträge/Sparen — Toggle aktivieren um diese auszublenden.
+              {t("pages:hints.transfersIncluded", { amount: formatCHF(groups.find((g) => g.isSavings)!.total) })}
             </p>
           )}
         </div>

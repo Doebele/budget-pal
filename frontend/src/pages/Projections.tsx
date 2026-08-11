@@ -211,10 +211,7 @@ export default function Projections() {
               {t("pages:ui.ahv_saeule_1_bvg_pensionskasse_saeule_2_saeu")}
             </p>
             <p className="text-text-tertiary text-[11px] mt-1 max-w-3xl leading-relaxed">
-              Vor dem Rentenalter ({params.retirement_age}): AHV = 0; BVG, 3a und 3b zeigen das projizierte{" "}
-              <span className="text-text-secondary">Kapital</span>. Ab dann: AHV- und BVG-Rente bzw. bei 3a/3b eine
-              Rentenformel mit 2 % Restverzinsung über 20 Jahre Auszahlungsdauer. AHV-Beitragsjahre werden
-              bis zum Rentenalter fortgeschrieben (max. 44 Jahre).
+              {t("pages:hints.pensionChartHint", { age: params.retirement_age })}
             </p>
           </div>
         </div>
@@ -279,7 +276,7 @@ export default function Projections() {
         {projection && retirementInHorizon && retIdx != null && (
           <div className="mt-4 pt-4 border-t border-border/50 space-y-3">
             <p className="text-text-secondary text-xs font-semibold uppercase tracking-wide">
-              Voraussichtliche Rente bei Pensionierung {projection.years[retIdx]} — Monatliche Beträge
+              {t("pages:hints.pensionAtRetirement", { year: projection.years[retIdx] })}
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
@@ -313,8 +310,7 @@ export default function Projections() {
         )}
         {projection && !retirementInHorizon && (
           <p className="text-text-tertiary text-xs mt-3">
-            Rentenbeginn ca. {retirementYear} liegt ausserhalb des gewählten Horizonts ({selectedHorizon.years} J.) —
-            wähle einen längeren Zeithorizont für die Rentenbetragsanzeige.
+            {t("pages:hints.horizonTooShort", { year: retirementYear, years: selectedHorizon.years })}
           </p>
         )}
 

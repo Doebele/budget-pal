@@ -10,7 +10,7 @@ import { Check, CheckCircle, Download, EditPencil, Eye, FloppyDisk, Group, Label
 import { Link } from "react-router-dom";
 import { differenceInYears, parseISO } from "date-fns";
 import { useTaxonomySuperCategories, type SuperCategory } from "@/lib/categories";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { useUiStore, type Accent, type UiLanguage } from "@/lib/store";
 import i18n from "@/i18n";
 
@@ -531,7 +531,7 @@ export default function Settings() {
               <span className="text-text-tertiary text-xs">% p.a.</span>
             </div>
             <p className="text-text-tertiary text-xs mt-2 leading-relaxed">
-              Referenzwert zur Darstellung von SARON-Hypotheken (kein Live-Tageszins). Quelle und Details:{" "}
+              {t("pages:hints.saronHint")}{" "}
               <a
                 href={SARON_INDEX_URL}
                 target="_blank"
@@ -547,7 +547,7 @@ export default function Settings() {
           {/* Birthdate — key for peer group & pension */}
           <div>
             <label className="label">
-              Geburtsdatum
+              {t("pages:hints.birthdate")}
               <span className="text-text-tertiary font-normal ml-1 text-xs">{t("pages:misc.r38")}</span>
             </label>
             <div className="flex items-center gap-3">
@@ -560,9 +560,9 @@ export default function Settings() {
               />
               {age !== null && (
                 <span className="text-text-secondary text-sm">
-                  → <span className="text-text-primary font-medium">{age} Jahre</span>
+                  → <span className="text-text-primary font-medium">{t("pages:hints.yearsOld", { age })}</span>
                   {retirementYear && (
-                    <span className="text-text-tertiary ml-2">· Rente ca. {retirementYear}</span>
+                    <span className="text-text-tertiary ml-2">{t("pages:hints.pensionAround", { year: retirementYear })}</span>
                   )}
                 </span>
               )}
@@ -571,8 +571,8 @@ export default function Settings() {
 
           <div>
             <label className="label">
-              Rentenalter
-              <span className="text-text-tertiary font-normal ml-1 text-xs">(Ziel)</span>
+              {t("pages:hints.retirementAge")}
+              <span className="text-text-tertiary font-normal ml-1 text-xs">{t("pages:hints.target")}</span>
             </label>
             <div className="flex items-center gap-4">
               <input
@@ -592,7 +592,7 @@ export default function Settings() {
             disabled={mutation.isPending}
           >
             <FloppyDisk className="w-4 h-4" />
-            {saved ? "✓ Gespeichert!" : mutation.isPending ? "Speichern..." : "Speichern"}
+            {saved ? t("pages:settings2.saved") : mutation.isPending ? t("pages:settings2.saving") : t("buttons.save")}
           </button>
         </div>
       </div>
@@ -621,12 +621,12 @@ export default function Settings() {
         <div className="mb-4">
           <h2 className="text-text-primary font-semibold text-sm">{t("pages:settings2.g40")}</h2>
           <p className="text-text-tertiary text-xs mt-0.5">
-            Übersicht, welche Transaktionskategorien (Reale Angaben) und Wizard-Labels (Empirische Angaben) jeder Superkategorie zugeordnet sind — inkl. gespeichertem Peer-Ø.
+            {t("pages:hints.taxonomyOverview")}
           </p>
           {peerConfig?.peerLabel && (
             <div className="mt-2 flex items-center gap-1.5 text-xs text-text-tertiary">
               <Group className="w-3 h-3 text-accent shrink-0" />
-              <span>Peer-Gruppe: <span className="text-text-secondary font-medium">{peerConfig.peerLabel}</span></span>
+              <span>{t("pages:hints.peerGroupLabel")} <span className="text-text-secondary font-medium">{peerConfig.peerLabel}</span></span>
               <span className="text-text-disabled">·</span>
               <span>{peerConfig.sampleSize}</span>
             </div>
@@ -636,8 +636,14 @@ export default function Settings() {
         {/* Übersicht: Superkategorie ↔ empirische vs. reale Kategorien (farbkodiert) */}
         <div className="rounded-xl border border-border/50 overflow-hidden mb-4">
           <p className="text-[11px] text-text-tertiary px-3 py-2 bg-bg-surface2/40 border-b border-border/30">
-            {t("pages:ui.zuordnung_aus_der_taxonomie")} <span className="text-text-secondary">{t("pages:misc.r39")}</span> (Wizard-Deckel) und{" "}
-            <span className="text-text-secondary">{t("pages:misc.r40")}</span> (Transaktionskategorien) — Farbe = Superkategorie.
+            <Trans
+              i18nKey="pages:hints.taxonomyMapping"
+              values={{ empirical: t("pages:misc.r39"), actual: t("pages:misc.r40") }}
+              components={[
+                <span key="0" className="text-text-secondary" />,
+                <span key="1" className="text-text-secondary" />,
+              ]}
+            />
           </p>
           <div className="overflow-x-auto">
             <table className="w-full text-xs min-w-[640px]">
@@ -1119,8 +1125,7 @@ export default function Settings() {
           <div>
             <h2 className="text-text-primary font-semibold text-sm">{t("pages:settings2.g19")}</h2>
             <p className="text-text-tertiary text-xs mt-0.5">
-              Ordnet jedes Budget-Label aus empirischen Angaben einer Superkategorie zu.
-              Die Budgetanalyse nutzt daraus die passende Ist-Transaktionskategorie und Peer-Gruppe.
+              {t("pages:hints.mappingNote")}
             </p>
           </div>
           <button
@@ -1194,7 +1199,7 @@ export default function Settings() {
                 className="btn-primary flex items-center gap-2 disabled:opacity-40"
               >
                 <FloppyDisk className="w-4 h-4" />
-                {mappingSaved ? "✓ Gespeichert!" : saveMappingsMutation.isPending ? "Speichern..." : "Zuordnungen speichern"}
+                {mappingSaved ? t("pages:settings2.saved") : saveMappingsMutation.isPending ? t("pages:settings2.saving") : t("pages:settings2.saveMappings")}
               </button>
               {mappingDirty && (
                 <span className="text-xs text-warning">{t("pages:settings2.g44")}</span>
@@ -1496,8 +1501,7 @@ export default function Settings() {
         <div className="space-y-2">
           <h3 className="text-text-secondary text-xs font-medium uppercase tracking-wide">{t("pages:settings2.g13")}</h3>
           <p className="text-text-tertiary text-xs">
-            Exportiert alle deine Daten als JSON-Backup: Transaktionen, Konten, Budgets,
-            Wiederkehrende Einträge, Wizard-Konfiguration, Säulen 1–3a und Assets.
+            {t("pages:hints.exportNote")}
           </p>
           <button
             type="button"
@@ -1521,8 +1525,7 @@ export default function Settings() {
         <div className="space-y-3">
           <h3 className="text-text-secondary text-xs font-medium uppercase tracking-wide">{t("pages:settings2.g17")}</h3>
           <p className="text-text-tertiary text-xs">
-            Stellt Daten aus einem vorherigen JSON-Backup wieder her. Bestehende Einträge werden
-            nicht überschrieben — nur fehlende Daten werden ergänzt.
+            {t("pages:hints.restoreNote")}
           </p>
 
           {/* File picker */}
