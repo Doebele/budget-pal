@@ -700,7 +700,11 @@
     "grossMinusDeductions": "Gross {{gross}} − deductions {{deductions}}",
     "entriesCount": "{{count}} entries",
     "konfidenz_band": "Ø confidence band",
-    "ltvExplain": "LTV (loan-to-value) = mortgage ÷ market value. FINMA recommends ≤ 65% for long-term affordability."
+    "ltvExplain": "LTV (loan-to-value) = mortgage ÷ market value. FINMA recommends ≤ 65% for long-term affordability.",
+    "scenario": "Scenario",
+    "noScenario": "No scenario (own values)",
+    "scenarioHint": "Savings rate and income come from the selected scenario.",
+    "simulationParams": "Simulation parameters"
   },
   "health": {
     "savingsRate": "Savings rate",

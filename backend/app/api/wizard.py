@@ -344,6 +344,10 @@ def _compute_monthly_expenses(p: WizardCompletePayload) -> float:
     )
 
 
+#: Aufschlag auf die Sparrate, wenn das Szenario "Sparplan erhoehen" aktiv ist.
+SAVINGS_INCREASE_PCT = 10.0
+
+
 def _build_scenario_params(p: WizardCompletePayload) -> dict:
     scenarios = []
     if p.scenario_mortgage:
@@ -363,6 +367,10 @@ def _build_scenario_params(p: WizardCompletePayload) -> dict:
         "kanton": p.kanton,
         "household_type": p.haushalt,
         "active_scenarios": scenarios,
+        # Szenario "Sparplan erhoehen" als Aufschlag auf die Sparrate.
+        # Fester Vorgabewert; ein spaeteres Eingabefeld in Schritt 8 schreibt
+        # denselben Schluessel, ohne dass hier etwas umgebaut werden muss.
+        "savings_increase_pct": SAVINGS_INCREASE_PCT if p.scenario_savings else 0.0,
         "ahv_beitragsjahre": p.ahv_beitragsjahre,
         "ahv_avg_lohn": p.ahv_durchschnitts_lohn,
         "bvg_guthaben": p.bvg_guthaben,

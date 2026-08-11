@@ -7,7 +7,7 @@ POST /projections/scenarios           — save a new scenario
 PUT  /projections/scenarios/{id}      — update scenario
 DELETE /projections/scenarios/{id}    — delete scenario
 """
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -18,7 +18,7 @@ from sqlalchemy import select, desc
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.core.config import settings
-from app.models.models import Scenario, ProjectionCache, PensionData, Asset, User
+from app.models.models import Scenario, PensionData, User
 from app.services.projection import ProjectionService
 
 router = APIRouter()
@@ -28,9 +28,11 @@ projection_service = ProjectionService()
 # ── Schemas ───────────────────────────────────────────────────
 
 class ProjectionParameters(BaseModel):
-    current_net_worth: float
-    annual_savings: float
-    annual_income: float
+    # Optional, damit ein gewaehltes Szenario sie liefern kann. Nach dem Merge
+    # wird geprueft, dass alle drei gesetzt sind (siehe run_projection).
+    current_net_worth: Optional[float] = None
+    annual_savings: Optional[float] = None
+    annual_income: Optional[float] = None
     years_to_project: Optional[int] = None
     target_age: Optional[int] = None
     mean_return: float = 0.07
@@ -81,6 +83,48 @@ class ScenarioUpdate(BaseModel):
     is_default: Optional[bool] = None
 
 
+# ── Szenario → Simulationsparameter ───────────────────────────
+
+def _params_from_scenario(parameters_json: Dict[str, Any]) -> Dict[str, Any]:
+    """Bildet die Wizard-Werte aus `Scenario.parameters_json` auf die
+    Argumente von `ProjectionService.run()` ab.
+
+    Nur Schluessel, die tatsaechlich vorhanden sind, landen im Ergebnis —
+    fehlende ueberlaesst der Aufrufer dem Request-Body bzw. den Defaults.
+    """
+    p = parameters_json or {}
+    out: Dict[str, Any] = {}
+
+    if p.get("inflation_rate") is not None:
+        # wizard.py teilt bereits durch 100, der Wert ist ein Bruchteil.
+        out["inflation_rate"] = float(p["inflation_rate"])
+    if p.get("retirement_age") is not None:
+        out["retirement_age"] = int(p["retirement_age"])
+    if p.get("life_expectancy") is not None:
+        out["life_expectancy"] = int(p["life_expectancy"])
+
+    # Sparrate aus dem monatlichen Ueberschuss des Wizards.
+    income = p.get("monthly_income")
+    expenses = p.get("monthly_expenses")
+    if income is not None and expenses is not None:
+        annual_savings = max(0.0, float(income) - float(expenses)) * 12
+        # Szenario "Sparplan erhoehen": schlaegt einen Prozentsatz auf.
+        # ponytail: die heutige Jahresschleife in projection.py kennt kein
+        # Alters-Gate — die Sparrate fliesst auch nach dem Rentenalter weiter.
+        # Fuer Horizonte bis zum Rentenalter unerheblich, darueber hinaus nicht.
+        # Wird mit der Entnahmephase (annual_flows) fuer alle Szenarien behoben.
+        increase_pct = float(p.get("savings_increase_pct") or 0.0)
+        if increase_pct:
+            annual_savings *= 1 + increase_pct / 100
+        out["annual_savings"] = annual_savings
+
+    # Bruttolohn, nicht monthly_income — das ist netto (wizard.py rechnet x0.72).
+    if p.get("ahv_avg_lohn") is not None:
+        out["annual_income"] = float(p["ahv_avg_lohn"])
+
+    return out
+
+
 # ── Routes ────────────────────────────────────────────────────
 
 @router.post("/run", response_model=ProjectionResult)
@@ -92,22 +136,40 @@ async def run_projection(
 ):
     """Run Monte Carlo simulation and Swiss pension projection.
 
-    Results are cached for 24h keyed by user_id + scenario_id (if provided).
+    Kein Ergebnis-Cache: der frühere Cache war auf (user_id, scenario_id)
+    geschlüsselt und ignorierte die Body-Parameter komplett. Jeder Reglerzug
+    hätte danach 24 Stunden lang dieselbe Kurve geliefert. 10'000 Läufe
+    rechnet NumPy in Millisekunden — ein Cache lohnt den Invalidierungsaufwand
+    nicht. Tabelle und Modell ProjectionCache bleiben für Altdaten bestehen.
     """
-    # Check cache first
+    # Szenario laden und mit dem Body zusammenfuehren. `exclude_unset` sorgt
+    # dafuer, dass nur ausdruecklich gesendete Felder das Szenario uebersteuern
+    # — Pydantic-Defaults duerfen es nicht ueberschreiben.
+    merged: Dict[str, Any] = {}
     if scenario_id:
-        now = datetime.now(timezone.utc)
-        cache_result = await db.execute(
-            select(ProjectionCache).where(
-                ProjectionCache.user_id == current_user.id,
-                ProjectionCache.scenario_id == scenario_id,
-                ProjectionCache.expires_at > now,
+        scenario_row = await db.execute(
+            select(Scenario).where(
+                Scenario.id == scenario_id,
+                Scenario.user_id == current_user.id,
             )
         )
-        cached = cache_result.scalar_one_or_none()
-        if cached:
-            result = cached.result_json
-            return ProjectionResult(**result)
+        scenario = scenario_row.scalar_one_or_none()
+        if not scenario:
+            raise HTTPException(status_code=404, detail="Scenario not found.")
+        merged.update(_params_from_scenario(scenario.parameters_json))
+    merged.update(params.model_dump(exclude_unset=True))
+
+    # Pflichtwerte pruefen — die Validierung an der Vertrauensgrenze bleibt,
+    # sie wandert nur hinter den Merge.
+    missing = [
+        f for f in ("current_net_worth", "annual_savings", "annual_income")
+        if merged.get(f) is None
+    ]
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Missing required parameters: {', '.join(missing)}",
+        )
 
     # Fetch pension data for this user
     pension_result = await db.execute(
@@ -116,22 +178,27 @@ async def run_projection(
     pension_records = pension_result.scalars().all()
 
     # Determine projection horizon
-    years_to_project = params.years_to_project
-    if not years_to_project and params.target_age and params.date_of_birth:
-        dob = datetime.fromisoformat(params.date_of_birth)
+    date_of_birth = merged.get("date_of_birth")
+    years_to_project = merged.get("years_to_project")
+    if not years_to_project and merged.get("target_age") and date_of_birth:
+        dob = datetime.fromisoformat(date_of_birth)
         current_age = (datetime.now() - dob).days / 365.25
-        years_to_project = max(1, int(params.target_age - current_age))
+        years_to_project = max(1, int(merged["target_age"] - current_age))
+    if not years_to_project and merged.get("life_expectancy") and date_of_birth:
+        dob = datetime.fromisoformat(date_of_birth)
+        current_age = (datetime.now() - dob).days / 365.25
+        years_to_project = max(1, int(merged["life_expectancy"] - current_age))
     years_to_project = years_to_project or 30
 
     # Run simulation
     result_data = projection_service.run(
-        current_net_worth=params.current_net_worth,
-        annual_savings=params.annual_savings,
-        annual_income=params.annual_income,
+        current_net_worth=merged["current_net_worth"],
+        annual_savings=merged["annual_savings"],
+        annual_income=merged["annual_income"],
         years=years_to_project,
-        mean_return=params.mean_return,
-        volatility=params.return_volatility,
-        inflation_rate=params.inflation_rate,
+        mean_return=merged.get("mean_return", 0.07),
+        volatility=merged.get("return_volatility", 0.12),
+        inflation_rate=merged.get("inflation_rate", 0.015),
         pension_records=[
             {
                 "pillar": r.pillar.value,
@@ -144,26 +211,14 @@ async def run_projection(
             }
             for r in pension_records
         ],
-        date_of_birth=params.date_of_birth,
-        retirement_age=params.retirement_age,
+        date_of_birth=date_of_birth,
+        retirement_age=merged.get("retirement_age", 65),
         runs=settings.monte_carlo_runs,
     )
 
     result_dict = result_data.copy()
     result_dict["computed_at"] = datetime.now(timezone.utc).isoformat()
     result_dict["runs"] = settings.monte_carlo_runs
-
-    # Cache result if scenario_id provided
-    if scenario_id:
-        cache_entry = ProjectionCache(
-            user_id=current_user.id,
-            scenario_id=scenario_id,
-            result_json=result_dict,
-            expires_at=datetime.now(timezone.utc) + timedelta(seconds=settings.projection_cache_ttl),
-        )
-        db.add(cache_entry)
-        await db.flush()
-        await db.commit()
 
     return ProjectionResult(**result_dict)
 
@@ -304,3 +359,5 @@ async def delete_scenario(
     if not scenario:
         raise HTTPException(status_code=404, detail="Scenario not found.")
     await db.delete(scenario)
+    # get_db committet nicht — ohne diese Zeile war das Loeschen wirkungslos.
+    await db.commit()

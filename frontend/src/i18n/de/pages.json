@@ -700,7 +700,11 @@
     "grossMinusDeductions": "Brutto {{gross}} − Abzüge {{deductions}}",
     "entriesCount": "{{count}} Einträge",
     "konfidenz_band": "Ø Konfidenz-Band",
-    "ltvExplain": "LTV (Loan-to-Value) = Hypothek ÷ Marktwert. FINMA empfiehlt ≤ 65 % für langfristige Tragbarkeit."
+    "ltvExplain": "LTV (Loan-to-Value) = Hypothek ÷ Marktwert. FINMA empfiehlt ≤ 65 % für langfristige Tragbarkeit.",
+    "scenario": "Szenario",
+    "noScenario": "Ohne Szenario (eigene Werte)",
+    "scenarioHint": "Sparrate und Einkommen stammen aus dem gewählten Szenario.",
+    "simulationParams": "Simulationsparameter"
   },
   "health": {
     "savingsRate": "Sparquote",

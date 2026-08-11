@@ -423,8 +423,11 @@ class ProjectionService:
         """
         results = {}
         for scenario in scenarios:
-            name = scenario.pop("name", "Unnamed")
-            params = {**base_kwargs, **scenario}
+            # get statt pop: pop mutierte die Liste des Aufrufers, beim zweiten
+            # Durchlauf derselben Liste hiess danach alles "Unnamed".
+            name = scenario.get("name", "Unnamed")
+            overrides = {k: v for k, v in scenario.items() if k != "name"}
+            params = {**base_kwargs, **overrides}
             result = self.run(**params)
             results[name] = {
                 "years": result["years"],

@@ -1,5 +1,5 @@
 import { clsx } from "clsx";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { projectionsApi, accountsApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -20,6 +20,12 @@ function currentAgeFromProfileBirth(iso: string | undefined): number {
   if (Number.isNaN(dob.getTime())) return 40;
   const days = (Date.now() - dob.getTime()) / (1000 * 60 * 60 * 24);
   return Math.floor(days / 365.25);
+}
+
+interface ScenarioSummary {
+  id: number;
+  name: string;
+  parameters?: Record<string, unknown> & { wizard_onboarding?: boolean };
 }
 
 type HorizonKey = "1yr" | "5yr" | "10yr" | "retirement" | "age90";
@@ -68,20 +74,43 @@ export default function Projections() {
     queryFn: () => accountsApi.list().then((r) => r.data),
   });
 
+  // Gespeicherte Szenarien. Vorausgewaehlt wird der Finanzplan aus dem Wizard,
+  // damit die Seite die echten Zahlen des Nutzers zeigt statt der Defaults oben.
+  const { data: scenarios = [] } = useQuery<ScenarioSummary[]>({
+    queryKey: ["projection-scenarios"],
+    queryFn: () => projectionsApi.listScenarios().then((r) => r.data),
+  });
+  const [scenarioId, setScenarioId] = useState<number | null>(null);
+  const [scenarioTouched, setScenarioTouched] = useState(false);
+  useEffect(() => {
+    if (scenarioTouched || scenarioId !== null || scenarios.length === 0) return;
+    const wizard = scenarios.find((sc) => sc.parameters?.wizard_onboarding);
+    setScenarioId((wizard ?? scenarios[0]).id);
+  }, [scenarios, scenarioId, scenarioTouched]);
+
   // Auto-compute net worth from accounts
   const totalBalance = (accounts || []).reduce((sum: number, a: { balance: number }) => sum + a.balance, 0);
 
   const { data: projection, isLoading, refetch } = useQuery({
-    queryKey: ["projection", horizon, params, profileBirthIso, totalBalance],
-    queryFn: () =>
-      projectionsApi
-        .run({
-          ...params,
-          current_net_worth: totalBalance || params.current_net_worth,
-          years_to_project: selectedHorizon.years,
-          date_of_birth: profileBirthIso,
-        })
-        .then((r) => r.data),
+    queryKey: ["projection", horizon, params, profileBirthIso, totalBalance, scenarioId],
+    queryFn: () => {
+      // Bei gewaehltem Szenario Sparrate und Einkommen NICHT mitsenden — der
+      // Server fuellt nur ungesetzte Felder aus parameters_json (exclude_unset).
+      // Das Nettovermoegen kommt weiterhin aus den Konten.
+      const { annual_savings, annual_income, ...rest } = params;
+      const body = scenarioId ? rest : { ...rest, annual_savings, annual_income };
+      return projectionsApi
+        .run(
+          {
+            ...body,
+            current_net_worth: totalBalance || params.current_net_worth,
+            years_to_project: selectedHorizon.years,
+            date_of_birth: profileBirthIso,
+          },
+          scenarioId ?? undefined,
+        )
+        .then((r) => r.data);
+    },
     enabled: true,
   });
 
@@ -129,9 +158,35 @@ export default function Projections() {
         ))}
       </div>
 
+      {/* Szenario-Auswahl */}
+      {scenarios.length > 0 && (
+        <div className="card flex flex-wrap items-center gap-3">
+          <label className="label mb-0" htmlFor="scenario-select">
+            {t("pages:ui.scenario")}
+          </label>
+          <select
+            id="scenario-select"
+            className="input w-full max-w-sm"
+            value={scenarioId ?? ""}
+            onChange={(e) => {
+              setScenarioTouched(true);
+              setScenarioId(e.target.value ? Number(e.target.value) : null);
+            }}
+          >
+            <option value="">{t("pages:ui.noScenario")}</option>
+            {scenarios.map((sc) => (
+              <option key={sc.id} value={sc.id}>{sc.name}</option>
+            ))}
+          </select>
+          {scenarioId !== null && (
+            <span className="text-text-tertiary text-xs">{t("pages:ui.scenarioHint")}</span>
+          )}
+        </div>
+      )}
+
       {/* Parameters */}
       <div className="card">
-        <h2 className="text-text-primary font-semibold text-sm mb-4">Simulationsparameter</h2>
+        <h2 className="text-text-primary font-semibold text-sm mb-4">{t("pages:ui.simulationParams")}</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
             <label className="label">{t("pages:misc.r30")}</label>
