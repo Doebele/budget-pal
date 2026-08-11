@@ -35,6 +35,21 @@ Alle Präferenzen (Theme/Dichte/Akzent lokal, Sprache zusätzlich serverseitig) 
 
 ---
 
+## Begriffe / Terminology
+
+Zwei Begriffe ziehen sich durch die ganze Anwendung und bedeuten **nicht**, was
+der Alltagsgebrauch nahelegt:
+
+| Oberfläche | Bedeutung |
+|---|---|
+| **Empirische Angaben** / *Empirical Data* | **Angenommene und statistische** Werte aus dem 8-stufigen Wizard, vorbelegt mit BFS-Vergleichswerten der Peer-Gruppe. Schätzungen und Planwerte — keine Messwerte. |
+| **Reale Angaben** / *Actual Data* | **Gemessene** Werte: Transaktionen aus dem CSV-/PDF-Import echter Kontoauszüge. |
+
+„Empirisch" steht hier also für *modelliert*, „real" für *beobachtet* — genau
+umgekehrt zur üblichen Wortbedeutung von „empirisch".
+
+---
+
 ## Features
 
 ### Oberfläche / UI
@@ -77,7 +92,7 @@ Alle Präferenzen (Theme/Dichte/Akzent lokal, Sprache zusätzlich serverseitig) 
 - Szenario-Vergleich (Was-wäre-wenn-Analysen)
 
 ### Visualisierungen
-- **Sankey-Diagramm**: Cashflow — Einnahmen → Superkategorien → Sparen (real & empirisch)
+- **Sankey-Diagramm**: Cashflow — Einnahmen → Superkategorien → Sparen, wahlweise aus realen (importierten) oder empirischen (Wizard-)Daten
 - **Monte Carlo Fan-Chart**: Recharts AreaChart mit Perzentilbändern
 - **Finanzplan**: Gestapeltes Flächendiagramm (Rentenentwicklung 3 Säulen)
 - Budget-Statusbalken pro Kategorie
@@ -296,7 +311,7 @@ budget-pal/
 │   │   │   ├── projections.py  # Monte Carlo scenarios
 │   │   │   ├── recurring_plan.py # Budgetplan CRUD
 │   │   │   ├── taxonomy.py     # Taxonomy + per-User Label-Hiding
-│   │   │   ├── wizard.py       # Empirisches Finanzprofil
+│   │   │   ├── wizard.py       # Empirisches Finanzprofil (Annahmen/Statistik)
 │   │   │   ├── currency.py     # Wechselkurse (ECB / Fallback)
 │   │   │   └── settings.py     # User-Einstellungen
 │   │   └── services/
@@ -352,7 +367,7 @@ budget-pal/
 │   │       ├── Finanzplan.tsx  # Langfristprognose + Rentensäulen
 │   │       ├── Projections.tsx # Monte Carlo Fan-Chart
 │   │       ├── Forecast.tsx    # Kategorie-Breakdown, Chart-Export
-│   │       ├── Wizard.tsx      # Empirisches Finanzprofil
+│   │       ├── Wizard.tsx      # Empirisches Finanzprofil (Annahmen/Statistik)
 │   │       ├── Accounts.tsx
 │   │       └── Settings.tsx    # Einstellungen inkl. Kategorie-Taxonomie
 │   ├── nginx.conf

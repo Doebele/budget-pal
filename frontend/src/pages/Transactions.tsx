@@ -1,3 +1,9 @@
+/**
+ * Reale Angaben / Actual Data — transactions imported from real bank
+ * statements (CSV/PDF). The counterpart is "empirische Angaben" /
+ * "Empirical Data": assumed and statistical values from the wizard
+ * (see pages/Wizard.tsx). Do not read "empirical" as "observed".
+ */
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { transactionsApi, accountsApi } from "@/lib/api";

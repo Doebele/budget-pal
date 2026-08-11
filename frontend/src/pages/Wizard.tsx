@@ -1,6 +1,11 @@
 /**
  * Onboarding Wizard — 8-step Swiss financial profile builder.
  *
+ * Produces the "empirische Angaben" / "Empirical Data": ASSUMED and
+ * STATISTICAL values, pre-filled from BFS peer-group averages. The
+ * counterpart is "reale Angaben" / "Actual Data" — imported bank
+ * transactions (see pages/Transactions.tsx).
+ *
  * Steps:
  *  1. Demografie (Profil)
  *  2. Einkommen

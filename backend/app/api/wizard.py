@@ -2,6 +2,11 @@
 Wizard API — onboarding endpoint that bootstraps a full user financial profile
 from the 8-step wizard in one transactional POST.
 
+Everything here is "empirical" in this project's sense: ASSUMED and STATISTICAL
+values the user entered, pre-filled from Swiss FSO (BFS) peer-group averages.
+The counterpart is "actual" data — transactions imported from real bank
+statements (see api/transactions.py). Do not read "empirical" as "observed".
+
 POST /wizard/complete
   Accepts: WizardCompletePayload (all wizard form data)
   Creates:

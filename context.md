@@ -140,7 +140,7 @@ Laufendes Änderungsprotokoll aller bedeutenden Erweiterungen und Bugfixes.
 - Wizard-Budget-Einträge als Ausgangsbasis
 - Säulen 1–3 Rentenprojektionen, Inflationsbereinigung
 
-### Wizard (Empirisches Profil)
+### Wizard (Empirisches Profil — Annahmen und Statistik)
 
 - Schweizer Finanzprofil erfassen: Wohnen, Transport, Versicherungen, Abos, Sparen
 - Daten fließen in Budgetplan und Prognosen ein
