@@ -141,6 +141,10 @@
     "addEntry": "Add entry",
     "suggestionHint": "Take suggestion, adjust values and save as a new entry for",
     "ongoing": "ongoing",
+    "yearTotal": "Year {{year}}",
+    "vsPrevYear": "vs. {{year}}",
+    "cumulative": "cumulative",
+    "cumulativeTitle": "Running balance since January",
     "reconActual": "Actual:",
     "recon": {
       "booked": "Booked",

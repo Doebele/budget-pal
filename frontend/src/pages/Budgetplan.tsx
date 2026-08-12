@@ -83,20 +83,18 @@ const DND_ENTRY_MIME = "application/x-budgetplan-recurring-entry";
 
 // ── Constants ─────────────────────────────────────────────────
 
-const MONTH_NAMES = [
-  "Januar", "Februar", "März", "April", "Mai", "Juni",
-  "Juli", "August", "September", "Oktober", "November", "Dezember",
-];
-
 const PERIODICITIES = ["weekly", "monthly", "quarterly", "halfyearly", "yearly"] as const;
 
-const PERIOD_FACTOR: Record<string, number> = {
-  weekly: 4.33,
-  monthly: 1,
-  quarterly: 1 / 3,
-  halfyearly: 1 / 6,
-  yearly: 1 / 12,
-};
+/**
+ * Faelligkeiten je Monat, in dem der Eintrag anfaellt — Gegenstueck zu
+ * `backend/app/services/plan_schedule.py`. Alles ausser `weekly` faellt genau
+ * einmal an; `getApplicableMonths` bestimmt bereits *welche* Monate.
+ */
+const OCCURRENCES_PER_MONTH: Record<string, number> = { weekly: 52 / 12 };
+
+function occurrencesPerMonth(periodicity: string): number {
+  return OCCURRENCES_PER_MONTH[periodicity] ?? 1;
+}
 
 // ── Helpers ───────────────────────────────────────────────────
 
@@ -378,10 +376,22 @@ function EntryTooltip({ entry, account, targetRef, visible, recon, refCcy }: Ent
 
       {/* Detail rows */}
       <div className="space-y-1.5 text-xs">
-        {/* Periodicity */}
+        {/* Periodicity — bei woechentlich zusaetzlich der Monatswert, sonst
+            passt der Betrag hier nicht zu dem auf dem Chip. */}
         <div className="flex items-center gap-2 text-text-secondary">
           <Refresh className="w-3 h-3 text-text-tertiary shrink-0" />
-          <span>{periodicityLabel(entry.periodicity)}</span>
+          <span>
+            {periodicityLabel(entry.periodicity)}
+            {occurrencesPerMonth(entry.periodicity) !== 1 && (
+              <> · {t("table.monthlyEquiv")}{" "}
+                {formatAmount(
+                  Math.abs((entry.amount_reference ?? entry.amount) *
+                    occurrencesPerMonth(entry.periodicity)),
+                  refCcy,
+                )}
+              </>
+            )}
+          </span>
         </div>
 
         {/* Dates */}
@@ -871,8 +881,17 @@ export default function Budgetplan() {
   const { user } = useAuth();
   const refCcy = user?.currency ?? "CHF";
 
+  /** Betrag einer einzelnen Faelligkeit, in Referenzwaehrung. */
   function planDisplayAmt(e: RecurringPlanEntry): number {
     return e.amount_reference ?? e.amount;
+  }
+
+  /**
+   * Was der Eintrag den Monat kostet. Ein woechentlicher Eintrag faellt
+   * 4,33-mal an — vorher ging er einfach in die Monatssumme ein.
+   */
+  function planMonthlyAmt(e: RecurringPlanEntry): number {
+    return planDisplayAmt(e) * occurrencesPerMonth(e.periodicity);
   }
 
   const {
@@ -942,6 +961,13 @@ export default function Budgetplan() {
   const { data: categories = [] } = useQuery({
     queryKey: ["categories"],
     queryFn: () => categoriesApi.list().then((r) => r.data as Category[]),
+  });
+
+  // Vorjahr — nur fuer die Vergleichszahl in der Jahresbilanz.
+  const { data: prevYearEntries = [] } = useQuery({
+    queryKey: ["recurring-plan", year - 1],
+    queryFn: () =>
+      recurringPlanApi.list({ year: year - 1 }).then((r) => r.data as RecurringPlanEntry[]),
   });
 
   // Plan-Ist-Abgleich: einmal fuer das ganze Jahr, nicht je Monatsspalte.
@@ -1015,18 +1041,24 @@ export default function Budgetplan() {
     });
   }
 
+  /** Typ- und Kategoriefilter — auch das Vorjahr muss ihn sehen, sonst
+   *  vergleicht die Bilanz zwei verschiedene Ausschnitte. */
+  const matchesFilter = useCallback(
+    (e: RecurringPlanEntry) => {
+      const typeOk = filter === "all" ? true : filter === "income" ? e.amount > 0 : e.amount < 0;
+      if (catFilter.size === 0) return typeOk;
+      const cat = e.category_id != null ? categories.find((c) => c.id === e.category_id) : null;
+      const sc = cat
+        ? resolveSuperCategoryForRow(cat)
+        : resolveSuperCategory(e.description, e.amount < 0);
+      return typeOk && catFilter.has(sc.id);
+    },
+    [filter, catFilter, categories, resolveSuperCategoryForRow, resolveSuperCategory],
+  );
+
   const filteredEntries = useMemo(
-    () =>
-      entries.filter((e) => {
-        const typeOk = filter === "all" ? true : filter === "income" ? e.amount > 0 : e.amount < 0;
-        if (catFilter.size === 0) return typeOk;
-        const cat = e.category_id != null ? categories.find((c) => c.id === e.category_id) : null;
-        const sc = cat
-          ? resolveSuperCategoryForRow(cat)
-          : resolveSuperCategory(e.description, e.amount < 0);
-        return typeOk && catFilter.has(sc.id);
-      }),
-    [entries, filter, catFilter, categories, resolveSuperCategoryForRow, resolveSuperCategory]
+    () => entries.filter(matchesFilter),
+    [entries, matchesFilter],
   );
 
   const sortedEntries = useMemo(() => {
@@ -1349,12 +1381,54 @@ export default function Budgetplan() {
     const list = monthEntries[m];
     const income = list
       .filter((e) => e.amount > 0)
-      .reduce((s, e) => s + planDisplayAmt(e), 0);
+      .reduce((s, e) => s + planMonthlyAmt(e), 0);
     const expense = list
       .filter((e) => e.amount < 0)
-      .reduce((s, e) => s + Math.abs(planDisplayAmt(e)), 0);
+      .reduce((s, e) => s + Math.abs(planMonthlyAmt(e)), 0);
     return { income, expense, count: list.length };
   }
+
+  /** Monatssalden 1–12 einer Eintragsliste; Index 0 ist Januar. */
+  function monthlyNets(list: RecurringPlanEntry[], y: number): number[] {
+    const nets = Array<number>(12).fill(0);
+    for (const e of list) {
+      for (const m of getApplicableMonths(e, y)) nets[m - 1] += planMonthlyAmt(e);
+    }
+    return nets;
+  }
+
+  /** Laufsaldo: Summe aller Monate bis einschliesslich diesem. */
+  const cumulativeNets = useMemo(() => {
+    const nets = monthlyNets(sortedEntries, year);
+    let running = 0;
+    return nets.map((n) => (running += n));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortedEntries, year]);
+
+  const yearTotals = useMemo(() => {
+    let income = 0;
+    let expense = 0;
+    for (let m = 1; m <= 12; m++) {
+      for (const e of monthEntries[m]) {
+        const amt = planMonthlyAmt(e);
+        if (amt > 0) income += amt;
+        else expense += Math.abs(amt);
+      }
+    }
+    return { income, expense, net: income - expense };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [monthEntries]);
+
+  /** Vorjahressaldo aus denselben Plandaten — nur zum Vergleich. */
+  const prevYearNet = useMemo(
+    () =>
+      monthlyNets(prevYearEntries.filter(matchesFilter), year - 1).reduce(
+        (s, n) => s + n,
+        0,
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [prevYearEntries, matchesFilter, year],
+  );
 
   /** Abgleich-Status der sichtbaren Eintraege eines Monats, gezaehlt. */
   function monthReconCounts(m: number): ReconCounts {
@@ -1566,6 +1640,42 @@ export default function Budgetplan() {
         </button>
       </div>
 
+      {/* ── Jahresbilanz ── */}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-4 px-4 py-2.5 bg-bg-surface rounded-xl border border-border/50 text-sm">
+        <span className="text-text-tertiary text-xs font-medium uppercase tracking-wide">
+          {t("pages:budgetplan.yearTotal", { year })}
+        </span>
+        <span className="text-gain font-medium tabular-nums">
+          +{formatAmount(yearTotals.income, refCcy)}
+        </span>
+        <span className="text-loss font-medium tabular-nums">
+          −{formatAmount(yearTotals.expense, refCcy)}
+        </span>
+        <span
+          className={clsx(
+            "font-semibold tabular-nums",
+            yearTotals.net >= 0 ? "text-gain" : "text-loss",
+          )}
+        >
+          = {yearTotals.net >= 0 ? "+" : "−"}
+          {formatAmount(Math.abs(yearTotals.net), refCcy)}
+        </span>
+        {prevYearEntries.length > 0 && (
+          <span className="text-text-tertiary text-xs tabular-nums">
+            {t("pages:budgetplan.vsPrevYear", { year: year - 1 })}{" "}
+            <span
+              className={clsx(
+                "font-medium",
+                yearTotals.net - prevYearNet >= 0 ? "text-gain" : "text-loss",
+              )}
+            >
+              {yearTotals.net - prevYearNet >= 0 ? "+" : "−"}
+              {formatAmount(Math.abs(yearTotals.net - prevYearNet), refCcy)}
+            </span>
+          </span>
+        )}
+      </div>
+
       {/* ── Prefill success banner ── */}
       {prefillResult && (
         <div className="flex items-center gap-3 mb-3 px-4 py-3 bg-gain/10 border border-gain/30 rounded-xl text-sm text-gain">
@@ -1653,6 +1763,17 @@ export default function Budgetplan() {
                                 {net >= 0 ? "+" : "−"}
                                 {formatAmount(Math.abs(net), refCcy)}
                               </p>
+                              <p className="text-[10px] text-text-tertiary tabular-nums mt-0.5">
+                                {t("pages:budgetplan.cumulative")}{" "}
+                                <span
+                                  className={
+                                    cumulativeNets[m - 1] >= 0 ? "text-gain" : "text-loss"
+                                  }
+                                >
+                                  {cumulativeNets[m - 1] >= 0 ? "+" : "−"}
+                                  {formatAmount(Math.abs(cumulativeNets[m - 1]), refCcy)}
+                                </span>
+                              </p>
                             </div>
                           )}
                         </>
@@ -1688,7 +1809,7 @@ export default function Budgetplan() {
                           ScIcon={sc.icon}
                           scColor={sc.color}
                           scLabel={sc.label}
-                          planDisplayAmt={planDisplayAmt(entry)}
+                          planDisplayAmt={planMonthlyAmt(entry)}
                           refCcy={refCcy}
                           recon={reconByKey.get(`${entry.id}:${m}`)}
                         />
@@ -1750,6 +1871,13 @@ export default function Budgetplan() {
                           = {net >= 0 ? "+" : "−"}{formatCurrencyCompact(Math.abs(net), refCcy)}
                         </span>
                       )}
+                      <span
+                        className="text-text-tertiary tabular-nums"
+                        title={t("pages:budgetplan.cumulativeTitle")}
+                      >
+                        Σ {cumulativeNets[m - 1] >= 0 ? "+" : "−"}
+                        {formatCurrencyCompact(Math.abs(cumulativeNets[m - 1]), refCcy)}
+                      </span>
                     </div>
                     <NavArrowDown
                       className={clsx(
@@ -1822,7 +1950,7 @@ export default function Budgetplan() {
                                   "py-2 text-right font-semibold tabular-nums",
                                   entry.amount < 0 ? "text-loss" : "text-gain"
                                 )}>
-                                  {entry.amount < 0 ? "−" : "+"}{formatCurrencyCompact(Math.abs(planDisplayAmt(entry)), refCcy)}
+                                  {entry.amount < 0 ? "−" : "+"}{formatCurrencyCompact(Math.abs(planMonthlyAmt(entry)), refCcy)}
                                 </td>
                                 <td className="py-2 pl-4 text-text-secondary text-xs">{periodicityLabel(entry.periodicity)}</td>
                                 <td className="py-2 pl-4 text-text-secondary text-xs hidden sm:table-cell">

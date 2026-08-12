@@ -141,6 +141,10 @@
     "addEntry": "Eintrag hinzufügen",
     "suggestionHint": "Vorschlag übernehmen, Werte anpassen und als neuen Eintrag für",
     "ongoing": "laufend",
+    "yearTotal": "Jahr {{year}}",
+    "vsPrevYear": "ggü. {{year}}",
+    "cumulative": "kumuliert",
+    "cumulativeTitle": "Laufsaldo seit Januar",
     "reconActual": "Ist:",
     "recon": {
       "booked": "Gebucht",

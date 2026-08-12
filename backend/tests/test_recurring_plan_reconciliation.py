@@ -60,11 +60,12 @@ async def seeded(tmp_path, app):
                 periodicity="monthly", start_date=date(YEAR, 1, 1),
                 end_date=date(YEAR, 1, 31), is_future=True,
             ),
-            # nie gebucht, Monat liegt in der Vergangenheit
+            # nie gebucht, Monate liegen in der Vergangenheit. Laeuft ueber das
+            # ganze Jahr, damit der Monatsfilter etwas zu filtern hat.
             RecurringPlan(
                 user_id=user.id, description="Zeitungsabo", amount=-25.0,
-                periodicity="monthly", start_date=date(YEAR, 1, 1),
-                end_date=date(YEAR, 1, 31), is_future=True,
+                periodicity="quarterly", start_date=date(YEAR, 1, 1),
+                end_date=date(YEAR, 12, 31), is_future=True,
             ),
             # nie gebucht, liegt sicher in der Zukunft
             RecurringPlan(

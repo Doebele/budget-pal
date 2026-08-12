@@ -225,14 +225,23 @@ async def _get_own_entry(
     return entry
 
 
+#: Wie viele verschiedene Monate eines Jahres eine Periodizitaet erwarten laesst.
+#: "weekly" fehlt bewusst — woechentlich und monatlich sind an der Monatszahl
+#: nicht zu unterscheiden, beide treffen alle zwoelf.
+_MONTHS_PER_YEAR = {"monthly": 12, "quarterly": 4, "halfyearly": 2, "yearly": 1}
+
+
 def _infer_periodicity(distinct_months: int) -> str:
-    if distinct_months >= 10:
-        return "monthly"
-    if 3 <= distinct_months <= 5:
-        return "quarterly"
-    if distinct_months == 2:
-        return "halfyearly"
-    return "yearly"
+    """Periodizitaet aus der Anzahl Monate mit Buchung — naechstliegende Erwartung.
+
+    Die fruehere Staffelung liess 6 bis 9 Monate durchfallen: sie landeten auf
+    "yearly", obwohl eine Zahlung in acht Monaten alles andere als jaehrlich
+    ist. Bei Gleichstand gewinnt die haeufigere Periodizitaet.
+    """
+    return min(
+        _MONTHS_PER_YEAR,
+        key=lambda p: (abs(_MONTHS_PER_YEAR[p] - distinct_months), -_MONTHS_PER_YEAR[p]),
+    )
 
 
 # Empirical income lines → canonical txn category name (Super «Sparen» / real user categories)
