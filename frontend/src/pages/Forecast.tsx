@@ -27,6 +27,7 @@ import BudgetStackedBarChart, {
   CHART_SC_ORDER,
 } from "@/components/charts/BudgetStackedBarChart";
 import { useTaxonomySuperCategories, resolveSuperCategoryFromList } from "@/lib/categories";
+import { applicableMonths, monthlyAmount } from "@/lib/planSchedule";
 import ForecastCard from "@/components/ForecastCard";
 import RetirementPlanner from "@/components/RetirementPlanner";
 import { useAuth } from "@/lib/auth";
@@ -116,11 +117,13 @@ function formatMonthShort(m: string): string {
   return `${new Intl.DateTimeFormat(i18n.language, { month: "short" }).format(new Date(Number(year), parseInt(month, 10) - 1, 1))} ${year}`;
 }
 
-// ── Recurring plan month helper (mirrors Budgetplan.tsx logic) ──
+// ── Budgetplan-Eintraege ──────────────────────────────────────
 
 interface PlanEntry {
   id: number;
   amount: number;
+  /** Betrag in der Referenzwaehrung des Nutzers — bei Fremdwaehrung ≠ amount. */
+  amount_reference?: number;
   periodicity: string;
   start_date: string;
   end_date: string | null;
@@ -128,27 +131,10 @@ interface PlanEntry {
   category_id: number | null;
 }
 
-function getPlanApplicableMonths(entry: PlanEntry, year: number): number[] {
-  const sd = new Date(entry.start_date + "T00:00:00");
-  const ed = entry.end_date ? new Date(entry.end_date + "T00:00:00") : null;
-  const startM = sd.getFullYear() < year ? 1 : sd.getFullYear() === year ? sd.getMonth() + 1 : null;
-  if (startM === null) return [];
-  const endM = ed
-    ? ed.getFullYear() > year ? 12 : ed.getFullYear() === year ? ed.getMonth() + 1 : null
-    : 12;
-  if (endM === null) return [];
-  const anchor = sd.getMonth() + 1;
-  const months: number[] = [];
-  for (let m = startM; m <= endM; m++) {
-    switch (entry.periodicity) {
-      case "weekly":
-      case "monthly": months.push(m); break;
-      case "quarterly": if (((m - anchor) % 3 + 3) % 3 === 0) months.push(m); break;
-      case "halfyearly": if (((m - anchor) % 6 + 6) % 6 === 0) months.push(m); break;
-      case "yearly": if (m === anchor) months.push(m); break;
-    }
-  }
-  return months;
+/** Monatswert in Referenzwaehrung. `amount` steht in der Planwaehrung: eine
+ *  Zeile in EUR floss vorher unkonvertiert in die Prognose. */
+function planMonthlyAmount(entry: PlanEntry): number {
+  return monthlyAmount(entry.amount_reference ?? entry.amount, entry.periodicity);
 }
 
 function categoryColor(name: string): string {
@@ -328,9 +314,10 @@ export default function Forecast() {
       let expense = 0;
 
       for (const entry of entries) {
-        if (getPlanApplicableMonths(entry, year).includes(month)) {
-          if (entry.amount > 0) income += entry.amount;
-          else expense += entry.amount; // already negative
+        if (applicableMonths(entry, year).includes(month)) {
+          const amt = planMonthlyAmount(entry);
+          if (amt > 0) income += amt;
+          else expense += amt; // already negative
         }
       }
       // Only add point if there's actual plan data
@@ -375,9 +362,9 @@ export default function Forecast() {
       for (const entry of entries) {
         // Only expense entries (negative amount)
         if (entry.amount >= 0) continue;
-        if (!getPlanApplicableMonths(entry, year).includes(month)) continue;
+        if (!applicableMonths(entry, year).includes(month)) continue;
 
-        const amt = Math.abs(entry.amount);
+        const amt = Math.abs(planMonthlyAmount(entry));
         let scId = "sonstiges";
 
         const cat = entry.category_id != null ? catById.get(entry.category_id) : null;

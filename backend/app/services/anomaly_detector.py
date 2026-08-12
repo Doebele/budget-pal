@@ -92,7 +92,7 @@ async def detect(
     findings += _detect_price_changes(rows, ref, rates, recent_cutoff)
     findings += _detect_missing_salary(rows, ref, rates, today)
     findings += _detect_large_cash(rows, ref, rates, recent_cutoff)
-    findings += await _detect_upcoming_bills(user.id, db, today)
+    findings += await _detect_upcoming_bills(user.id, db, today, ref, rates)
     findings += await _detect_budget_overrun(user.id, db, rows, ref, rates, today)
 
     # Sort: alert > warning > info
@@ -289,10 +289,15 @@ PERIODICITY_DAYS = {
 }
 
 
-async def _detect_upcoming_bills(user_id: int, db: AsyncSession, today: date) -> List[AnomalyFinding]:
+async def _detect_upcoming_bills(
+    user_id: int, db: AsyncSession, today: date, ref: str, rates: dict
+) -> List[AnomalyFinding]:
     """
     Find RecurringPlan expense entries whose next occurrence falls within 7 days.
     For each plan entry the next occurrence is estimated from start_date + N × period.
+
+    Der Betrag wird in die Referenzwaehrung umgerechnet: `plan.amount` steht in
+    der Waehrung der Planzeile, wurde hier aber unbesehen als CHF beschriftet.
     """
     horizon = today + timedelta(days=7)
 
@@ -321,13 +326,16 @@ async def _detect_upcoming_bills(user_id: int, db: AsyncSession, today: date) ->
         if today <= next_occ <= horizon:
             days_away = (next_occ - today).days
             when_str = "heute" if days_away == 0 else f"in {days_away} Tag{'en' if days_away != 1 else ''}"
+            amt = abs(convert_with_eur_rates(
+                rates, plan.amount, (plan.currency or "CHF").strip().upper(), ref
+            ))
             findings.append(AnomalyFinding(
                 type="upcoming_bill",
                 severity="warning",
                 title=f"Zahlung fällig: {plan.description}",
-                body=f"CHF {abs(plan.amount):,.2f} — {when_str} ({next_occ.strftime('%d.%m.%Y')})",
-                amount=abs(plan.amount),
-                currency="CHF",
+                body=f"{ref} {amt:,.2f} — {when_str} ({next_occ.strftime('%d.%m.%Y')})",
+                amount=round(amt, 2),
+                currency=ref,
             ))
 
     return findings[:5]

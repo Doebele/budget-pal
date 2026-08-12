@@ -28,6 +28,7 @@ import {
 import i18n from "@/i18n";
 import { useTaxonomy } from "@/lib/categories";
 import { matchPlanEntryProviderId } from "@/lib/planEntryProviderMatch";
+import { applicableMonths, occurrencesPerMonth } from "@/lib/planSchedule";
 import { formatAmount, formatCurrencyCompact } from "@/lib/theme";
 import { useAuth } from "@/lib/auth";
 import ProviderBrandIcon from "@/components/wizard/ProviderBrandIcon";
@@ -85,53 +86,9 @@ const DND_ENTRY_MIME = "application/x-budgetplan-recurring-entry";
 
 const PERIODICITIES = ["weekly", "monthly", "quarterly", "halfyearly", "yearly"] as const;
 
-/**
- * Faelligkeiten je Monat, in dem der Eintrag anfaellt — Gegenstueck zu
- * `backend/app/services/plan_schedule.py`. Alles ausser `weekly` faellt genau
- * einmal an; `getApplicableMonths` bestimmt bereits *welche* Monate.
- */
-const OCCURRENCES_PER_MONTH: Record<string, number> = { weekly: 52 / 12 };
-
-function occurrencesPerMonth(periodicity: string): number {
-  return OCCURRENCES_PER_MONTH[periodicity] ?? 1;
-}
-
 // ── Helpers ───────────────────────────────────────────────────
 
-function getApplicableMonths(entry: RecurringPlanEntry, year: number): number[] {
-  const sd = new Date(entry.start_date + "T00:00:00");
-  const ed = entry.end_date ? new Date(entry.end_date + "T00:00:00") : null;
-  const startM = sd.getFullYear() < year ? 1 : sd.getFullYear() === year ? sd.getMonth() + 1 : null;
-  if (startM === null) return [];
-  const endM = ed
-    ? ed.getFullYear() > year
-      ? 12
-      : ed.getFullYear() === year
-      ? ed.getMonth() + 1
-      : null
-    : 12;
-  if (endM === null) return [];
-  const anchor = sd.getMonth() + 1;
-  const months: number[] = [];
-  for (let m = startM; m <= endM; m++) {
-    switch (entry.periodicity) {
-      case "weekly":
-      case "monthly":
-        months.push(m);
-        break;
-      case "quarterly":
-        if (((m - anchor) % 3 + 3) % 3 === 0) months.push(m);
-        break;
-      case "halfyearly":
-        if (((m - anchor) % 6 + 6) % 6 === 0) months.push(m);
-        break;
-      case "yearly":
-        if (m === anchor) months.push(m);
-        break;
-    }
-  }
-  return months;
-}
+const getApplicableMonths = applicableMonths;
 
 function periodicityLabel(p: string): string {
   // Modulweit statt via useTranslation — die Funktion wird auch ausserhalb
