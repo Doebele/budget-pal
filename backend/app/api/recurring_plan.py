@@ -7,6 +7,7 @@ Routes:
   POST   /api/recurring-plan/prefill      bulk-create suggested entries (with dedup)
   GET    /api/recurring-plan              list entries for the authenticated user
   POST   /api/recurring-plan             create a new entry
+  POST   /api/recurring-plan/batch        create/update/delete many in one transaction
   PUT    /api/recurring-plan/{id}        update an entry (own records only)
   DELETE /api/recurring-plan/{id}        delete an entry (own records only)
 """
@@ -229,6 +230,23 @@ async def _get_own_entry(
 #: "weekly" fehlt bewusst — woechentlich und monatlich sind an der Monatszahl
 #: nicht zu unterscheiden, beide treffen alle zwoelf.
 _MONTHS_PER_YEAR = {"monthly": 12, "quarterly": 4, "halfyearly": 2, "yearly": 1}
+
+
+def _new_plan_row(payload: RecurringPlanCreate, user_id: int) -> RecurringPlan:
+    """Baut die ORM-Zeile aus einem Create-Payload — Einzel- und Batch-Weg teilen sie."""
+    return RecurringPlan(
+        user_id=user_id,
+        account_id=payload.account_id,
+        category_id=payload.category_id,
+        description=payload.description,
+        amount=payload.amount,
+        periodicity=payload.periodicity,
+        start_date=payload.start_date,
+        end_date=payload.end_date,
+        is_future=payload.is_future,
+        notes=payload.notes,
+        **({"currency": payload.currency.strip().upper()} if payload.currency else {}),
+    )
 
 
 def _infer_periodicity(distinct_months: int) -> str:
@@ -815,19 +833,7 @@ async def create_recurring_plan(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    entry = RecurringPlan(
-        user_id=current_user.id,
-        account_id=payload.account_id,
-        category_id=payload.category_id,
-        description=payload.description,
-        amount=payload.amount,
-        periodicity=payload.periodicity,
-        start_date=payload.start_date,
-        end_date=payload.end_date,
-        is_future=payload.is_future,
-        notes=payload.notes,
-        **({ "currency": payload.currency.strip().upper() } if payload.currency else {}),
-    )
+    entry = _new_plan_row(payload, current_user.id)
     db.add(entry)
     await db.commit()
     await db.refresh(entry)
@@ -854,6 +860,79 @@ async def update_recurring_plan(
     loaded = await _load_recurring_with_account(db, entry_id, current_user.id)
     rates = await currency_service.get_rates("EUR")
     return recurring_plan_to_response(loaded, current_user, rates)
+
+
+# ── Massenaenderungen ─────────────────────────────────────────
+
+class BatchUpdate(RecurringPlanUpdate):
+    id: int
+
+
+class BatchRequest(BaseModel):
+    """Ein Bündel Änderungen, die gemeinsam gelten oder gemeinsam ausbleiben."""
+
+    create: List[RecurringPlanCreate] = Field(default_factory=list, max_length=500)
+    update: List[BatchUpdate] = Field(default_factory=list, max_length=500)
+    delete: List[int] = Field(default_factory=list, max_length=500)
+
+
+class BatchResponse(BaseModel):
+    created: int
+    updated: int
+    deleted: int
+
+
+@router.post("/batch", response_model=BatchResponse)
+async def batch_recurring_plan(
+    payload: BatchRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Mehrere Aenderungen in genau einer Transaktion.
+
+    "Monat leeren" lief bisher als Schleife aus Einzelaufrufen im Browser:
+    pro Eintrag erst die Ersatzzeilen anlegen, dann das Original loeschen.
+    Brach die Schleife in der Mitte ab, blieb der Plan halb umgebaut zurueck.
+    Hier gilt entweder alles oder nichts.
+
+    Fehlt auch nur eine der angesprochenen Zeilen — oder gehoert sie einem
+    anderen Konto — bricht der ganze Aufruf ab, statt den Rest still
+    anzuwenden.
+    """
+    touched = {u.id for u in payload.update} | set(payload.delete)
+    owned: dict[int, RecurringPlan] = {}
+    if touched:
+        result = await db.execute(
+            select(RecurringPlan).where(
+                RecurringPlan.user_id == current_user.id,
+                RecurringPlan.id.in_(touched),
+            )
+        )
+        owned = {row.id: row for row in result.scalars().all()}
+        missing = sorted(touched - owned.keys())
+        if missing:
+            raise HTTPException(
+                status_code=404, detail=f"Entries not found: {missing}"
+            )
+
+    for item in payload.update:
+        entry = owned[item.id]
+        for field, value in item.model_dump(exclude_unset=True, exclude={"id"}).items():
+            setattr(entry, field, value)
+        entry.updated_at = _now()
+
+    for item in payload.create:
+        db.add(_new_plan_row(item, current_user.id))
+
+    for entry_id in set(payload.delete):
+        await db.delete(owned[entry_id])
+
+    await db.commit()
+    return BatchResponse(
+        created=len(payload.create),
+        updated=len(payload.update),
+        deleted=len(set(payload.delete)),
+    )
 
 
 @router.delete("/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)

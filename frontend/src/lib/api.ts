@@ -277,6 +277,12 @@ export const recurringPlanApi = {
   }) => api.post("/recurring-plan/prefill", payload),
   reconciliation: (year: number, month?: number) =>
     api.get("/recurring-plan/reconciliation", { params: { year, month } }),
+  /** Alles oder nichts — siehe backend/app/api/recurring_plan.py */
+  batch: (payload: {
+    create?: Record<string, unknown>[];
+    update?: Array<{ id: number } & Record<string, unknown>>;
+    delete?: number[];
+  }) => api.post("/recurring-plan/batch", payload),
 };
 
 /** Plan-Ist-Abgleich — siehe backend/app/api/recurring_plan.py */

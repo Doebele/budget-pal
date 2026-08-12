@@ -515,6 +515,9 @@ interface EntryChipProps {
   planDisplayAmt: number;
   refCcy: string;
   recon?: ReconciliationEntry;
+  /** null = Auswahlmodus aus */
+  selected: boolean | null;
+  onToggleSelected: (id: number) => void;
 }
 
 function EntryChip({
@@ -523,6 +526,7 @@ function EntryChip({
   onDragStart, onDragEnd, onEdit,
   providerId, ScIcon, scColor, scLabel,
   planDisplayAmt, refCcy, recon,
+  selected, onToggleSelected,
 }: EntryChipProps) {
   const { t } = useTranslation();
   const [hovering, setHovering] = useState(false);
@@ -558,6 +562,17 @@ function EntryChip({
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
+      {selected !== null && (
+        <label className="flex items-center px-1.5 shrink-0 border-r border-border/30 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={() => onToggleSelected(entry.id)}
+            className="accent-accent w-3.5 h-3.5"
+            aria-label={entry.description}
+          />
+        </label>
+      )}
       <button
         type="button"
         draggable={!dndBusy}
@@ -949,6 +964,13 @@ export default function Budgetplan() {
   /** Hover-Hervorhebung: Entry-ID deren gleichnamige Einträge über alle Monate leuchten */
   const [hoveredEntryId, setHoveredEntryId] = useState<number | null>(null);
 
+  /** Mehrfachauswahl für Massenänderungen — Auswahl gilt der Planzeile, nicht
+   *  der einzelnen Fälligkeit. */
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [bulkPct, setBulkPct] = useState("");
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+
   // Queries
   const { data: entries = [], isLoading } = useQuery({
     queryKey: ["recurring-plan", year],
@@ -1147,23 +1169,74 @@ export default function Budgetplan() {
   });
 
   const clearMonthMut = useMutation({
-    mutationFn: async (payload: { month: number; rows: RecurringPlanEntry[] }) => {
+    // Ein Aufruf statt einer Schleife aus Einzelaufrufen: bricht sie in der
+    // Mitte ab, bleibt der Plan sonst halb umgebaut zurueck.
+    mutationFn: (payload: { month: number; rows: RecurringPlanEntry[] }) => {
       const { month: targetMonth, rows } = payload;
       const unique = [...new Map(rows.map((e) => [e.id, e])).values()];
+      const create: Record<string, unknown>[] = [];
+      const remove: number[] = [];
       for (const entry of unique) {
         const { creates, deleteId } = planRemoveMonthFromEntry(entry, year, targetMonth);
         if (!deleteId) continue;
-        for (const body of creates) {
-          await recurringPlanApi.create(body);
-        }
-        await recurringPlanApi.delete(deleteId);
+        create.push(...creates);
+        remove.push(deleteId);
       }
+      return recurringPlanApi.batch({ create, delete: remove });
     },
     onSuccess: () => {
       invalidate();
       setClearMonthDialog(null);
     },
   });
+
+  const bulkMut = useMutation({
+    mutationFn: (payload: Parameters<typeof recurringPlanApi.batch>[0]) =>
+      recurringPlanApi.batch(payload),
+    onSuccess: () => {
+      invalidate();
+      setSelected(new Set());
+      setBulkDeleteOpen(false);
+      setBulkPct("");
+    },
+  });
+
+  /** Die ausgewählten Planzeilen, unabhängig von der Monatsspalte. */
+  const selectedEntries = useMemo(
+    () => entries.filter((e) => selected.has(e.id)),
+    [entries, selected],
+  );
+
+  function toggleSelected(id: number) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function bulkAssignCategory(categoryId: string) {
+    if (selected.size === 0) return;
+    bulkMut.mutate({
+      update: [...selected].map((id) => ({
+        id,
+        category_id: categoryId ? Number(categoryId) : null,
+      })),
+    });
+  }
+
+  function bulkApplyPercent() {
+    const pct = Number(bulkPct.replace(",", "."));
+    if (!Number.isFinite(pct) || pct === 0 || selectedEntries.length === 0) return;
+    bulkMut.mutate({
+      update: selectedEntries.map((e) => ({
+        id: e.id,
+        // Auf Rappen runden — sonst sammeln sich über mehrere Aufschläge
+        // Nachkommastellen an, die niemand erfasst hat.
+        amount: Math.round(e.amount * (1 + pct / 100) * 100) / 100,
+      })),
+    });
+  }
 
   const prefillMut = useMutation({
     mutationFn: (entries: PrefillSuggestion[]) =>
@@ -1605,6 +1678,24 @@ export default function Budgetplan() {
           </select>
         </div>
 
+        {/* Mehrfachauswahl */}
+        <button
+          onClick={() => {
+            setSelectMode((on) => !on);
+            setSelected(new Set());
+          }}
+          className={clsx(
+            "flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm font-medium transition-colors",
+            selectMode
+              ? "bg-accent/15 border-accent text-accent"
+              : "bg-bg-surface2 hover:bg-bg-surface border-border text-text-secondary hover:text-text-primary",
+          )}
+          aria-pressed={selectMode}
+        >
+          <CheckSquare className="w-4 h-4" />
+          {t("pages:budgetplan.select")}
+        </button>
+
         {/* View toggle */}
         <div className="toggle-group">
           <button
@@ -1675,6 +1766,102 @@ export default function Budgetplan() {
           </span>
         )}
       </div>
+
+      {/* ── Massenänderungen ── */}
+      {selectMode && (
+        <div className="flex flex-wrap items-center gap-3 mb-4 px-4 py-2.5 bg-accent/8 border border-accent/40 rounded-xl text-sm">
+          <span className="text-text-primary font-medium">
+            {t("pages:budgetplan.selectedCount", { count: selected.size })}
+          </span>
+          <button
+            onClick={() => setSelected(new Set(filteredEntries.map((e) => e.id)))}
+            className="text-xs text-accent hover:underline"
+          >
+            {t("pages:budgetplan.selectAll")}
+          </button>
+          <button
+            onClick={() => setSelected(new Set())}
+            className="text-xs text-text-tertiary hover:text-text-primary"
+          >
+            {t("pages:budgetplan.selectNone")}
+          </button>
+
+          <span className="w-px h-5 bg-border/60" />
+
+          <div className="w-56">
+            <BudgetplanCategoryPicker
+              value=""
+              onChange={bulkAssignCategory}
+              groupedCategoryOptions={groupedCategoryOptions}
+              groupedCategoryIds={groupedCategoryIds}
+              categories={categories}
+              isExpense
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <input
+              type="number"
+              step="0.1"
+              value={bulkPct}
+              onChange={(e) => setBulkPct(e.target.value)}
+              placeholder={t("pages:budgetplan.percentPlaceholder")}
+              aria-label={t("pages:budgetplan.percentLabel")}
+              className="w-20 bg-bg-surface2 border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+            <span className="text-text-tertiary text-xs">%</span>
+            <button
+              onClick={bulkApplyPercent}
+              disabled={selected.size === 0 || bulkMut.isPending || !bulkPct.trim()}
+              className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-bg-surface2 border border-border text-text-secondary hover:text-text-primary transition-colors disabled:opacity-40"
+            >
+              {t("pages:budgetplan.applyPercent")}
+            </button>
+          </div>
+
+          <button
+            onClick={() => setBulkDeleteOpen(true)}
+            disabled={selected.size === 0 || bulkMut.isPending}
+            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-loss hover:bg-loss/10 border border-loss/40 transition-colors disabled:opacity-40"
+          >
+            <Trash className="w-3.5 h-3.5" />
+            {t("pages:budgetplan.deleteSelected")}
+          </button>
+        </div>
+      )}
+
+      {/* ── Auswahl löschen: Bestätigung ── */}
+      {bulkDeleteOpen && (
+        <>
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70]" aria-hidden />
+          <div className="fixed inset-0 z-[71] flex items-center justify-center p-4">
+            <div className="w-full max-w-sm bg-bg-surface border border-border rounded-xl p-5 shadow-2xl">
+              <h3 className="text-text-primary font-semibold text-base mb-2">
+                {t("pages:budgetplan.deleteSelectedQuestion", { count: selected.size })}
+              </h3>
+              <p className="text-text-secondary text-sm mb-4">
+                {t("pages:budgetplan.deleteSelectedHint")}
+              </p>
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => setBulkDeleteOpen(false)}
+                  disabled={bulkMut.isPending}
+                  className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
+                >
+                  {t("buttons.cancel")}
+                </button>
+                <button
+                  onClick={() => bulkMut.mutate({ delete: [...selected] })}
+                  disabled={bulkMut.isPending}
+                  className="px-4 py-2 text-sm font-medium bg-loss hover:bg-loss/90 text-white rounded-lg transition-colors disabled:opacity-60"
+                >
+                  {t("buttons.delete")}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* ── Prefill success banner ── */}
       {prefillResult && (
@@ -1812,6 +1999,8 @@ export default function Budgetplan() {
                           planDisplayAmt={planMonthlyAmt(entry)}
                           refCcy={refCcy}
                           recon={reconByKey.get(`${entry.id}:${m}`)}
+                          selected={selectMode ? selected.has(entry.id) : null}
+                          onToggleSelected={toggleSelected}
                         />
                       );
                     })}
@@ -1912,6 +2101,7 @@ export default function Budgetplan() {
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="text-text-tertiary text-xs uppercase tracking-wide">
+                            {selectMode && <th className="w-8" />}
                             <th className="text-left pb-2 font-medium">{t("table.description")}</th>
                             <th className="text-right pb-2 font-medium">{t("table.amount")}</th>
                             <th className="text-left pb-2 font-medium pl-4">{t("pages:budgetplan.periodicityLabel")}</th>
@@ -1930,6 +2120,17 @@ export default function Budgetplan() {
                                 className="border-t border-border/20 hover:bg-bg-surface2 cursor-pointer transition-colors"
                                 onClick={() => openEdit(entry)}
                               >
+                                {selectMode && (
+                                  <td className="py-2" onClick={(e) => e.stopPropagation()}>
+                                    <input
+                                      type="checkbox"
+                                      checked={selected.has(entry.id)}
+                                      onChange={() => toggleSelected(entry.id)}
+                                      className="accent-accent w-3.5 h-3.5"
+                                      aria-label={entry.description}
+                                    />
+                                  </td>
+                                )}
                                 <td className="py-2 text-text-primary font-medium">
                                   <span className="flex items-center gap-1.5">
                                     {badge && (
