@@ -139,7 +139,15 @@
     "all": "All",
     "entryButton": "Entry",
     "addEntry": "Add entry",
-    "suggestionHint": "Take suggestion, adjust values and save as a new entry for"
+    "suggestionHint": "Take suggestion, adjust values and save as a new entry for",
+    "ongoing": "ongoing",
+    "reconActual": "Actual:",
+    "recon": {
+      "booked": "Booked",
+      "deviating": "Amount deviates",
+      "open": "Open",
+      "overdue": "Overdue"
+    }
   },
   "wizard": {
     "w00": "Estimated net income",

@@ -275,7 +275,32 @@ export const recurringPlanApi = {
       source: string;
     }>;
   }) => api.post("/recurring-plan/prefill", payload),
+  reconciliation: (year: number, month?: number) =>
+    api.get("/recurring-plan/reconciliation", { params: { year, month } }),
 };
+
+/** Plan-Ist-Abgleich — siehe backend/app/api/recurring_plan.py */
+export type ReconciliationStatus = "booked" | "deviating" | "open" | "overdue";
+
+export interface ReconciliationEntry {
+  plan_id: number;
+  description: string;
+  month: number;
+  periodicity: string;
+  expected: number;
+  actual: number | null;
+  status: ReconciliationStatus;
+  matched_transaction_ids: number[];
+}
+
+export interface ReconciliationResponse {
+  year: number;
+  entries: ReconciliationEntry[];
+  booked_count: number;
+  open_count: number;
+  overdue_count: number;
+  deviating_count: number;
+}
 
 // Settings (category mappings)
 export const settingsApi = {

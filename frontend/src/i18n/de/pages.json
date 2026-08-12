@@ -139,7 +139,15 @@
     "all": "Alle",
     "entryButton": "Eintrag",
     "addEntry": "Eintrag hinzufügen",
-    "suggestionHint": "Vorschlag übernehmen, Werte anpassen und als neuen Eintrag für"
+    "suggestionHint": "Vorschlag übernehmen, Werte anpassen und als neuen Eintrag für",
+    "ongoing": "laufend",
+    "reconActual": "Ist:",
+    "recon": {
+      "booked": "Gebucht",
+      "deviating": "Betrag weicht ab",
+      "open": "Offen",
+      "overdue": "Überfällig"
+    }
   },
   "wizard": {
     "w00": "Geschätztes Nettoeinkommen",

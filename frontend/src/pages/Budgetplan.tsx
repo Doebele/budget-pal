@@ -14,10 +14,18 @@ import { displayLocale } from "@/lib/format";
 import { useState, useMemo, useEffect, useRef, useCallback, type DragEvent } from "react";
 import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { BookStack, Building, Calendar, CheckSquare, DataTransferBoth, Drag, EditPencil, NavArrowDown, NavArrowLeft, NavArrowRight, Page, Plus, Refresh, Search, Sparks, Square, Trash, Xmark } from "@/lib/icons";
+import { BookStack, Building, Calendar, CheckCircle, CheckSquare, Clock, DataTransferBoth, Drag, EditPencil, NavArrowDown, NavArrowLeft, NavArrowRight, Page, Plus, Refresh, Search, Sparks, Square, Trash, WarningCircle, WarningTriangle, Xmark } from "@/lib/icons";
 import { clsx } from "clsx";
 
-import { recurringPlanApi, accountsApi, categoriesApi } from "@/lib/api";
+import {
+  recurringPlanApi,
+  accountsApi,
+  categoriesApi,
+  type ReconciliationEntry,
+  type ReconciliationResponse,
+  type ReconciliationStatus,
+} from "@/lib/api";
+import i18n from "@/i18n";
 import { useTaxonomy } from "@/lib/categories";
 import { matchPlanEntryProviderId } from "@/lib/planEntryProviderMatch";
 import { formatAmount, formatCurrencyCompact } from "@/lib/theme";
@@ -80,13 +88,7 @@ const MONTH_NAMES = [
   "Juli", "August", "September", "Oktober", "November", "Dezember",
 ];
 
-const PERIODICITIES = [
-  { value: "weekly", label: "Wöchentlich" },
-  { value: "monthly", label: "Monatlich" },
-  { value: "quarterly", label: "Quartalsweise" },
-  { value: "halfyearly", label: "Halbjährlich" },
-  { value: "yearly", label: "Jährlich" },
-];
+const PERIODICITIES = ["weekly", "monthly", "quarterly", "halfyearly", "yearly"] as const;
 
 const PERIOD_FACTOR: Record<string, number> = {
   weekly: 4.33,
@@ -134,7 +136,9 @@ function getApplicableMonths(entry: RecurringPlanEntry, year: number): number[] 
 }
 
 function periodicityLabel(p: string): string {
-  return PERIODICITIES.find((x) => x.value === p)?.label ?? p;
+  // Modulweit statt via useTranslation — die Funktion wird auch ausserhalb
+  // von Komponenten gebraucht.
+  return i18n.t(`periodicity.${p}`, { ns: "common", defaultValue: p });
 }
 
 const ISO_FAR = "9999-12-31";
@@ -307,9 +311,13 @@ interface EntryTooltipProps {
   account: Account | undefined;
   targetRef: React.RefObject<HTMLElement | null>;
   visible: boolean;
+  /** Abgleich dieser Faelligkeit, falls vorhanden. */
+  recon?: ReconciliationEntry;
+  refCcy: string;
 }
 
-function EntryTooltip({ entry, account, targetRef, visible }: EntryTooltipProps) {
+function EntryTooltip({ entry, account, targetRef, visible, recon, refCcy }: EntryTooltipProps) {
+  const { t } = useTranslation();
   const [pos, setPos] = useState({ top: 0, left: 0, above: false });
   const tooltipRef = useRef<HTMLDivElement>(null);
 
@@ -383,9 +391,25 @@ function EntryTooltip({ entry, account, targetRef, visible }: EntryTooltipProps)
             {formatDateDE(entry.start_date)}
             {entry.end_date && entry.end_date !== "9999-12-31"
               ? ` – ${formatDateDE(entry.end_date)}`
-              : " (laufend)"}
+              : ` (${t("pages:budgetplan.ongoing")})`}
           </span>
         </div>
+
+        {/* Plan-Ist-Abgleich */}
+        {recon && (() => {
+          const { Icon, color } = RECON_BADGE[recon.status];
+          return (
+            <div className={clsx("flex items-center gap-2", color)}>
+              <Icon className="w-3 h-3 shrink-0" />
+              <span>
+                {t(`pages:budgetplan.recon.${recon.status}`)}
+                {recon.actual !== null && recon.status === "deviating" && (
+                  <> — {t("pages:budgetplan.reconActual")} {formatAmount(Math.abs(recon.actual), refCcy)}</>
+                )}
+              </span>
+            </div>
+          );
+        })()}
 
         {/* Notes */}
         {entry.notes && (
@@ -417,6 +441,51 @@ function EntryTooltip({ entry, account, targetRef, visible }: EntryTooltipProps)
   );
 }
 
+// ── Plan-Ist-Abgleich ─────────────────────────────────────────
+
+/**
+ * Icon und Farbe je Abgleich-Status. Die Form unterscheidet sich mit, denn
+ * Farbe allein traegt die Information nicht (WCAG 1.4.1).
+ */
+const RECON_BADGE: Record<
+  ReconciliationStatus,
+  { Icon: React.ComponentType<{ className?: string }>; color: string }
+> = {
+  booked: { Icon: CheckCircle, color: "text-gain" },
+  deviating: { Icon: WarningTriangle, color: "text-warning" },
+  open: { Icon: Clock, color: "text-text-tertiary" },
+  overdue: { Icon: WarningCircle, color: "text-loss" },
+};
+
+const RECON_ORDER: ReconciliationStatus[] = ["overdue", "deviating", "open", "booked"];
+
+type ReconCounts = Record<ReconciliationStatus, number>;
+
+/** Zaehlt die Faelligkeiten eines Monats nach Status; leer wird nicht gezeigt. */
+function ReconSummary({ counts }: { counts: ReconCounts }) {
+  const { t } = useTranslation();
+  const shown = RECON_ORDER.filter((s) => counts[s] > 0);
+  if (shown.length === 0) return null;
+  return (
+    <div className="flex items-center gap-2 text-[10px] tabular-nums">
+      {shown.map((s) => {
+        const { Icon, color } = RECON_BADGE[s];
+        return (
+          <span
+            key={s}
+            className={clsx("flex items-center gap-0.5", color)}
+            title={t(`pages:budgetplan.recon.${s}`)}
+          >
+            <Icon className="w-3 h-3" />
+            {counts[s]}
+            <span className="sr-only"> {t(`pages:budgetplan.recon.${s}`)}</span>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Entry chip with tooltip ───────────────────────────────────
 
 interface EntryChipProps {
@@ -435,6 +504,7 @@ interface EntryChipProps {
   scLabel: string;
   planDisplayAmt: number;
   refCcy: string;
+  recon?: ReconciliationEntry;
 }
 
 function EntryChip({
@@ -442,7 +512,7 @@ function EntryChip({
   isHighlighted, onHoverChange,
   onDragStart, onDragEnd, onEdit,
   providerId, ScIcon, scColor, scLabel,
-  planDisplayAmt, refCcy,
+  planDisplayAmt, refCcy, recon,
 }: EntryChipProps) {
   const { t } = useTranslation();
   const [hovering, setHovering] = useState(false);
@@ -516,6 +586,16 @@ function EntryChip({
                 <ScIcon className="w-[13px] h-[13px] text-text-secondary" strokeWidth={2.4} />
               </div>
             )}
+            {recon && (() => {
+              const { Icon, color } = RECON_BADGE[recon.status];
+              const label = t(`pages:budgetplan.recon.${recon.status}`);
+              return (
+                <span className={clsx("ml-1 flex items-center", color)} title={label}>
+                  <Icon className="w-3.5 h-3.5" />
+                  <span className="sr-only">{label}</span>
+                </span>
+              );
+            })()}
           </div>
           <span
             className={clsx(
@@ -544,6 +624,8 @@ function EntryChip({
         account={account}
         targetRef={chipRef}
         visible={hovering}
+        recon={recon}
+        refCcy={refCcy}
       />
     </div>
   );
@@ -862,6 +944,23 @@ export default function Budgetplan() {
     queryFn: () => categoriesApi.list().then((r) => r.data as Category[]),
   });
 
+  // Plan-Ist-Abgleich: einmal fuer das ganze Jahr, nicht je Monatsspalte.
+  const { data: reconciliation } = useQuery({
+    queryKey: ["recurring-plan-reconciliation", year],
+    queryFn: () =>
+      recurringPlanApi.reconciliation(year).then((r) => r.data as ReconciliationResponse),
+    staleTime: 60_000,
+  });
+
+  /** Abgleich je Faelligkeit, Schluessel `${plan_id}:${month}`. */
+  const reconByKey = useMemo(() => {
+    const map = new Map<string, ReconciliationEntry>();
+    for (const e of reconciliation?.entries ?? []) {
+      map.set(`${e.plan_id}:${e.month}`, e);
+    }
+    return map;
+  }, [reconciliation]);
+
   const bootstrapPeerRef = useRef(false);
   useEffect(() => {
     if (bootstrapPeerRef.current) return;
@@ -976,7 +1075,10 @@ export default function Budgetplan() {
   }, [suggestions]);
 
   // Mutations
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["recurring-plan", year] });
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["recurring-plan", year] });
+    qc.invalidateQueries({ queryKey: ["recurring-plan-reconciliation", year] });
+  };
 
   const createMut = useMutation({
     mutationFn: (data: Record<string, unknown>) => recurringPlanApi.create(data),
@@ -1254,6 +1356,16 @@ export default function Budgetplan() {
     return { income, expense, count: list.length };
   }
 
+  /** Abgleich-Status der sichtbaren Eintraege eines Monats, gezaehlt. */
+  function monthReconCounts(m: number): ReconCounts {
+    const counts: ReconCounts = { booked: 0, deviating: 0, open: 0, overdue: 0 };
+    for (const e of monthEntries[m]) {
+      const r = reconByKey.get(`${e.id}:${m}`);
+      if (r) counts[r.status] += 1;
+    }
+    return counts;
+  }
+
   // View/filter persist
   function setViewPersist(v: "calendar" | "accordion") {
     setView(v);
@@ -1511,6 +1623,7 @@ export default function Budgetplan() {
                         </button>
                       )}
                     </div>
+                    <ReconSummary counts={monthReconCounts(m)} />
                     <div className="mt-2 flex flex-col items-end gap-0.5 text-right tabular-nums">
                       {income === 0 && expense === 0 ? (
                         <span className="text-text-tertiary text-xs">—</span>
@@ -1577,6 +1690,7 @@ export default function Budgetplan() {
                           scLabel={sc.label}
                           planDisplayAmt={planDisplayAmt(entry)}
                           refCcy={refCcy}
+                          recon={reconByKey.get(`${entry.id}:${m}`)}
                         />
                       );
                     })}
@@ -1627,7 +1741,8 @@ export default function Budgetplan() {
                     <span className="text-text-tertiary text-xs shrink-0 hidden sm:inline">
                       {count} {count === 1 ? t("pages:budgetplan.entryOne") : t("pages:budgetplan.entryMany")}
                     </span>
-                    <div className="flex flex-wrap gap-2 sm:gap-3 ml-auto text-xs justify-end">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-3 ml-auto text-xs justify-end">
+                      <ReconSummary counts={monthReconCounts(m)} />
                       {income > 0 && <span className="text-gain font-medium">+{formatCurrencyCompact(income, refCcy)}</span>}
                       {expense > 0 && <span className="text-loss font-medium">−{formatCurrencyCompact(expense, refCcy)}</span>}
                       {count > 0 && (
@@ -1669,7 +1784,7 @@ export default function Budgetplan() {
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="text-text-tertiary text-xs uppercase tracking-wide">
-                            <th className="text-left pb-2 font-medium">Bezeichnung</th>
+                            <th className="text-left pb-2 font-medium">{t("table.description")}</th>
                             <th className="text-right pb-2 font-medium">{t("table.amount")}</th>
                             <th className="text-left pb-2 font-medium pl-4">{t("pages:budgetplan.periodicityLabel")}</th>
                             <th className="text-left pb-2 font-medium pl-4 hidden sm:table-cell">{t("table.category")}</th>
@@ -1679,13 +1794,30 @@ export default function Budgetplan() {
                         <tbody>
                           {list.map((entry) => {
                             const cat = categories.find((c) => c.id === entry.category_id);
+                            const r = reconByKey.get(`${entry.id}:${m}`);
+                            const badge = r ? RECON_BADGE[r.status] : null;
                             return (
                               <tr
                                 key={entry.id}
                                 className="border-t border-border/20 hover:bg-bg-surface2 cursor-pointer transition-colors"
                                 onClick={() => openEdit(entry)}
                               >
-                                <td className="py-2 text-text-primary font-medium">{entry.description}</td>
+                                <td className="py-2 text-text-primary font-medium">
+                                  <span className="flex items-center gap-1.5">
+                                    {badge && (
+                                      <span
+                                        className={clsx("flex items-center", badge.color)}
+                                        title={t(`pages:budgetplan.recon.${r!.status}`)}
+                                      >
+                                        <badge.Icon className="w-3.5 h-3.5" />
+                                        <span className="sr-only">
+                                          {t(`pages:budgetplan.recon.${r!.status}`)}
+                                        </span>
+                                      </span>
+                                    )}
+                                    {entry.description}
+                                  </span>
+                                </td>
                                 <td className={clsx(
                                   "py-2 text-right font-semibold tabular-nums",
                                   entry.amount < 0 ? "text-loss" : "text-gain"
@@ -1950,7 +2082,7 @@ export default function Budgetplan() {
                     onChange={(e) => setForm((f) => ({ ...f, periodicity: e.target.value }))}
                   >
                     {PERIODICITIES.map((p) => (
-                      <option key={p.value} value={p.value}>{p.label}</option>
+                      <option key={p} value={p}>{periodicityLabel(p)}</option>
                     ))}
                   </select>
                 </div>
