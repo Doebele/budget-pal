@@ -12,6 +12,11 @@ WORKDIR /app
 ARG VITE_API_BASE_URL=/api
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
+# Service Worker beim Entwickeln weglassen — sonst zeigt der Browser nach
+# `make build` noch den Stand davor.
+ARG VITE_DISABLE_PWA=false
+ENV VITE_DISABLE_PWA=$VITE_DISABLE_PWA
+
 # Install dependencies first (cache layer)
 COPY frontend/package.json frontend/package-lock.json* ./
 RUN npm ci --prefer-offline 2>/dev/null || npm install

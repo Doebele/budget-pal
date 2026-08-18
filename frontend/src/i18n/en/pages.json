@@ -293,6 +293,7 @@
     "w172": "Supplementary insurance (if any)",
     "w173": "e.g. Maria",
     "w174": "e.g. VIAC, Frankly, PostFinance",
+    "stepOf": "Step {{current}} of {{total}}",
     "w175": "Profile",
     "w176": "Income",
     "w177": "Peer group",

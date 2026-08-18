@@ -8,6 +8,10 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      // Der Service Worker liefert nach einem neuen Build noch einmal die alte
+      // Version aus — beim Entwickeln heisst das: Aenderung gebaut, Browser
+      // zeigt den Stand davor. VITE_DISABLE_PWA=true laesst ihn ganz weg.
+      disable: process.env.VITE_DISABLE_PWA === "true",
       registerType: "autoUpdate",
       includeAssets: ["favicon.svg", "pwa-192.svg", "pwa-512.svg"],
       manifest: {

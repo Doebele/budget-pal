@@ -293,6 +293,7 @@
     "w172": "Zusatzversicherung (falls vorhanden)",
     "w173": "z.B. Maria",
     "w174": "z.B. VIAC, Frankly, PostFinance",
+    "stepOf": "Schritt {{current}} von {{total}}",
     "w175": "Profil",
     "w176": "Einkommen",
     "w177": "Peer-Gruppe",
