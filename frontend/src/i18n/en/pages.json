@@ -797,5 +797,28 @@
     "amortisationDuty": "Amortisation obligation: down to ≤ 65% within 15 years.",
     "importCreatedNothing": "This import created no transactions — only the history entry disappears.",
     "kpiMismatch": "The KPI tile shows {{amount}} (from the stats API incl. all transactions). This view is based on the {{count}} most recently loaded transactions."
+  },
+  "onboarding": {
+    "title": "Welcome to Budget-Pal",
+    "subtitle": "Two ways to a first result. Both lead to the same dashboard — one with your numbers, one with made-up ones.",
+    "importTitle": "Upload a bank statement",
+    "importBody": "CSV or PDF from your bank. Transactions are categorised automatically; you then confirm the largest ones.",
+    "demoTitle": "Explore sample data",
+    "demoBody": "A fictional Swiss household over twelve months. Nothing is uploaded, nothing disclosed — removable without a trace at any time.",
+    "loadDemo": "Load sample data",
+    "loading": "Loading…",
+    "demoLoaded": "{{count}} sample transactions loaded.",
+    "toDashboard": "Go to dashboard",
+    "removeDemo": "Remove",
+    "wizardHint": "Pension forecast and wealth planning need your profile as well —",
+    "wizardLink": "fill in Empirical Data",
+    "skip": "Later, straight to the dashboard",
+    "progressTitle": "Your profile",
+    "stepData": "Data",
+    "stepProfile": "Profile",
+    "stepPlan": "Budget plan",
+    "unlocksData": "Add data — unlocks budget analysis and forecast",
+    "unlocksProfile": "Fill in your profile — unlocks pension and wealth forecast",
+    "unlocksPlan": "Create a budget plan — unlocks plan-vs-actual reconciliation"
   }
 }

@@ -105,7 +105,10 @@ async def onboarding_status(
 
     demo = await _demo_account(db, current_user.id)
 
-    steps = [accounts > 0, txns > 0, wizard > 0, plan > 0]
+    # Drei Schritte, nicht vier: ein Konto ohne Buchungen ist kein
+    # Fortschritt, den man feiern muesste. Die Anzeige zeigt dieselben drei —
+    # sonst widerspricht der Prozentsatz den Haken daneben.
+    steps = [txns > 0, wizard > 0, plan > 0]
     return OnboardingStatus(
         has_accounts=accounts > 0,
         has_transactions=txns > 0,
@@ -190,7 +193,7 @@ async def load_demo_data(
         db,
         user_id=current_user.id,
         action="demo_data_loaded",
-        method="POST /onboarding/demo",
+        method="demo",
         affected_rows=len(rows),
     )
     await db.commit()
@@ -223,7 +226,7 @@ async def remove_demo_data(
         db,
         user_id=current_user.id,
         action="demo_data_removed",
-        method="DELETE /onboarding/demo",
+        method="demo",
         affected_rows=len(txns),
     )
     await db.commit()

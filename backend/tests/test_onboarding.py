@@ -11,7 +11,7 @@ from datetime import date, datetime, timezone
 import pytest
 from sqlalchemy import func as sqlfunc, select
 
-from app.models.models import Account, AccountType, Transaction, User
+from app.models.models import Account, AccountType, ActivityLog, Transaction, User
 from app.services.demo_data import DEMO_ACCOUNT_MARKER
 
 pytestmark = pytest.mark.anyio
@@ -123,6 +123,25 @@ class TestDemoData:
         assert account.notes == DEMO_ACCOUNT_MARKER
 
 
+class TestAuditTrail:
+    async def test_audit_values_fit_their_columns(self, client, db_session):
+        """Die Tests laufen auf SQLite, das Laengenangaben ignoriert — auf
+        Postgres brach genau dieser Eintrag den Endpunkt mit 500 ab
+        ("value too long for type character varying(16)"). Deshalb hier
+        explizit gegen die Modellgrenze geprueft statt gegen die Test-DB."""
+        client.post("/api/onboarding/demo")
+
+        rows = (await db_session.execute(
+            select(ActivityLog).where(ActivityLog.action == "demo_data_loaded")
+        )).scalars().all()
+        assert rows
+
+        for column in ("action", "method"):
+            limit = getattr(ActivityLog, column).type.length
+            for row in rows:
+                assert len(getattr(row, column)) <= limit, (column, getattr(row, column))
+
+
 class TestStatus:
     async def test_fresh_user_has_nothing(self, client):
         body = client.get("/api/onboarding/status").json()
@@ -137,4 +156,5 @@ class TestStatus:
         assert body["has_transactions"] is True
         assert body["is_demo"] is True
         assert body["transaction_count"] > 100
-        assert 0 < body["completeness_pct"] < 100
+        # Daten ja, Profil und Plan nein — ein Drittel.
+        assert body["completeness_pct"] == 33

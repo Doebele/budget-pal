@@ -797,5 +797,28 @@
     "amortisationDuty": "Amortisationspflicht: auf ≤ 65 % innerhalb von 15 Jahren.",
     "importCreatedNothing": "Dieser Import hat keine Transaktionen angelegt — es verschwindet nur der Eintrag aus der Historie.",
     "kpiMismatch": "KPI-Kachel zeigt {{amount}} (aus der Stats-API inkl. alle Transaktionen). Diese Ansicht basiert auf den zuletzt geladenen {{count}} Transaktionen."
+  },
+  "onboarding": {
+    "title": "Willkommen bei Budget-Pal",
+    "subtitle": "Zwei Wege zum ersten Ergebnis. Beide führen zum selben Dashboard — der eine mit deinen Zahlen, der andere mit erfundenen.",
+    "importTitle": "Kontoauszug hochladen",
+    "importBody": "CSV oder PDF deiner Bank. Die Buchungen werden automatisch kategorisiert; du bestätigst danach die grössten Posten.",
+    "demoTitle": "Beispieldaten ansehen",
+    "demoBody": "Ein erfundener Schweizer Haushalt über zwölf Monate. Nichts wird hochgeladen, nichts preisgegeben — jederzeit spurlos entfernbar.",
+    "loadDemo": "Beispieldaten laden",
+    "loading": "Wird geladen…",
+    "demoLoaded": "{{count}} Beispiel-Buchungen geladen.",
+    "toDashboard": "Zum Dashboard",
+    "removeDemo": "Entfernen",
+    "wizardHint": "Für Rentenprognose und Vermögensplanung braucht es zusätzlich dein Profil —",
+    "wizardLink": "Empirische Angaben ausfüllen",
+    "skip": "Später, direkt zum Dashboard",
+    "progressTitle": "Dein Profil",
+    "stepData": "Daten",
+    "stepProfile": "Profil",
+    "stepPlan": "Budgetplan",
+    "unlocksData": "Daten erfassen — schaltet Budgetanalyse und Prognose frei",
+    "unlocksProfile": "Profil ausfüllen — schaltet Renten- und Vermögensprognose frei",
+    "unlocksPlan": "Budgetplan anlegen — schaltet den Plan-Ist-Abgleich frei"
   }
 }

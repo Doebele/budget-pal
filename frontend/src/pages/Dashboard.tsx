@@ -18,6 +18,7 @@ import { deduplicateWizardBatch } from "@/lib/wizardUtils";
 import { useTranslation } from "react-i18next";
 import { translateCategory } from "@/lib/categoryLabel";
 import ProgressBar from "@/components/ui/ProgressBar";
+import OnboardingProgress from "@/components/OnboardingProgress";
 
 // ── Stat card ─────────────────────────────────────────────────
 
@@ -167,6 +168,9 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Onboarding-Fortschritt — verschwindet, sobald alles beisammen ist */}
+      <OnboardingProgress />
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">

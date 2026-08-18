@@ -332,6 +332,23 @@ export interface ReconciliationResponse {
   deviating_count: number;
 }
 
+// Onboarding — siehe backend/app/api/onboarding.py
+export interface OnboardingStatus {
+  has_accounts: boolean;
+  has_transactions: boolean;
+  transaction_count: number;
+  has_wizard: boolean;
+  has_plan: boolean;
+  is_demo: boolean;
+  completeness_pct: number;
+}
+
+export const onboardingApi = {
+  status: () => api.get<OnboardingStatus>("/onboarding/status"),
+  loadDemo: () => api.post("/onboarding/demo"),
+  removeDemo: () => api.delete("/onboarding/demo"),
+};
+
 // Settings (category mappings)
 export const settingsApi = {
   getCategoryMappings: () => api.get("/settings/category-mappings"),
