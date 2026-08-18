@@ -819,6 +819,14 @@
     "stepPlan": "Budget plan",
     "unlocksData": "Add data — unlocks budget analysis and forecast",
     "unlocksProfile": "Fill in your profile — unlocks pension and wealth forecast",
-    "unlocksPlan": "Create a budget plan — unlocks plan-vs-actual reconciliation"
+    "unlocksPlan": "Create a budget plan — unlocks plan-vs-actual reconciliation",
+    "reviewTitle": "Confirm the largest items",
+    "reviewBody": "Grouped by merchant. One confirmation applies to every booking from that merchant — including future imports.",
+    "reviewCount": "{{count}} transactions",
+    "reviewNoCategory": "— none —",
+    "reviewConfirm": "Confirm",
+    "reviewSaving": "Saving…",
+    "reviewSkip": "Skip",
+    "reviewDone": "Thanks — the assignments are saved and now apply to new transactions too."
   }
 }

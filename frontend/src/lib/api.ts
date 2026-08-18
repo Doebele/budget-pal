@@ -343,10 +343,21 @@ export interface OnboardingStatus {
   completeness_pct: number;
 }
 
+export interface ReviewGroup {
+  merchant: string;
+  category: string | null;
+  count: number;
+  total: number;
+  sample_description: string;
+}
+
 export const onboardingApi = {
   status: () => api.get<OnboardingStatus>("/onboarding/status"),
   loadDemo: () => api.post("/onboarding/demo"),
   removeDemo: () => api.delete("/onboarding/demo"),
+  review: () => api.get<ReviewGroup[]>("/onboarding/review"),
+  confirmReview: (entries: Array<{ merchant: string; category: string }>) =>
+    api.post("/onboarding/review", entries),
 };
 
 // Settings (category mappings)

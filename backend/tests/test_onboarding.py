@@ -158,3 +158,83 @@ class TestStatus:
         assert body["transaction_count"] > 100
         # Daten ja, Profil und Plan nein — ein Drittel.
         assert body["completeness_pct"] == 33
+
+
+class TestReview:
+    """Die Bestaetigungsschleife.
+
+    Sie gruppiert nach Haendler statt nach Buchung, weil Stufe 0 der
+    Kategorisierung ueber `merchant_normalized` nachschlaegt: ein bestaetigter
+    Haendler wirkt auf alle seine Buchungen, auch kuenftige.
+    """
+
+    async def test_candidates_are_grouped_by_merchant(self, client):
+        client.post("/api/onboarding/demo")
+        rows = client.get("/api/onboarding/review").json()
+
+        assert rows
+        merchants = [r["merchant"] for r in rows]
+        assert len(merchants) == len(set(merchants)), "jeder Haendler nur einmal"
+        assert all(r["count"] >= 1 for r in rows)
+
+    async def test_biggest_spender_comes_first(self, client):
+        """Wer zehn Bestaetigungen macht, soll die zehn wichtigsten treffen."""
+        client.post("/api/onboarding/demo")
+        rows = client.get("/api/onboarding/review").json()
+        totals = [r["total"] for r in rows]
+        assert totals == sorted(totals), "aufsteigend, also groesste Ausgabe zuerst"
+
+    async def test_income_is_left_out(self, client):
+        client.post("/api/onboarding/demo")
+        rows = client.get("/api/onboarding/review").json()
+        assert all(r["total"] < 0 for r in rows)
+
+    async def test_confirming_marks_every_booking_of_that_merchant(self, client, db_session):
+        client.post("/api/onboarding/demo")
+        first = client.get("/api/onboarding/review").json()[0]
+
+        r = client.post("/api/onboarding/review", json=[
+            {"merchant": first["merchant"], "category": "Wohnen"},
+        ])
+        assert r.status_code == 200, r.text
+        assert r.json()["confirmed_merchants"] == 1
+        assert r.json()["updated_transactions"] == first["count"]
+
+        rows = (await db_session.execute(
+            select(Transaction).where(
+                Transaction.merchant_normalized == first["merchant"]
+            )
+        )).scalars().all()
+        assert rows
+        assert all(t.user_verified for t in rows)
+        assert all(t.category == "Wohnen" for t in rows)
+
+    async def test_confirmed_merchants_drop_out_of_the_list(self, client):
+        """Sonst legt die Schleife denselben Haendler wieder und wieder vor."""
+        client.post("/api/onboarding/demo")
+        first = client.get("/api/onboarding/review").json()[0]
+        client.post("/api/onboarding/review", json=[
+            {"merchant": first["merchant"], "category": "Wohnen"},
+        ])
+
+        after = client.get("/api/onboarding/review").json()
+        assert first["merchant"] not in [r["merchant"] for r in after]
+
+    async def test_empty_confirmation_changes_nothing(self, client):
+        client.post("/api/onboarding/demo")
+        r = client.post("/api/onboarding/review", json=[])
+        assert r.status_code == 200
+        assert r.json()["updated_transactions"] == 0
+
+    async def test_foreign_merchant_name_touches_nothing(self, client, db_session, test_user):
+        """Der Name kommt aus dem Request — er darf nur eigene Zeilen treffen."""
+        client.post("/api/onboarding/demo")
+        r = client.post("/api/onboarding/review", json=[
+            {"merchant": "Gibt Es Nicht AG", "category": "Wohnen"},
+        ])
+        assert r.status_code == 200
+        assert r.json()["updated_transactions"] == 0
+
+    async def test_batch_size_is_capped(self, client):
+        payload = [{"merchant": f"M{i}", "category": "Wohnen"} for i in range(51)]
+        assert client.post("/api/onboarding/review", json=payload).status_code == 422

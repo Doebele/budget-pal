@@ -17,6 +17,7 @@ import { clsx } from "clsx";
 
 import { onboardingApi, type OnboardingStatus } from "@/lib/api";
 import { Flask, Reports, Trash, Upload } from "@/lib/icons";
+import OnboardingReview from "@/components/OnboardingReview";
 
 export default function Onboarding() {
   const { t } = useTranslation();
@@ -134,6 +135,13 @@ export default function Onboarding() {
             )}
           </div>
         </div>
+
+        {/* Bestaetigungsschleife — erscheint erst, wenn Buchungen da sind */}
+        {status?.has_transactions && (
+          <div className="mt-6">
+            <OnboardingReview />
+          </div>
+        )}
 
         {/* Der Wizard bleibt — aber als Angebot, nicht als Huerde. */}
         <p className="text-center text-text-tertiary text-xs mt-8">

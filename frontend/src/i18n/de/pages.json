@@ -819,6 +819,14 @@
     "stepPlan": "Budgetplan",
     "unlocksData": "Daten erfassen — schaltet Budgetanalyse und Prognose frei",
     "unlocksProfile": "Profil ausfüllen — schaltet Renten- und Vermögensprognose frei",
-    "unlocksPlan": "Budgetplan anlegen — schaltet den Plan-Ist-Abgleich frei"
+    "unlocksPlan": "Budgetplan anlegen — schaltet den Plan-Ist-Abgleich frei",
+    "reviewTitle": "Die grössten Posten bestätigen",
+    "reviewBody": "Nach Händler gruppiert. Eine Bestätigung gilt für alle Buchungen dieses Händlers — auch für künftige Importe.",
+    "reviewCount": "{{count}} Buchungen",
+    "reviewNoCategory": "— keine —",
+    "reviewConfirm": "Bestätigen",
+    "reviewSaving": "Wird gespeichert…",
+    "reviewSkip": "Überspringen",
+    "reviewDone": "Danke — die Zuordnungen sind gespeichert und gelten ab jetzt auch für neue Buchungen."
   }
 }

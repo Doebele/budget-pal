@@ -8,6 +8,8 @@ kann, und entscheidet danach, ob man ihr echte Auszuege gibt.
 
 Routes:
   GET    /api/onboarding/status   Was fehlt noch bis zur vollen Auswertung
+  GET    /api/onboarding/review   Groesste Haendler zur Bestaetigung
+  POST   /api/onboarding/review   Bestaetigte Zuordnungen uebernehmen
   POST   /api/onboarding/demo     Beispieldaten anlegen (idempotent)
   DELETE /api/onboarding/demo     Beispieldaten restlos entfernen
 """
@@ -53,6 +55,27 @@ class OnboardingStatus(BaseModel):
     is_demo: bool
     #: 0–100, grob wie weit das Profil traegt.
     completeness_pct: int
+
+
+class ReviewGroup(BaseModel):
+    """Ein Haendler mit allen seinen Buchungen."""
+
+    merchant: str
+    category: Optional[str]
+    count: int
+    #: Summe in Kontowaehrung, Vorzeichen wie gebucht.
+    total: float
+    sample_description: str
+
+
+class ReviewConfirmation(BaseModel):
+    merchant: str
+    category: str
+
+
+class ReviewResult(BaseModel):
+    confirmed_merchants: int
+    updated_transactions: int
 
 
 class DemoResult(BaseModel):
@@ -231,3 +254,133 @@ async def remove_demo_data(
     )
     await db.commit()
     return DemoResult(account_id=account.id, transactions=0, removed=len(txns))
+
+
+# ── Bestaetigungsschleife ─────────────────────────────────────
+
+#: Wie viele Haendler zur Bestaetigung vorgelegt werden. Zehn sind in einer
+#: Minute erledigt; eine vollstaendige Durchsicht bricht jeder ab.
+REVIEW_LIMIT = 10
+
+
+@router.get("/review", response_model=List[ReviewGroup])
+async def review_candidates(
+    limit: int = REVIEW_LIMIT,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Die groessten noch unbestaetigten Haendler.
+
+    Gruppiert nach Haendler, nicht nach einzelner Buchung: die
+    Kategorisierung schlaegt in Stufe 0 ueber `merchant_normalized` nach
+    (`user_history.load_category_hints`). Ein bestaetigter Haendler wirkt
+    damit auf alle seine bisherigen *und* kuenftigen Buchungen — zehn
+    Bestaetigungen decken oft die halbe Liste ab.
+
+    Nur Ausgaben: bei Einnahmen gibt es selten etwas zu entscheiden.
+    """
+    limit = max(1, min(limit, 50))
+    grouped = (await db.execute(
+        select(
+            Transaction.merchant_normalized,
+            sqlfunc.count(Transaction.id).label("cnt"),
+            sqlfunc.sum(Transaction.amount).label("total"),
+            sqlfunc.min(Transaction.description).label("sample"),
+            sqlfunc.max(Transaction.category).label("category"),
+        )
+        .join(Account)
+        .where(
+            Account.user_id == current_user.id,
+            Transaction.is_deleted.isnot(True),
+            Transaction.amount < 0,
+            Transaction.merchant_normalized.isnot(None),
+            Transaction.merchant_normalized != "",
+            Transaction.user_verified.is_(False),
+        )
+        .group_by(Transaction.merchant_normalized)
+        .order_by(sqlfunc.sum(Transaction.amount))
+        .limit(limit)
+    )).all()
+
+    return [
+        ReviewGroup(
+            merchant=row.merchant_normalized,
+            category=row.category,
+            count=row.cnt,
+            total=round(float(row.total or 0.0), 2),
+            sample_description=row.sample or row.merchant_normalized,
+        )
+        for row in grouped
+    ]
+
+
+@router.post("/review", response_model=ReviewResult)
+async def confirm_review(
+    payload: List[ReviewConfirmation],
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Uebernimmt die bestaetigten Zuordnungen.
+
+    Setzt Kategorie *und* `user_verified` auf allen Buchungen des Haendlers.
+    Das Flag ist der eigentliche Gewinn: es macht die Zuordnung zur Stufe 0
+    der Kategorisierung, die alle spaeteren Stufen schlaegt.
+    """
+    if not payload:
+        return ReviewResult(confirmed_merchants=0, updated_transactions=0)
+    if len(payload) > 50:
+        raise HTTPException(status_code=422, detail="Zu viele Eintraege auf einmal")
+
+    by_merchant = {p.merchant: p.category for p in payload if p.category.strip()}
+    if not by_merchant:
+        return ReviewResult(confirmed_merchants=0, updated_transactions=0)
+
+    rows = (await db.execute(
+        select(Transaction)
+        .join(Account)
+        .where(
+            Account.user_id == current_user.id,
+            Transaction.is_deleted.isnot(True),
+            Transaction.merchant_normalized.in_(list(by_merchant)),
+        )
+    )).scalars().all()
+
+    category_ids = {
+        name: await _category_id_for_name(db, current_user.id, name)
+        for name in set(by_merchant.values())
+    }
+
+    for txn in rows:
+        category = by_merchant.get(txn.merchant_normalized or "")
+        if not category:
+            continue
+        txn.category = category
+        txn.category_id = category_ids.get(category)
+        txn.user_verified = True
+        txn.confidence_score = 1.0
+
+    await record_activity(
+        db,
+        user_id=current_user.id,
+        action="onboarding_review",
+        method="review",
+        affected_rows=len(rows),
+    )
+    await db.commit()
+    return ReviewResult(confirmed_merchants=len(by_merchant), updated_transactions=len(rows))
+
+
+async def _category_id_for_name(
+    db: AsyncSession, user_id: int, name: str
+) -> Optional[int]:
+    """Kategorie-ID zum Anzeigenamen; eigene Kategorie schlaegt System."""
+    rows = (await db.execute(
+        select(Category).where(
+            or_(Category.user_id == user_id, Category.is_system.is_(True)),
+            sqlfunc.lower(Category.name) == name.strip().lower(),
+        )
+    )).scalars().all()
+    for c in rows:
+        if c.user_id == user_id:
+            return c.id
+    return rows[0].id if rows else None
