@@ -346,11 +346,6 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
     @apply bg-bg-surface2 rounded-sm animate-pulse;
   }
 
-  /* Nivo chart overrides */
-  .nivo-chart-container {
-    @apply text-text-secondary;
-  }
-
   /* Toggle-Switch-Muster — fintools-Stil: Track + aktives Surface-Pill */
   .toggle-group {
     display: inline-flex;

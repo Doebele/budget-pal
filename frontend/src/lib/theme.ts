@@ -3,10 +3,9 @@
  * Use these in JS/TS contexts (chart configs, inline styles, etc.)
  * that can't read Tailwind classes directly.
  *
- * Theme-bewusst: `themePalettes.dark` / `themePalettes.light` +
- * `buildNivoTheme(palette)`. Komponenten nutzen den Hook
- * `useThemeColors()` (src/hooks/useThemeColors.ts); die Exporte
- * `colors` / `nivoTheme` sind Dark-Aliase für noch nicht migrierte Stellen.
+ * Theme-bewusst: `themePalettes.dark` / `themePalettes.light`. Komponenten
+ * nutzen den Hook `useThemeColors()` (src/hooks/useThemeColors.ts); der Export
+ * `colors` ist ein Dark-Alias für noch nicht migrierte Stellen.
  */
 import { displayLocale } from "./format";
 
@@ -82,7 +81,7 @@ const darkPalette = {
   chart,
   chartPalette,
 
-  // Tooltip-Schatten (Nivo/Recharts)
+  // Tooltip-Schatten (Recharts/ECharts)
   tooltipShadow: "0 8px 32px rgba(0,0,0,0.5)",
 } as const;
 
@@ -144,106 +143,6 @@ export const themePalettes: Record<"dark" | "light", ThemePalette> = {
 
 /** @deprecated Dark-Alias — neue Stellen nutzen useThemeColors(). */
 export const colors = themePalettes.dark;
-
-// ── Nivo chart theme ──────────────────────────────────────────
-
-export function buildNivoTheme(c: ThemePalette) {
-  return {
-    background: "transparent",
-    textColor: c.textSecondary,
-    fontSize: 12,
-    fontFamily: "Syne, system-ui, sans-serif",
-    axis: {
-      domain: {
-        line: {
-          stroke: c.border,
-          strokeWidth: 1,
-        },
-      },
-      legend: {
-        text: {
-          fill: c.textTertiary,
-          fontSize: 11,
-        },
-      },
-      ticks: {
-        line: {
-          stroke: c.borderSubtle,
-          strokeWidth: 1,
-        },
-        text: {
-          fill: c.textTertiary,
-          fontSize: 11,
-        },
-      },
-    },
-    grid: {
-      line: {
-        stroke: c.borderSubtle,
-        strokeWidth: 1,
-      },
-    },
-    legends: {
-      title: {
-        text: {
-          fill: c.textSecondary,
-          fontSize: 11,
-        },
-      },
-      text: {
-        fill: c.textSecondary,
-        fontSize: 11,
-      },
-      ticks: {
-        line: {},
-        text: {
-          fill: c.textTertiary,
-          fontSize: 10,
-        },
-      },
-    },
-    annotations: {
-      text: {
-        fill: c.textPrimary,
-        fontSize: 12,
-      },
-      link: {
-        stroke: c.accent,
-        strokeWidth: 1,
-      },
-      outline: {
-        stroke: c.border,
-        strokeWidth: 2,
-      },
-      symbol: {
-        fill: c.bgSurface,
-        outlineWidth: 2,
-        outlineColor: c.accent,
-      },
-    },
-    tooltip: {
-      container: {
-        background: c.bgElevated,
-        color: c.textPrimary,
-        fontSize: 12,
-        borderRadius: "6px",
-        border: `1px solid ${c.border}`,
-        padding: "8px 12px",
-        boxShadow: c.tooltipShadow,
-      },
-    },
-    crosshair: {
-      line: {
-        stroke: c.textTertiary,
-        strokeWidth: 1,
-        strokeOpacity: 0.5,
-      },
-    },
-  };
-}
-
-/** @deprecated Dark-Alias — neue Stellen nutzen useThemeColors().nivoTheme. */
-export const nivoTheme = buildNivoTheme(themePalettes.dark);
 
 // ── Category colors ───────────────────────────────────────────
 // NOTE: canonical colours now live in src/lib/categories.ts (getCategoryColor).
