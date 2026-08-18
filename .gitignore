@@ -12,6 +12,12 @@
 *.p12
 secrets/
 
+# Lokale Claude-Code-Konfiguration: die Allow-Liste sammelt ganze
+# Kommandozeilen, gelegentlich samt Zugangsdaten. launch.json bleibt
+# versioniert — das ist geteilte Dev-Konfiguration ohne Geheimnisse.
+.claude/settings.local.json
+.claude/worktrees/
+
 # ── Python ────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
