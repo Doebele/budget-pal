@@ -767,7 +767,7 @@
     "tipModePlan": "Calculation is based on your budget plan (recurring entries)."
   },
   "hints": {
-    "pensionChartHint": "Before retirement age ({{age}}): OASI = 0; BVG, 3a and 3b show the projected capital. From then on: OASI and BVG pension, and for 3a/3b a pension formula with 2% residual interest over a 20-year payout period. OASI contribution years are projected up to retirement age (max. 44 years).",
+    "pensionChartHint": "Before retirement age ({{age}}): OASI = 0; BVG, 3a and 3b show the projected capital. From then on: OASI and BVG pension, and for 3a/3b a pension formula with 2% residual interest over a 20-year payout period. OASI contribution years are projected up to retirement age (max. 44 years). The OASI pension is an estimate: full pension from six times the annual minimum pension, linearly interpolated below that, minus 1/44 for each missing contribution year. The compensation office's pension scale is authoritative.",
     "saronHint": "Reference value for displaying SARON mortgages (not a live daily rate). Source and details:",
     "birthdate": "Date of birth",
     "yearsOld": "{{age}} years",

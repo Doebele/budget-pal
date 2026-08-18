@@ -223,10 +223,9 @@ export default function Budget() {
   // Per-transaction list — used for both drill-down AND frequency-filtered KPIs
   const { data: periodTransactions = [] } = useQuery({
     queryKey: ["period-transactions-drilldown", periodStart, periodEnd],
-    queryFn: () =>
-      transactionsApi
-        .list({ start: periodStart, end: periodEnd, limit: 2000 })
-        .then((r) => r.data),
+    // Die Seite rechnet Kennzahlen ueber den ganzen Zeitraum — eine gedeckelte
+    // erste Seite wuerde sie stillschweigend zu niedrig ausweisen.
+    queryFn: () => transactionsApi.listAll({ start: periodStart, end: periodEnd }),
     staleTime: 30_000,
   });
 

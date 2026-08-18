@@ -95,6 +95,30 @@ export const transactionsApi = {
   list: (params?: Record<string, unknown>) => api.get("/transactions", { params }),
   listPage: (params?: Record<string, unknown>, cursor?: string) =>
     api.get("/transactions", { params: { ...params, cursor, limit: 100 } }),
+  /**
+   * Alle Transaktionen eines Zeitraums, ueber den Cursor durchgeblaettert.
+   *
+   * Das Backend deckelt `limit` bei 500. Wer mehr anfordert, bekommt 422 —
+   * und wer genau 500 anfordert, bekommt stillschweigend nur die ersten 500,
+   * was schlimmer ist: die Kennzahlen daraus waeren zu niedrig, ohne dass es
+   * auffaellt.
+   */
+  listAll: async <T = unknown>(
+    params?: Record<string, unknown>,
+    maxPages = 20,
+  ): Promise<T[]> => {
+    const all: T[] = [];
+    let cursor: string | undefined;
+    for (let page = 0; page < maxPages; page++) {
+      const r = await api.get("/transactions", {
+        params: { ...params, cursor, limit: 500 },
+      });
+      all.push(...(r.data as T[]));
+      cursor = r.headers["x-next-cursor"];
+      if (!cursor) break;
+    }
+    return all;
+  },
   listArchived: (params?: Record<string, unknown>) =>
     api.get("/transactions/archived", { params }),
   restore: (id: number) => api.post(`/transactions/${id}/restore`),

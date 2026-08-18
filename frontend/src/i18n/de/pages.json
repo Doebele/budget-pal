@@ -767,7 +767,7 @@
     "tipModePlan": "Berechnung basiert auf deinem Budgetplan (Wiederkehrende Einträge)."
   },
   "hints": {
-    "pensionChartHint": "Vor dem Rentenalter ({{age}}): AHV = 0; BVG, 3a und 3b zeigen das projizierte Kapital. Ab dann: AHV- und BVG-Rente bzw. bei 3a/3b eine Rentenformel mit 2 % Restverzinsung über 20 Jahre Auszahlungsdauer. AHV-Beitragsjahre werden bis zum Rentenalter fortgeschrieben (max. 44 Jahre).",
+    "pensionChartHint": "Vor dem Rentenalter ({{age}}): AHV = 0; BVG, 3a und 3b zeigen das projizierte Kapital. Ab dann: AHV- und BVG-Rente bzw. bei 3a/3b eine Rentenformel mit 2 % Restverzinsung über 20 Jahre Auszahlungsdauer. AHV-Beitragsjahre werden bis zum Rentenalter fortgeschrieben (max. 44 Jahre). Die AHV-Rente ist eine Schätzung: Vollrente ab dem Sechsfachen der jährlichen Minimalrente, darunter linear interpoliert, abzüglich 1/44 je fehlendem Beitragsjahr. Massgebend ist die Rentenskala der Ausgleichskasse.",
     "saronHint": "Referenzwert zur Darstellung von SARON-Hypotheken (kein Live-Tageszins). Quelle und Details:",
     "birthdate": "Geburtsdatum",
     "yearsOld": "{{age}} Jahre",

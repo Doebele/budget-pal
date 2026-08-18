@@ -286,22 +286,49 @@ class TestAHVPension:
         if retirement_year < len(result["pension_ahv"]):
             assert result["pension_ahv"][retirement_year] > 0.0
 
-    def test_ahv_full_contribution_years(self):
-        """Test AHV with full contribution years (44 years)."""
-        pension_series = self.service._project_ahv(
+    def test_full_years_and_high_salary_give_the_maximum(self):
+        """Die Maximalrente braucht beides: 44 Beitragsjahre *und* ein
+        massgebendes Einkommen ab dem Sechsfachen der Minimalrente."""
+        pension = self.service._project_ahv(
             age_at_year=66,
             retirement_age=65,
             record={
                 "contribution_years": 44,
-                "average_insured_salary": 80000.0,
+                "average_insured_salary": 95_000.0,   # > 6 × 15'120
             },
-            annual_income=80000.0,
+            annual_income=95_000.0,
             current_age=66,
         )
+        assert pension == pytest.approx(2520.0 * 12)
 
-        # With 44 years (full), should get max pension
-        expected = 2520.0 * 12  # Max monthly × 12
-        assert abs(pension_series - expected) < 0.01
+    def test_salary_moves_the_pension(self):
+        """`average_insured_salary` wurde vorher zugewiesen und nie gelesen:
+        jedes Einkommen ergab bei 44 Jahren dieselbe Maximalrente."""
+        def at(salary: float) -> float:
+            return self.service._project_ahv(
+                age_at_year=66, retirement_age=65,
+                record={"contribution_years": 44, "average_insured_salary": salary},
+                annual_income=salary, current_age=66,
+            )
+
+        assert at(40_000.0) < at(70_000.0) < at(95_000.0)
+        # Minimalrente als Untergrenze bei vollen Beitragsjahren
+        assert at(0.0) == pytest.approx(1260.0 * 12)
+
+    def test_missing_years_cost_one_forty_fourth_each(self):
+        """Rentenskala: je fehlendem Beitragsjahr 1/44 weniger. Vorher
+        interpolierte die Formel zwischen Minimal- und Maximalrente, ein
+        fehlendes Jahr kostete damit fast nichts."""
+        def with_years(years: int) -> float:
+            return self.service._project_ahv(
+                age_at_year=66, retirement_age=65,
+                record={"contribution_years": years, "average_insured_salary": 95_000.0},
+                annual_income=95_000.0, current_age=66,
+            )
+
+        full = with_years(44)
+        assert with_years(22) == pytest.approx(full / 2)
+        assert with_years(33) == pytest.approx(full * 33 / 44)
 
     def test_ahv_min_contribution_years(self):
         """Test AHV with minimum contribution years."""

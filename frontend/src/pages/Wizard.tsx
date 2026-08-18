@@ -277,16 +277,22 @@ function healthInsuranceMonthly(data: WizardData): number {
   return healthPremiums(data).reduce((sum, p) => sum + (p || 0), 0);
 }
 
+/**
+ * AHV-Rente, gleiche Rechnung wie `_project_ahv` im Backend — sonst zeigt der
+ * Wizard eine andere Zahl als die Rentenprognose.
+ *
+ * Vollrente ab dem Sechsfachen der jaehrlichen Minimalrente, darunter linear
+ * zwischen Minimum und Maximum; dann Kuerzung um 1/44 je fehlendem
+ * Beitragsjahr.
+ */
 function computeAhvRente(beitragsjahre: number, avgLohn: number): number {
-  // BFS AHV formula approximation (2023 scale):
-  // Min 1_225 CHF/Mo (44 years), Max 2_450 CHF/Mo
   const fullYears = 44;
-  const minRente = 1_225;
-  const maxRente = 2_450;
-  const completionFactor = Math.min(beitragsjahre / fullYears, 1);
-  const lohnFactor = Math.min(avgLohn / 86_040, 1); // OASI max insured salary
+  const minRente = 1_260; // AHV-Skala 2025
+  const maxRente = 2_520;
+  const fullPensionIncome = minRente * 12 * 6;
+  const lohnFactor = Math.min(Math.max(avgLohn / fullPensionIncome, 0), 1);
   const base = minRente + (maxRente - minRente) * lohnFactor;
-  return Math.round(base * completionFactor);
+  return Math.round(base * Math.min(beitragsjahre / fullYears, 1));
 }
 
 function computeBvgKapital(guthaben: number, jahresbeitrag: number, yearsToRetirement: number): number {

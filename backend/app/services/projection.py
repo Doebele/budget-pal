@@ -426,14 +426,22 @@ class ProjectionService:
             avg_salary = annual_income
 
         contribution_years = min(contribution_years, AHV_FULL_YEARS)
-        completeness = contribution_years / AHV_FULL_YEARS
 
-        # Simplified AHV formula: between min and max pension based on completeness
-        pension_monthly = AHV_MIN_PENSION + completeness * (
+        # Die Rentenhoehe haengt am massgebenden durchschnittlichen
+        # Jahreseinkommen: die Vollrente wird ab dem Sechsfachen der jaehrlichen
+        # Minimalrente erreicht, darunter liegt sie zwischen Minimum und Maximum.
+        # ponytail: die Rentenskala ist in Wirklichkeit zweistufig geknickt,
+        # hier linear interpoliert — Merkblatt 3.01 fuer die exakte Segmentformel.
+        full_pension_income = AHV_MIN_PENSION * 12 * 6
+        income_factor = min(max(avg_salary / full_pension_income, 0.0), 1.0)
+        full_pension_monthly = AHV_MIN_PENSION + income_factor * (
             AHV_MAX_PENSION - AHV_MIN_PENSION
         )
-        pension_monthly = min(pension_monthly, AHV_MAX_PENSION)
-        pension_monthly = max(pension_monthly, AHV_MIN_PENSION * completeness)
+
+        # Kuerzung um 1/44 je fehlendem Beitragsjahr (Rentenskala). Vorher
+        # interpolierte die Formel zwischen Minimal- und Maximalrente, womit ein
+        # fehlendes Jahr fast nichts kostete und `avg_salary` gar nicht einging.
+        pension_monthly = full_pension_monthly * (contribution_years / AHV_FULL_YEARS)
 
         # Vorbezugskuerzung: wer die AHV vor dem ordentlichen Rentenalter
         # bezieht, erhaelt sie lebenslang gekuerzt — 6.8 % je vorbezogenem
