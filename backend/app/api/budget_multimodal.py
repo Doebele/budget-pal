@@ -42,6 +42,7 @@ from app.services.currency_service import (
     normalize_reference_currency,
     convert_with_eur_rates,
 )
+from app.services.peer_group import peer_savings_rate
 from app.services.wizard_derive import (
     health_insurance_monthly,
     monthly_amount,
@@ -549,6 +550,9 @@ class HealthScoreResponse(BaseModel):
     grade: str          # A / B / C / D / F
     components: List[HealthScoreComponent]
     top_levers: List[HealthScoreLever]
+    #: Eigene Sparquote und die der Vergleichsgruppe, beide in Prozent.
+    savings_rate_pct: float = 0.0
+    peer_savings_rate_pct: float = 0.0
 
 
 def _grade(score: float) -> str:
@@ -568,13 +572,24 @@ def _compute_health_score(
     has_pension: bool,
     months_covered: int,
     ref: str,
+    household_type: str = "single",
 ) -> HealthScoreResponse:
     """Shared scoring logic — called with data from any mode."""
 
     # Component 1: Savings Rate (30%)
+    #
+    # Gemessen an der Vergleichsgruppe statt an einer festen Zahl: vorher
+    # galten 25 % als Bestwert (`rate * 4`), egal ob jemand 3'800 oder 18'500
+    # im Monat hat. Die BFS-Erhebung zeigt dagegen 8 % bei tiefen und 26 % bei
+    # hohen Einkommen — dieselbe Sparquote bedeutet je nach Haushalt etwas
+    # voellig anderes.
+    monthly_income = income / max(1, months_covered)
+    peer_rate = peer_savings_rate(monthly_income, household_type)
     if income > 0:
         savings_rate_pct = max(0.0, (income - expenses) / income * 100)
-        savings_score = min(100.0, savings_rate_pct * 4.0)
+        # Wer die Vergleichsquote erreicht, hat die volle Punktzahl. Der
+        # Benchmark ist das Uebliche, nicht das Ideal.
+        savings_score = min(100.0, savings_rate_pct / peer_rate * 100) if peer_rate > 0 else 0.0
     else:
         savings_rate_pct = 0.0
         savings_score = 0.0
@@ -613,10 +628,16 @@ def _compute_health_score(
     components = [
         HealthScoreComponent(
             name="Sparquote", score=round(savings_score, 1), weight=0.30,
-            detail=f"{savings_rate_pct:.1f}% Sparquote" if income > 0 else "Keine Einnahmen im Zeitraum",
+            detail=(
+                f"{savings_rate_pct:.1f}% — Vergleichsgruppe {peer_rate:.0f}%"
+                if income > 0 else "Keine Einnahmen im Zeitraum"
+            ),
             name_key="savingsRate",
-            detail_key="savingsRateDetail" if income > 0 else "noIncomeInPeriod",
-            detail_params={"pct": f"{savings_rate_pct:.1f}"} if income > 0 else None,
+            detail_key="savingsRateVsPeer" if income > 0 else "noIncomeInPeriod",
+            detail_params=(
+                {"pct": f"{savings_rate_pct:.1f}", "peer": f"{peer_rate:.0f}"}
+                if income > 0 else None
+            ),
         ),
         HealthScoreComponent(
             name="Budgettreue", score=round(adherence_score, 1), weight=0.25,
@@ -694,6 +715,8 @@ def _compute_health_score(
         grade=_grade(weighted_score),
         components=components,
         top_levers=levers[:3],
+        savings_rate_pct=round(savings_rate_pct, 1),
+        peer_savings_rate_pct=round(peer_rate, 1),
     )
 
 
@@ -724,9 +747,14 @@ async def budget_health_score(
         period_start = date.fromisoformat(start)
         period_end   = date.fromisoformat(end)
     else:
-        period_start = (today.replace(day=1) - timedelta(days=1)).replace(day=1)
-        period_start = (period_start - timedelta(days=1)).replace(day=1)
-        period_end   = today
+        # Bis zum letzten *abgeschlossenen* Monat. Endete der Zeitraum heute,
+        # zaehlten die halben laufenden Monatsausgaben mit, der Lohn vom 25.
+        # aber nicht — ein Haushalt, der zum Monatsende bezahlt wird, sah
+        # dadurch in den ersten drei Wochen jedes Monats 0 % Sparquote.
+        period_end = today.replace(day=1) - timedelta(days=1)
+        period_start = period_end.replace(day=1)
+        for _ in range(2):
+            period_start = (period_start - timedelta(days=1)).replace(day=1)
 
     months_covered = max(
         1,
@@ -949,6 +977,19 @@ async def budget_health_score(
         income = income_for_savings
         expenses = expenses_for_savings
 
+    # Haushaltsform fuer den Peer-Vergleich: ein Paar spart anders als eine
+    # Einzelperson. Ohne Wizard-Angaben bleibt es bei "single".
+    household_type = "single"
+    from app.models.models import UserWizardConfig as _UWC
+    _cfg = (await db.execute(
+        select(_UWC).where(_UWC.user_id == current_user.id)
+    )).scalars().first()
+    if _cfg and _cfg.wizard_data_json:
+        try:
+            household_type = _json.loads(_cfg.wizard_data_json).get("haushalt") or "single"
+        except (ValueError, TypeError):
+            pass
+
     return _compute_health_score(
         income=income,
         expenses=expenses,
@@ -957,4 +998,5 @@ async def budget_health_score(
         has_pension=has_pension,
         months_covered=months_covered,
         ref=ref,
+        household_type=household_type,
     )
