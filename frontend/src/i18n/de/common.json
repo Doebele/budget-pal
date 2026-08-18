@@ -43,7 +43,12 @@
   "notifications": {
     "title": "Benachrichtigungen",
     "empty": "Keine Anomalien erkannt.",
-    "allGood": "Alles sieht normal aus 🎉"
+    "allGood": "Alles sieht normal aus 🎉",
+    "severity": {
+      "alert": "Alarm",
+      "warning": "Warnung",
+      "info": "Hinweis"
+    }
   },
   "common": {
     "loading": "Wird geladen…",

@@ -43,7 +43,12 @@
   "notifications": {
     "title": "Notifications",
     "empty": "No anomalies detected.",
-    "allGood": "Everything looks normal 🎉"
+    "allGood": "Everything looks normal 🎉",
+    "severity": {
+      "alert": "Alert",
+      "warning": "Warning",
+      "info": "Notice"
+    }
   },
   "common": {
     "loading": "Loading…",

@@ -3,8 +3,14 @@
  *
  * Shows a badge count for warnings/alerts.
  * Clicking opens a slide-down panel listing all findings.
+ *
+ * Das Panel haengt per Portal an `document.body`. Absolut positioniert wurde
+ * es von der Rail beschnitten: die traegt `overflow: hidden` fuer die
+ * Breiten-Animation und schnitt damit alles ab, was ueber ihre 220 px
+ * hinausragte — das Panel ist 320 px breit.
  */
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
 import { notificationsApi } from "@/lib/api";
 import { Bell, BellNotification, Cash, CreditCard, Dollar, GraphDown, InfoCircle, Refresh, WarningCircle, WarningTriangle, Xmark } from "@/lib/icons";
@@ -21,10 +27,12 @@ interface Finding {
   currency?: string | null;
 }
 
+//: `labelKey` statt fester Beschriftung — bei "info" stand vorher der
+//: Icon-Name "InfoCircle" im Badge.
 const SEVERITY_META = {
-  alert:   { color: "text-loss",    bg: "bg-loss/10 border-loss/20",    icon: WarningCircle,  label: "Alarm"    },
-  warning: { color: "text-warning", bg: "bg-warning/10 border-warning/20", icon: WarningTriangle, label: "Warnung" },
-  info:    { color: "text-accent",  bg: "bg-accent/10 border-accent/20",  icon: InfoCircle,         label: "InfoCircle"    },
+  alert:   { color: "text-loss",    bg: "bg-loss/10 border-loss/20",       icon: WarningCircle,   labelKey: "severity.alert"   },
+  warning: { color: "text-warning", bg: "bg-warning/10 border-warning/20", icon: WarningTriangle, labelKey: "severity.warning" },
+  info:    { color: "text-accent",  bg: "bg-accent/10 border-accent/20",   icon: InfoCircle,      labelKey: "severity.info"    },
 };
 
 const TYPE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -35,10 +43,16 @@ const TYPE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = 
   large_cash:       Cash,
 };
 
+/** Abstand zu Anker und Fensterrand. */
+const GAP = 8;
+const PANEL_WIDTH = 320;
+
 export default function NotificationBell() {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
 
   // Lightweight count poll (every 5 min)
   const { data: countData } = useQuery({
@@ -60,13 +74,50 @@ export default function NotificationBell() {
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target as Node;
+      // Zwei Container: der Glockenknopf hier, das Panel am body. Ohne die
+      // zweite Pruefung schloesse ein Klick *im* Panel es sofort wieder.
+      const inside =
+        panelRef.current?.contains(target) || boxRef.current?.contains(target);
+      if (!inside) setOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
+
+  // Vor dem Paint messen, sonst blitzt das Panel einen Frame an (0,0) auf.
+  useLayoutEffect(() => {
+    if (!open) {
+      setPos(null);
+      return;
+    }
+    const place = () => {
+      const anchor = panelRef.current;
+      if (!anchor) return;
+      const a = anchor.getBoundingClientRect();
+      const { innerWidth: vw, innerHeight: vh } = window;
+      const width = boxRef.current?.offsetWidth || PANEL_WIDTH;
+
+      // Rechtsbuendig zum Glockenknopf, aber nie ueber den Fensterrand.
+      let left = a.right - width;
+      left = Math.min(Math.max(GAP, left), vw - width - GAP);
+
+      let top = a.bottom + GAP;
+      const height = boxRef.current?.offsetHeight ?? 0;
+      // Kein Platz darunter → ueber den Knopf klappen.
+      if (height && top + height > vh - GAP) {
+        top = Math.max(GAP, a.top - height - GAP);
+      }
+      setPos({ top, left });
+    };
+    place();
+    window.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
+    return () => {
+      window.removeEventListener("scroll", place, true);
+      window.removeEventListener("resize", place);
+    };
+  }, [open, findings.length, isLoading]);
 
   const total = countData?.total ?? 0;
   const hasAlert = (countData?.alerts ?? 0) > 0;
@@ -101,14 +152,25 @@ export default function NotificationBell() {
         )}
       </button>
 
-      {/* Dropdown panel */}
-      {open && (
-        <div className="absolute right-0 top-full mt-2 w-80 bg-bg-surface border border-border rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in">
+      {/* Dropdown panel — am body, damit die Rail es nicht beschneidet */}
+      {open && createPortal(
+        <div
+          ref={boxRef}
+          role="dialog"
+          aria-label={t("notifications.title")}
+          className="fixed w-80 max-w-[calc(100vw-1rem)] bg-bg-surface border border-border rounded-xl shadow-2xl z-[60] overflow-hidden animate-fade-in"
+          style={{
+            top: pos?.top ?? -9999,
+            left: pos?.left ?? -9999,
+            // Bis zur ersten Messung unsichtbar, sonst springt es sichtbar.
+            visibility: pos ? "visible" : "hidden",
+          }}
+        >
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <span className="text-text-primary text-sm font-semibold flex items-center gap-2">
               <BellNotification className="w-3.5 h-3.5 text-accent" />
-              Benachrichtigungen
+              {t("notifications.title")}
             </span>
             <button onClick={() => setOpen(false)} className="text-text-tertiary hover:text-text-primary transition-colors">
               <Xmark className="w-3.5 h-3.5" />
@@ -147,7 +209,7 @@ export default function NotificationBell() {
                     <div className="flex items-start justify-between gap-1">
                       <p className="text-text-primary text-xs font-medium leading-tight">{f.title}</p>
                       <span className={clsx("text-[9px] font-semibold uppercase tracking-wide shrink-0", meta.color)}>
-                        {meta.label}
+                        {t(`notifications.${meta.labelKey}`)}
                       </span>
                     </div>
                     <p className="text-text-tertiary text-[11px] mt-0.5 leading-snug">{f.body}</p>
@@ -164,7 +226,8 @@ export default function NotificationBell() {
               </p>
             </div>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
