@@ -16,6 +16,8 @@ make logs             # Stream all logs
 make stop             # Stop all services
 make down             # Stop + remove containers
 make down-volumes     # DESTRUCTIVE: also deletes DB volume
+make build-nosw       # Frontend build without the service worker — otherwise the
+                      #   browser serves the previous version after `make build`
 ```
 
 ### Database migrations
@@ -109,7 +111,9 @@ api/              # One router per domain, all mounted in main.py under /api/<na
   imports.py      # /imports — CSV/PDF upload, preview, history
   projections.py  # /projections — Monte Carlo scenarios, CRUD
   budgets.py      # /budgets — monthly budget per supercategory
-  recurring_plan.py # /recurring-plan — Budgetplan CRUD
+  recurring_plan.py # /recurring-plan — Budgetplan CRUD, /reconciliation (Plan-Ist),
+                  #   /batch (create+update+delete in one transaction)
+  onboarding.py   # /onboarding — status, demo data (load/remove), merchant review
   taxonomy.py     # /taxonomy — supercategory list + per-user hidden labels
   pension.py      # /pension — AHV/BVG/3a data
   assets.py       # /assets — net worth items
@@ -124,8 +128,26 @@ services/
   currency_service.py # ECB rate fetch with file cache (rates.json)
   import_parsers/     # Bank CSV/PDF parsers: UBS, N26, Revolut, comdirect
   audit_log.py        # record_activity() — writes to activity_log for all destructive ops
-  peer_group_seed.py  # Seeds peer_group_benchmarks on startup
+  peer_group_seed.py  # Seeds system categories on startup (NOT the benchmark table —
+                      #   `peer_group_benchmarks` is empty; peer values come from
+                      #   peer_group.py constants)
+  peer_group.py       # BFS HABE reference values: income medians, savings rates,
+                      #   canton multipliers. peer_savings_rate() feeds the health score.
+  plan_schedule.py    # Which months a plan entry falls in, and how often per month.
+                      #   Frontend twin: frontend/src/lib/planSchedule.ts — keep in sync.
+  demo_data.py        # Anonymous sample household (fixed seed → reproducible)
 ```
+
+### Test environment caveats
+Tests run against **in-memory SQLite**, which ignores `VARCHAR(n)` limits. A string
+that is too long for a column passes every test and then fails on PostgreSQL with
+`value too long for type character varying(n)` — this happened with
+`activity_log.method` (VARCHAR(16)). When a value goes into a length-limited column,
+assert against the model's limit (`Model.column.type.length`), not against the test DB.
+
+There is no frontend test runner: `npm test` starts vitest, but the project has no
+vitest config and no DOM environment (`jsdom` is not installed). `npm run lint` also
+fails — ESLint finds no configuration file. Only `npm run typecheck` works.
 
 ### Database startup policy
 `backend/start.sh` handles two cases:

@@ -19,9 +19,32 @@ bank import, AI categorization, long-term financial projections, and the Swiss 3
 
 ## ✨ Neueste Updates / Latest Updates
 
+**August 2026 — Onboarding, Szenarien und Plan-Ist-Abgleich**
+
+- 🚪 **Drei Wege zum ersten Ergebnis** — statt eines achtstufigen Wizards vor dem Dashboard:
+  Kontoauszug hochladen (gemessen), Budget selbst einschätzen (geschätzt, Kurzstrecke durch
+  denselben Wizard) oder anonyme Beispieldaten laden (erfunden, 424 Buchungen über
+  zwölf Monate, jederzeit spurlos entfernbar)
+- ✅ **Bestätigungsschleife nach dem Import** — die zehn grössten *Händler* statt Buchungen;
+  eine Bestätigung wirkt auf alle Buchungen dieses Händlers und auf jeden künftigen Import
+- 📊 **Fortschritt statt Sperre** — das Dashboard zeigt, was schon geht, und benennt je
+  Schritt, was der nächste freischaltet
+- 🔀 **Szenarien wirken** — Sparplan, Frühpensionierung, Pflegekosten und Amortisation
+  fliessen jetzt in die Monte-Carlo-Projektion ein (vorher waren es Schalter ohne Funktion)
+- 🧾 **Plan-Ist-Abgleich im Budgetplan** — jede Fälligkeit trägt ihren Status
+  (gebucht / abweichend / offen / überfällig), Jahresbilanz mit Vorjahresvergleich und
+  kumuliertem Laufsaldo
+- 🗂️ **Massenänderungen** — Mehrfachauswahl, Massen-Kategorisierung, Teuerungsaufschlag,
+  alles über einen transaktionalen Batch-Endpunkt
+- 📈 **Sparquote an der Vergleichsgruppe** — BFS-Werte nach Haushaltsform und
+  Einkommensklasse statt einer festen Zielmarke
+- ♿ **Barrierefreiheit** — Wizard-Schritte als echte Buttons (Tastatur, Fokusring,
+  `aria-current`), Fortschrittsbalken mit `role="progressbar"`, Statusfarben zusätzlich
+  durch Form unterscheidbar
+
 **Juni 2026 — Neues Design-System & Mehrsprachigkeit**
 
-- 🎨 **Light & Dark Mode** — vollständig token-basiertes Design-System (CSS-Variablen), umschaltbar pro Nutzer, inkl. theme-bewusster Charts (Recharts, Nivo, ECharts)
+- 🎨 **Light & Dark Mode** — vollständig token-basiertes Design-System (CSS-Variablen), umschaltbar pro Nutzer, inkl. theme-bewusster Charts (Recharts, ECharts)
 - 🧭 **Rail-Navigation** — einklappbare Desktop-Seitenleiste (52/220px) mit Tooltips, portiert vom Schwesterprojekt application-pal; auf Mobile weiterhin Bottom-Navigation + Drawer
 - 🗜️ **Density-Modi** — «Kompakt» (mehr Information) und «Komfort» (mehr Weissraum, sanfter UI-Zoom)
 - 🌐 **Sprachwechsel Deutsch/Englisch** — react-i18next mit Persistenz in der Datenbank (`users.ui_language`, erweiterbar für weitere Sprachen); Zahlen- und Datumsformate folgen der Sprache bei Schweizer Konventionen (de-CH/en-CH)
@@ -77,10 +100,31 @@ umgekehrt zur üblichen Wortbedeutung von „empirisch".
 - Per-User Anpassungen: Labels ausblenden, eigene Labels hinzufügen (Settings)
 - Kategorienverwaltung: Migrierung von Transaktionen beim Ausblenden eines Labels
 
+### Onboarding
+Drei Einstiege nach der Registrierung, alle mit demselben Ziel — eine erste
+brauchbare Zahl, bevor jemand 50 Felder ausfüllt:
+
+| Weg | Datenlage | Wofür |
+|---|---|---|
+| **Kontoauszug hochladen** | gemessen | echte Zahlen, braucht die Unterlagen |
+| **Budget selbst einschätzen** | geschätzt | vier Schritte durch den Wizard; darf Dinge enthalten, die erst bevorstehen |
+| **Beispieldaten ansehen** | erfunden | anonym, sofort, für Demos und zum Kennenlernen |
+
+- Beispieldaten: erfundener Schweizer Haushalt, 424 Buchungen über zwölf Monate,
+  fester Startwert (dieselbe Vorführung zeigt zweimal dieselben Zahlen),
+  idempotent, über `DELETE /api/onboarding/demo` restlos entfernbar
+- Bestätigungsschleife über die zehn grössten Händler — wirkt über
+  `merchant_normalized` auf Stufe 0 der Kategorisierung
+
 ### Budgetplanung
 - Monatsbudget pro Superkategorie
 - **Budgetplan**: Jahresübersicht wiederkehrender Einträge über 12 Monate (Kalender- und Listenansicht)
-- Wiederkehrende Einnahmen/Ausgaben (monatlich, quartalsweise, jährlich, ...)
+- Wiederkehrende Einnahmen/Ausgaben (wöchentlich, monatlich, quartalsweise, halbjährlich, jährlich)
+- **Plan-Ist-Abgleich**: Status je Fälligkeit — gebucht / Betrag weicht ab / offen / überfällig;
+  Textabgleich über dieselbe Fuzzy-Logik wie die Duplikaterkennung beim Import
+- **Jahresbilanz** mit Vorjahresvergleich und kumuliertem Laufsaldo je Monat
+- **Massenänderungen**: Mehrfachauswahl, Kategorisierung, Löschen, prozentualer
+  Teuerungsaufschlag — als eine Transaktion (`POST /api/recurring-plan/batch`)
 
 ### Prognosen
 - **Monte Carlo Simulation** (10.000 Durchläufe), Perzentilbänder (p10, p25, p50, p75, p90)
@@ -90,6 +134,11 @@ umgekehrt zur üblichen Wortbedeutung von „empirisch".
   - Säule 3a: Zinseszins, max. CHF 7'056/Jahr steuerlich abzugsfähig
 - Inflationsbereinigung (Standard: 1.5% CHF)
 - Szenario-Vergleich (Was-wäre-wenn-Analysen)
+- **Wirksame Szenarien**: Sparplan erhöhen, Frühpensionierung (inkl. AHV-Vorbezugskürzung
+  von 6.8 %/Jahr), Pflegekosten ab 80, Hypothek amortisieren — beliebig kombinierbar
+- **Budget-Gesundheit**: fünf gewichtete Komponenten; die Sparquote wird an der
+  BFS-Vergleichsgruppe gemessen (Haushaltsform × Einkommensklasse), nicht an einer
+  festen Zielmarke
 
 ### Visualisierungen
 - **Sankey-Diagramm**: Cashflow — Einnahmen → Superkategorien → Sparen, wahlweise aus realen (importierten) oder empirischen (Wizard-)Daten
@@ -343,10 +392,12 @@ budget-pal/
 │   │   │   ├── api.ts          # Axios + JWT interceptor + alle API-Calls
 │   │   │   ├── auth.tsx        # Auth Context + Sprach-Sync mit DB
 │   │   │   ├── store.ts        # zustand UI-Store (Theme/Dichte/Akzent/Sprache/Rail)
-│   │   │   ├── theme.ts        # themePalettes dark/light + Nivo-Theme-Builder
+│   │   │   ├── theme.ts        # themePalettes dark/light + Betragsformatierung
 │   │   │   ├── format.ts       # locale-bewusste Zahlen-/Datumsformatierung
 │   │   │   ├── icons.tsx       # Iconoir-Adapter (size-Prop-kompatibel)
-│   │   │   └── categories.ts   # useTaxonomy(), SuperCategory Typen, Lookups
+│   │   │   ├── categories.ts   # useTaxonomy(), SuperCategory Typen, Lookups
+│   │   │   └── planSchedule.ts # Fälligkeiten eines Budgetplan-Eintrags
+│   │   │                       #   (Gegenstück zu services/plan_schedule.py)
 │   │   ├── hooks/
 │   │   │   └── useThemeColors.ts   # theme-bewusste Chart-Farben
 │   │   ├── components/
