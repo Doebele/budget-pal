@@ -19,7 +19,7 @@
  */
 
 import { useState, useCallback, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Airplane, ArrowRight, Bank, BitcoinCircle, Building, Car, Cash, Check, Coins, Community, Globe, GraphDown, GraphUp, Group, Heart, Home, Laptop, NavArrowLeft, NavArrowRight, OpenBook, PiggyBank, Reports, ShieldCheck, Shuffle, Sofa, StatsReport, Suitcase, Train, Trash, User, UserXmark, Wallet } from "@/lib/icons";
 import { clsx } from "clsx";
 import { api } from "@/lib/api";
@@ -1778,7 +1778,7 @@ function Step8({ data, update }: { data: WizardData; update: (p: Partial<WizardD
 
 // ── Review Screen ──────────────────────────────────────────────
 
-function ReviewScreen({ data }: { data: WizardData }) {
+function ReviewScreen({ data, budgetOnly = false }: { data: WizardData; budgetOnly?: boolean }) {
   const { t } = useTranslation();
   const netto = computeNettoEinkommen(data);
   const age = new Date().getFullYear() - data.geburtsjahr;
@@ -1823,7 +1823,7 @@ function ReviewScreen({ data }: { data: WizardData }) {
           {data.vorname ? t("pages:wizard.almostDone", { name: data.vorname }) : t("pages:wizard.summary")}
         </h2>
         <p className="text-text-secondary text-sm max-w-sm mx-auto">
-          {t("pages:wizard.reviewIntro")}
+          {budgetOnly ? t("pages:wizard.budgetReviewIntro") : t("pages:wizard.reviewIntro")}
         </p>
       </div>
 
@@ -1835,16 +1835,23 @@ function ReviewScreen({ data }: { data: WizardData }) {
           value={netto > 0 ? `${Math.round(((netto - monthlyExpenses) / netto) * 100)}%` : "—"}
           sub={t("pages:wizard.w148")}
         />
-        <SummaryCard label={t("pages:wizard.w48")} value={chf(totalAssets)} sub={t("pages:wizard.w118")} />
-        <SummaryCard label={t("pages:wizard.w100")} value={chf(pillar3aTotal)} sub={t("pages:wizard.w49")} />
-        <SummaryCard
-          label={t("pages:wizard.pensionAtAge", { age: data.zielRentenalter })}
-          value={chf(ahvRente + bvgRente)}
-          sub={`AHV ${chf(ahvRente)} + BVG ${chf(bvgRente)}`}
-        />
+        {/* Vermoegen und Vorsorge stehen in der Kurzstrecke nicht zur
+            Verfuegung — drei Kacheln mit Null waeren keine Zusammenfassung,
+            sondern eine Fehlanzeige. */}
+        {!budgetOnly && (
+          <>
+            <SummaryCard label={t("pages:wizard.w48")} value={chf(totalAssets)} sub={t("pages:wizard.w118")} />
+            <SummaryCard label={t("pages:wizard.w100")} value={chf(pillar3aTotal)} sub={t("pages:wizard.w49")} />
+            <SummaryCard
+              label={t("pages:wizard.pensionAtAge", { age: data.zielRentenalter })}
+              value={chf(ahvRente + bvgRente)}
+              sub={`AHV ${chf(ahvRente)} + BVG ${chf(bvgRente)}`}
+            />
+          </>
+        )}
       </div>
 
-      <div className="card border-accent/20 bg-accent/5">
+      <div className={clsx("card border-accent/20 bg-accent/5", budgetOnly && "hidden")}>
         <h4 className="text-text-primary font-medium text-sm mb-3">{t("pages:wizard.w105")}</h4>
         <div className="flex flex-wrap gap-2">
           {data.scenarioMortgage && (
@@ -1875,6 +1882,19 @@ function ReviewScreen({ data }: { data: WizardData }) {
 // ── Main Wizard ────────────────────────────────────────────────
 
 const TOTAL_STEPS = 8;
+
+/**
+ * Die Kurzstrecke: Profil, Einkommen, Wohnen und Alltag — alles, was den
+ * Budgetplan ergibt. Vermoegen, Vorsorge und Ziele (6–8) verlangen
+ * Unterlagen, die man selten zur Hand hat, und bleiben fuer spaeter. Auch
+ * die Peer-Gruppe (3) faellt weg: sie ist ein Vorschlag, keine Frage.
+ *
+ * Es sind dieselben Schritte in derselben Reihenfolge — nur kuerzer. Ein
+ * zweiter, eigener Fragebogen waere eine zweite Wahrheit ueber dieselben
+ * Zahlen geworden.
+ */
+const BUDGET_STEPS = [1, 2, 4, 5];
+const ALL_STEPS = Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1);
 const STORAGE_KEY = "budgetpal_wizard_draft";
 
 function normalizeWizardData(raw: Partial<WizardData> | null | undefined): WizardData {
@@ -1948,6 +1968,9 @@ function persistWizardDraft(data: WizardData) {
 export default function Wizard() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const budgetScope = searchParams.get("scope") === "budget";
+  const steps = budgetScope ? BUDGET_STEPS : ALL_STEPS;
   const [currentStep, setCurrentStep] = useState(1);
   const [wizardData, setWizardData] = useState<WizardData>(loadDraft);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -2016,10 +2039,11 @@ export default function Wizard() {
     setDirection("forward");
     setAnimating(true);
     await new Promise((r) => setTimeout(r, 180));
-    if (currentStep === TOTAL_STEPS) {
+    const at = steps.indexOf(currentStep);
+    if (at >= steps.length - 1) {
       setIsReview(true);
     } else {
-      setCurrentStep((s) => s + 1);
+      setCurrentStep(steps[at + 1]);
     }
     setAnimating(false);
   }
@@ -2032,7 +2056,8 @@ export default function Wizard() {
     if (isReview) {
       setIsReview(false);
     } else {
-      setCurrentStep((s) => Math.max(1, s - 1));
+      const at = steps.indexOf(currentStep);
+      setCurrentStep(steps[Math.max(0, at - 1)]);
     }
     setAnimating(false);
   }
@@ -2073,7 +2098,9 @@ export default function Wizard() {
         subscription_total: subscriptionTotal,
       });
       localStorage.removeItem(STORAGE_KEY);
-      navigate("/finanzplan");
+      // Ohne Vorsorgedaten hat der Finanzplan nichts zu zeigen — die
+      // Kurzstrecke landet dort, wo ihre Zahlen wirken.
+      navigate(budgetScope ? "/budget" : "/finanzplan");
     } catch (err) {
       console.error("Wizard submit failed:", err);
       setSubmitError(t("pages:wizard.w50"));
@@ -2112,7 +2139,11 @@ export default function Wizard() {
               {t("pages:ui.zusammenfassung_alle_schritte_ausgefuellt")}
             </p>
           ) : (
-            <StepIndicator currentStep={currentStep} totalSteps={TOTAL_STEPS} onStepClick={goToStep} />
+            <StepIndicator
+              currentStep={currentStep}
+              stepNumbers={steps}
+              onStepClick={goToStep}
+            />
           )}
 
           {/* Progress bar */}
@@ -2122,7 +2153,7 @@ export default function Wizard() {
               style={{
                 width: isReview
                   ? "100%"
-                  : `${((currentStep - 1) / TOTAL_STEPS) * 100}%`,
+                  : `${(steps.indexOf(currentStep) / steps.length) * 100}%`,
               }}
             />
           </div>
@@ -2143,7 +2174,7 @@ export default function Wizard() {
             )}
           >
             {isReview ? (
-              <ReviewScreen data={wizardData} />
+              <ReviewScreen data={wizardData} budgetOnly={budgetScope} />
             ) : (
               stepComponents[currentStep]
             )}
@@ -2168,7 +2199,11 @@ export default function Wizard() {
               disabled={animating || isSubmitting}
             >
               <NavArrowLeft className="w-4 h-4" />
-              {isReview ? t("pages:wizard.w51") : t("pages:wizard.w52")}
+              {isReview
+                ? budgetScope
+                  ? t("pages:wizard.w52")
+                  : t("pages:wizard.w51")
+                : t("pages:wizard.w52")}
             </button>
           )}
           {!(isReview || currentStep > 1) && <div />}
@@ -2196,7 +2231,7 @@ export default function Wizard() {
               onClick={goNext}
               disabled={animating || !canGoNext()}
             >
-              {currentStep === TOTAL_STEPS ? (
+              {steps.indexOf(currentStep) === steps.length - 1 ? (
                 <>
                   {t("pages:wizard.w400")} <ArrowRight className="w-4 h-4" />
                 </>
@@ -2220,7 +2255,8 @@ export default function Wizard() {
                 </>
               ) : (
                 <>
-                  {t("pages:wizard.w307")} <ArrowRight className="w-4 h-4" />
+                  {budgetScope ? t("pages:wizard.budgetSubmit") : t("pages:wizard.w307")}{" "}
+                  <ArrowRight className="w-4 h-4" />
                 </>
               )}
             </button>

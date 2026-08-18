@@ -330,7 +330,9 @@
     "ahvPension": "AHV / Rente",
     "rent": "Miete",
     "ownership": "Wohneigentum",
-    "years": "{{count}} Jahre"
+    "years": "{{count}} Jahre",
+    "budgetSubmit": "Budget übernehmen",
+    "budgetReviewIntro": "Überprüfe deine Einschätzung. Vorsorge und Vermögen kannst du später ergänzen — dein Fortschritt bleibt bei jedem Schritt gespeichert."
   },
   "step5": {
     "s00": "Alltag & Abonnements",
@@ -800,7 +802,7 @@
   },
   "onboarding": {
     "title": "Willkommen bei Budget-Pal",
-    "subtitle": "Zwei Wege zum ersten Ergebnis. Beide führen zum selben Dashboard — der eine mit deinen Zahlen, der andere mit erfundenen.",
+    "subtitle": "Drei Wege zum ersten Ergebnis. Alle führen zum selben Dashboard — mit gemessenen Zahlen, geschätzten oder erfundenen.",
     "importTitle": "Kontoauszug hochladen",
     "importBody": "CSV oder PDF deiner Bank. Die Buchungen werden automatisch kategorisiert; du bestätigst danach die grössten Posten.",
     "demoTitle": "Beispieldaten ansehen",
@@ -810,8 +812,8 @@
     "demoLoaded": "{{count}} Beispiel-Buchungen geladen.",
     "toDashboard": "Zum Dashboard",
     "removeDemo": "Entfernen",
-    "wizardHint": "Für Rentenprognose und Vermögensplanung braucht es zusätzlich dein Profil —",
-    "wizardLink": "Empirische Angaben ausfüllen",
+    "wizardHint": "Für Rentenprognose und Vermögensplanung braucht es zusätzlich Vorsorge und Vermögen —",
+    "wizardLink": "vollständiges Profil ausfüllen",
     "skip": "Später, direkt zum Dashboard",
     "progressTitle": "Dein Profil",
     "stepData": "Daten",
@@ -827,6 +829,8 @@
     "reviewConfirm": "Bestätigen",
     "reviewSaving": "Wird gespeichert…",
     "reviewSkip": "Überspringen",
-    "reviewDone": "Danke — die Zuordnungen sind gespeichert und gelten ab jetzt auch für neue Buchungen."
+    "reviewDone": "Danke — die Zuordnungen sind gespeichert und gelten ab jetzt auch für neue Buchungen.",
+    "estimateTitle": "Budget selbst einschätzen",
+    "estimateBody": "Vier Schritte: Profil, Einkommen, Wohnen und Alltag mit Abos. Deine eigene Einschätzung — sie darf auch Dinge enthalten, die es in keinem Kontoauszug gibt."
   }
 }

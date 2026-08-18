@@ -16,7 +16,7 @@ import { useTranslation } from "react-i18next";
 import { clsx } from "clsx";
 
 import { onboardingApi, type OnboardingStatus } from "@/lib/api";
-import { Flask, Reports, Trash, Upload } from "@/lib/icons";
+import { EditPencil, Flask, Reports, Trash, Upload } from "@/lib/icons";
 import OnboardingReview from "@/components/OnboardingReview";
 
 export default function Onboarding() {
@@ -58,7 +58,7 @@ export default function Onboarding() {
           </p>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-3">
           {/* Weg 1 — echte Daten */}
           <button
             type="button"
@@ -80,7 +80,28 @@ export default function Onboarding() {
             </p>
           </button>
 
-          {/* Weg 2 — Beispieldaten */}
+          {/* Weg 2 — selbst einschaetzen */}
+          <button
+            type="button"
+            onClick={() => navigate("/wizard?scope=budget")}
+            className={clsx(
+              "text-left p-5 rounded-2xl border border-border bg-bg-surface",
+              "hover:border-accent/60 hover:bg-bg-surface2 transition-colors",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+            )}
+          >
+            <div className="w-9 h-9 rounded-lg bg-gain/15 flex items-center justify-center mb-3">
+              <EditPencil className="w-4 h-4 text-gain" />
+            </div>
+            <h2 className="text-text-primary font-semibold text-sm mb-1.5">
+              {t("pages:onboarding.estimateTitle")}
+            </h2>
+            <p className="text-text-secondary text-xs leading-relaxed">
+              {t("pages:onboarding.estimateBody")}
+            </p>
+          </button>
+
+          {/* Weg 3 — Beispieldaten */}
           <div
             className={clsx(
               "p-5 rounded-2xl border bg-bg-surface",
@@ -143,7 +164,8 @@ export default function Onboarding() {
           </div>
         )}
 
-        {/* Der Wizard bleibt — aber als Angebot, nicht als Huerde. */}
+        {/* Der vollstaendige Wizard bleibt als Angebot fuer alles, was ueber
+            das Budget hinausgeht. */}
         <p className="text-center text-text-tertiary text-xs mt-8">
           {t("pages:onboarding.wizardHint")}{" "}
           <button

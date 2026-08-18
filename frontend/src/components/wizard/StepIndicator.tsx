@@ -22,6 +22,12 @@ interface StepIndicatorProps {
   className?: string;
   /** If provided, step circles become clickable links */
   onStepClick?: (step: number) => void;
+  /**
+   * Welche Schritte ueberhaupt vorkommen, in Original-Nummerierung. Die
+   * Kurzstrecke laesst Vorsorge und Vermoegen weg — ohne diese Angabe zeigte
+   * die Leiste acht Schritte an, von denen vier nie erscheinen.
+   */
+  stepNumbers?: number[];
 }
 
 interface StepBoxProps {
@@ -55,19 +61,23 @@ export default function StepIndicator({
   totalSteps = 8,
   className,
   onStepClick,
+  stepNumbers,
 }: StepIndicatorProps) {
   const { t } = useTranslation();
   const clickable = Boolean(onStepClick);
+  // `step` ist die Nummer im vollen Wizard (fuer Beschriftung und Sprung),
+  // `i` die laufende Nummer in dieser Auswahl (fuer die Anzeige).
+  const steps = stepNumbers ?? Array.from({ length: totalSteps }, (_, i) => i + 1);
+  const position = Math.max(0, steps.indexOf(currentStep));
 
   return (
     <>
       {/* ── Desktop: full step circles ─────────────────────── */}
       <div className={clsx("hidden md:flex items-center w-full", className)}>
-        {Array.from({ length: totalSteps }, (_, i) => {
-          const step = i + 1;
-          const isCompleted = step < currentStep;
+        {steps.map((step, i) => {
+          const isCompleted = i < position;
           const isActive = step === currentStep;
-          const isPending = step > currentStep;
+          const isPending = i > position;
           const interactive = clickable && !isActive;
 
           return (
@@ -77,7 +87,7 @@ export default function StepIndicator({
                 interactive={interactive}
                 isActive={isActive}
                 onClick={() => onStepClick?.(step)}
-                title={clickable ? t(STEP_LABELS[i]) : undefined}
+                title={clickable ? t(STEP_LABELS[step - 1]) : undefined}
                 className={clsx(
                   "flex flex-col items-center gap-1.5 rounded-lg",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base",
@@ -99,7 +109,7 @@ export default function StepIndicator({
                   {isCompleted ? (
                     <Check className="w-4 h-4" />
                   ) : (
-                    <span>{step}</span>
+                    <span>{i + 1}</span>
                   )}
                 </div>
                 <span
@@ -112,12 +122,12 @@ export default function StepIndicator({
                     isPending && clickable && "group-hover:text-text-secondary",
                   )}
                 >
-                  {t(STEP_LABELS[i])}
+                  {t(STEP_LABELS[step - 1])}
                 </span>
               </StepBox>
 
               {/* Connector line (not after last) */}
-              {step < totalSteps && (
+              {i < steps.length - 1 && (
                 <div
                   className={clsx(
                     "flex-1 h-[2px] mx-2 rounded-full transition-all duration-500",
@@ -134,9 +144,8 @@ export default function StepIndicator({
       <div className={clsx("flex md:hidden items-center gap-3", className)}>
         {/* Mini dots */}
         <div className="flex items-center gap-1.5">
-          {Array.from({ length: totalSteps }, (_, i) => {
-            const step = i + 1;
-            const isCompleted = step < currentStep;
+          {steps.map((step, i) => {
+            const isCompleted = i < position;
             const isActive = step === currentStep;
             const interactive = clickable && !isActive;
             return (
@@ -145,7 +154,7 @@ export default function StepIndicator({
                 interactive={interactive}
                 isActive={isActive}
                 onClick={() => onStepClick?.(step)}
-                title={clickable ? t(STEP_LABELS[i]) : undefined}
+                title={clickable ? t(STEP_LABELS[step - 1]) : undefined}
                 className={clsx(
                   "rounded-full transition-all duration-300",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
@@ -158,13 +167,13 @@ export default function StepIndicator({
                 )}
               >
                 {/* Der Punkt allein sagt nichts — die Beschriftung traegt ihn. */}
-                <span className="sr-only">{t(STEP_LABELS[i])}</span>
+                <span className="sr-only">{t(STEP_LABELS[step - 1])}</span>
               </StepBox>
             );
           })}
         </div>
         <span className="text-text-tertiary text-xs">
-          {t("pages:wizard.stepOf", { current: currentStep, total: totalSteps })}
+          {t("pages:wizard.stepOf", { current: position + 1, total: steps.length })}
           {" "}—{" "}
           <span className="text-text-secondary">{t(STEP_LABELS[currentStep - 1])}</span>
         </span>

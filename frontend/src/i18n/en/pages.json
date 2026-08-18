@@ -330,7 +330,9 @@
     "ahvPension": "OASI / pension",
     "rent": "Rent",
     "ownership": "Home ownership",
-    "years": "{{count}} years"
+    "years": "{{count}} years",
+    "budgetSubmit": "Apply budget",
+    "budgetReviewIntro": "Check your estimate. Pension and assets can be added later — your progress is saved at every step."
   },
   "step5": {
     "s00": "Everyday & subscriptions",
@@ -800,7 +802,7 @@
   },
   "onboarding": {
     "title": "Welcome to Budget-Pal",
-    "subtitle": "Two ways to a first result. Both lead to the same dashboard — one with your numbers, one with made-up ones.",
+    "subtitle": "Three ways to a first result. All lead to the same dashboard — with measured, estimated or invented numbers.",
     "importTitle": "Upload a bank statement",
     "importBody": "CSV or PDF from your bank. Transactions are categorised automatically; you then confirm the largest ones.",
     "demoTitle": "Explore sample data",
@@ -810,8 +812,8 @@
     "demoLoaded": "{{count}} sample transactions loaded.",
     "toDashboard": "Go to dashboard",
     "removeDemo": "Remove",
-    "wizardHint": "Pension forecast and wealth planning need your profile as well —",
-    "wizardLink": "fill in Empirical Data",
+    "wizardHint": "Pension forecast and wealth planning also need your pension and assets —",
+    "wizardLink": "fill in the full profile",
     "skip": "Later, straight to the dashboard",
     "progressTitle": "Your profile",
     "stepData": "Data",
@@ -827,6 +829,8 @@
     "reviewConfirm": "Confirm",
     "reviewSaving": "Saving…",
     "reviewSkip": "Skip",
-    "reviewDone": "Thanks — the assignments are saved and now apply to new transactions too."
+    "reviewDone": "Thanks — the assignments are saved and now apply to new transactions too.",
+    "estimateTitle": "Estimate your budget",
+    "estimateBody": "Four steps: profile, income, housing and daily life with subscriptions. Your own estimate — it may include things no bank statement knows about."
   }
 }
