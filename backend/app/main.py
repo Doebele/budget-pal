@@ -14,6 +14,7 @@ from app.core.database import AsyncSessionLocal, init_db
 from app.api import auth, transactions, imports, projections, accounts, categories, budgets, pension, assets, wizard, currency, forecasting, budget_multimodal, recurring_plan, taxonomy, backup, goals, notifications
 from app.api import settings as settings_api
 from app.api import webauthn
+from app.api import onboarding
 from app.services.currency_service import currency_service
 
 logging.basicConfig(
@@ -269,6 +270,7 @@ app.include_router(recurring_plan.router, prefix="/api/recurring-plan", tags=["r
 app.include_router(backup.router, prefix="/api/backup", tags=["backup"])
 app.include_router(goals.router, prefix="/api/goals", tags=["goals"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
+app.include_router(onboarding.router, prefix="/api/onboarding", tags=["onboarding"])
 
 
 # ── Health Check ──────────────────────────────────────────────
