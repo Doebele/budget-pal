@@ -76,29 +76,17 @@ export default defineConfig({
   build: {
     outDir: "dist",
     sourcemap: false,
-    // Nivo + Recharts exceed Vite’s default 500 kB warning; gzip is typically ~150 kB.
+    // ECharts + Recharts exceed Vite’s default 500 kB warning; gzip is typically ~150 kB.
     chunkSizeWarningLimit: 900,
     rollupOptions: {
       output: {
         manualChunks: {
           "react-vendor": ["react", "react-dom", "react-router-dom"],
           "query": ["@tanstack/react-query"],
-          "charts": [
-            "recharts",
-            "@nivo/core",
-            "@nivo/bar",
-            "@nivo/heatmap",
-            "@nivo/line",
-            "@nivo/pie",
-            "@nivo/sankey",
-            "@nivo/treemap",
-          ],
-          "ui": [
-            "@radix-ui/react-dialog",
-            "@radix-ui/react-dropdown-menu",
-            "@radix-ui/react-tabs",
-            "iconoir-react",
-          ],
+          // echarts bleibt ungenannt: Rollup laedt es dann nur mit den Seiten,
+          // die es brauchen, statt es in einen Startchunk zu ziehen.
+          "charts": ["recharts"],
+          "ui": ["iconoir-react"],
         },
       },
     },
