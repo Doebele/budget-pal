@@ -11,6 +11,7 @@ import { format, parseISO } from "date-fns";
 import { de } from "date-fns/locale";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import ProgressBar from "@/components/ui/ProgressBar";
 
 type GoalType = "savings" | "debt_payoff" | "emergency_fund" | "purchase" | "retirement" | "other";
 
@@ -377,12 +378,7 @@ function GoalCard({ goal, onEdit, onDelete, confirmDelete, onCancelDelete, onCon
             {formatAmount(goal.target_amount, "CHF")}
           </span>
         </div>
-        <div className="h-2 bg-bg-surface2 rounded-full overflow-hidden">
-          <div
-            className="h-full rounded-full transition-all duration-500"
-            style={{ width: `${Math.min(100, goal.progress_pct)}%`, backgroundColor: barColor }}
-          />
-        </div>
+        <ProgressBar value={goal.progress_pct} color={barColor} opacity={1} size="md" label={goal.name} />
         <div className="flex justify-between mt-1 text-[10px] text-text-tertiary">
           <span>{goal.progress_pct.toFixed(1)}% erreicht</span>
           {!goal.is_achieved && (

@@ -74,7 +74,9 @@
     "srcBudgetplan": "Budget plan · Recurring entries by supercategory",
     "srcActualPlusForecast": "Actual data + forecast from recurring payments (Ø 12 mo.)",
     "srcEmpirical": "Empirical data · Taxes fixed",
-    "srcRecurring": "Recurring payments · Ø last 12 months"
+    "srcRecurring": "Recurring payments · Ø last 12 months",
+    "noDataForPeriod": "No data for the selected period.",
+    "noDataWizardHint": "Start the <a>setup wizard</a> to capture empirical budgets."
   },
   "accounts": {
     "title": "Accounts",

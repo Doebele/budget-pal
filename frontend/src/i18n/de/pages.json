@@ -74,7 +74,9 @@
     "srcBudgetplan": "Budgetplan · Wiederkehrende Einträge nach Superkategorie",
     "srcActualPlusForecast": "Ist-Daten + Prognose aus wiederkehrenden Zahlungen (Ø 12 Mt.)",
     "srcEmpirical": "Empirische Angaben · Steuern fix",
-    "srcRecurring": "Wiederkehrende Zahlungen · Ø letzte 12 Monate"
+    "srcRecurring": "Wiederkehrende Zahlungen · Ø letzte 12 Monate",
+    "noDataForPeriod": "Keine Daten für den gewählten Zeitraum.",
+    "noDataWizardHint": "Starte den <a>Setup-Wizard</a>, um empirische Budgets zu erfassen."
   },
   "accounts": {
     "title": "Konten",

@@ -4,6 +4,10 @@
  * Renders a single horizontal bar for a supercategory showing:
  *   ■ Ist  (solid bar, category colour)
  *   □ Soll (full-width background track)
+ *   | Peer (senkrechte Markierung)
+ *
+ * Mit dem Peer-Wert zeigt die Balkenansicht dieselben drei Groessen wie die
+ * Ring-Gauges — die Wahl der Darstellung kostet dann keine Information mehr.
  *
  * Clicking opens the drill-down panel.
  */
@@ -12,6 +16,7 @@ import { NavArrowRight, WarningTriangle } from "@/lib/icons";
 import { formatCHF } from "@/lib/theme";
 import type { SuperCategory } from "@/lib/categories";
 import { translateCategory } from "@/lib/categoryLabel";
+import ProgressBar from "@/components/ui/ProgressBar";
 
 export interface SubItem {
   label: string;
@@ -24,6 +29,7 @@ export interface SuperCategoryBarProps {
   superCategory: SuperCategory;
   actual?: number;      // CHF – real transactions
   planned?: number;     // CHF – wizard / combined soll
+  peer?: number;        // CHF – BFS-Vergleichswert der Peer-Gruppe
   subItems?: SubItem[];
   onClick?: () => void;
 }
@@ -32,16 +38,20 @@ export default function SuperCategoryBar({
   superCategory,
   actual,
   planned,
+  peer,
   subItems,
   onClick,
 }: SuperCategoryBarProps) {
   const hasActual  = actual  !== undefined && actual  > 0;
   const hasPlanned = planned !== undefined && planned > 0;
 
-  // Decide track width (max of actual / planned)
-  const trackMax = Math.max(actual ?? 0, planned ?? 0);
+  const hasPeer = peer !== undefined && peer > 0;
+
+  // Decide track width (max of actual / planned / peer)
+  const trackMax = Math.max(actual ?? 0, planned ?? 0, peer ?? 0);
   const actualPct  = trackMax > 0 ? Math.min(100, ((actual  ?? 0) / trackMax) * 100) : 0;
   const plannedPct = trackMax > 0 ? Math.min(100, ((planned ?? 0) / trackMax) * 100) : 0;
+  const peerPct    = trackMax > 0 ? Math.min(100, ((peer    ?? 0) / trackMax) * 100) : 0;
 
   const isOverBudget = hasActual && hasPlanned && actual! > planned!;
   const overPct      = isOverBudget
@@ -97,33 +107,19 @@ export default function SuperCategoryBar({
       </div>
 
       {/* Bar track */}
-      <div className="relative h-2 bg-bg-surface2 rounded-full overflow-hidden">
-        {/* Planned / Soll track (lighter, full-width reference) */}
-        {hasPlanned && (
-          <div
-            className="absolute inset-y-0 left-0 rounded-full opacity-25"
-            style={{
-              width: `${plannedPct}%`,
-              backgroundColor: superCategory.color,
-            }}
-          />
-        )}
-        {/* Actual / Ist bar */}
-        {hasActual && (
-          <div
-            className="absolute inset-y-0 left-0 rounded-full transition-all duration-500"
-            style={{
-              width: `${actualPct}%`,
-              backgroundColor: isOverBudget ? "#f87171" : superCategory.color,
-              opacity: 0.85,
-            }}
-          />
-        )}
-        {/* No-data case */}
-        {!hasActual && !hasPlanned && (
-          <div className="absolute inset-y-0 left-0 w-full rounded-full bg-bg-elevated" />
-        )}
-      </div>
+      {hasActual || hasPlanned ? (
+        <ProgressBar
+          size="md"
+          value={hasActual ? actualPct : 0}
+          reference={hasPlanned ? plannedPct : undefined}
+          marker={hasPeer ? peerPct : undefined}
+          markerLabel={hasPeer ? `Peer: ${formatCHF(peer!)}` : undefined}
+          color={isOverBudget ? "var(--red)" : superCategory.color}
+          label={superCategory.label}
+        />
+      ) : (
+        <div className="h-2 rounded-full bg-bg-elevated" />
+      )}
 
       {/* Sub-items summary */}
       {subItems && subItems.length > 1 && (

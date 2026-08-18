@@ -17,6 +17,7 @@ import { useTaxonomy, type SuperCategory } from "@/lib/categories";
 import { deduplicateWizardBatch } from "@/lib/wizardUtils";
 import { useTranslation } from "react-i18next";
 import { translateCategory } from "@/lib/categoryLabel";
+import ProgressBar from "@/components/ui/ProgressBar";
 
 // ── Stat card ─────────────────────────────────────────────────
 
@@ -325,16 +326,7 @@ export default function Dashboard() {
                       </span>
                       <span className="text-text-primary text-xs font-mono">{formatCHF(cat.total)}</span>
                     </div>
-                    <div className="h-1.5 bg-bg-surface2 rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{
-                          width: `${Math.min(100, pct)}%`,
-                          backgroundColor: sc.color,
-                          opacity: 0.75,
-                        }}
-                      />
-                    </div>
+                    <ProgressBar value={pct} color={sc.color} opacity={0.75} />
                   </div>
                 );
               })}
@@ -420,12 +412,14 @@ export default function Dashboard() {
                       {g.progress_pct.toFixed(0)}%
                     </span>
                   </div>
-                  <div className="h-1.5 bg-bg-surface rounded-full overflow-hidden mb-1.5">
-                    <div
-                      className="h-full rounded-full"
-                      style={{ width: `${Math.min(100, g.progress_pct)}%`, backgroundColor: color }}
-                    />
-                  </div>
+                  <ProgressBar
+                    value={g.progress_pct}
+                    color={color}
+                    opacity={1}
+                    trackClassName="bg-bg-surface"
+                    className="mb-1.5"
+                    label={g.name}
+                  />
                   <div className="flex justify-between text-[10px] text-text-tertiary">
                     <span>{formatCHF(g.current_amount)}</span>
                     {g.months_to_target != null && g.months_to_target > 0 && (

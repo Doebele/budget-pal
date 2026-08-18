@@ -323,6 +323,17 @@ export function formatAmount(amount: number, currency = "CHF", maximumFractionDi
   }).format(amount);
 }
 
+/**
+ * Grosse Summen ohne Rappen.
+ *
+ * "CHF 254'234.21" liest sich schlecht und die beiden Nachkommastellen sagen
+ * bei einem Jahres- oder Vermoegenswert nichts. Unterhalb der Schwelle bleiben
+ * sie stehen — bei einer einzelnen Buchung zaehlt der Rappen sehr wohl.
+ */
+export function formatAmountRounded(amount: number, currency = "CHF", threshold = 10_000): string {
+  return formatAmount(amount, currency, Math.abs(amount) >= threshold ? 0 : 2);
+}
+
 /** Compact label (e.g. Budgetplan chips): «EUR 12k» style when large. */
 export function formatCurrencyCompact(amount: number, currency: string): string {
   const a = Math.abs(amount);

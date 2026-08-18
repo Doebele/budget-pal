@@ -41,7 +41,9 @@ import { computeDateRange, TimeGranularity } from "@/lib/granularity";
 import { useTaxonomy, type SuperCategory } from "@/lib/categories";
 import { deduplicateWizardBatch } from "@/lib/wizardUtils";
 import type { MultiAnalysisResult } from "@/types/budgetAnalysis";
-import { useTranslation } from "react-i18next";
+import { useTranslation, Trans } from "react-i18next";
+import ProgressBar from "@/components/ui/ProgressBar";
+import EmptyState from "@/components/ui/EmptyState";
 
 // ── Transaction row type used in Budget (extended with recurrence) ──
 interface TxnRow {
@@ -686,15 +688,12 @@ export default function Budget() {
               <p className="text-text-tertiary text-xs mb-1">
                 {t("pages:budget.plannedOf", { amount: fmtRef(totalPlanned) })} · <span className="text-accent/70">{t("pages:budget.showDetails")}</span>
               </p>
-              <div className="h-1.5 bg-bg-surface2 rounded-full overflow-hidden">
-                <div
-                  className={clsx(
-                    "h-full rounded-full transition-all duration-500",
-                    kpi.expenses > totalPlanned ? "bg-loss" : "bg-accent",
-                  )}
-                  style={{ width: `${Math.min(100, (kpi.expenses / totalPlanned) * 100)}%` }}
-                />
-              </div>
+              <ProgressBar
+                value={(kpi.expenses / totalPlanned) * 100}
+                color={kpi.expenses > totalPlanned ? "var(--red)" : "var(--accent)"}
+                opacity={1}
+                label={t("pages:budget.utilisation")}
+              />
             </div>
           ) : (
             <p className="text-text-tertiary text-xs">
@@ -874,17 +873,20 @@ export default function Budget() {
           )}
         </div>
 
+        {/* Ohne Daten gar keine Ansicht rendern — vorher stand die Meldung
+            "Keine Daten" ueber einem leeren Diagramm. */}
         {!hasSomeData && (
-          <p className="text-text-tertiary text-sm text-center py-10">
-            Keine Daten für den gewählten Zeitraum.{" "}
-            {!capabilities?.wizard_available && (
-              <span>
-                Starte den{" "}
-                <a href="/wizard" className="text-accent underline">Setup-Wizard</a>{" "}
-                um empirische Budgets zu erfassen.
-              </span>
-            )}
-          </p>
+          <EmptyState
+            title={t("pages:budget.noDataForPeriod")}
+            hint={
+              !capabilities?.wizard_available ? (
+                <Trans
+                  i18nKey="pages:budget.noDataWizardHint"
+                  components={{ a: <a href="/wizard" className="text-accent underline" /> }}
+                />
+              ) : undefined
+            }
+          />
         )}
 
         {/* ── DashboardSpeed view ── */}
@@ -901,7 +903,7 @@ export default function Budget() {
         )}
 
         {/* ── Stacked bar view ── */}
-        {view === "stacked" && (
+        {view === "stacked" && hasSomeData && (
           <Suspense
             fallback={
               <div className="py-10 flex items-center justify-center text-text-tertiary text-sm">
@@ -922,7 +924,7 @@ export default function Budget() {
         )}
 
         {/* ── Bar view ── */}
-        {view === "bar" && (
+        {view === "bar" && hasSomeData && (
           <div className="divide-y divide-border/40">
             {visibleMainRows.map((row) => (
               <SuperCategoryBar
@@ -930,6 +932,7 @@ export default function Budget() {
                 superCategory={row.sc}
                 actual={row.actual  > 0 ? row.actual  : undefined}
                 planned={row.planned > 0 ? row.planned : undefined}
+                peer={hasPeerGauge ? peerBySuperCat.get(row.sc.id) : undefined}
                 subItems={row.subItems}
                 onClick={() => openDrillDown(row)}
               />
@@ -953,6 +956,7 @@ export default function Budget() {
                     superCategory={sonstigesRow.sc}
                     actual={sonstigesRow.actual  > 0 ? sonstigesRow.actual  : undefined}
                     planned={sonstigesRow.planned > 0 ? sonstigesRow.planned : undefined}
+                    peer={hasPeerGauge ? peerBySuperCat.get(sonstigesRow.sc.id) : undefined}
                     subItems={sonstigesRow.subItems}
                     onClick={() => openDrillDown(sonstigesRow)}
                   />
@@ -963,7 +967,7 @@ export default function Budget() {
         )}
 
         {/* ── Compare view (3-Weg: Ist / Soll / Peer-Ø) ── */}
-        {view === "compare" && (
+        {view === "compare" && hasSomeData && (
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[520px]">
               <thead>

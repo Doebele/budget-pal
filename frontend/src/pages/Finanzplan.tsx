@@ -14,9 +14,10 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, Bank, Building, Coins, GraphUp, MagicWand, PiggyBank, Refresh, Reports, ShieldCheck, WarningCircle, WarningTriangle } from "@/lib/icons";
 import { api } from "@/lib/api";
-import { formatCHF } from "@/lib/theme";
+import { formatAmountRounded } from "@/lib/theme";
 import { useTaxonomy } from "@/lib/categories";
 import { useTranslation } from "react-i18next";
+import ProgressBar from "@/components/ui/ProgressBar";
 
 // ── Types mirroring backend responses ─────────────────────────
 
@@ -64,7 +65,8 @@ interface MortgageTrancheDto {
 // ── Helpers ────────────────────────────────────────────────────
 
 function fmtCHF(v: number) {
-  return formatCHF(v, false);
+  // Vermoegens- und Jahreswerte: die Rappen tragen hier keine Information.
+  return formatAmountRounded(v, "CHF");
 }
 
 /** Wizard Step 6 mortgage row — tolerates snake_case (API / stored JSON). */
@@ -466,12 +468,14 @@ export default function Finanzplan() {
                     <span className="text-text-tertiary text-xs w-10 text-right">{pct.toFixed(0)}%</span>
                   </div>
                   {/* Progress bar */}
-                  <div className="h-1.5 rounded-full bg-bg-elevated overflow-hidden ml-9">
-                    <div
-                      className="h-full rounded-full transition-all"
-                      style={{ width: `${pct}%`, backgroundColor: group.color }}
-                    />
-                  </div>
+                  <ProgressBar
+                    value={pct}
+                    color={group.color}
+                    opacity={1}
+                    trackClassName="bg-bg-elevated"
+                    className="ml-9"
+                    label={group.label}
+                  />
                   {/* Sub-items */}
                   {group.items.length > 1 && (
                     <div className="mt-2 ml-9 space-y-0.5">
