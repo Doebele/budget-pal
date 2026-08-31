@@ -14,8 +14,10 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, Bank, Building, Coins, GraphUp, MagicWand, PiggyBank, Refresh, Reports, ShieldCheck, WarningCircle, WarningTriangle } from "@/lib/icons";
 import { api } from "@/lib/api";
-import { formatCHF } from "@/lib/theme";
+import { formatAmountRounded } from "@/lib/theme";
 import { useTaxonomy } from "@/lib/categories";
+import { useTranslation } from "react-i18next";
+import ProgressBar from "@/components/ui/ProgressBar";
 
 // ── Types mirroring backend responses ─────────────────────────
 
@@ -63,7 +65,8 @@ interface MortgageTrancheDto {
 // ── Helpers ────────────────────────────────────────────────────
 
 function fmtCHF(v: number) {
-  return formatCHF(v, false);
+  // Vermoegens- und Jahreswerte: die Rappen tragen hier keine Information.
+  return formatAmountRounded(v, "CHF");
 }
 
 /** Wizard Step 6 mortgage row — tolerates snake_case (API / stored JSON). */
@@ -100,11 +103,13 @@ function latestWizardBudgets(budgets: BudgetItem[]): BudgetItem[] {
 }
 
 // API returns pillar as the enum VALUE: "1", "2", "3a", "3b"
+// Werte sind i18n-Schluessel — uebersetzt wird erst beim Rendern, sonst
+// friert die Sprache beim Modul-Import ein.
 const PILLAR_LABEL: Record<string, string> = {
-  "1":  "Säule 1 — AHV/IV",
-  "2":  "Säule 2 — Pensionskasse (BVG)",
-  "3a": "Säule 3a — Gebundene Vorsorge",
-  "3b": "Säule 3b — Lebensversicherung",
+  "1":  "pages:finanzplan.pillar1",
+  "2":  "pages:finanzplan.pillar2",
+  "3a": "pages:finanzplan.pillar3a",
+  "3b": "pages:finanzplan.pillar3b",
 };
 
 const PILLAR_COLOR: Record<string, string> = {
@@ -115,13 +120,13 @@ const PILLAR_COLOR: Record<string, string> = {
 };
 
 const ASSET_LABEL: Record<string, string> = {
-  stock: "Aktien & ETFs",
-  property: "Immobilien",
-  crypto: "Kryptowährungen",
-  savings: "Sparkonto / Bank",
-  bond: "Obligationen",
-  pension: "Pensionskasse",
-  other: "Sonstiges",
+  stock: "pages:finanzplan.assetStock",
+  property: "pages:finanzplan.assetProperty",
+  crypto: "pages:finanzplan.assetCrypto",
+  savings: "pages:finanzplan.assetSavings",
+  bond: "pages:finanzplan.assetBond",
+  pension: "pages:finanzplan.assetPension",
+  other: "pages:finanzplan.assetOther",
 };
 
 const ASSET_COLOR: Record<string, string> = {
@@ -137,6 +142,7 @@ const ASSET_COLOR: Record<string, string> = {
 // ── Component ──────────────────────────────────────────────────
 
 export default function Finanzplan() {
+  const { t } = useTranslation();
   const { resolveSuperCategory } = useTaxonomy();
   const { data: budgets = [], isLoading: budgetsLoading, error: budgetsError } = useQuery<BudgetItem[]>({
     queryKey: ["finanzplan-budgets"],
@@ -301,7 +307,7 @@ export default function Finanzplan() {
     const { gross, debt: totalDebt, net: equity, entries } = vermoegenImmobilien;
     const positions: LiabilityPosition[] = [
       {
-        label: "Immobilien (Vermögen)",
+        label: t("pages:finanzplan.realEstate"),
         grossValue: gross,
         debt: totalDebt,
         equity,
@@ -343,7 +349,7 @@ export default function Finanzplan() {
     return (
       <div className="flex flex-col items-center gap-3 py-16 text-center">
         <WarningCircle className="w-8 h-8 text-loss" />
-        <p className="text-text-secondary text-sm">Finanzplan konnte nicht geladen werden.</p>
+        <p className="text-text-secondary text-sm">{t("pages:finanzplan.loadError")}</p>
       </div>
     );
   }
@@ -357,7 +363,7 @@ export default function Finanzplan() {
         <div>
           <h1 className="text-text-primary font-display font-bold text-2xl mb-2">Kein Finanzplan vorhanden</h1>
           <p className="text-text-secondary text-sm leading-relaxed">
-            Erstelle deinen persönlichen Finanzplan mit dem Wizard — basierend auf echten BFS-Daten für deine Peer-Gruppe.
+            {t("pages:ui.erstelle_deinen_persoenlichen_finanzplan_mit")}
           </p>
         </div>
         <Link
@@ -379,7 +385,7 @@ export default function Finanzplan() {
         <div>
           <h1 className="text-text-primary font-display font-bold text-2xl mb-1">Finanzplan</h1>
           <p className="text-text-secondary text-sm">
-            Empirische Angaben — Monatliche Übersicht
+            {t("pages:ui.empirische_angaben_monatliche_uebersicht")}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -410,22 +416,22 @@ export default function Finanzplan() {
       {/* ── Cashflow-Karten ───────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-bg-surface2 rounded-xl border border-border/40 px-4 py-3">
-          <p className="text-text-tertiary text-[11px] uppercase tracking-widest font-semibold mb-1">Ausgaben/Mo</p>
+          <p className="text-text-tertiary text-[11px] uppercase tracking-widest font-semibold mb-1">{t("pages:finanzplan.expensesPerMonth")}</p>
           <p className="text-text-primary font-mono font-bold text-xl">{fmtCHF(totalExpenses)}</p>
           <p className="text-text-tertiary text-xs mt-1">{wizardBudgets.length} Budgetposten</p>
         </div>
         <div className="bg-bg-surface2 rounded-xl border border-border/40 px-4 py-3">
-          <p className="text-text-tertiary text-[11px] uppercase tracking-widest font-semibold mb-1">Gesamtvermögen</p>
+          <p className="text-text-tertiary text-[11px] uppercase tracking-widest font-semibold mb-1">{t("pages:finanzplan.netWorth")}</p>
           <p className="font-mono font-bold text-xl" style={{ color: "#10b981" }}>{fmtCHF(totalAssets)}</p>
           <p className="text-text-tertiary text-xs mt-1">{assets.length} Positionen</p>
         </div>
         <div className="bg-bg-surface2 rounded-xl border border-border/40 px-4 py-3">
           <p className="text-text-tertiary text-[11px] uppercase tracking-widest font-semibold mb-1">Vorsorgekapital</p>
           <p className="font-mono font-bold text-xl" style={{ color: "#a78bfa" }}>{fmtCHF(totalPension)}</p>
-          <p className="text-text-tertiary text-xs mt-1">{pension.length} Einträge</p>
+          <p className="text-text-tertiary text-xs mt-1">{t("pages:ui.entriesCount", { count: pension.length })}</p>
         </div>
         <div className="bg-bg-surface2 rounded-xl border border-border/40 px-4 py-3">
-          <p className="text-text-tertiary text-[11px] uppercase tracking-widest font-semibold mb-1">Verpflichtungen</p>
+          <p className="text-text-tertiary text-[11px] uppercase tracking-widest font-semibold mb-1">{t("pages:finanzplan.liabilities")}</p>
           <p className="font-mono font-bold text-xl" style={{ color: totalLiabilities > 0 ? "#f87171" : "#94a3b8" }}>
             {fmtCHF(totalLiabilities)}
           </p>
@@ -441,7 +447,7 @@ export default function Finanzplan() {
       {wizardBudgets.length > 0 && (
         <section className="bg-bg-surface2 rounded-xl border border-border/40 overflow-hidden">
           <div className="px-5 py-4 border-b border-border/40 flex items-center justify-between">
-            <h2 className="text-text-primary font-semibold text-sm">Monatlicher Budgetplan</h2>
+            <h2 className="text-text-primary font-semibold text-sm">{t("pages:finanzplan.monthlyBudgetPlan")}</h2>
             <span className="text-text-tertiary text-xs font-mono">{fmtCHF(totalExpenses)} / Mo</span>
           </div>
           <div className="divide-y divide-border/30">
@@ -462,12 +468,14 @@ export default function Finanzplan() {
                     <span className="text-text-tertiary text-xs w-10 text-right">{pct.toFixed(0)}%</span>
                   </div>
                   {/* Progress bar */}
-                  <div className="h-1.5 rounded-full bg-bg-elevated overflow-hidden ml-9">
-                    <div
-                      className="h-full rounded-full transition-all"
-                      style={{ width: `${pct}%`, backgroundColor: group.color }}
-                    />
-                  </div>
+                  <ProgressBar
+                    value={pct}
+                    color={group.color}
+                    opacity={1}
+                    trackClassName="bg-bg-elevated"
+                    className="ml-9"
+                    label={group.label}
+                  />
                   {/* Sub-items */}
                   {group.items.length > 1 && (
                     <div className="mt-2 ml-9 space-y-0.5">
@@ -490,14 +498,14 @@ export default function Finanzplan() {
       {assets.length > 0 && (
         <section className="bg-bg-surface2 rounded-xl border border-border/40 overflow-hidden">
           <div className="px-5 py-4 border-b border-border/40 flex items-center justify-between">
-            <h2 className="text-text-primary font-semibold text-sm">Vermögen</h2>
+            <h2 className="text-text-primary font-semibold text-sm">{t("pages:wizard.w105")}</h2>
             <span className="text-text-tertiary text-xs font-mono">{fmtCHF(totalAssets)}</span>
           </div>
           <div className="divide-y divide-border/30">
             {assetsByType.map(([type, value]) => {
               const pct = totalAssets > 0 ? (value / totalAssets) * 100 : 0;
               const color = ASSET_COLOR[type] ?? "#94a3b8";
-              const label = ASSET_LABEL[type] ?? type;
+              const label = ASSET_LABEL[type] ? t(ASSET_LABEL[type]) : type;
               return (
                 <div key={type} className="px-5 py-3">
                   <div className="flex items-center gap-3 mb-1.5">
@@ -523,7 +531,7 @@ export default function Finanzplan() {
       {pension.length > 0 && (
         <section className="bg-bg-surface2 rounded-xl border border-border/40 overflow-hidden">
           <div className="px-5 py-4 border-b border-border/40 flex items-center justify-between">
-            <h2 className="text-text-primary font-semibold text-sm">Vorsorge</h2>
+            <h2 className="text-text-primary font-semibold text-sm">{t("pages:ui.vorsorge")}</h2>
             <span className="text-text-tertiary text-xs font-mono">{fmtCHF(totalPension)} Kapital</span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-border/30">
@@ -554,7 +562,7 @@ export default function Finanzplan() {
                 <div key={pillar} className="px-5 py-4">
                   <div className="flex items-center gap-2 mb-3">
                     <ShieldCheck className="w-4 h-4 flex-shrink-0" style={{ color }} />
-                    <span className="text-text-secondary text-xs font-medium">{PILLAR_LABEL[pillar]}</span>
+                    <span className="text-text-secondary text-xs font-medium">{PILLAR_LABEL[pillar] ? t(PILLAR_LABEL[pillar]) : pillar}</span>
                   </div>
                   {entries.length === 0 ? (
                     <p className="text-text-tertiary text-xs">Nicht erfasst</p>
@@ -564,7 +572,7 @@ export default function Finanzplan() {
                       {ahvMonthlyEst !== null && (
                         <>
                           <div className="flex justify-between">
-                            <span className="text-text-tertiary text-xs">Geschätzte Rente</span>
+                            <span className="text-text-tertiary text-xs">{t("pages:finanzplan.estimatedPension")}</span>
                             <span className="font-mono text-xs font-semibold" style={{ color }}>{fmtCHF(ahvMonthlyEst)}/Mo</span>
                           </div>
                           <div className="flex justify-between">
@@ -574,7 +582,7 @@ export default function Finanzplan() {
                             </span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-text-tertiary text-xs">Ø Jahreslohn</span>
+                            <span className="text-text-tertiary text-xs">{t("pages:ui.jahreslohn")}</span>
                             <span className="font-mono text-xs text-text-secondary">
                               {entries[0]?.average_insured_salary ? fmtCHF(entries[0].average_insured_salary) : "—"}
                             </span>
@@ -590,12 +598,12 @@ export default function Finanzplan() {
                             <span className="font-mono text-xs text-text-primary">{fmtCHF(totalBalance)}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-text-tertiary text-xs">Gesch. Rente</span>
+                            <span className="text-text-tertiary text-xs">{t("pages:ui.gesch_rente")}</span>
                             <span className="font-mono text-xs font-semibold" style={{ color }}>{fmtCHF(bvgMonthlyEst)}/Mo</span>
                           </div>
                           {totalContrib > 0 && (
                             <div className="flex justify-between">
-                              <span className="text-text-tertiary text-xs">Jahresbeitrag</span>
+                              <span className="text-text-tertiary text-xs">{t("pages:ui.jahresbeitrag")}</span>
                               <span className="font-mono text-xs text-text-secondary">{fmtCHF(totalContrib)}</span>
                             </div>
                           )}
@@ -611,7 +619,7 @@ export default function Finanzplan() {
                           </div>
                           {totalContrib > 0 && (
                             <div className="flex justify-between">
-                              <span className="text-text-tertiary text-xs">Jahresbeitrag</span>
+                              <span className="text-text-tertiary text-xs">{t("pages:ui.jahresbeitrag")}</span>
                               <span className="font-mono text-xs text-text-secondary">{fmtCHF(totalContrib)}</span>
                             </div>
                           )}
@@ -651,7 +659,7 @@ export default function Finanzplan() {
             if (totalMo <= 0) return null;
             return (
               <div className="px-5 py-3 border-t border-border/40 bg-bg-elevated/40 flex items-center justify-between">
-                <span className="text-text-tertiary text-xs">Geschätzte Gesamtrente bei Pensionierung</span>
+                <span className="text-text-tertiary text-xs">{t("pages:finanzplan.estimatedTotalPension")}</span>
                 <span className="font-mono text-sm font-bold text-accent">{fmtCHF(totalMo)} / Monat</span>
               </div>
             );
@@ -665,7 +673,7 @@ export default function Finanzplan() {
           <div className="px-5 py-4 border-b border-border/40 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <WarningTriangle className="w-4 h-4 text-loss" />
-              <h2 className="text-text-primary font-semibold text-sm">Verpflichtungen & Schulden</h2>
+              <h2 className="text-text-primary font-semibold text-sm">{t("pages:finanzplan.liabilitiesAndDebt")}</h2>
             </div>
             <span className="text-loss text-xs font-mono font-semibold">{fmtCHF(totalLiabilities)}</span>
           </div>
@@ -673,9 +681,9 @@ export default function Finanzplan() {
           {/* Summary table header */}
           <div className="px-5 py-2 grid grid-cols-4 gap-2 border-b border-border/20 bg-bg-elevated/40">
             <span className="text-text-tertiary text-[10px] uppercase tracking-wide font-semibold">Position</span>
-            <span className="text-text-tertiary text-[10px] uppercase tracking-wide font-semibold text-right">Marktwert</span>
+            <span className="text-text-tertiary text-[10px] uppercase tracking-wide font-semibold text-right">{t("pages:ui.marktwert")}</span>
             <span className="text-text-tertiary text-[10px] uppercase tracking-wide font-semibold text-right">Eigenkapital</span>
-            <span className="text-text-tertiary text-[10px] uppercase tracking-wide font-semibold text-right">Hypothek</span>
+            <span className="text-text-tertiary text-[10px] uppercase tracking-wide font-semibold text-right">{t("pages:ui.hypothek")}</span>
           </div>
 
           <div className="divide-y divide-border/30">
@@ -702,7 +710,7 @@ export default function Finanzplan() {
                     <div className="ml-6">
                       <div className="flex justify-between text-[10px] text-text-tertiary mb-1">
                         <span>Belehnungsgrad (LTV)</span>
-                        <span className={ltvRatio > 80 ? "text-loss font-semibold" : ltvRatio > 65 ? "text-amber-400" : "text-gain"}>
+                        <span className={ltvRatio > 80 ? "text-loss font-semibold" : ltvRatio > 65 ? "txt-warning" : "text-gain"}>
                           {ltvRatio.toFixed(1)}%
                         </span>
                       </div>
@@ -743,8 +751,8 @@ export default function Finanzplan() {
           {/* Info note */}
           <div className="px-5 py-3 border-t border-border/20">
             <p className="text-text-tertiary text-[11px]">
-              LTV (Loan-to-Value) = Hypothek ÷ Marktwert. FINMA empfiehlt ≤ 65 % für langfristige Tragbarkeit.
-              Amortisationspflicht: auf ≤ 65 % innerhalb von 15 Jahren.
+              {t("pages:ui.ltvExplain")}
+              {t("pages:hints.amortisationDuty")}
             </p>
           </div>
         </section>

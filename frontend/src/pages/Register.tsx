@@ -20,7 +20,9 @@ export default function Register() {
     try {
       const { data } = await authApi.register({ name, email, password });
       setAuthToken(data.access_token);
-      navigate("/");
+      // Frisch registriert heisst: keine Konten, keine Buchungen. Das
+      // Dashboard waere leer — der Einstieg zeigt stattdessen die zwei Wege.
+      navigate("/onboarding");
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
       setError(msg || t("register.failed"));

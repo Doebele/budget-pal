@@ -10,6 +10,8 @@ import { clsx } from "clsx";
 import { format, parseISO } from "date-fns";
 import { de } from "date-fns/locale";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import ProgressBar from "@/components/ui/ProgressBar";
 
 type GoalType = "savings" | "debt_payoff" | "emergency_fund" | "purchase" | "retirement" | "other";
 
@@ -51,6 +53,7 @@ const DEFAULT_FORM = {
 };
 
 export default function Goals() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
@@ -206,7 +209,7 @@ export default function Goals() {
               />
             </div>
             <div>
-              <label className="block text-xs text-text-tertiary mb-1">Monatliche Einlage (CHF)</label>
+              <label className="block text-xs text-text-tertiary mb-1">{t("pages:ui.monatliche_einlage_chf")}</label>
               <input
                 type="number"
                 min="0"
@@ -228,7 +231,7 @@ export default function Goals() {
             </div>
             <div className="md:col-span-2 flex justify-end gap-2 pt-2">
               <button type="button" onClick={resetForm} className="btn-secondary">
-                Abbrechen
+                {t("pages:ui.abbrechen")}
               </button>
               <button
                 type="submit"
@@ -276,9 +279,9 @@ export default function Goals() {
       {!isLoading && goals.length === 0 && (
         <div className="card flex flex-col items-center justify-center py-16 text-center">
           <Position className="w-12 h-12 text-text-tertiary mb-3" />
-          <p className="text-text-primary font-medium mb-1">Noch keine Ziele</p>
+          <p className="text-text-primary font-medium mb-1">{t("pages:misc.r27")}</p>
           <p className="text-text-tertiary text-sm mb-4">
-            Erstelle dein erstes Sparziel und verfolge deinen Fortschritt.
+            {t("pages:ui.erstelle_dein_erstes_sparziel_und_verfolge_d")}
           </p>
           <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
             <Plus className="w-4 h-4" /> Erstes Ziel erstellen
@@ -324,6 +327,7 @@ interface GoalCardProps {
 }
 
 function GoalCard({ goal, onEdit, onDelete, confirmDelete, onCancelDelete, onConfirmDelete }: GoalCardProps) {
+  const { t } = useTranslation();
   const meta = GOAL_TYPE_META[goal.goal_type] ?? GOAL_TYPE_META.other;
   const barColor = goal.is_achieved ? "#10b981" : meta.color;
 
@@ -350,7 +354,7 @@ function GoalCard({ goal, onEdit, onDelete, confirmDelete, onCancelDelete, onCon
           {confirmDelete ? (
             <>
               <button onClick={onConfirmDelete} className="text-[10px] px-1.5 py-0.5 rounded bg-loss/20 text-loss border border-loss/30 hover:bg-loss/40 whitespace-nowrap">
-                Löschen
+                {t("pages:ui.loeschen")}
               </button>
               <button onClick={onCancelDelete} className="text-text-tertiary hover:text-text-secondary p-1">
                 <Xmark className="w-3 h-3" />
@@ -374,12 +378,7 @@ function GoalCard({ goal, onEdit, onDelete, confirmDelete, onCancelDelete, onCon
             {formatAmount(goal.target_amount, "CHF")}
           </span>
         </div>
-        <div className="h-2 bg-bg-surface2 rounded-full overflow-hidden">
-          <div
-            className="h-full rounded-full transition-all duration-500"
-            style={{ width: `${Math.min(100, goal.progress_pct)}%`, backgroundColor: barColor }}
-          />
-        </div>
+        <ProgressBar value={goal.progress_pct} color={barColor} opacity={1} size="md" label={goal.name} />
         <div className="flex justify-between mt-1 text-[10px] text-text-tertiary">
           <span>{goal.progress_pct.toFixed(1)}% erreicht</span>
           {!goal.is_achieved && (

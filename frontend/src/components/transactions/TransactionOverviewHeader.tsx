@@ -5,6 +5,7 @@ import { clsx } from "clsx";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { useBulkDelete } from "@/hooks/useBulkDelete";
+import { useTranslation } from "react-i18next";
 
 /**
  * Bulk archive / purge for the selected account on the transactions overview.
@@ -17,6 +18,7 @@ export function TransactionOverviewHeader({
   accountId: number;
   accountName: string;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
 
   const {
@@ -60,13 +62,13 @@ export function TransactionOverviewHeader({
         type="button"
         onClick={() => setOpen(true)}
         className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium bg-amber-600/90 hover:bg-amber-600 text-white shadow-md transition-colors"
-        title="Alle Transaktionen dieses Kontos archivieren"
+        title={t("pages:misc.r15")}
       >
         <span className="relative inline-flex">
           <Archive className="w-4 h-4" />
           <WarningTriangle className="w-2.5 h-2.5 text-amber-100 absolute -right-1 -top-0.5" />
         </span>
-        <span className="hidden sm:inline">Transaktionen archivieren</span>
+        <span className="hidden sm:inline">{t("pages:ui.transaktionen_archivieren")}</span>
       </button>
 
       {open && (
@@ -89,10 +91,10 @@ export function TransactionOverviewHeader({
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-text-primary">
-                    Alle Transaktionen dieses Kontos archivieren?
+                    {t("pages:ui.alle_transaktionen_dieses_kontos_archivieren")}
                   </h3>
                   <p className="text-text-tertiary text-sm mt-1">
-                    Konto: <span className="text-text-primary font-medium">{accountName}</span>
+                    {t("pages:ui.konto_2")} <span className="text-text-primary font-medium">{accountName}</span>
                   </p>
                 </div>
                 <button
@@ -101,7 +103,7 @@ export function TransactionOverviewHeader({
                     if (!dismissLocked) closeModal();
                   }}
                   className="ml-auto p-1 rounded text-text-disabled hover:text-text-primary"
-                  aria-label="Schließen"
+                  aria-label={t("pages:misc.r16")}
                 >
                   <Xmark className="w-5 h-5" />
                 </button>
@@ -111,14 +113,14 @@ export function TransactionOverviewHeader({
             <div className="p-5 space-y-4">
               {!accountIdValid && (
                 <p className="text-warning text-sm rounded-lg border border-amber-500/30 bg-warning-muted p-3">
-                  Ungültige Konto-ID. Bitte Konto erneut auswählen.
+                  {t("pages:ui.ungueltige_konto_id_bitte_konto_erneut_auswa")}
                 </p>
               )}
 
               {showPreviewSpinner && (
                 <div className="flex items-center gap-3 text-text-tertiary text-sm">
                   <div className="w-5 h-5 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
-                  Vorschau wird geladen…
+                  {t("pages:ui.vorschau_wird_geladen")}
                 </div>
               )}
 
@@ -139,9 +141,7 @@ export function TransactionOverviewHeader({
                 <div className="rounded-lg bg-bg-surface2/80 border border-border p-4 space-y-2">
                   <p className="text-text-primary font-medium">{count} Transaktionen betroffen</p>
                   <p className="text-text-tertiary text-sm">
-                    Nach dem Archivieren erscheinen diese Buchungen nicht mehr in der
-                    Transaktionsübersicht (Soft-Delete). Daten bleiben in der Datenbank für
-                    Nachvollziehbarkeit.
+                    {t("pages:hints.archiveNote")}
                   </p>
                   {count > 0 && preview.date_range.from && preview.date_range.to && (
                     <p className="text-xs text-text-disabled">
@@ -151,9 +151,8 @@ export function TransactionOverviewHeader({
                     </p>
                   )}
                   {count === 0 && (
-                    <p className="text-amber-200/90 text-sm pt-1">
-                      Es gibt keine aktiven Transaktionen mehr für dieses Konto (alle archiviert oder
-                      leer). Archivieren oder Hard-Delete ist nicht möglich.
+                    <p className="txt-warning text-sm pt-1">
+                      {t("pages:hints.noActiveTxns")}
                     </p>
                   )}
                   <p className="text-sm text-text-secondary font-mono">
@@ -162,14 +161,13 @@ export function TransactionOverviewHeader({
                 </div>
               )}
 
-              <div className="rounded-lg border border-red-500/25 bg-red-950/30 p-4 space-y-3">
-                <p className="text-loss text-sm font-medium flex items-center gap-2">
+              <div className="msg msg-error flex-col gap-0 p-4 space-y-3">
+                <p className="text-sm font-medium flex items-center gap-2">
                   <Trash className="w-4 h-4" />
-                  Löschen ohne Archivierung (Hard-Delete)
+                  {t("pages:ui.loeschen_ohne_archivierung_hard_delete")}
                 </p>
-                <p className="text-red-200/80 text-xs">
-                  Entfernt die Datensätze unwiderruflich aus der Datenbank. Nur verwenden, wenn Sie
-                  sicher sind.
+                <p className="text-xs">
+                  {t("pages:hints.hardDeleteWarning")}
                 </p>
                 <label className="flex items-center gap-2 cursor-pointer text-sm text-text-secondary">
                   <input
@@ -178,7 +176,7 @@ export function TransactionOverviewHeader({
                     onChange={(e) => setConfirmHard(e.target.checked)}
                     className="rounded border-border-strong"
                   />
-                  Ich verstehe, dass Hard-Delete nicht rückgängig gemacht werden kann.
+                  {t("pages:ui.ich_verstehe_dass_hard_delete_nicht_rueckgae")}
                 </label>
               </div>
 
@@ -189,7 +187,7 @@ export function TransactionOverviewHeader({
                   onClick={closeModal}
                   className="px-4 py-2.5 rounded-lg border border-border-strong text-text-secondary hover:bg-bg-surface2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Abbrechen
+                  {t("pages:ui.abbrechen")}
                 </button>
                 <button
                   type="button"
@@ -217,7 +215,7 @@ export function TransactionOverviewHeader({
                   )}
                 >
                   <Trash className="w-4 h-4" />
-                  Endgültig löschen
+                  {t("pages:ui.endgueltig_loeschen")}
                 </button>
               </div>
             </div>

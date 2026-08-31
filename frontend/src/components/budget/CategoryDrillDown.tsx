@@ -16,6 +16,8 @@ import { clsx } from "clsx";
 import { formatCHF } from "@/lib/theme";
 import type { SuperCategory } from "@/lib/categories";
 import type { SubItem } from "./SuperCategoryBar";
+import { translateCategory } from "@/lib/categoryLabel";
+import { useTranslation } from "react-i18next";
 
 export interface DrillDownTransaction {
   id: number;
@@ -51,6 +53,7 @@ export default function CategoryDrillDown({
   onEditWizard,
   onEditTransactions,
 }: Props) {
+  const { t } = useTranslation();
   const [subView, setSubView] = useState<SubView>("both");
   const hasActual  = actual  !== undefined && actual  > 0;
   const hasPlanned = planned !== undefined && planned > 0;
@@ -247,7 +250,7 @@ export default function CategoryDrillDown({
                       return (
                         <div key={sub.label}>
                           <div className="flex items-center justify-between mb-1 gap-2">
-                            <span className="text-text-secondary text-xs truncate flex-1">{sub.label}</span>
+                            <span className="text-text-secondary text-xs truncate flex-1">{translateCategory(sub.label)}</span>
                             <div className="flex items-center gap-2 shrink-0 text-xs font-mono">
                               {sharePct !== null && (
                                 <span className="text-text-disabled tabular-nums">{sharePct}%</span>
@@ -303,7 +306,7 @@ export default function CategoryDrillDown({
           {transactions && transactions.length > 0 && (
             <div className="px-5 py-4">
               <h3 className="text-text-secondary text-xs font-semibold uppercase tracking-wide mb-3">
-                Transaktionen
+                {t("pages:ui.transaktionen")}
               </h3>
               <div className="space-y-2">
                 {transactions.slice(0, 12).map((txn) => (
@@ -349,7 +352,7 @@ export default function CategoryDrillDown({
               onClick={onEditTransactions}
               className="flex-1 btn-secondary text-xs"
             >
-              Reale Angaben bearbeiten
+              {t("pages:ui.reale_angaben_bearbeiten")}
             </button>
           )}
           {onEditWizard && (
@@ -358,7 +361,7 @@ export default function CategoryDrillDown({
               onClick={onEditWizard}
               className="flex-1 btn-secondary text-xs"
             >
-              Empirische Angaben bearbeiten
+              {t("pages:ui.empirische_angaben_bearbeiten")}
             </button>
           )}
         </div>

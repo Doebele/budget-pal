@@ -15,6 +15,10 @@ import { computeDateRange, TimeGranularity } from "@/lib/granularity";
 import { clsx } from "clsx";
 import { useTaxonomy, type SuperCategory } from "@/lib/categories";
 import { deduplicateWizardBatch } from "@/lib/wizardUtils";
+import { useTranslation } from "react-i18next";
+import { translateCategory } from "@/lib/categoryLabel";
+import ProgressBar from "@/components/ui/ProgressBar";
+import OnboardingProgress from "@/components/OnboardingProgress";
 
 // ── Stat card ─────────────────────────────────────────────────
 
@@ -62,6 +66,7 @@ function StatCard({
 // ── Main Dashboard ────────────────────────────────────────────
 
 export default function Dashboard() {
+  const { t } = useTranslation();
   const { resolveSuperCategory, superCategories } = useTaxonomy();
   const [granularity, setGranularity] = useState<TimeGranularity>("ytd");
   const [anchor, setAnchor] = useState<Date>(() => new Date());
@@ -158,36 +163,39 @@ export default function Dashboard() {
             </Link>
             <Link to="/projections" className="btn-primary flex items-center gap-2">
               <GraphUp className="w-4 h-4" />
-              Prognosen
+              {t("pages:ui.prognosen")}
             </Link>
           </div>
         </div>
       </div>
 
+      {/* Onboarding-Fortschritt — verschwindet, sobald alles beisammen ist */}
+      <OnboardingProgress />
+
       {/* Stat cards */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard
-          label="Gesamtvermögen"
+          label={t("pages:dashboard.netWorth")}
           value={formatCHF(totalBalance, true)}
           icon={Wallet}
           colorClass="text-text-primary"
         />
         <StatCard
-          label="Einnahmen"
+          label={t("pages:dashboard.income")}
           periodHint={range.label}
           value={formatCHF(stats?.total_income || 0)}
           icon={ArrowUpRight}
           colorClass="text-gain"
         />
         <StatCard
-          label="Ausgaben"
+          label={t("pages:dashboard.expenses")}
           periodHint={range.label}
           value={formatCHF(stats?.total_expenses || 0)}
           icon={ArrowDownRight}
           colorClass="text-loss"
         />
         <StatCard
-          label="Netto"
+          label={t("pages:ui.netto")}
           periodHint={range.label}
           value={formatCHF((stats?.total_income || 0) - (stats?.total_expenses || 0))}
           icon={GraphUp}
@@ -218,14 +226,14 @@ export default function Dashboard() {
               onClick={() => setSankeyFlowOrder("value")}
               className={clsx("toggle-btn", sankeyFlowOrder === "value" && "active")}
             >
-              Nach Betrag
+              {t("pages:ui.nach_betrag")}
             </button>
             <button
               type="button"
               onClick={() => setSankeyFlowOrder("superCategory")}
               className={clsx("toggle-btn", sankeyFlowOrder === "superCategory" && "active")}
             >
-              Nach Kategorien
+              {t("pages:ui.nach_kategorien")}
             </button>
           </div>
         </div>
@@ -233,7 +241,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 xl:gap-8">
           <div className="min-w-0">
             <h3 className="text-text-secondary text-xs font-semibold uppercase tracking-wide mb-3">
-              Reale Angaben
+              {t("pages:ui.reale_angaben")}
             </h3>
             {sankeyDataReal.links.length > 0 ? (
               <Suspense
@@ -260,11 +268,11 @@ export default function Dashboard() {
 
           <div className="min-w-0">
             <h3 className="text-text-secondary text-xs font-semibold uppercase tracking-wide mb-3">
-              Empirische Angaben
+              {t("pages:ui.empirische_angaben")}
             </h3>
             {wizardLoading ? (
               <div className="h-56 flex items-center justify-center text-text-tertiary text-sm rounded-xl bg-bg-surface2/40 border border-border/30">
-                Lade empirische Angaben…
+                {t("pages:ui.lade_empirische_angaben")}
               </div>
             ) : sankeyDataEmpirical.links.length > 0 ? (
               <Suspense
@@ -284,7 +292,7 @@ export default function Dashboard() {
               </Suspense>
             ) : (
               <div className="h-56 flex items-center justify-center text-text-tertiary text-sm text-center px-3 rounded-xl bg-bg-surface2/40 border border-border/30">
-                Keine empirischen Angaben. Bitte zuerst den Setup-Wizard abschliessen.
+                {t("pages:ui.keine_empirischen_angaben_bitte_zuerst_den_s")}
               </div>
             )}
           </div>
@@ -301,7 +309,7 @@ export default function Dashboard() {
         {stats?.top_categories && stats.top_categories.length > 0 && (
           <div className="card">
             <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between mb-4">
-              <h2 className="text-text-primary font-semibold text-sm">Top Ausgaben-Kategorien</h2>
+              <h2 className="text-text-primary font-semibold text-sm">{t("pages:dashboard.topExpenseCategories")}</h2>
               <span className="text-text-tertiary text-xs">{range.label}</span>
             </div>
             <div className="space-y-3">
@@ -318,20 +326,11 @@ export default function Dashboard() {
                         >
                           <sc.icon className="w-2.5 h-2.5" style={{ color: sc.color }} />
                         </span>
-                        {cat.category || "Sonstige"}
+                        {cat.category ? translateCategory(cat.category) : t("pages:ui.sonstige_anlagen")}
                       </span>
                       <span className="text-text-primary text-xs font-mono">{formatCHF(cat.total)}</span>
                     </div>
-                    <div className="h-1.5 bg-bg-surface2 rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{
-                          width: `${Math.min(100, pct)}%`,
-                          backgroundColor: sc.color,
-                          opacity: 0.75,
-                        }}
-                      />
-                    </div>
+                    <ProgressBar value={pct} color={sc.color} opacity={0.75} />
                   </div>
                 );
               })}
@@ -341,7 +340,7 @@ export default function Dashboard() {
 
         <div className="card flex flex-col">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-text-primary font-semibold text-sm">Letzte Transaktionen</h2>
+            <h2 className="text-text-primary font-semibold text-sm">{t("pages:ui.letzte_transaktionen")}</h2>
             <Link to="/transactions" className="text-accent text-xs flex items-center gap-1 hover:text-accent-light">
               Alle <ArrowRight className="w-3 h-3" />
             </Link>
@@ -372,7 +371,7 @@ export default function Dashboard() {
                         {txn.merchant_normalized || txn.description.slice(0, 30)}
                       </p>
                       <p className="text-text-tertiary text-xs">
-                        {format(new Date(txn.date), "dd.MM.")} · {txn.category || "Unkategorisiert"}
+                        {format(new Date(txn.date), "dd.MM.")} · {txn.category ? translateCategory(txn.category) : t("txn.uncategorized")}
                       </p>
                     </div>
                   </div>
@@ -383,7 +382,7 @@ export default function Dashboard() {
               );
             })}
             {(!recentTxns || recentTxns.length === 0) && (
-              <p className="text-text-tertiary text-xs text-center py-8">Keine Transaktionen</p>
+              <p className="text-text-tertiary text-xs text-center py-8">{t("pages:misc.r24")}</p>
             )}
           </div>
         </div>
@@ -417,12 +416,14 @@ export default function Dashboard() {
                       {g.progress_pct.toFixed(0)}%
                     </span>
                   </div>
-                  <div className="h-1.5 bg-bg-surface rounded-full overflow-hidden mb-1.5">
-                    <div
-                      className="h-full rounded-full"
-                      style={{ width: `${Math.min(100, g.progress_pct)}%`, backgroundColor: color }}
-                    />
-                  </div>
+                  <ProgressBar
+                    value={g.progress_pct}
+                    color={color}
+                    opacity={1}
+                    trackClassName="bg-bg-surface"
+                    className="mb-1.5"
+                    label={g.name}
+                  />
                   <div className="flex justify-between text-[10px] text-text-tertiary">
                     <span>{formatCHF(g.current_amount)}</span>
                     {g.months_to_target != null && g.months_to_target > 0 && (
@@ -439,11 +440,11 @@ export default function Dashboard() {
       {/* Quick nav */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         {[
-          { to: "/transactions", label: "Reale Angaben",     desc: "Alle ansehen & filtern", Icon: Reports  },
-          { to: "/wizard",       label: "Empirische Angaben", desc: "Profil & Planungsdaten", Icon: MagicWand      },
-          { to: "/goals",        label: "Sparziele",          desc: "Ziele verwalten",         Icon: Position     },
-          { to: "/projections",  label: "Prognosen",         desc: "Monte Carlo & Rente",     Icon: GraphUp },
-          { to: "/import",       label: "Import",            desc: "CSV / PDF hochladen",     Icon: PageUp     },
+          { to: "/transactions", label: t("pages:dashboard.actualData"), desc: t("pages:dashboard.viewAllAndFilter"), Icon: Reports },
+          { to: "/wizard", label: t("pages:dashboard.empiricalData"), desc: t("pages:dashboard.wizardDesc"), Icon: MagicWand },
+          { to: "/goals", label: t("nav.goals"), desc: t("pages:dashboard.goalsDesc"), Icon: Position },
+          { to: "/projections", label: t("pages:dashboard.forecasts"), desc: t("pages:dashboard.forecastsDesc"), Icon: GraphUp },
+          { to: "/import", label: t("nav.import"), desc: t("pages:dashboard.importDesc"), Icon: PageUp },
         ].map(({ to, label, desc, Icon }) => (
           <Link
             key={to}

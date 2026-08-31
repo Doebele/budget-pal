@@ -3,6 +3,7 @@ import { GraphUp, Group, NavArrowRight, Shield } from "@/lib/icons";
 import { clsx } from "clsx";
 import type { PeerGroupDefaults, PeerGroupProfile } from "@/services/peerGroupAnalyzer";
 import { formatCHF } from "@/services/peerGroupAnalyzer";
+import { useTranslation } from "react-i18next";
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -107,6 +108,7 @@ function IncomeComparison({
   userIncome: number;
   peerMedian: number;
 }) {
+  const { t } = useTranslation();
   const [userWidth, setUserWidth] = useState(0);
   const [peerWidth, setPeerWidth] = useState(0);
   const max = Math.max(userIncome, peerMedian) * 1.15;
@@ -126,7 +128,7 @@ function IncomeComparison({
   return (
     <div className="space-y-2.5">
       <div className="flex items-center gap-3">
-        <span className="text-text-tertiary text-xs w-24 shrink-0">Dein Einkommen</span>
+        <span className="text-text-tertiary text-xs w-24 shrink-0">{t("pages:misc.r17")}</span>
         <div className="flex-1 h-2.5 bg-white/8 rounded-full overflow-hidden">
           <div
             className="h-full bg-accent rounded-full transition-all duration-700 ease-out"
@@ -138,7 +140,7 @@ function IncomeComparison({
         </span>
       </div>
       <div className="flex items-center gap-3">
-        <span className="text-text-tertiary text-xs w-24 shrink-0">Peer-Median</span>
+        <span className="text-text-tertiary text-xs w-24 shrink-0">{t("pages:ui.peer_median")}</span>
         <div className="flex-1 h-2.5 bg-white/8 rounded-full overflow-hidden">
           <div
             className="h-full bg-white/30 rounded-full transition-all duration-700 ease-out"
@@ -167,6 +169,7 @@ export default function PeerGroupCard({
   onAccept,
   onAdjust,
 }: PeerGroupCardProps) {
+  const { t } = useTranslation();
   const [editingKey, setEditingKey] = useState<keyof PeerGroupDefaults | null>(null);
   const [editValue, setEditValue] = useState("");
   const [visible, setVisible] = useState(false);
@@ -251,7 +254,7 @@ export default function PeerGroupCard({
 
       {/* ── Expense breakdown ────────────────────────────── */}
       <div className="card">
-        <h4 className="text-text-primary text-sm font-medium mb-4">Typische Ausgaben deiner Peer-Gruppe</h4>
+        <h4 className="text-text-primary text-sm font-medium mb-4">{t("pages:misc.r18")}</h4>
         <div className="space-y-2.5">
           {DISPLAY_CATEGORIES.filter(c => c.key !== "savings_rate").map((cat, i) => (
             <BarRow
@@ -269,7 +272,7 @@ export default function PeerGroupCard({
       <div className="card">
         <h4 className="text-text-primary text-sm font-medium mb-1">Vorgeschlagene Budgetwerte</h4>
         <p className="text-text-tertiary text-xs mb-4">
-          Basierend auf BFS-Daten für dein Profil. Klicke auf einen Wert, um ihn anzupassen.
+          {t("pages:ui.basierend_auf_bfs_daten_fuer_dein_profil_kli")}
         </p>
 
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
@@ -335,7 +338,7 @@ export default function PeerGroupCard({
         className="btn-primary w-full py-3 text-base font-semibold"
         onClick={onAccept}
       >
-        Diese Defaults übernehmen
+        {t("pages:ui.diese_defaults_uebernehmen")}
       </button>
 
       <style>{`

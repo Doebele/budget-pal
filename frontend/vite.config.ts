@@ -8,6 +8,10 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      // Der Service Worker liefert nach einem neuen Build noch einmal die alte
+      // Version aus — beim Entwickeln heisst das: Aenderung gebaut, Browser
+      // zeigt den Stand davor. VITE_DISABLE_PWA=true laesst ihn ganz weg.
+      disable: process.env.VITE_DISABLE_PWA === "true",
       registerType: "autoUpdate",
       includeAssets: ["favicon.svg", "pwa-192.svg", "pwa-512.svg"],
       manifest: {
@@ -76,29 +80,17 @@ export default defineConfig({
   build: {
     outDir: "dist",
     sourcemap: false,
-    // Nivo + Recharts exceed Vite’s default 500 kB warning; gzip is typically ~150 kB.
+    // ECharts + Recharts exceed Vite’s default 500 kB warning; gzip is typically ~150 kB.
     chunkSizeWarningLimit: 900,
     rollupOptions: {
       output: {
         manualChunks: {
           "react-vendor": ["react", "react-dom", "react-router-dom"],
           "query": ["@tanstack/react-query"],
-          "charts": [
-            "recharts",
-            "@nivo/core",
-            "@nivo/bar",
-            "@nivo/heatmap",
-            "@nivo/line",
-            "@nivo/pie",
-            "@nivo/sankey",
-            "@nivo/treemap",
-          ],
-          "ui": [
-            "@radix-ui/react-dialog",
-            "@radix-ui/react-dropdown-menu",
-            "@radix-ui/react-tabs",
-            "iconoir-react",
-          ],
+          // echarts bleibt ungenannt: Rollup laedt es dann nur mit den Seiten,
+          // die es brauchen, statt es in einen Startchunk zu ziehen.
+          "charts": ["recharts"],
+          "ui": ["iconoir-react"],
         },
       },
     },

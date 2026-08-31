@@ -1,3 +1,9 @@
+/**
+ * Reale Angaben / Actual Data — transactions imported from real bank
+ * statements (CSV/PDF). The counterpart is "empirische Angaben" /
+ * "Empirical Data": assumed and statistical values from the wizard
+ * (see pages/Wizard.tsx). Do not read "empirical" as "observed".
+ */
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { transactionsApi, accountsApi } from "@/lib/api";
@@ -19,6 +25,8 @@ import {
   recurrenceFilterToApiParams,
   type RecurrenceFilterValue,
 } from "@/lib/recurrenceFilter";
+import { translateCategory } from "@/lib/categoryLabel";
+import { useTranslation } from "react-i18next";
 
 type RecurrenceType = "weekly" | "monthly" | "quarterly" | "halfyearly" | "yearly";
 
@@ -66,6 +74,7 @@ interface BudgetAnalysis {
 }
 
 export default function Transactions() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const refCcy = user?.currency ?? "CHF";
   const superCategories = useTaxonomySuperCategories();
@@ -274,9 +283,9 @@ export default function Transactions() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-display text-text-primary">Reale Angaben</h1>
+          <h1 className="text-2xl font-display text-text-primary">{t("pages:transactions.title")}</h1>
           <p className="text-text-tertiary text-sm mt-0.5">
-            {range.label} · {transactions?.length || 0} Einträge
+            {range.label} · {t("pages:ui.entriesCount", { count: transactions?.length || 0 })}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -307,7 +316,7 @@ export default function Transactions() {
             <div>
               <h2 className="text-text-primary text-lg font-medium">
                 {viewMode === "all"
-                  ? "Alle Konten"
+                  ? t("filters.allAccounts")
                   : selectedAccount?.name || "Konto"}
               </h2>
               <p className="text-text-tertiary text-xs">
@@ -336,7 +345,7 @@ export default function Transactions() {
               <PercentageCircle className="w-4 h-4" />
               <span className="hidden sm:inline">Budget-Analyse</span>
             </button>
-            <span className="text-text-tertiary text-sm hidden sm:inline">Übersicht:</span>
+            <span className="text-text-tertiary text-sm hidden sm:inline">{t("filters.overview")}</span>
 
             {/* Custom Account Dropdown with Logos */}
             <div className="relative">
@@ -347,14 +356,14 @@ export default function Transactions() {
                 {viewMode === "all" ? (
                   <>
                     <ViewGrid className="w-4 h-4 text-accent" />
-                    <span>Alle Konten</span>
+                    <span>{t("filters.allAccounts")}</span>
                   </>
                 ) : (
                   (() => {
                     const acc = accounts?.find(
                       (a: AccountRow) => String(a.id) === String(viewMode)
                     );
-                    if (!acc) return <span>Konto</span>;
+                    if (!acc) return <span>{t("table.account")}</span>;
                     const bank = getBankByName(acc.bank);
                     return (
                       <>
@@ -401,7 +410,7 @@ export default function Transactions() {
                       <div className="w-6 h-6 rounded bg-accent/20 flex items-center justify-center flex-shrink-0">
                         <ViewGrid className="w-3.5 h-3.5 text-accent" />
                       </div>
-                      <span className="text-text-primary">Alle Konten</span>
+                      <span className="text-text-primary">{t("filters.allAccounts")}</span>
                       {viewMode === "all" && (
                         <Check className="w-4 h-4 text-accent ml-auto" />
                       )}
@@ -468,7 +477,7 @@ export default function Transactions() {
           {/* Summary Cards — Beträge in Referenzwährung */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="bg-bg-surface rounded-lg p-3">
-              <p className="text-text-tertiary text-xs mb-1">Monatliches Einkommen</p>
+              <p className="text-text-tertiary text-xs mb-1">{t("pages:transactions.monthlyIncome")}</p>
               <p className="text-gain font-mono text-lg">
                 +{formatAmount(budgetAnalysis.total_monthly_income, budgetAnalysis.reference_currency || refCcy)}
               </p>
@@ -513,8 +522,8 @@ export default function Transactions() {
                     <tr>
                       <th className="text-left px-3 py-2">Beschreibung</th>
                       <th className="text-left px-3 py-2">Periode</th>
-                      <th className="text-right px-3 py-2">Betrag</th>
-                      <th className="text-right px-3 py-2">Monatl. Äquiv.</th>
+                      <th className="text-right px-3 py-2">{t("table.amount")}</th>
+                      <th className="text-right px-3 py-2">{t("table.monthlyEquiv")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border-subtle">
@@ -597,7 +606,7 @@ export default function Transactions() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary" />
           <input
             type="text"
-            placeholder="Suchen..."
+            placeholder={t("filters.search")}
             className="input pl-9"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -607,20 +616,20 @@ export default function Transactions() {
           className="input w-auto min-w-[14rem]"
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
-          aria-label="Nach Kategorie filtern"
+          aria-label={t("filters.filterByCategory")}
         >
-          <option value="">Alle Kategorien</option>
+          <option value="">{t("filters.allCategories")}</option>
           {ALL_CAT_GROUPS.map(({ sc, cats }) => (
             <optgroup key={sc.id} label={`${sc.emoji} ${sc.label}`}>
               {cats.map((cat) => (
-                <option key={cat} value={cat}>{titleCase(cat)}</option>
+                <option key={cat} value={cat}>{translateCategory(titleCase(cat))}</option>
               ))}
             </optgroup>
           ))}
           {orphanFilterCategories.length > 0 && (
-            <optgroup label="Weitere (in deinen Daten)">
+            <optgroup label={t("pages:ui.weitere_in_deinen_daten")}>
               {orphanFilterCategories.map((cat) => (
-                <option key={cat} value={cat}>{titleCase(cat)}</option>
+                <option key={cat} value={cat}>{translateCategory(titleCase(cat))}</option>
               ))}
             </optgroup>
           )}
@@ -631,11 +640,11 @@ export default function Transactions() {
           onChange={(e) =>
             setRecurrenceFilter(e.target.value as RecurrenceFilterValue)
           }
-          aria-label="Nach Wiederkehrend / Rhythmus filtern"
+          aria-label={t("pages:ui.nach_wiederkehrend_rhythmus_filtern")}
         >
           {RECURRENCE_FILTER_OPTIONS.map(({ value, label }) => (
             <option key={value || "all"} value={value}>
-              {label}
+              {t(label)}
             </option>
           ))}
         </select>
@@ -647,7 +656,7 @@ export default function Transactions() {
           <table className="w-full">
             <thead className="sticky top-0 z-10 bg-bg-surface">
               <tr className="border-b border-border/50">
-                {["Datum", "Beschreibung", "Konto", "Kategorie", "Wiederkehrend", "Betrag", "Referenz", ""].map((h, colIdx) => (
+                {[t("table.date"), t("table.description"), t("table.account"), t("table.category"), t("table.recurring"), t("table.amount"), t("table.reference"), ""].map((h, colIdx) => (
                   <th
                     key={h || "actions"}
                     className={clsx(
@@ -741,7 +750,7 @@ export default function Transactions() {
                             {ALL_CAT_GROUPS.map(({ sc, cats }) => (
                               <optgroup key={sc.id} label={`${sc.emoji}  ${sc.label}`}>
                                 {cats.map((cat) => (
-                                  <option key={cat} value={cat}>{titleCase(cat)}</option>
+                                  <option key={cat} value={cat}>{translateCategory(titleCase(cat))}</option>
                                 ))}
                               </optgroup>
                             ))}
@@ -767,7 +776,7 @@ export default function Transactions() {
                                 }}
                               >
                                 <sc.icon className="w-3 h-3 shrink-0" />
-                                {txn.category || "Unkategorisiert"}
+                                {txn.category ? translateCategory(txn.category) : t("txn.uncategorized")}
                               </span>
                             );
                           })()}
@@ -793,11 +802,11 @@ export default function Transactions() {
                           className="bg-transparent border-none outline-none cursor-pointer text-xs appearance-none"
                         >
                           <option value="">—</option>
-                          <option value="weekly">Wöchentlich</option>
-                          <option value="monthly">Monatlich</option>
-                          <option value="quarterly">Vierteljährlich</option>
-                          <option value="halfyearly">Halbjährlich</option>
-                          <option value="yearly">Jährlich</option>
+                          <option value="weekly">{t("periodicity.weekly")}</option>
+                          <option value="monthly">{t("periodicity.monthly")}</option>
+                          <option value="quarterly">{t("periodicity.quarterly")}</option>
+                          <option value="halfyearly">{t("periodicity.halfyearly")}</option>
+                          <option value="yearly">{t("periodicity.yearly")}</option>
                         </select>
                       </div>
                     </td>
@@ -829,7 +838,7 @@ export default function Transactions() {
                             disabled={deleteMutation.isPending}
                             className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-loss/20 text-loss border border-loss/30 hover:bg-loss/40 transition-colors whitespace-nowrap"
                           >
-                            Löschen
+                            {t("pages:ui.loeschen")}
                           </button>
                           <button
                             onClick={() => setConfirmingDeleteId(null)}
@@ -852,7 +861,7 @@ export default function Transactions() {
                           <button
                             onClick={() => setConfirmingDeleteId(txn.id)}
                             className="text-text-tertiary hover:text-loss transition-colors"
-                            title="Eintrag löschen"
+                            title={t("pages:transactions.deleteEntry")}
                           >
                             <Trash className="w-3.5 h-3.5" />
                           </button>
@@ -866,7 +875,7 @@ export default function Transactions() {
                   <td colSpan={8} className="px-4 py-12 text-center text-text-tertiary text-sm">
                     Keine Transaktionen für {range.label} gefunden.{" "}
                     <Link to="/import" className="text-accent hover:text-accent-light">
-                      CSV importieren
+                      {t("pages:ui.csv_importieren")}
                     </Link>
                   </td>
                 </tr>
@@ -880,7 +889,7 @@ export default function Transactions() {
       <div ref={sentinelRef} className="h-4" />
       {isFetchingNextPage && (
         <div className="flex justify-center py-4 text-text-tertiary text-sm animate-pulse">
-          Weitere Transaktionen laden…
+          {t("pages:ui.weitere_transaktionen_laden")}
         </div>
       )}
 

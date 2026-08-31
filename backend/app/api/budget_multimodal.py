@@ -42,6 +42,7 @@ from app.services.currency_service import (
     normalize_reference_currency,
     convert_with_eur_rates,
 )
+from app.services.peer_group import peer_savings_rate
 from app.services.wizard_derive import (
     health_insurance_monthly,
     monthly_amount,
@@ -528,12 +529,20 @@ class HealthScoreComponent(BaseModel):
     score: float        # 0–100
     weight: float       # 0–1, sum = 1.0
     detail: str
+    # i18n: das Frontend uebersetzt ueber die Schluessel; `name`/`detail`
+    # bleiben als deutsche Rueckfallebene fuer aeltere Clients erhalten.
+    name_key: Optional[str] = None
+    detail_key: Optional[str] = None
+    detail_params: Optional[dict] = None
 
 
 class HealthScoreLever(BaseModel):
     title: str
     body: str
     potential: float    # CHF / month improvement potential
+    title_key: Optional[str] = None
+    body_key: Optional[str] = None
+    body_params: Optional[dict] = None
 
 
 class HealthScoreResponse(BaseModel):
@@ -541,6 +550,9 @@ class HealthScoreResponse(BaseModel):
     grade: str          # A / B / C / D / F
     components: List[HealthScoreComponent]
     top_levers: List[HealthScoreLever]
+    #: Eigene Sparquote und die der Vergleichsgruppe, beide in Prozent.
+    savings_rate_pct: float = 0.0
+    peer_savings_rate_pct: float = 0.0
 
 
 def _grade(score: float) -> str:
@@ -560,13 +572,24 @@ def _compute_health_score(
     has_pension: bool,
     months_covered: int,
     ref: str,
+    household_type: str = "single",
 ) -> HealthScoreResponse:
     """Shared scoring logic — called with data from any mode."""
 
     # Component 1: Savings Rate (30%)
+    #
+    # Gemessen an der Vergleichsgruppe statt an einer festen Zahl: vorher
+    # galten 25 % als Bestwert (`rate * 4`), egal ob jemand 3'800 oder 18'500
+    # im Monat hat. Die BFS-Erhebung zeigt dagegen 8 % bei tiefen und 26 % bei
+    # hohen Einkommen — dieselbe Sparquote bedeutet je nach Haushalt etwas
+    # voellig anderes.
+    monthly_income = income / max(1, months_covered)
+    peer_rate = peer_savings_rate(monthly_income, household_type)
     if income > 0:
         savings_rate_pct = max(0.0, (income - expenses) / income * 100)
-        savings_score = min(100.0, savings_rate_pct * 4.0)
+        # Wer die Vergleichsquote erreicht, hat die volle Punktzahl. Der
+        # Benchmark ist das Uebliche, nicht das Ideal.
+        savings_score = min(100.0, savings_rate_pct / peer_rate * 100) if peer_rate > 0 else 0.0
     else:
         savings_rate_pct = 0.0
         savings_score = 0.0
@@ -605,13 +628,27 @@ def _compute_health_score(
     components = [
         HealthScoreComponent(
             name="Sparquote", score=round(savings_score, 1), weight=0.30,
-            detail=f"{savings_rate_pct:.1f}% Sparquote" if income > 0 else "Keine Einnahmen im Zeitraum",
+            detail=(
+                f"{savings_rate_pct:.1f}% — Vergleichsgruppe {peer_rate:.0f}%"
+                if income > 0 else "Keine Einnahmen im Zeitraum"
+            ),
+            name_key="savingsRate",
+            detail_key="savingsRateVsPeer" if income > 0 else "noIncomeInPeriod",
+            detail_params=(
+                {"pct": f"{savings_rate_pct:.1f}", "peer": f"{peer_rate:.0f}"}
+                if income > 0 else None
+            ),
         ),
         HealthScoreComponent(
             name="Budgettreue", score=round(adherence_score, 1), weight=0.25,
             detail=(
                 f"{round(expenses / planned_total * 100):.0f}% des Budgets ausgeschöpft"
                 if planned_total > 0 else "Kein Soll-Budget erfasst"
+            ),
+            name_key="budgetAdherence",
+            detail_key="budgetUsedDetail" if planned_total > 0 else "noTargetBudget",
+            detail_params=(
+                {"pct": f"{round(expenses / planned_total * 100):.0f}"} if planned_total > 0 else None
             ),
         ),
         HealthScoreComponent(
@@ -620,14 +657,24 @@ def _compute_health_score(
                 f"Einnahmen decken Ausgaben zu {round(income/expenses*100) if expenses > 0 else 100:.0f}%"
                 if income > 0 else "Keine Einnahmen erfasst"
             ),
+            name_key="cashflow",
+            detail_key="cashflowDetail" if income > 0 else "noIncomeRecorded",
+            detail_params=(
+                {"pct": f"{round(income/expenses*100) if expenses > 0 else 100:.0f}"} if income > 0 else None
+            ),
         ),
         HealthScoreComponent(
             name="Altersvorsorge", score=round(pension_score, 1), weight=0.15,
             detail="Vorsorgebeiträge erkannt" if has_pension else "Keine Säule-3a-Beiträge erkannt",
+            name_key="retirementProvision",
+            detail_key="pensionDetected" if has_pension else "noPillar3aDetected",
         ),
         HealthScoreComponent(
             name="Ausgabendiversität", score=round(diversity_score, 1), weight=0.10,
             detail=f"{len(cat_totals)} Kategorien im Zeitraum",
+            name_key="expenseDiversity",
+            detail_key="categoriesInPeriod",
+            detail_params={"count": len(cat_totals)},
         ),
     ]
 
@@ -637,27 +684,27 @@ def _compute_health_score(
     if savings_score < 70:
         gap = max(0, income * 0.20 - (income - expenses))
         levers.append(HealthScoreLever(
-            title="Sparquote erhöhen",
+            title="Sparquote erhöhen", title_key="increaseSavings", body_key="savingsLeverBody", body_params={"ref": ref, "amount": f"{gap/months_covered:,.0f}"},
             body=f"Ziel: 20% Sparquote. Spare zusätzlich ~{ref} {gap/months_covered:,.0f}/Monat.",
             potential=round(gap / months_covered, 0),
         ))
     if adherence_score < 70 and planned_total > 0:
         overspend = max(0.0, expenses - planned_total) / months_covered
         levers.append(HealthScoreLever(
-            title="Budgeteinhaltung verbessern",
+            title="Budgeteinhaltung verbessern", title_key="improveAdherence", body_key="adherenceLeverBody", body_params={"ref": ref, "amount": f"{overspend:,.0f}"},
             body=f"Ausgaben übersteigen das Budget um ~{ref} {overspend:,.0f}/Monat.",
             potential=round(overspend, 0),
         ))
     if pension_score < 70:
         levers.append(HealthScoreLever(
-            title="Säule 3a einrichten",
+            title="Säule 3a einrichten", title_key="setupPillar3a", body_key="pillar3aLeverBody", body_params=None,
             body="Zahle regelmässig in die Säule 3a ein. Max. CHF 7'056/Jahr (2024, unselbstständig).",
             potential=588.0,
         ))
     if cashflow_score < 80 and income > 0:
         deficit = max(0.0, expenses - income) / months_covered
         levers.append(HealthScoreLever(
-            title="Ausgaben senken",
+            title="Ausgaben senken", title_key="reduceExpenses", body_key="reduceLeverBody", body_params={"ref": ref, "amount": f"{deficit:,.0f}"},
             body=f"Ausgaben übersteigen Einnahmen um ~{ref} {deficit:,.0f}/Monat.",
             potential=round(deficit, 0),
         ))
@@ -668,6 +715,8 @@ def _compute_health_score(
         grade=_grade(weighted_score),
         components=components,
         top_levers=levers[:3],
+        savings_rate_pct=round(savings_rate_pct, 1),
+        peer_savings_rate_pct=round(peer_rate, 1),
     )
 
 
@@ -698,9 +747,14 @@ async def budget_health_score(
         period_start = date.fromisoformat(start)
         period_end   = date.fromisoformat(end)
     else:
-        period_start = (today.replace(day=1) - timedelta(days=1)).replace(day=1)
-        period_start = (period_start - timedelta(days=1)).replace(day=1)
-        period_end   = today
+        # Bis zum letzten *abgeschlossenen* Monat. Endete der Zeitraum heute,
+        # zaehlten die halben laufenden Monatsausgaben mit, der Lohn vom 25.
+        # aber nicht — ein Haushalt, der zum Monatsende bezahlt wird, sah
+        # dadurch in den ersten drei Wochen jedes Monats 0 % Sparquote.
+        period_end = today.replace(day=1) - timedelta(days=1)
+        period_start = period_end.replace(day=1)
+        for _ in range(2):
+            period_start = (period_start - timedelta(days=1)).replace(day=1)
 
     months_covered = max(
         1,
@@ -923,6 +977,19 @@ async def budget_health_score(
         income = income_for_savings
         expenses = expenses_for_savings
 
+    # Haushaltsform fuer den Peer-Vergleich: ein Paar spart anders als eine
+    # Einzelperson. Ohne Wizard-Angaben bleibt es bei "single".
+    household_type = "single"
+    from app.models.models import UserWizardConfig as _UWC
+    _cfg = (await db.execute(
+        select(_UWC).where(_UWC.user_id == current_user.id)
+    )).scalars().first()
+    if _cfg and _cfg.wizard_data_json:
+        try:
+            household_type = _json.loads(_cfg.wizard_data_json).get("haushalt") or "single"
+        except (ValueError, TypeError):
+            pass
+
     return _compute_health_score(
         income=income,
         expenses=expenses,
@@ -931,4 +998,5 @@ async def budget_health_score(
         has_pension=has_pension,
         months_covered=months_covered,
         ref=ref,
+        household_type=household_type,
     )

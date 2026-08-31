@@ -41,6 +41,9 @@ import { computeDateRange, TimeGranularity } from "@/lib/granularity";
 import { useTaxonomy, type SuperCategory } from "@/lib/categories";
 import { deduplicateWizardBatch } from "@/lib/wizardUtils";
 import type { MultiAnalysisResult } from "@/types/budgetAnalysis";
+import { useTranslation, Trans } from "react-i18next";
+import ProgressBar from "@/components/ui/ProgressBar";
+import EmptyState from "@/components/ui/EmptyState";
 
 // ── Transaction row type used in Budget (extended with recurrence) ──
 interface TxnRow {
@@ -89,13 +92,14 @@ const PEER_KEYS_BY_SC: Record<string, (keyof PeerConfig)[]> = {
 };
 
 // ── Frequency filter ──────────────────────────────────────────
+// label = i18n-Schluessel, erst beim Rendern uebersetzt
 const FREQ_OPTIONS = [
-  { key: "monthly",    label: "Monatlich"    },
-  { key: "quarterly",  label: "Quartalsweise" },
-  { key: "halfyearly", label: "Halbjährlich"  },
-  { key: "yearly",     label: "Jährlich"      },
-  { key: "weekly",     label: "Wöchentlich"   },
-  { key: "einmalig",   label: "Einmalig"      },
+  { key: "monthly",    label: "periodicity.monthly"      },
+  { key: "quarterly",  label: "periodicity.quarterlyAlt" },
+  { key: "halfyearly", label: "periodicity.halfyearly"   },
+  { key: "yearly",     label: "periodicity.yearly"       },
+  { key: "weekly",     label: "periodicity.weekly"       },
+  { key: "einmalig",   label: "periodicity.once"         },
 ] as const;
 
 // ── Aggregated row (per supercategory) ────────────────────────
@@ -110,6 +114,7 @@ interface SuperRow {
 // ── Page ──────────────────────────────────────────────────────
 
 export default function Budget() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const refCcy = user?.currency ?? "CHF";
   const fmtRef = (n: number) => formatAmount(n, refCcy);
@@ -220,10 +225,9 @@ export default function Budget() {
   // Per-transaction list — used for both drill-down AND frequency-filtered KPIs
   const { data: periodTransactions = [] } = useQuery({
     queryKey: ["period-transactions-drilldown", periodStart, periodEnd],
-    queryFn: () =>
-      transactionsApi
-        .list({ start: periodStart, end: periodEnd, limit: 2000 })
-        .then((r) => r.data),
+    // Die Seite rechnet Kennzahlen ueber den ganzen Zeitraum — eine gedeckelte
+    // erste Seite wuerde sie stillschweigend zu niedrig ausweisen.
+    queryFn: () => transactionsApi.listAll({ start: periodStart, end: periodEnd }),
     staleTime: 30_000,
   });
 
@@ -571,7 +575,7 @@ export default function Budget() {
       {/* ── Header ─────────────────────────────── */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h1 className="text-2xl font-display text-text-primary">Budgetanalyse</h1>
+          <h1 className="text-2xl font-display text-text-primary">{t("pages:budget.title")}</h1>
           <p className="text-text-tertiary text-sm mt-0.5">{range.label}</p>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
@@ -586,7 +590,7 @@ export default function Budget() {
               onClick={() => { setWizardEditorScId(undefined); setShowWizardEditor(true); }}
               className="btn-secondary text-xs flex items-center gap-1.5"
             >
-              Budgets bearbeiten
+              {t("pages:budget.editBudgets")}
             </button>
           )}
         </div>
@@ -606,7 +610,7 @@ export default function Budget() {
                 : "bg-bg-surface2 border-border text-text-tertiary hover:text-text-primary",
             )}
           >
-            {label}
+            {t(label)}
           </button>
         ))}
 
@@ -616,26 +620,26 @@ export default function Budget() {
         {/* Exclude-transfers toggle */}
         <button
           type="button"
-          title="Kontoüberträge ein-/ausschließen"
+          title={t("pages:misc.r23")}
           onClick={toggleExcludeTransfers}
           className={clsx(
             "px-3 py-1.5 rounded-lg text-xs border transition-colors",
             excludeTransfers
-              ? "bg-amber-500/15 border-amber-500/40 text-amber-400"
+              ? "msg-warning"
               : "bg-bg-surface2 border-border text-text-tertiary hover:text-text-primary",
           )}
         >
-          {excludeTransfers ? "Überträge ausgeblendet" : "Überträge einschließen"}
+          {excludeTransfers ? t("pages:budget.transfersHidden") : t("pages:budget.includeTransfers")}
         </button>
 
         {!ALL_FREQS_SELECTED ? (
-          <span className="text-amber-400 text-xs self-center ml-1 flex items-center gap-1">
+          <span className="txt-warning text-xs self-center ml-1 flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
-            Alle Werte gefiltert nach Wiederkehrend
+            {t("pages:ui.alle_werte_gefiltert_nach_wiederkehrend")}
           </span>
         ) : (
           <span className="text-text-disabled text-xs self-center ml-1">
-            Gilt für alle Werte auf dieser Seite
+            {t("pages:budget.appliesToAll")}
           </span>
         )}
       </div>
@@ -646,7 +650,7 @@ export default function Budget() {
         {/* Netto */}
         <div className="card flex flex-col gap-2">
           <div className="flex items-center justify-between">
-            <span className="text-text-tertiary text-xs uppercase tracking-wide">Netto-Überschuss</span>
+            <span className="text-text-tertiary text-xs uppercase tracking-wide">{t("pages:budget.netSurplus")}</span>
             <div className="w-8 h-8 rounded-lg bg-bg-surface2 flex items-center justify-center">
               {kpi.net >= 0
                 ? <GraphUp className="w-4 h-4 text-gain" />
@@ -671,7 +675,7 @@ export default function Budget() {
           className="card flex flex-col gap-2 text-left hover:ring-1 hover:ring-accent/30 transition-all cursor-pointer"
         >
           <div className="flex items-center justify-between">
-            <span className="text-text-tertiary text-xs uppercase tracking-wide">Ausgaben</span>
+            <span className="text-text-tertiary text-xs uppercase tracking-wide">{t("pages:dashboard.expenses")}</span>
             <div className="w-8 h-8 rounded-lg bg-bg-surface2 flex items-center justify-center">
               <Wallet className="w-4 h-4 text-text-tertiary" />
             </div>
@@ -682,21 +686,18 @@ export default function Budget() {
           {totalPlanned > 0 ? (
             <div>
               <p className="text-text-tertiary text-xs mb-1">
-                von {fmtRef(totalPlanned)} geplant · <span className="text-accent/70">Details anzeigen</span>
+                {t("pages:budget.plannedOf", { amount: fmtRef(totalPlanned) })} · <span className="text-accent/70">{t("pages:budget.showDetails")}</span>
               </p>
-              <div className="h-1.5 bg-bg-surface2 rounded-full overflow-hidden">
-                <div
-                  className={clsx(
-                    "h-full rounded-full transition-all duration-500",
-                    kpi.expenses > totalPlanned ? "bg-loss" : "bg-accent",
-                  )}
-                  style={{ width: `${Math.min(100, (kpi.expenses / totalPlanned) * 100)}%` }}
-                />
-              </div>
+              <ProgressBar
+                value={(kpi.expenses / totalPlanned) * 100}
+                color={kpi.expenses > totalPlanned ? "var(--red)" : "var(--accent)"}
+                opacity={1}
+                label={t("pages:budget.utilisation")}
+              />
             </div>
           ) : (
             <p className="text-text-tertiary text-xs">
-              {capabilities?.wizard_available ? "Empirische Budgets geladen…" : "Details anzeigen →"}
+              {capabilities?.wizard_available ? t("pages:budget.empiricalLoaded") : t("pages:budget.showDetailsArrow")}
             </p>
           )}
         </button>
@@ -704,7 +705,7 @@ export default function Budget() {
         {/* Budget-Ausschöpfung */}
         <div className="card flex flex-col gap-2">
           <div className="flex items-center justify-between">
-            <span className="text-text-tertiary text-xs uppercase tracking-wide">Ausschöpfung</span>
+            <span className="text-text-tertiary text-xs uppercase tracking-wide">{t("pages:budget.utilisation")}</span>
             <div className="w-8 h-8 rounded-lg bg-bg-surface2 flex items-center justify-center">
               <Position className="w-4 h-4 text-text-tertiary" />
             </div>
@@ -719,14 +720,14 @@ export default function Budget() {
               </p>
               <p className="text-text-tertiary text-xs">
                 {utilisation > 100
-                  ? `${utilisation - 100}% über Budget`
-                  : utilisation > 80 ? "Nahe am Limit" : "Im grünen Bereich"}
+                  ? t("pages:budget.overBudget", { pct: utilisation - 100 })
+                  : utilisation > 80 ? t("pages:budget.nearLimit") : t("pages:budget.inTheGreen")}
               </p>
             </>
           ) : (
             <>
               <p className="text-2xl font-mono font-semibold text-text-disabled">—</p>
-              <p className="text-text-tertiary text-xs">Kein Soll-Budget definiert</p>
+              <p className="text-text-tertiary text-xs">{t("pages:budget.noTargetBudget")}</p>
             </>
           )}
         </div>
@@ -738,7 +739,7 @@ export default function Budget() {
         {/* Card header */}
         <div className="px-4 pt-4 pb-2 border-b border-border">
           <div className="flex items-center justify-between gap-2">
-            <h2 className="text-text-primary font-semibold text-sm">Ausgaben-Kategorien</h2>
+            <h2 className="text-text-primary font-semibold text-sm">{t("pages:budget.expenseCategories")}</h2>
 
             <div className="flex items-center gap-2">
               <span className="text-text-tertiary text-xs hidden sm:inline">{range.label}</span>
@@ -746,7 +747,7 @@ export default function Budget() {
               {/* Sort order toggle */}
               <button
                 type="button"
-                title={sortOrder === "default" ? "Sortierung: Standard → nach Betrag" : "Sortierung: nach Betrag → Standard"}
+                title={sortOrder === "default" ? t("pages:budget.sortToAmount") : t("pages:budget.sortToDefault")}
                 onClick={() => handleSetSortOrder(sortOrder === "default" ? "amount" : "default")}
                 className={clsx(
                   "flex items-center gap-1 px-2 py-1.5 rounded-lg border text-xs transition-colors",
@@ -756,7 +757,7 @@ export default function Budget() {
                 )}
               >
                 <DataTransferBoth className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">{sortOrder === "amount" ? "Betrag" : "Standard"}</span>
+                <span className="hidden sm:inline">{sortOrder === "amount" ? t("table.amount") : t("pages:budget.sortDefault")}</span>
               </button>
 
               {/* View toggle: Balken / DashboardSpeed / Stacked */}
@@ -789,7 +790,7 @@ export default function Budget() {
                 </button>
                 <button
                   type="button"
-                  title="Monatlicher Verlauf (Stacked Bar)"
+                  title={t("pages:ui.monatlicher_verlauf_stacked_bar")}
                   onClick={() => handleSetView("stacked")}
                   className={clsx(
                     "px-2 py-1.5 border-l border-border transition-colors",
@@ -867,22 +868,25 @@ export default function Budget() {
               className="flex items-center gap-1 px-2 py-1 rounded-lg border border-border/40 text-xs text-text-tertiary hover:text-text-secondary transition-colors"
             >
               <Eye className="w-3 h-3" />
-              <span className="hidden sm:inline">Alle einblenden</span>
+              <span className="hidden sm:inline">{t("pages:budget.showAll")}</span>
             </button>
           )}
         </div>
 
+        {/* Ohne Daten gar keine Ansicht rendern — vorher stand die Meldung
+            "Keine Daten" ueber einem leeren Diagramm. */}
         {!hasSomeData && (
-          <p className="text-text-tertiary text-sm text-center py-10">
-            Keine Daten für den gewählten Zeitraum.{" "}
-            {!capabilities?.wizard_available && (
-              <span>
-                Starte den{" "}
-                <a href="/wizard" className="text-accent underline">Setup-Wizard</a>{" "}
-                um empirische Budgets zu erfassen.
-              </span>
-            )}
-          </p>
+          <EmptyState
+            title={t("pages:budget.noDataForPeriod")}
+            hint={
+              !capabilities?.wizard_available ? (
+                <Trans
+                  i18nKey="pages:budget.noDataWizardHint"
+                  components={{ a: <a href="/wizard" className="text-accent underline" /> }}
+                />
+              ) : undefined
+            }
+          />
         )}
 
         {/* ── DashboardSpeed view ── */}
@@ -899,7 +903,7 @@ export default function Budget() {
         )}
 
         {/* ── Stacked bar view ── */}
-        {view === "stacked" && (
+        {view === "stacked" && hasSomeData && (
           <Suspense
             fallback={
               <div className="py-10 flex items-center justify-center text-text-tertiary text-sm">
@@ -920,7 +924,7 @@ export default function Budget() {
         )}
 
         {/* ── Bar view ── */}
-        {view === "bar" && (
+        {view === "bar" && hasSomeData && (
           <div className="divide-y divide-border/40">
             {visibleMainRows.map((row) => (
               <SuperCategoryBar
@@ -928,6 +932,7 @@ export default function Budget() {
                 superCategory={row.sc}
                 actual={row.actual  > 0 ? row.actual  : undefined}
                 planned={row.planned > 0 ? row.planned : undefined}
+                peer={hasPeerGauge ? peerBySuperCat.get(row.sc.id) : undefined}
                 subItems={row.subItems}
                 onClick={() => openDrillDown(row)}
               />
@@ -951,6 +956,7 @@ export default function Budget() {
                     superCategory={sonstigesRow.sc}
                     actual={sonstigesRow.actual  > 0 ? sonstigesRow.actual  : undefined}
                     planned={sonstigesRow.planned > 0 ? sonstigesRow.planned : undefined}
+                    peer={hasPeerGauge ? peerBySuperCat.get(sonstigesRow.sc.id) : undefined}
                     subItems={sonstigesRow.subItems}
                     onClick={() => openDrillDown(sonstigesRow)}
                   />
@@ -961,12 +967,12 @@ export default function Budget() {
         )}
 
         {/* ── Compare view (3-Weg: Ist / Soll / Peer-Ø) ── */}
-        {view === "compare" && (
+        {view === "compare" && hasSomeData && (
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[520px]">
               <thead>
                 <tr className="border-b border-border/60 text-[11px] text-text-tertiary uppercase tracking-wide">
-                  <th className="px-4 py-2.5 text-left font-medium w-40">Kategorie</th>
+                  <th className="px-4 py-2.5 text-left font-medium w-40">{t("table.category")}</th>
                   <th className="px-3 py-2.5 text-right font-medium">Ist</th>
                   <th className="px-3 py-2.5 text-right font-medium">Soll</th>
                   <th className="px-3 py-2.5 text-right font-medium">vs. Soll</th>
@@ -1105,10 +1111,10 @@ export default function Budget() {
             {/* Legend */}
             <div className="flex flex-wrap gap-4 px-4 py-3 border-t border-border/40 text-[10px] text-text-tertiary">
               <span>
-                <span className="text-gain">Grün</span> = unter Budget / unter Peer
+                <span className="text-gain">{t("pages:budget.legendGreen")}</span>{t("pages:budget.legendGreenText")}
               </span>
               <span>
-                <span className="text-loss">Rot</span> = über Budget / über Peer
+                <span className="text-loss">{t("pages:budget.legendRed")}</span>{t("pages:budget.legendRedText")}
               </span>
               {peerBySuperCat.size === 0 && (
                 <span className="text-text-disabled">
@@ -1144,9 +1150,9 @@ export default function Budget() {
               {peerData.peer_info && (
                 <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-text-tertiary border-b border-border pb-3">
                   <span>Altersgruppe: <strong className="text-text-secondary">{peerData.peer_info.age_range}</strong></span>
-                  <span>Haushalt: <strong className="text-text-secondary">{peerData.peer_info.household_type}</strong></span>
+                  <span>{t("pages:ui.haushalt_2")} <strong className="text-text-secondary">{peerData.peer_info.household_type}</strong></span>
                   <span>Medianeinkommen: <strong className="text-text-secondary">{fmtRef(peerData.peer_info.median_income)}/Monat</strong></span>
-                  <span>Sparquote Peers: <strong className="text-text-secondary">{peerData.peer_info.savings_rate_pct}%</strong></span>
+                  <span>{t("pages:ui.sparquote_peers")} <strong className="text-text-secondary">{peerData.peer_info.savings_rate_pct}%</strong></span>
                 </div>
               )}
               <div className="space-y-3">
@@ -1199,7 +1205,7 @@ export default function Budget() {
               {peerData.opportunities && peerData.opportunities.length > 0 && (
                 <div className="border-t border-border pt-3">
                   <p className="text-text-tertiary text-xs font-semibold uppercase tracking-wide mb-2">
-                    Einspar-Potenzial
+                    {t("pages:ui.einspar_potenzial")}
                   </p>
                   <div className="space-y-2">
                     {peerData.opportunities.slice(0, 3).map((opp) => (

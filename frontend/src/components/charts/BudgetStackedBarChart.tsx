@@ -21,7 +21,10 @@ import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import ReactECharts from "echarts-for-react";
 import type { SuperCategory } from "@/lib/categories";
 import { resolveSuperCategoryFromList, useTaxonomySuperCategories } from "@/lib/categories";
-import { formatCHF } from "@/lib/theme";
+import { formatCHF, themePalettes, type ThemePalette } from "@/lib/theme";
+import { useThemeColors } from "@/hooks/useThemeColors";
+import { useTranslation } from "react-i18next";
+import i18n from "@/i18n";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -98,11 +101,13 @@ export const CHART_SC_ORDER = [
 
 // ── Month helpers ─────────────────────────────────────────────────
 
-const MONTH_NAMES_SHORT = ["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
 
 function fmtMonth(m: string): string {
+  // Monatskuerzel aus Intl — folgt der UI-Sprache ohne eigene Uebersetzung.
   const [y, mo] = m.split("-");
-  return `${MONTH_NAMES_SHORT[parseInt(mo, 10) - 1]} ${y.slice(2)}`;
+  const name = new Intl.DateTimeFormat(i18n.language, { month: "short" })
+    .format(new Date(Number(y), parseInt(mo, 10) - 1, 1));
+  return `${name} ${y.slice(2)}`;
 }
 
 /** Returns "YYYY-MM" for the month that is `n` months before today */
@@ -438,6 +443,7 @@ function buildOption(
   layers: ChartLayers,
   subsByMonth: SubCatDetail,
   firstForecastIdx = -1,
+  theme: ThemePalette = themePalettes.dark,
 ) {
   const { keys, labels, colors, data, singleScMode, subCatColors, orderedSc } = layers;
   const axisColor = "#64748b";
@@ -502,7 +508,7 @@ function buildOption(
 
     let html = `<div style="font-weight:600;margin-bottom:4px;font-size:13px;color:#f1f5f9">${first.name ?? fmtMonth(monthKey)}</div>`;
     if (isFuture) {
-      html += `<div style="margin-bottom:6px"><span style="background:#7c3aed22;border:1px solid #7c3aed55;color:#a78bfa;font-size:10px;padding:1px 6px;border-radius:9999px">Prognose (Periodizität)</span></div>`;
+      html += `<div style="margin-bottom:6px"><span style="background:#7c3aed22;border:1px solid #7c3aed55;color:#a78bfa;font-size:10px;padding:1px 6px;border-radius:9999px">{t("pages:misc.r12")}</span></div>`;
     }
     for (const p of visible) {
       const pct = total > 0 ? ((p.value / total) * 100).toFixed(1) : "0.0";
@@ -551,10 +557,10 @@ function buildOption(
     tooltip: {
       trigger: "item" as const,
       appendToBody: true,
-      backgroundColor: "#1e293b",
-      borderColor: "#334155",
+      backgroundColor: theme.bgElevated,
+      borderColor: theme.border,
       borderWidth: 1,
-      textStyle: { color: "#e2e8f0", fontSize: 12 },
+      textStyle: { color: theme.textPrimary, fontSize: 12 },
       formatter: tooltipFormatter,
     },
     legend: { bottom: 0, textStyle: { color: labelColor, fontSize: 11 }, data: legendData },
@@ -764,11 +770,13 @@ export default function BudgetStackedBarChart({
   hiddenScIds,
   sortOrder = "default",
 }: Props) {
+  const { t } = useTranslation();
   const [mode, setMode] = useState<"historical" | "forecast" | "budgetplan">("historical");
   // In embedded mode always show historical data (no forecast toggle)
   const activeMode = embedded ? "historical" : mode;
   const hasBudgetPlan = (budgetPlanMonths?.length ?? 0) > 0 && budgetPlanByMonth != null;
   const superCategories = useTaxonomySuperCategories();
+  const { colors: themeColors } = useThemeColors();
   const chartSc = useMemo(
     () =>
       CHART_SC_ORDER
@@ -891,8 +899,8 @@ export default function BudgetStackedBarChart({
   );
 
   const option = useMemo(
-    () => buildOption(activeMonths, layers, activeSubs, activeFirstForecastIdx),
-    [activeMonths, layers, activeSubs, activeFirstForecastIdx],
+    () => buildOption(activeMonths, layers, activeSubs, activeFirstForecastIdx, themeColors),
+    [activeMonths, layers, activeSubs, activeFirstForecastIdx, themeColors],
   );
 
   // ── Ribbon polygon injection ───────────────────────────────────
@@ -916,15 +924,15 @@ export default function BudgetStackedBarChart({
 
   // Status label under the chart title
   const sourceLabel = useMemo(() => {
-    if (activeMode === "budgetplan") return "Budgetplan · Wiederkehrende Einträge nach Superkategorie";
+    if (activeMode === "budgetplan") return t("pages:budget.srcBudgetplan");
     if (activeMode === "historical") {
       return histFirstForecastIdx >= 0
-        ? "Ist-Daten + Prognose aus wiederkehrenden Zahlungen (Ø 12 Mt.)"
-        : "Ist-Daten aus realen Transaktionen";
+        ? t("pages:budget.srcActualPlusForecast")
+        : t("pages:budget.actualFromTxns");
     }
-    if (wizardData) return "Empirische Angaben · Steuern fix";
+    if (wizardData) return t("pages:budget.srcEmpirical");
     if (Object.keys(recurringPatterns.monthlyAvg).length > 0)
-      return "Wiederkehrende Zahlungen · Ø letzte 12 Monate";
+      return t("pages:budget.srcRecurring");
     return "KI-Prognose · Steuern auf histor. Ø begrenzt";
   }, [activeMode, histFirstForecastIdx, wizardData, recurringPatterns]);
 
@@ -1013,7 +1021,7 @@ export default function BudgetStackedBarChart({
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-text-primary font-semibold text-sm">
-            Ausgaben nach Kategorie
+            {t("pages:ui.ausgaben_nach_kategorie")}
           </h2>
           <p className="text-text-tertiary text-[11px] mt-0.5">{sourceLabel}</p>
         </div>

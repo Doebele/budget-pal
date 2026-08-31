@@ -2,6 +2,11 @@
 Wizard API — onboarding endpoint that bootstraps a full user financial profile
 from the 8-step wizard in one transactional POST.
 
+Everything here is "empirical" in this project's sense: ASSUMED and STATISTICAL
+values the user entered, pre-filled from Swiss FSO (BFS) peer-group averages.
+The counterpart is "actual" data — transactions imported from real bank
+statements (see api/transactions.py). Do not read "empirical" as "observed".
+
 POST /wizard/complete
   Accepts: WizardCompletePayload (all wizard form data)
   Creates:
@@ -305,6 +310,17 @@ def _mortgage_interest(p: WizardCompletePayload) -> float:
     return mortgage_interest_monthly(pairs)
 
 
+def _weighted_mortgage_rate(p: WizardCompletePayload) -> float:
+    """Nach Schuld gewichteter Mischzinssatz ueber alle Tranchen, in Prozent."""
+    pairs = [(m.debt_value, m.mortgage_rate) for m in p.mortgage_entries if m.debt_value > 0]
+    if not pairs and p.outstanding_debt > 0:
+        pairs = [(p.outstanding_debt, p.mortgage_rate)]
+    total = sum(debt for debt, _ in pairs)
+    if total <= 0:
+        return 0.0
+    return sum(debt * rate for debt, rate in pairs) / total
+
+
 def _compute_monthly_expenses(p: WizardCompletePayload) -> float:
     housing = (
         p.monthly_rent + p.nebenkosten
@@ -344,6 +360,12 @@ def _compute_monthly_expenses(p: WizardCompletePayload) -> float:
     )
 
 
+#: Aufschlag auf die Sparrate, wenn das Szenario "Sparplan erhoehen" aktiv ist.
+SAVINGS_INCREASE_PCT = 10.0
+#: Um wie viele Jahre das Szenario "Fruehpensionierung" den Ruhestand vorzieht.
+EARLY_RETIREMENT_YEARS = 3
+
+
 def _build_scenario_params(p: WizardCompletePayload) -> dict:
     scenarios = []
     if p.scenario_mortgage:
@@ -363,6 +385,17 @@ def _build_scenario_params(p: WizardCompletePayload) -> dict:
         "kanton": p.kanton,
         "household_type": p.haushalt,
         "active_scenarios": scenarios,
+        # Szenario "Sparplan erhoehen" als Aufschlag auf die Sparrate.
+        # Fester Vorgabewert; ein spaeteres Eingabefeld in Schritt 8 schreibt
+        # denselben Schluessel, ohne dass hier etwas umgebaut werden muss.
+        "savings_increase_pct": SAVINGS_INCREASE_PCT if p.scenario_savings else 0.0,
+        # Fuer die Szenarien "Pflegekosten" und "Hypothek amortisieren".
+        # Die Tranchen liegen zwar in mortgage_tranches, erreichen die
+        # Projektion aber nur ueber diese Kopie im Szenario.
+        "monthly_expenses_base": _compute_monthly_expenses(p),
+        "mortgage_debt": sum(m.debt_value for m in p.mortgage_entries) or p.outstanding_debt,
+        "mortgage_rate_pct": _weighted_mortgage_rate(p),
+        "early_retirement_years": EARLY_RETIREMENT_YEARS,
         "ahv_beitragsjahre": p.ahv_beitragsjahre,
         "ahv_avg_lohn": p.ahv_durchschnitts_lohn,
         "bvg_guthaben": p.bvg_guthaben,

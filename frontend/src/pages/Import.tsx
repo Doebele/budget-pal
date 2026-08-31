@@ -16,6 +16,7 @@ import { de } from "date-fns/locale";
 import { clsx } from "clsx";
 import { useUiStore } from "@/lib/store";
 import { formatCHF, getFrequencyStyle, getFrequencyBadgeStyle, PERIODICITY_LABELS } from "@/lib/theme";
+import { useTranslation } from "react-i18next";
 
 const BANKS = [
   { value: "ubs", label: "UBS" },
@@ -141,6 +142,7 @@ interface CategoryRow {
 }
 
 export default function Import() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const csvRef = useRef<HTMLInputElement>(null);
   const pdfRef = useRef<HTMLInputElement>(null);
@@ -486,27 +488,27 @@ export default function Import() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
-        <h1 className="text-2xl font-display text-text-primary">Import</h1>
-        <p className="text-text-tertiary text-sm mt-0.5">CSV und PDF Kontoauszüge importieren</p>
+        <h1 className="text-2xl font-display text-text-primary">{t("pages:import.i19")}</h1>
+        <p className="text-text-tertiary text-sm mt-0.5">{t("pages:import.i12")}</p>
       </div>
 
       {/* Config */}
       <div className="card">
-        <h2 className="text-text-primary font-semibold text-sm mb-4">Import-Einstellungen</h2>
+        <h2 className="text-text-primary font-semibold text-sm mb-4">{t("pages:import.i22")}</h2>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="label">Ziel-Konto</label>
+            <label className="label">{t("pages:import.i44")}</label>
             <select className="input" value={selectedAccount} onChange={(e) => setSelectedAccount(e.target.value)}>
-              <option value="">Konto wählen...</option>
+              <option value="">{t("pages:import.i27")}</option>
               {(accounts || []).map((a: { id: number; name: string; bank: string }) => (
                 <option key={a.id} value={String(a.id)}>{a.name} ({a.bank})</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="label">Bank (optional, auto-erkannt)</label>
+            <label className="label">{t("pages:import.i02")}</label>
             <select className="input" value={selectedBank} onChange={(e) => setSelectedBank(e.target.value)}>
-              <option value="">Auto-Erkennung</option>
+              <option value="">{t("pages:import.i01")}</option>
               {BANKS.map((b) => (
                 <option key={b.value} value={b.value}>{b.label}</option>
               ))}
@@ -525,8 +527,8 @@ export default function Import() {
           onClick={() => selectedAccount && csvRef.current?.click()}
         >
           <Upload className="w-8 h-8 text-text-tertiary mx-auto mb-3" />
-          <p className="text-text-primary font-medium text-sm">CSV importieren</p>
-          <p className="text-text-tertiary text-xs mt-1">Zuerst Vorschau, dann Import</p>
+          <p className="text-text-primary font-medium text-sm">{t("pages:import.i11")}</p>
+          <p className="text-text-tertiary text-xs mt-1">{t("pages:import.i45")}</p>
           <input ref={csvRef} type="file" accept=".csv" className="hidden" onChange={handleCsvPreview} />
         </div>
 
@@ -538,8 +540,8 @@ export default function Import() {
           onClick={() => selectedAccount && pdfRef.current?.click()}
         >
           <Page className="w-8 h-8 text-text-tertiary mx-auto mb-3" />
-          <p className="text-text-primary font-medium text-sm">PDF importieren</p>
-          <p className="text-text-tertiary text-xs mt-1">OCR-Extraktion mit interaktiver Vorschau</p>
+          <p className="text-text-primary font-medium text-sm">{t("pages:import.i36")}</p>
+          <p className="text-text-tertiary text-xs mt-1">{t("pages:import.i34")}</p>
           <input ref={pdfRef} type="file" accept=".pdf" className="hidden" onChange={handlePdfChange} />
         </div>
       </div>
@@ -621,7 +623,7 @@ export default function Import() {
               {/* ── Header ── */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-shrink-0">
                 <div>
-                  <h3 className="text-text-primary font-semibold">PDF Vorschau</h3>
+                  <h3 className="text-text-primary font-semibold">{t("pages:import.i35")}</h3>
                   <p className="text-text-tertiary text-xs">
                     {pdfPreview.filename} · {pdfPreview.total_rows} Zeilen · {pdfPreview.parsed_rows} erkannt
                   </p>
@@ -637,17 +639,17 @@ export default function Import() {
                   <div className="rounded-lg bg-bg-surface2 px-3 py-2 text-text-secondary">
                     Bank: <span className="text-text-primary font-semibold">{pdfPreview.bank.toUpperCase()}</span>
                   </div>
-                  <div className="rounded-lg bg-green-900/30 border border-green-800/40 px-3 py-2 text-text-secondary">
-                    Erkannt: <span className="text-green-300 font-semibold">{pdfPreview.parsed_rows}</span>
+                  <div className="rounded-lg border px-3 py-2 msg-success">
+                    Erkannt: <span className="font-semibold">{pdfPreview.parsed_rows}</span>
                   </div>
                   <div className="rounded-lg bg-bg-surface2 px-3 py-2 text-text-secondary">
-                    Wiederkehrend: <span className="text-violet-300 font-semibold">{recurringCount > 0 ? `${recurringCount} Zahlungen` : "–"}</span>
+                    Wiederkehrend: <span className="txt-info font-semibold">{recurringCount > 0 ? `${recurringCount} Zahlungen` : "–"}</span>
                   </div>
                   <div className="rounded-lg bg-bg-surface2 px-3 py-2 text-text-secondary">
-                    Duplikate: <span className="text-amber-300 font-semibold">{pdfPreview.rows.filter((r) => r.duplicate_kind !== "none").length}</span>
+                    Duplikate: <span className="txt-warning font-semibold">{pdfPreview.rows.filter((r) => r.duplicate_kind !== "none").length}</span>
                   </div>
                   <div className="rounded-lg bg-bg-surface2 px-3 py-2 text-text-secondary">
-                    Fehler: <span className={pdfPreview.error_rows > 0 ? "text-red-300 font-semibold" : "text-text-tertiary"}>{pdfPreview.error_rows}</span>
+                    {t("pages:ui.fehler_2")} <span className={pdfPreview.error_rows > 0 ? "txt-error font-semibold" : "text-text-tertiary"}>{pdfPreview.error_rows}</span>
                   </div>
                 </div>
                 {pdfPreview.total_rows === 0 && (
@@ -681,7 +683,7 @@ export default function Import() {
                   <p className="text-loss text-[11px] mt-2 flex items-start gap-1.5">
                     <WarningCircle className="w-3.5 h-3.5 shrink-0 mt-px" />
                     <span>
-                      <strong>Unvollständig:</strong> Das Dokument ist länger, als in
+                      <strong>{t("pages:import.i40")}</strong> Das Dokument ist länger, als in
                       einem Durchgang ausgewertet werden kann — Buchungen aus dem
                       hinteren Teil fehlen. Teile das PDF auf oder nutze, falls
                       vorhanden, den CSV-Export der Bank.
@@ -689,7 +691,7 @@ export default function Import() {
                   </p>
                 )}
                 {pdfPreview.ai_extracted && (
-                  <p className="text-amber-300 text-[11px] mt-2 flex items-start gap-1.5">
+                  <p className="txt-warning text-[11px] mt-2 flex items-start gap-1.5">
                     <WarningCircle className="w-3.5 h-3.5 shrink-0 mt-px" />
                     <span>
                       Unbekanntes PDF-Format — diese Zeilen wurden per KI aus dem Text
@@ -708,7 +710,7 @@ export default function Import() {
                 )}
                 {hasDuplicates && (
                   <p className="text-text-disabled text-[11px] mt-2">
-                    Konto-Duplikate: überschreiben, behalten oder löschen. PDF-Duplikate: importieren oder überspringen.
+                    {t("pages:ui.konto_duplikate_ueberschreiben_behalten_oder")}
                   </p>
                 )}
               </div>
@@ -719,18 +721,18 @@ export default function Import() {
                   <thead className="sticky top-0 z-10 bg-bg-surface2">
                     <tr>
                       {/* Status badges column */}
-                      <th className="text-left px-2 py-2.5 text-text-tertiary font-medium w-[90px] whitespace-nowrap">Status</th>
+                      <th className="text-left px-2 py-2.5 text-text-tertiary font-medium w-[90px] whitespace-nowrap">{t("pages:import.i38")}</th>
                       {/* Date */}
-                      <th className="text-left px-2 py-2.5 text-text-tertiary font-medium w-[108px]">Datum</th>
+                      <th className="text-left px-2 py-2.5 text-text-tertiary font-medium w-[108px]">{t("pages:import.i14")}</th>
                       {/* Description — gets max remaining space */}
-                      <th className="text-left px-2 py-2.5 text-text-tertiary font-medium min-w-[220px]">Beschreibung</th>
+                      <th className="text-left px-2 py-2.5 text-text-tertiary font-medium min-w-[220px]">{t("pages:import.i06")}</th>
                       {/* Amount */}
-                      <th className="text-right px-2 py-2.5 text-text-tertiary font-medium w-[110px]">Betrag (CHF)</th>
+                      <th className="text-right px-2 py-2.5 text-text-tertiary font-medium w-[110px]">{t("pages:import.i08")}</th>
                       {/* AI Category + Frequency */}
-                      <th className="text-left px-2 py-2.5 text-text-tertiary font-medium w-[310px]">Kategorie / Frequenz</th>
+                      <th className="text-left px-2 py-2.5 text-text-tertiary font-medium w-[310px]">{t("pages:import.i26")}</th>
                       {/* Duplicate action — only shown if there are duplicates */}
                       {hasDuplicates && (
-                        <th className="text-left px-2 py-2.5 text-text-tertiary font-medium w-[160px]">Duplikat-Aktion</th>
+                        <th className="text-left px-2 py-2.5 text-text-tertiary font-medium w-[160px]">{t("pages:import.i15")}</th>
                       )}
                     </tr>
                   </thead>
@@ -752,8 +754,8 @@ export default function Import() {
                           <td className="px-2 py-2 align-middle">
                             <div className="flex flex-col gap-0.5">
                               {row.duplicate_kind === "database" && (
-                                <span className="inline-flex rounded px-1.5 py-0.5 bg-amber-900/60 text-amber-200 text-[10px] font-medium leading-tight">
-                                  Konto
+                                <span className="inline-flex rounded px-1.5 py-0.5 msg-warning text-[10px] font-medium leading-tight">
+                                  {t("pages:ui.konto")}
                                 </span>
                               )}
                               {row.duplicate_kind === "pdf" && (
@@ -816,8 +818,8 @@ export default function Import() {
                               className={clsx(
                                 "bg-bg-surface2 border rounded px-2 py-1 text-right w-full font-mono font-semibold text-xs",
                                 isExpense
-                                  ? "border-red-800/50 text-red-300"
-                                  : "border-green-800/50 text-green-300"
+                                  ? "border-red-800/50 txt-error"
+                                  : "border-green-800/50 txt-success"
                               )}
                             />
                           </td>
@@ -831,7 +833,7 @@ export default function Import() {
                                 onChange={(e) => handleCategoryChange(row.id, idx, e.target.value)}
                                 className="flex-1 min-w-0 bg-bg-surface2 border border-border rounded px-1.5 py-1 text-text-secondary text-[11px]"
                               >
-                                <option value="">↩ Zurücksetzen</option>
+                                <option value="">{t("pages:misc.r29")}</option>
                                 {pdfCategoryOptions.map((name) => (
                                   <option key={name} value={name}>{name}</option>
                                 ))}
@@ -852,12 +854,12 @@ export default function Import() {
                                   getFrequencyStyle(row.periodicity)
                                 )}
                               >
-                                <option value="">Einmalig</option>
-                                <option value="weekly">Wöchentlich</option>
-                                <option value="monthly">Monatlich</option>
-                                <option value="quarterly">Vierteljährlich</option>
-                                <option value="halfyearly">Halbjährlich</option>
-                                <option value="yearly">Jährlich</option>
+                                <option value="">{t("pages:import.i16")}</option>
+                                <option value="weekly">{t("pages:import.i42")}</option>
+                                <option value="monthly">{t("pages:import.i30")}</option>
+                                <option value="quarterly">{t("pages:import.i41")}</option>
+                                <option value="halfyearly">{t("pages:import.i18")}</option>
+                                <option value="yearly">{t("pages:import.i25")}</option>
                               </select>
                             </div>
                           </td>
@@ -878,10 +880,10 @@ export default function Import() {
                                     })
                                   }
                                 >
-                                  <option value="keep_existing">Behalten</option>
-                                  <option value="overwrite">Überschreiben</option>
-                                  <option value="delete_both">Löschen</option>
-                                  <option value="import">Neu importieren</option>
+                                  <option value="keep_existing">{t("pages:import.i03")}</option>
+                                  <option value="overwrite">{t("pages:import.i47")}</option>
+                                  <option value="delete_both">{t("pages:import.i29")}</option>
+                                  <option value="import">{t("pages:import.i31")}</option>
                                 </select>
                               ) : row.duplicate_kind === "pdf" ? (
                                 <select
@@ -896,11 +898,11 @@ export default function Import() {
                                     })
                                   }
                                 >
-                                  <option value="skip">Überspringen</option>
-                                  <option value="import">Importieren</option>
+                                  <option value="skip">{t("pages:import.i48")}</option>
+                                  <option value="import">{t("pages:import.i24")}</option>
                                 </select>
                               ) : (
-                                <span className="text-text-disabled text-[10px]">Import</span>
+                                <span className="text-text-disabled text-[10px]">{t("pages:import.i19")}</span>
                               )}
                             </td>
                           )}
@@ -917,7 +919,7 @@ export default function Import() {
                   {pdfPreview.rows.filter((r) => r.merge_action !== "skip" && r.merge_action !== "keep_existing" && r.merge_action !== "delete_both").length} Transaktionen werden importiert
                 </p>
                 <div className="flex gap-3">
-                  <button onClick={() => setPdfPreview(null)} className="btn-secondary text-sm">Abbrechen</button>
+                  <button onClick={() => setPdfPreview(null)} className="btn-secondary text-sm">{t("pages:import.i00")}</button>
                   <button
                     onClick={() => pdfConfirmMutation.mutate()}
                     disabled={pdfConfirmMutation.isPending || pdfPreview.rows.length === 0}
@@ -954,7 +956,7 @@ export default function Import() {
                   {previewData.error_rows > 0 && (
                     <>
                       <span className="text-text-disabled">|</span>
-                      <span className="text-red-400 flex items-center gap-1">
+                      <span className="txt-error flex items-center gap-1">
                         <WarningTriangle className="w-3 h-3" />
                         {previewData.error_rows} Fehler
                       </span>
@@ -997,7 +999,7 @@ export default function Import() {
               <div className="bg-bg-surface2 px-4 py-3 border-b border-border flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Table className="w-4 h-4 text-accent" />
-                  <span className="text-text-primary font-medium text-sm">CSV-Feldzuweisung</span>
+                  <span className="text-text-primary font-medium text-sm">{t("pages:import.i13")}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-text-tertiary">
@@ -1018,9 +1020,9 @@ export default function Import() {
                   <table className="w-full text-sm">
                     <thead className="bg-bg-elevated text-text-secondary">
                       <tr>
-                        <th className="text-left px-3 py-2 text-xs font-medium">CSV Spalte</th>
-                        <th className="text-left px-3 py-2 text-xs font-medium">Ziel-Feld</th>
-                        <th className="text-left px-3 py-2 text-xs font-medium">Beispielwert</th>
+                        <th className="text-left px-3 py-2 text-xs font-medium">{t("pages:import.i10")}</th>
+                        <th className="text-left px-3 py-2 text-xs font-medium">{t("pages:import.i43")}</th>
+                        <th className="text-left px-3 py-2 text-xs font-medium">{t("pages:import.i04")}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
@@ -1050,7 +1052,7 @@ export default function Import() {
                                   {label}
                                 </span>
                               ) : (
-                                <span className="text-text-disabled text-xs italic">Nicht zugewiesen</span>
+                                <span className="text-text-disabled text-xs italic">{t("pages:import.i32")}</span>
                               )}
                             </td>
                             <td className="px-3 py-2 text-text-tertiary text-xs font-mono truncate max-w-[150px]">
@@ -1072,14 +1074,14 @@ export default function Import() {
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     <div>
                       <label className="label text-xs flex items-center gap-1">
-                        <span className="text-red-400">*</span> Datum
+                        <span className="text-red-400">*</span> {t("pages:ui.datum")}
                       </label>
                       <select
                         className="input text-xs"
                         value={manualMapping.date_col || ""}
                         onChange={(e) => setManualMapping({ ...manualMapping, date_col: e.target.value })}
                       >
-                        <option value="">-- Wählen --</option>
+                        <option value="">{t("pages:misc.r28")}</option>
                         {availableColumns.map((col) => (
                           <option key={col} value={col}>{col}</option>
                         ))}
@@ -1094,59 +1096,59 @@ export default function Import() {
                         value={manualMapping.description_col || ""}
                         onChange={(e) => setManualMapping({ ...manualMapping, description_col: e.target.value })}
                       >
-                        <option value="">-- Wählen --</option>
+                        <option value="">{t("pages:misc.r28")}</option>
                         {availableColumns.map((col) => (
                           <option key={col} value={col}>{col}</option>
                         ))}
                       </select>
                     </div>
                     <div>
-                      <label className="label text-xs">Betrag (kombiniert)</label>
+                      <label className="label text-xs">{t("pages:import.i09")}</label>
                       <select
                         className="input text-xs"
                         value={manualMapping.amount_col || ""}
                         onChange={(e) => setManualMapping({ ...manualMapping, amount_col: e.target.value })}
                       >
-                        <option value="">-- Wählen --</option>
+                        <option value="">{t("pages:misc.r28")}</option>
                         {availableColumns.map((col) => (
                           <option key={col} value={col}>{col}</option>
                         ))}
                       </select>
                     </div>
                     <div>
-                      <label className="label text-xs">Belastung (Soll)</label>
+                      <label className="label text-xs">{t("pages:import.i05")}</label>
                       <select
                         className="input text-xs"
                         value={manualMapping.debit_col || ""}
                         onChange={(e) => setManualMapping({ ...manualMapping, debit_col: e.target.value })}
                       >
-                        <option value="">-- Wählen --</option>
+                        <option value="">{t("pages:misc.r28")}</option>
                         {availableColumns.map((col) => (
                           <option key={col} value={col}>{col}</option>
                         ))}
                       </select>
                     </div>
                     <div>
-                      <label className="label text-xs">Gutschrift (Haben)</label>
+                      <label className="label text-xs">{t("pages:import.i17")}</label>
                       <select
                         className="input text-xs"
                         value={manualMapping.credit_col || ""}
                         onChange={(e) => setManualMapping({ ...manualMapping, credit_col: e.target.value })}
                       >
-                        <option value="">-- Wählen --</option>
+                        <option value="">{t("pages:misc.r28")}</option>
                         {availableColumns.map((col) => (
                           <option key={col} value={col}>{col}</option>
                         ))}
                       </select>
                     </div>
                     <div>
-                      <label className="label text-xs">Saldo (Balance)</label>
+                      <label className="label text-xs">{t("pages:import.i37")}</label>
                       <select
                         className="input text-xs"
                         value={manualMapping.balance_col || ""}
                         onChange={(e) => setManualMapping({ ...manualMapping, balance_col: e.target.value })}
                       >
-                        <option value="">-- Wählen --</option>
+                        <option value="">{t("pages:misc.r28")}</option>
                         {availableColumns.map((col) => (
                           <option key={col} value={col}>{col}</option>
                         ))}
@@ -1157,15 +1159,15 @@ export default function Import() {
 
                 {/* Warnings */}
                 {mappingWarnings.length > 0 && (
-                  <div className="bg-red-900/30 border border-red-500/30 rounded-lg p-3">
+                  <div className="msg msg-error flex-col gap-0 p-3">
                     <div className="flex items-center gap-2 mb-2">
-                      <WarningTriangle className="w-4 h-4 text-red-400" />
-                      <span className="text-red-300 font-medium text-sm">Zuweisungs-Probleme</span>
+                      <WarningTriangle className="w-4 h-4" />
+                      <span className="font-medium text-sm">{t("pages:import.i46")}</span>
                     </div>
                     <ul className="space-y-1">
                       {mappingWarnings.map((warn, idx) => (
-                        <li key={idx} className="text-red-300/80 text-xs flex items-start gap-2">
-                          <span className="text-red-400">•</span>
+                        <li key={idx} className="text-xs flex items-start gap-2">
+                          <span>•</span>
                           {warn}
                         </li>
                       ))}
@@ -1178,8 +1180,8 @@ export default function Import() {
                   <p className="flex items-start gap-2">
                     <span className="text-accent">💡</span>
                     <span>
-                      <strong className="text-text-secondary">Tipp:</strong> Wähle "Belastung" und "Gutschrift" für separate Spalten,
-                      oder "Betrag" für eine kombinierte Spalte mit +/- Vorzeichen. Felder mit <span className="text-red-400">*</span> sind erforderlich.
+                      <strong className="text-text-secondary">{t("pages:import.i39")}</strong> Wähle "Belastung" und "Gutschrift" für separate Spalten,
+                      oder "Betrag" für eine kombinierte Spalte mit +/- Vorzeichen. Felder mit <span className="text-red-400">*</span> {t("pages:ui.sind_erforderlich")}
                     </span>
                   </p>
                 </div>
@@ -1193,10 +1195,10 @@ export default function Import() {
               <thead className="bg-bg-surface2 sticky top-0">
                 <tr>
                   <th className="text-left px-3 py-2 text-text-tertiary font-medium">#</th>
-                  <th className="text-left px-3 py-2 text-text-tertiary font-medium">Datum</th>
-                  <th className="text-left px-3 py-2 text-text-tertiary font-medium">Beschreibung</th>
-                  <th className="text-right px-3 py-2 text-text-tertiary font-medium">Betrag</th>
-                  <th className="text-center px-3 py-2 text-text-tertiary font-medium">Status</th>
+                  <th className="text-left px-3 py-2 text-text-tertiary font-medium">{t("pages:import.i14")}</th>
+                  <th className="text-left px-3 py-2 text-text-tertiary font-medium">{t("pages:import.i06")}</th>
+                  <th className="text-right px-3 py-2 text-text-tertiary font-medium">{t("pages:import.i07")}</th>
+                  <th className="text-center px-3 py-2 text-text-tertiary font-medium">{t("pages:import.i38")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -1224,9 +1226,9 @@ export default function Import() {
                           OK
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-xs" title={row.errors.join(", ")}>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border msg-error text-xs" title={row.errors.join(", ")}>
                           <WarningTriangle className="w-3 h-3" />
-                          Fehler
+                          {t("pages:ui.fehler")}
                         </span>
                       )}
                     </td>
@@ -1260,7 +1262,7 @@ export default function Import() {
               }}
               className="px-4 py-2 rounded-lg bg-bg-elevated text-text-secondary hover:bg-bg-elevated transition-colors text-sm"
             >
-              Abbrechen
+              {t("pages:ui.abbrechen")}
             </button>
             <button
               onClick={handleCsvImport}
@@ -1286,7 +1288,7 @@ export default function Import() {
           <div className="flex items-center gap-3 mb-4">
             <CheckCircle className="w-5 h-5 text-gain" />
             <div>
-              <p className="text-text-primary font-semibold text-sm">Import abgeschlossen</p>
+              <p className="text-text-primary font-semibold text-sm">{t("pages:import.i20")}</p>
               <p className="text-text-tertiary text-xs">
                 {importResult.rows_imported} importiert · {importResult.rows_skipped} Duplikate übersprungen · Bank: {importResult.bank.toUpperCase()}
               </p>
@@ -1311,7 +1313,7 @@ export default function Import() {
       {/* History */}
       <div className="card">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-text-primary font-semibold text-sm">Import-Historie</h2>
+          <h2 className="text-text-primary font-semibold text-sm">{t("pages:import.i23")}</h2>
           {/* Delete Last Import Button */}
           {lastImport && lastImport.status === "completed" && (
             <button
@@ -1320,10 +1322,10 @@ export default function Import() {
                 setShowDeleteConfirm(true);
               }}
               className="text-text-tertiary hover:text-loss text-xs flex items-center gap-1 transition-colors"
-              title="Letzten Import löschen"
+              title={t("pages:import.i28")}
             >
               <Trash className="w-3.5 h-3.5" />
-              Letzten Import rückgängig machen
+              {t("pages:ui.letzten_import_rueckgaengig_machen")}
             </button>
           )}
         </div>
@@ -1343,7 +1345,7 @@ export default function Import() {
               <div className="flex-1 min-w-0">
                 <p className="text-text-primary text-xs font-medium truncate">{log.filename}</p>
                 <p className="text-text-tertiary text-xs">
-                  {log.bank?.toUpperCase()} · {log.rows_imported} Einträge · {format(new Date(log.created_at), "dd.MM.yyyy HH:mm")}
+                  {log.bank?.toUpperCase()} · {t("pages:ui.entriesCount", { count: log.rows_imported })} · {format(new Date(log.created_at), "dd.MM.yyyy HH:mm")}
                 </p>
               </div>
               {/* Jeder Eintrag einzeln entfernbar — nicht nur der letzte. Bei
@@ -1360,14 +1362,14 @@ export default function Import() {
                     ? `Import rückgängig machen (${log.rows_imported} Transaktionen entfernen)`
                     : "Eintrag aus der Historie entfernen"
                 }
-                aria-label="Import entfernen"
+                aria-label={t("pages:import.i21")}
               >
                 <Trash className="w-3.5 h-3.5" />
               </button>
             </div>
           ))}
           {(!history || history.length === 0) && (
-            <p className="text-text-tertiary text-sm text-center py-6">Noch keine Importe</p>
+            <p className="text-text-tertiary text-sm text-center py-6">{t("pages:import.i33")}</p>
           )}
         </div>
       </div>
@@ -1391,25 +1393,24 @@ export default function Import() {
               </h3>
             </div>
             <p className="text-text-secondary mb-2">
-              Der Import <strong className="text-text-primary">"{selectedImport.filename}"</strong> wird entfernt.
+              Der Import <strong className="text-text-primary">"{selectedImport.filename}"</strong> {t("pages:ui.wird_entfernt")}
             </p>
             {selectedImport.rows_imported > 0 ? (
               <>
                 <p className="text-text-secondary mb-4">
-                  <strong className="text-red-400">
+                  <strong className="txt-error">
                     ALLE {selectedImport.rows_imported} Transaktionen
                   </strong>{" "}
                   aus diesem Import werden gelöscht.
                 </p>
                 <p className="text-sm text-text-disabled">
-                  Diese Aktion kann nicht rückgängig gemacht werden!
+                  {t("pages:ui.diese_aktion_kann_nicht_rueckgaengig_gemacht")}
                 </p>
               </>
             ) : (
               /* Gescheiterte oder leere Importe haben nichts angelegt */
               <p className="text-text-secondary mb-4">
-                Dieser Import hat keine Transaktionen angelegt — es verschwindet nur
-                der Eintrag aus der Historie.
+                {t("pages:hints.importCreatedNothing")}
               </p>
             )}
             <div className="mt-6 flex justify-end gap-3">
@@ -1420,7 +1421,7 @@ export default function Import() {
                 }}
                 className="btn-secondary"
               >
-                Abbrechen
+                {t("pages:ui.abbrechen")}
               </button>
               <button
                 onClick={() => importToDelete && deleteMutation.mutate(importToDelete)}

@@ -8,14 +8,15 @@ export type RecurrenceFilterValue =
   | "halfyearly"
   | "yearly";
 
+// label = i18n-Schluessel, uebersetzt am Ausgabeort
 export const RECURRENCE_FILTER_OPTIONS: { value: RecurrenceFilterValue; label: string }[] = [
-  { value: "", label: "Alle" },
-  { value: "weekly", label: "Wöchentlich" },
-  { value: "monthly", label: "Monatlich" },
-  { value: "quarterly", label: "Vierteljährlich" },
-  { value: "halfyearly", label: "Halbjährlich" },
-  { value: "yearly", label: "Jährlich" },
-  { value: "once", label: "Einmalig" },
+  { value: "", label: "pages:budgetplan.all" },
+  { value: "weekly", label: "periodicity.weekly" },
+  { value: "monthly", label: "periodicity.monthly" },
+  { value: "quarterly", label: "periodicity.quarterly" },
+  { value: "halfyearly", label: "periodicity.halfyearly" },
+  { value: "yearly", label: "periodicity.yearly" },
+  { value: "once", label: "periodicity.once" },
 ];
 
 /** Maps UI value to GET /transactions (and /archived) query params. */

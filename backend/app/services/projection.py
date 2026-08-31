@@ -13,7 +13,7 @@ Features:
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 import numpy as np
 from app.core.config import settings
@@ -38,6 +38,10 @@ AHV_CONVERSION_RATE: float = settings.ahv_conversion_rate_bvg
 BVG_COORD_DEDUCTION: float = settings.bvg_coordination_deduction
 PAYOUT_YEARS: int = 20  # 3a/3b annuitization horizon (~age 65→85)
 PAYOUT_RESIDUAL_RATE: float = 0.02  # conservative yield during payout phase
+#: Ordentliches AHV-Rentenalter (Referenz 65).
+AHV_REGULAR_RETIREMENT_AGE: int = 65
+#: Lebenslange Kuerzung je vorbezogenem Jahr (Schweiz: 6.8 %).
+AHV_EARLY_WITHDRAWAL_REDUCTION: float = 0.068
 
 
 def _annuity_payout(
@@ -57,6 +61,94 @@ def _annuity_payout(
     if rate <= 0:
         return balance / years
     return balance * rate / (1 - (1 + rate) ** -years)
+
+
+#: Selbstbehalt Pflegeheim CH — Groessenordnung fuer das Szenario "Pflegekosten
+#: ab 80". Ergaenzungsleistungen sind darin nicht beruecksichtigt.
+CARE_COST_ANNUAL_DEFAULT: float = 72_000.0
+#: Laufzeit, ueber die das Szenario "Hypothek amortisieren" linear tilgt.
+AMORTIZATION_YEARS_DEFAULT: int = 15
+CARE_START_AGE: int = 80
+
+
+def build_annual_flows(
+    active_scenarios: Sequence[str],
+    years: int,
+    current_age: int,
+    retirement_age: int,
+    annual_savings: float = 0.0,
+    annual_expenses: float = 0.0,
+    lifestyle_factor: float = 0.8,
+    pension_series: Optional[Sequence[float]] = None,
+    care_cost_annual: float = CARE_COST_ANNUAL_DEFAULT,
+    mortgage_debt: float = 0.0,
+    mortgage_rate_pct: float = 0.0,
+    amortization_years: int = AMORTIZATION_YEARS_DEFAULT,
+    inflation_rate: float = 0.015,
+    planned_retirement_age: Optional[int] = None,
+) -> List[float]:
+    """Baut die jaehrlichen Zusatz-Cashflows der aktiven Szenarien.
+
+    Rueckgabe: Liste der Laenge `years`, NOMINALE CHF-Deltas je Jahr, die in
+    `ProjectionService.run(annual_flows=...)` auf die Sparrate addiert werden.
+    Mehrere Szenarien addieren sich — `active_scenarios` ist eine Liste.
+
+    Zur Einheit: `annual_savings`, `annual_expenses`, `care_cost_annual` und
+    `pension_series` kommen in heutigen CHF herein und werden hier pro Jahr auf
+    nominal hochgerechnet — die Jahresschleife in `run()` rechnet nominal und
+    deflationiert erst am Ende. Hypothekenbetraege bleiben nominal: ein
+    Hypothekarvertrag lautet auf einen festen Betrag, er waechst nicht mit der
+    Teuerung.
+
+    Reine Funktion, absichtlich ohne DB- oder Modellzugriff, damit sie ohne
+    Fixtures testbar bleibt.
+    """
+    flows = [0.0] * max(0, years)
+    if years <= 0:
+        return flows
+    if planned_retirement_age is None:
+        planned_retirement_age = retirement_age
+
+    active = set(active_scenarios or [])
+    # Index, ab dem das Rentenalter erreicht ist — wie retirement_idx in
+    # _project_pensions, damit Vermoegens- und Rentenpfad zusammenpassen.
+    retirement_idx = min(max(0, retirement_age - current_age), years)
+    planned_idx = min(max(0, planned_retirement_age - current_age), years)
+
+    if "early_retirement" in active:
+        # Nur das Fenster zwischen frueherem und geplantem Rentenalter. Danach
+        # sind beide Welten identisch, das Delta ist null. So braucht der
+        # Vergleich kein Ausgabenmodell im Basisfall — den gibt es hier nicht.
+        for yr in range(retirement_idx, planned_idx):
+            nominal = (1 + inflation_rate) ** yr
+            # Sparen endet. Der Abzug entspricht exakt dem, was die
+            # Jahresschleife in run() addiert — sonst bliebe ein Rest stehen.
+            flows[yr] -= annual_savings * nominal
+            flows[yr] -= annual_expenses * lifestyle_factor * nominal
+            if pension_series is not None and yr < len(pension_series):
+                # Serie kommt real herein (siehe _project_pensions).
+                flows[yr] += pension_series[yr] * nominal
+
+    if "care_costs_at_80" in active:
+        for yr in range(years):
+            if current_age + yr >= CARE_START_AGE:
+                flows[yr] -= care_cost_annual * (1 + inflation_rate) ** yr
+
+    if "mortgage_amortization" in active and mortgage_debt > 0:
+        span = max(1, min(amortization_years, years))
+        principal_per_year = mortgage_debt / span
+        rate = mortgage_rate_pct / 100
+        for yr in range(years):
+            if yr < span:
+                # Tilgung kostet Liquiditaet ...
+                flows[yr] -= principal_per_year
+                # ... spart aber Zins auf dem bereits getilgten Teil.
+                flows[yr] += principal_per_year * yr * rate
+            else:
+                # Nach der Tilgung faellt der gesamte Zins weg.
+                flows[yr] += mortgage_debt * rate
+
+    return flows
 
 
 def _bvg_rate_for_age(age: int) -> float:
@@ -83,6 +175,7 @@ class ProjectionService:
         date_of_birth: Optional[str] = None,
         retirement_age: int = 65,
         runs: int = 10_000,
+        annual_flows: Optional[Sequence[float]] = None,
     ) -> Dict[str, Any]:
         """
         Run Monte Carlo simulation and pension projections.
@@ -92,6 +185,20 @@ class ProjectionService:
           pension_ahv, pension_bvg, pension_3a,
           inflation_adjusted
         """
+        # ── Pension Projections ───────────────────────────────
+        # Vor der Monte-Carlo-Schleife, weil eine Entnahmephase die Rentenserie
+        # als Einkommen braucht (siehe build_annual_flows).
+        pension_ahv, pension_bvg, pension_3a, pension_3b, retirement_idx = (
+            self._project_pensions(
+                pension_records=pension_records or [],
+                years=years,
+                annual_income=annual_income,
+                date_of_birth=date_of_birth,
+                retirement_age=retirement_age,
+                inflation_rate=inflation_rate,
+            )
+        )
+
         # ── Monte Carlo ────────────────────────────────────────
         np.random.seed(None)
 
@@ -114,7 +221,16 @@ class ProjectionService:
         for yr in range(years):
             inflation_factor = (1 + inflation_rate) ** yr
             yr_savings = annual_savings * inflation_factor
+            if annual_flows is not None:
+                # Szenario-Cashflows sind bereits nominal fuer das jeweilige
+                # Jahr gerechnet und werden nicht nochmals inflationiert.
+                yr_savings += annual_flows[yr] if yr < len(annual_flows) else 0.0
             portfolio = portfolio * (1 + annual_returns[:, yr]) + yr_savings
+            if annual_flows is not None:
+                # Ohne Deckel "waechst" ein negatives Portfolio im Folgejahr mit
+                # der Rendite weiter — bei Entnahmen ist das Unsinn. Nur im
+                # Szenario-Pfad, damit der Default bit-identisch bleibt.
+                portfolio = np.maximum(portfolio, 0.0)
             all_values[:, yr + 1] = portfolio
 
         # Inflation adjust all values to today's CHF (real terms)
@@ -132,18 +248,6 @@ class ProjectionService:
 
         year_labels = list(range(datetime.now().year, datetime.now().year + years + 1))
 
-        # ── Pension Projections ───────────────────────────────
-        pension_ahv, pension_bvg, pension_3a, pension_3b, retirement_idx = (
-            self._project_pensions(
-                pension_records=pension_records or [],
-                years=years,
-                annual_income=annual_income,
-                date_of_birth=date_of_birth,
-                retirement_age=retirement_age,
-                inflation_rate=inflation_rate,
-            )
-        )
-
         return {
             "years": year_labels,
             "p10": p10,
@@ -158,6 +262,33 @@ class ProjectionService:
             "retirement_idx": retirement_idx,
             "inflation_adjusted": True,
         }
+
+    def project_pension_series(
+        self,
+        pension_records: List[Dict],
+        years: int,
+        annual_income: float,
+        date_of_birth: Optional[str],
+        retirement_age: int,
+        inflation_rate: float,
+    ) -> List[float]:
+        """Summe der jaehrlichen Rente aus allen Saeulen, in realen CHF.
+
+        Wird vom API-Layer gebraucht, um die Entnahmephase eines Szenarios zu
+        bauen, bevor `run()` laeuft. Rein rechnerisch, kein Monte Carlo.
+        """
+        ahv, bvg, p3a, p3b, retirement_idx = self._project_pensions(
+            pension_records=pension_records,
+            years=years,
+            annual_income=annual_income,
+            date_of_birth=date_of_birth,
+            retirement_age=retirement_age,
+            inflation_rate=inflation_rate,
+        )
+        return [
+            (ahv[i] + bvg[i] + p3a[i] + p3b[i]) if i >= retirement_idx else 0.0
+            for i in range(len(ahv))
+        ]
 
     def _project_pensions(
         self,
@@ -295,14 +426,31 @@ class ProjectionService:
             avg_salary = annual_income
 
         contribution_years = min(contribution_years, AHV_FULL_YEARS)
-        completeness = contribution_years / AHV_FULL_YEARS
 
-        # Simplified AHV formula: between min and max pension based on completeness
-        pension_monthly = AHV_MIN_PENSION + completeness * (
+        # Die Rentenhoehe haengt am massgebenden durchschnittlichen
+        # Jahreseinkommen: die Vollrente wird ab dem Sechsfachen der jaehrlichen
+        # Minimalrente erreicht, darunter liegt sie zwischen Minimum und Maximum.
+        # ponytail: die Rentenskala ist in Wirklichkeit zweistufig geknickt,
+        # hier linear interpoliert — Merkblatt 3.01 fuer die exakte Segmentformel.
+        full_pension_income = AHV_MIN_PENSION * 12 * 6
+        income_factor = min(max(avg_salary / full_pension_income, 0.0), 1.0)
+        full_pension_monthly = AHV_MIN_PENSION + income_factor * (
             AHV_MAX_PENSION - AHV_MIN_PENSION
         )
-        pension_monthly = min(pension_monthly, AHV_MAX_PENSION)
-        pension_monthly = max(pension_monthly, AHV_MIN_PENSION * completeness)
+
+        # Kuerzung um 1/44 je fehlendem Beitragsjahr (Rentenskala). Vorher
+        # interpolierte die Formel zwischen Minimal- und Maximalrente, womit ein
+        # fehlendes Jahr fast nichts kostete und `avg_salary` gar nicht einging.
+        pension_monthly = full_pension_monthly * (contribution_years / AHV_FULL_YEARS)
+
+        # Vorbezugskuerzung: wer die AHV vor dem ordentlichen Rentenalter
+        # bezieht, erhaelt sie lebenslang gekuerzt — 6.8 % je vorbezogenem
+        # Jahr. Ohne diesen Abzug erscheint eine Fruehpensionierung gratis.
+        early_years = max(0, AHV_REGULAR_RETIREMENT_AGE - retirement_age)
+        if early_years:
+            pension_monthly *= max(
+                0.0, 1 - AHV_EARLY_WITHDRAWAL_REDUCTION * early_years
+            )
 
         # Enforce configured maximum
         pension_monthly = min(pension_monthly, settings.ahv_max_pension_chf)
@@ -423,8 +571,11 @@ class ProjectionService:
         """
         results = {}
         for scenario in scenarios:
-            name = scenario.pop("name", "Unnamed")
-            params = {**base_kwargs, **scenario}
+            # get statt pop: pop mutierte die Liste des Aufrufers, beim zweiten
+            # Durchlauf derselben Liste hiess danach alles "Unnamed".
+            name = scenario.get("name", "Unnamed")
+            overrides = {k: v for k, v in scenario.items() if k != "name"}
+            params = {**base_kwargs, **overrides}
             result = self.run(**params)
             results[name] = {
                 "years": result["years"],

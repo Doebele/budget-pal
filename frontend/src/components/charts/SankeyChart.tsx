@@ -17,6 +17,8 @@ import ReactECharts from "echarts-for-react";
 import { useMemo } from "react";
 import { useThemeColors } from "@/hooks/useThemeColors";
 import { compareSubLabelsByTaxonomy, useTaxonomy } from "@/lib/categories";
+import { translateCategory } from "@/lib/categoryLabel";
+import { useTranslation } from "react-i18next";
 
 // ── Public types (unchanged for caller compatibility) ──────────
 export interface SankeyNode {
@@ -74,7 +76,9 @@ function fmt(v: number): string {
 const SEP = "\x00";
 
 function displayName(raw: string): string {
-  return raw.includes(SEP) ? raw.split(SEP)[1] : raw;
+  // Knotennamen sind Bezeichner (Verknuepfung der Links) — nur die Anzeige
+  // wird uebersetzt, der Name selbst bleibt unveraendert.
+  return translateCategory(raw.includes(SEP) ? raw.split(SEP)[1] : raw);
 }
 
 // ── Component ──────────────────────────────────────────────────
@@ -84,6 +88,7 @@ export default function SankeyChart({
   flowOrder = "value",
   superCategoryOrder = [],
 }: SankeyChartProps) {
+  const { t } = useTranslation();
   const { getCategoryColor, superCategories } = useTaxonomy();
   const { colors } = useThemeColors();
   const option = useMemo(() => {
@@ -157,7 +162,7 @@ export default function SankeyChart({
         color: colors.textPrimary,
         fontWeight: "bold",
         fontSize: 12,
-        formatter: () => "Einnahmen",
+        formatter: () => translateCategory("Einnahmen"),
       },
     });
 
@@ -248,6 +253,8 @@ export default function SankeyChart({
       tooltip: {
         trigger: "item",
         triggerOn: "mousemove",
+        // Am Chart-Rand sonst vom Container beschnitten.
+        appendToBody: true,
         backgroundColor: colors.bgElevated,
         borderColor: colors.border,
         borderWidth: 1,
@@ -352,7 +359,7 @@ export default function SankeyChart({
         style={{ height }}
         className="flex items-center justify-center text-text-tertiary text-sm"
       >
-        Keine Daten verfügbar
+        {t("pages:ui.keine_daten_verfuegbar")}
       </div>
     );
   }

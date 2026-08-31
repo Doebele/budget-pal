@@ -182,7 +182,7 @@ Die in der vorherigen Übergabe als „unzusammenhängend, Herkunft ungeklärt" 
 
 ### Frontend
 - Responsiv (Rail Desktop, Bottom-Nav/Drawer Mobile)
-- Theme-bewusste Charts (Recharts/Nivo via `useThemeColors`/`buildNivoTheme`)
+- Theme-bewusste Charts (Recharts/ECharts via `useThemeColors`)
 - Keine hartkodierten Tailwind-Farbklassen (slate/white) — nur Design-Tokens
 
 ### Codequalität

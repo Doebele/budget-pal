@@ -8,12 +8,14 @@ import ImportJobIndicator from "@/components/layout/ImportJobIndicator";
 import MobileDrawer from "@/components/layout/MobileDrawer";
 import BottomNav from "@/components/layout/BottomNav";
 import LoadingScreen from "@/components/layout/LoadingScreen";
+import { useTranslation } from "react-i18next";
 
 // ── UI-Attribute (Theme / Akzent / Density) ───────────────────
 function UiAttributes() {
   const theme = useUiStore((s) => s.theme);
   const accent = useUiStore((s) => s.accent);
   const density = useUiStore((s) => s.density);
+  const { i18n } = useTranslation();
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -24,6 +26,11 @@ function UiAttributes() {
   useEffect(() => {
     document.body.setAttribute("data-density", density);
   }, [density]);
+  // Ohne das bleibt <html lang> auf "de" stehen — Screenreader lesen die
+  // englische Oberflaeche dann mit deutscher Aussprache vor (WCAG 3.1.1).
+  useEffect(() => {
+    document.documentElement.setAttribute("lang", i18n.language);
+  }, [i18n.language]);
 
   return null;
 }
@@ -44,6 +51,7 @@ const Forecast = lazy(() => import("@/pages/Forecast"));
 const Finanzplan = lazy(() => import("@/pages/Finanzplan"));
 const Budgetplan = lazy(() => import("@/pages/Budgetplan"));
 const Goals = lazy(() => import("@/pages/Goals"));
+const Onboarding = lazy(() => import("@/pages/Onboarding"));
 
 // ── Protected Route ───────────────────────────────────────────
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -228,6 +236,17 @@ export default function App() {
             <ProtectedRoute>
               <AppShell>
                 <Goals />
+              </AppShell>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/onboarding"
+          element={
+            <ProtectedRoute>
+              <AppShell>
+                <Onboarding />
               </AppShell>
             </ProtectedRoute>
           }

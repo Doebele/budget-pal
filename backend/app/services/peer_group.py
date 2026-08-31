@@ -308,3 +308,34 @@ def get_peer_group_defaults(profile: PeerGroupProfile) -> Dict[str, Any]:
         "incomeMedian": income_median,
         "confidenceNote": confidence_by_age[profile.age_group],
     }
+
+
+# ── Sparquote der Peer-Gruppe ─────────────────────────────────
+
+def classify_income_level(monthly_income: float, household_type: str) -> IncomeLevel:
+    """Ordnet ein Monatseinkommen in tief / mittel / hoch ein.
+
+    Grenzen sind die Mittelwerte zwischen den drei Medianen der
+    Haushaltsform — dieselben Zahlen, mit denen der Wizard rechnet.
+    """
+    medians = INCOME_MEDIANS.get(household_type) or INCOME_MEDIANS["single"]
+    low_mid = (medians["low"] + medians["medium"]) / 2
+    mid_high = (medians["medium"] + medians["high"]) / 2
+    if monthly_income < low_mid:
+        return "low"
+    if monthly_income < mid_high:
+        return "medium"
+    return "high"
+
+
+def peer_savings_rate(monthly_income: float, household_type: str = "single") -> float:
+    """Sparquote der Vergleichsgruppe in Prozent (BFS HABE).
+
+    Bewusst nur eine Vergleichszahl, keine Empfehlung: Budget-Pal weiss
+    nicht, ob jemand gerade ein Studium finanziert oder eine Erbschaft
+    anlegt. Was der Wert leistet, ist die Einordnung — "Haushalte wie deiner
+    legen typischerweise X % zurueck".
+    """
+    if monthly_income <= 0:
+        return float(SAVINGS_RATES["medium"])
+    return float(SAVINGS_RATES[classify_income_level(monthly_income, household_type)])

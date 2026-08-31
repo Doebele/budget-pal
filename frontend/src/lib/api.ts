@@ -95,6 +95,30 @@ export const transactionsApi = {
   list: (params?: Record<string, unknown>) => api.get("/transactions", { params }),
   listPage: (params?: Record<string, unknown>, cursor?: string) =>
     api.get("/transactions", { params: { ...params, cursor, limit: 100 } }),
+  /**
+   * Alle Transaktionen eines Zeitraums, ueber den Cursor durchgeblaettert.
+   *
+   * Das Backend deckelt `limit` bei 500. Wer mehr anfordert, bekommt 422 —
+   * und wer genau 500 anfordert, bekommt stillschweigend nur die ersten 500,
+   * was schlimmer ist: die Kennzahlen daraus waeren zu niedrig, ohne dass es
+   * auffaellt.
+   */
+  listAll: async <T = unknown>(
+    params?: Record<string, unknown>,
+    maxPages = 20,
+  ): Promise<T[]> => {
+    const all: T[] = [];
+    let cursor: string | undefined;
+    for (let page = 0; page < maxPages; page++) {
+      const r = await api.get("/transactions", {
+        params: { ...params, cursor, limit: 500 },
+      });
+      all.push(...(r.data as T[]));
+      cursor = r.headers["x-next-cursor"];
+      if (!cursor) break;
+    }
+    return all;
+  },
   listArchived: (params?: Record<string, unknown>) =>
     api.get("/transactions/archived", { params }),
   restore: (id: number) => api.post(`/transactions/${id}/restore`),
@@ -275,6 +299,65 @@ export const recurringPlanApi = {
       source: string;
     }>;
   }) => api.post("/recurring-plan/prefill", payload),
+  reconciliation: (year: number, month?: number) =>
+    api.get("/recurring-plan/reconciliation", { params: { year, month } }),
+  /** Alles oder nichts — siehe backend/app/api/recurring_plan.py */
+  batch: (payload: {
+    create?: Record<string, unknown>[];
+    update?: Array<{ id: number } & Record<string, unknown>>;
+    delete?: number[];
+  }) => api.post("/recurring-plan/batch", payload),
+};
+
+/** Plan-Ist-Abgleich — siehe backend/app/api/recurring_plan.py */
+export type ReconciliationStatus = "booked" | "deviating" | "open" | "overdue";
+
+export interface ReconciliationEntry {
+  plan_id: number;
+  description: string;
+  month: number;
+  periodicity: string;
+  expected: number;
+  actual: number | null;
+  status: ReconciliationStatus;
+  matched_transaction_ids: number[];
+}
+
+export interface ReconciliationResponse {
+  year: number;
+  entries: ReconciliationEntry[];
+  booked_count: number;
+  open_count: number;
+  overdue_count: number;
+  deviating_count: number;
+}
+
+// Onboarding — siehe backend/app/api/onboarding.py
+export interface OnboardingStatus {
+  has_accounts: boolean;
+  has_transactions: boolean;
+  transaction_count: number;
+  has_wizard: boolean;
+  has_plan: boolean;
+  is_demo: boolean;
+  completeness_pct: number;
+}
+
+export interface ReviewGroup {
+  merchant: string;
+  category: string | null;
+  count: number;
+  total: number;
+  sample_description: string;
+}
+
+export const onboardingApi = {
+  status: () => api.get<OnboardingStatus>("/onboarding/status"),
+  loadDemo: () => api.post("/onboarding/demo"),
+  removeDemo: () => api.delete("/onboarding/demo"),
+  review: () => api.get<ReviewGroup[]>("/onboarding/review"),
+  confirmReview: (entries: Array<{ merchant: string; category: string }>) =>
+    api.post("/onboarding/review", entries),
 };
 
 // Settings (category mappings)
@@ -387,8 +470,19 @@ export const healthApi = {
     api.get<{
       score: number;
       grade: string;
-      components: Array<{ name: string; score: number; weight: number; detail: string }>;
-      top_levers: Array<{ title: string; body: string; potential: number }>;
+      components: Array<{
+        name: string; score: number; weight: number; detail: string;
+        // i18n-Schluessel des Backends; name/detail bleiben deutscher Rueckfall
+        name_key?: string | null;
+        detail_key?: string | null;
+        detail_params?: Record<string, string | number> | null;
+      }>;
+      top_levers: Array<{
+        title: string; body: string; potential: number;
+        title_key?: string | null;
+        body_key?: string | null;
+        body_params?: Record<string, string | number> | null;
+      }>;
     }>("/budget/health-score", { params }),
 };
 

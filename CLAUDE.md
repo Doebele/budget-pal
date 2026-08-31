@@ -16,6 +16,8 @@ make logs             # Stream all logs
 make stop             # Stop all services
 make down             # Stop + remove containers
 make down-volumes     # DESTRUCTIVE: also deletes DB volume
+make build-nosw       # Frontend build without the service worker — otherwise the
+                      #   browser serves the previous version after `make build`
 ```
 
 ### Database migrations
@@ -52,11 +54,38 @@ After cloning fresh: run `git config core.hooksPath .githooks` once to activate 
 
 ---
 
+## Domain vocabulary — read this first
+
+Two terms run through the whole app, and both mean the **opposite** of what
+everyday usage suggests. Getting them backwards leads to wrong code.
+
+| Term (UI) | Term (code) | What it actually is |
+|---|---|---|
+| **Empirische Angaben** / *Empirical Data* | `wizard`, `empirical` | **Assumed and statistical** values the user entered in the 8-step wizard, seeded from Swiss FSO (BFS) peer-group averages. These are estimates and plans — *not* observations. |
+| **Reale Angaben** / *Actual Data* | `actual`, `past`, `historical` | **Measured** values: transactions that came in through CSV/PDF import from real bank statements. |
+
+So "empirical" here means *modelled*, and "actual" means *observed* — the
+reverse of the ordinary meaning of "empirical". The naming is established
+across the UI, the i18n keys, the API (`mode=wizard` vs. `mode=past`) and the
+database; do not rename it, but never infer the meaning from the word alone.
+
+Where the distinction matters:
+- `Budget` rows with a non-null `notes` field come from the wizard (empirical);
+  `Transaction` rows come from import (actual).
+- `/api/budget/multi-analysis?mode=` — `wizard` = empirical, `past` = actual,
+  `combined` = 60 % actual + 40 % empirical, `peer` = FSO benchmark.
+- The Health Score has three modes: `historical` (actual), `empirical`
+  (wizard), `plan` (RecurringPlan — a third source, neither of the two).
+- `RecurringPlan` (Budgetplan) is a **separate** plan world from the wizard
+  `Budget` rows. Both feed different views; they are not synchronised.
+
+---
+
 ## Architecture
 
 ### Stack
 - **Backend**: Python 3.11, FastAPI (async), SQLAlchemy 2.0 async, Alembic, PostgreSQL 15
-- **Frontend**: React 18, TypeScript, Vite, TailwindCSS, TanStack Query, Recharts / Nivo
+- **Frontend**: React 18, TypeScript, Vite, TailwindCSS, TanStack Query, ECharts (+ Recharts)
 - **Deployment**: Docker Compose — 3 services: `budget-pal-db`, `budget-pal-backend`, `budget-pal-frontend`
 - **Build context**: Repo root (`.`) for both backend and frontend Dockerfiles
 
@@ -82,11 +111,13 @@ api/              # One router per domain, all mounted in main.py under /api/<na
   imports.py      # /imports — CSV/PDF upload, preview, history
   projections.py  # /projections — Monte Carlo scenarios, CRUD
   budgets.py      # /budgets — monthly budget per supercategory
-  recurring_plan.py # /recurring-plan — Budgetplan CRUD
+  recurring_plan.py # /recurring-plan — Budgetplan CRUD, /reconciliation (Plan-Ist),
+                  #   /batch (create+update+delete in one transaction)
+  onboarding.py   # /onboarding — status, demo data (load/remove), merchant review
   taxonomy.py     # /taxonomy — supercategory list + per-user hidden labels
   pension.py      # /pension — AHV/BVG/3a data
   assets.py       # /assets — net worth items
-  wizard.py       # /wizard — empirical financial profile setup
+  wizard.py       # /wizard — empirical profile (assumed/statistical, see glossary)
   currency.py     # /currency — live exchange rates (ECB, cached)
   goals.py        # /goals — financial goals
   forecasting.py  # /forecasting — predictive budget scenarios
@@ -97,8 +128,26 @@ services/
   currency_service.py # ECB rate fetch with file cache (rates.json)
   import_parsers/     # Bank CSV/PDF parsers: UBS, N26, Revolut, comdirect
   audit_log.py        # record_activity() — writes to activity_log for all destructive ops
-  peer_group_seed.py  # Seeds peer_group_benchmarks on startup
+  peer_group_seed.py  # Seeds system categories on startup (NOT the benchmark table —
+                      #   `peer_group_benchmarks` is empty; peer values come from
+                      #   peer_group.py constants)
+  peer_group.py       # BFS HABE reference values: income medians, savings rates,
+                      #   canton multipliers. peer_savings_rate() feeds the health score.
+  plan_schedule.py    # Which months a plan entry falls in, and how often per month.
+                      #   Frontend twin: frontend/src/lib/planSchedule.ts — keep in sync.
+  demo_data.py        # Anonymous sample household (fixed seed → reproducible)
 ```
+
+### Test environment caveats
+Tests run against **in-memory SQLite**, which ignores `VARCHAR(n)` limits. A string
+that is too long for a column passes every test and then fails on PostgreSQL with
+`value too long for type character varying(n)` — this happened with
+`activity_log.method` (VARCHAR(16)). When a value goes into a length-limited column,
+assert against the model's limit (`Model.column.type.length`), not against the test DB.
+
+There is no frontend test runner: `npm test` starts vitest, but the project has no
+vitest config and no DOM environment (`jsdom` is not installed). `npm run lint` also
+fails — ESLint finds no configuration file. Only `npm run typecheck` works.
 
 ### Database startup policy
 `backend/start.sh` handles two cases:
@@ -122,7 +171,8 @@ hooks/
 
 components/
   transactions/   # TransactionOverviewHeader (bulk archive modal), DeletedTransactionsView
-  charts/         # MonteCarloChart (Recharts), SankeyChart (Nivo)
+  charts/         # MonteCarloChart (Recharts), SankeyChart / CategoryGaugeChart /
+                  # BudgetStackedBarChart (ECharts)
   wizard/         # Multi-step onboarding wizard components
   layout/         # LoadingScreen, navigation shell
 ```

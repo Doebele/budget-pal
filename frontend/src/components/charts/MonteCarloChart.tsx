@@ -17,6 +17,7 @@ import {
 } from "recharts";
 import { formatCHF } from "@/lib/theme";
 import { useThemeColors } from "@/hooks/useThemeColors";
+import { useTranslation } from "react-i18next";
 
 interface ProjectionData {
   years: number[];
@@ -100,11 +101,12 @@ export default function MonteCarloChart({
   showRetirementLine = false,
   retirementYear,
 }: MonteCarloChartProps) {
+  const { t } = useTranslation();
   const { colors } = useThemeColors();
   if (!data?.years?.length) {
     return (
       <div style={{ height }} className="flex items-center justify-center text-text-tertiary text-sm">
-        Keine Daten verfügbar
+        {t("pages:ui.keine_daten_verfuegbar")}
       </div>
     );
   }

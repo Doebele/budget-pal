@@ -66,6 +66,11 @@ build:
 build-clean:
 	$(COMPOSE) build --no-cache
 
+## Build ohne Service Worker — beim Entwickeln, damit der Browser nach dem
+## Build nicht noch den Stand davor ausliefert
+build-nosw:
+	VITE_DISABLE_PWA=true $(COMPOSE) build budget-pal-frontend
+
 ## Start without rebuilding
 up:
 	$(COMPOSE) up -d

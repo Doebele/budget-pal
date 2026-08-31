@@ -43,7 +43,12 @@
   "notifications": {
     "title": "Benachrichtigungen",
     "empty": "Keine Anomalien erkannt.",
-    "allGood": "Alles sieht normal aus 🎉"
+    "allGood": "Alles sieht normal aus 🎉",
+    "severity": {
+      "alert": "Alarm",
+      "warning": "Warnung",
+      "info": "Hinweis"
+    }
   },
   "common": {
     "loading": "Wird geladen…",
@@ -51,5 +56,35 @@
     "openMenu": "Menü öffnen",
     "closeMenu": "Menü schliessen",
     "more": "Mehr"
+  },
+  "txn": {
+    "uncategorized": "Unkategorisiert"
+  },
+  "periodicity": {
+    "weekly": "Wöchentlich",
+    "monthly": "Monatlich",
+    "quarterly": "Vierteljährlich",
+    "halfyearly": "Halbjährlich",
+    "yearly": "Jährlich",
+    "once": "Einmalig",
+    "quarterlyAlt": "Quartalsweise"
+  },
+  "table": {
+    "date": "Datum",
+    "description": "Beschreibung",
+    "account": "Konto",
+    "category": "Kategorie",
+    "recurring": "Wiederkehrend",
+    "amount": "Betrag",
+    "reference": "Referenz",
+    "monthlyEquiv": "Monatl. Äquiv."
+  },
+  "filters": {
+    "search": "Suchen...",
+    "allCategories": "Alle Kategorien",
+    "allAccounts": "Alle Konten",
+    "filterByCategory": "Nach Kategorie filtern",
+    "overview": "Übersicht:",
+    "current": "Aktuell"
   }
 }

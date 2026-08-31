@@ -20,6 +20,7 @@ import {
 import { ArrowRight, Calendar, Coins, GraphUp, ShieldCheck, WarningTriangle } from "@/lib/icons";
 import { projectionsApi, api } from "@/lib/api";
 import { formatCHF } from "@/lib/theme";
+import { useTranslation } from "react-i18next";
 
 interface Props {
   /** Current total net worth from accounts */
@@ -41,6 +42,7 @@ const PILLAR_COLORS = {
 } as const;
 
 export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dateOfBirth }: Props) {
+  const { t } = useTranslation();
   const [retirementAge, setRetirementAge] = useState(65);
   const [annualIncome, setAnnualIncome] = useState(90_000);
   const [meanReturn, setMeanReturn] = useState(0.07);
@@ -134,7 +136,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
 
           <div>
             <label className="text-text-tertiary text-xs mb-1 block">
-              Jahreseinkommen (CHF)
+              {t("pages:ui.jahreseinkommen_chf")}
             </label>
             <input
               type="number"
@@ -169,14 +171,14 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
       {/* Summary KPIs — style matches Finanzplan cashflow cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
-          label="Vermögen bei Rente"
+          label={t("pages:misc.r02")}
           value={formatCHF(wealthAtRetirement)}
           sub={`in ${Math.max(yearsToRetirement, 0)} Jahren`}
           icon={<GraphUp className="w-4 h-4" style={{ color: "#10b981" }} />}
           valueColor="#10b981"
         />
         <KPICard
-          label="Rente/Monat"
+          label={t("pages:ui.rente_monat")}
           value={formatCHF(totalPensionMonthly)}
           sub="AHV + BVG + 3a + 3b"
           icon={<Coins className="w-4 h-4" style={{ color: PILLAR_COLORS.bvg }} />}
@@ -194,7 +196,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
           valueColor={isSurplus ? "#10b981" : "#f87171"}
         />
         <KPICard
-          label="Säulen-Struktur"
+          label={t("pages:misc.r01")}
           value={`${Math.round((ahvMonthly / (totalPensionMonthly || 1)) * 100)}% AHV`}
           sub={`${Math.round((bvgMonthly / (totalPensionMonthly || 1)) * 100)}% BVG · ${Math.round((pillar3aMonthly / (totalPensionMonthly || 1)) * 100)}% 3a · ${Math.round((pillar3bMonthly / (totalPensionMonthly || 1)) * 100)}% 3b`}
           icon={<ShieldCheck className="w-4 h-4" style={{ color: PILLAR_COLORS.ahv }} />}
@@ -207,7 +209,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
         <div className="card">
           <h3 className="text-text-primary font-semibold text-sm mb-4 flex items-center gap-2">
             <ArrowRight className="w-4 h-4 text-accent" />
-            Monatliche Rente nach Säule (CHF, real)
+            {t("pages:ui.monatliche_rente_nach_saeule_chf_real")}
           </h3>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={pensionBarData} margin={{ top: 8, right: 16, bottom: 0, left: 16 }}>
@@ -232,7 +234,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
             </BarChart>
           </ResponsiveContainer>
           <p className="text-text-tertiary text-[11px] mt-2">
-            Rote Linie = geschätzte monatliche Ausgaben im Ruhestand (80 % des aktuellen Niveaus)
+            {t("pages:ui.rote_linie_geschaetzte_monatliche_ausgaben_i")}
           </p>
         </div>
       )}
@@ -240,7 +242,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
       {/* Wealth Monte Carlo */}
       <div className="card">
         <h3 className="text-text-primary font-semibold text-sm mb-4">
-          Vermögensentwicklung (Monte Carlo — p10 / p50 / p90)
+          {t("pages:ui.vermoegensentwicklung_monte_carlo_p10_p50_p9")}
         </h3>
         {isLoading ? (
           <div className="h-56 flex items-center justify-center text-text-tertiary text-sm animate-pulse">

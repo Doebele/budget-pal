@@ -140,7 +140,7 @@ function CustomTooltip({ active, payload, label, peerNet, empiricalNet }: any) {
     <div className="bg-bg-surface border border-border rounded-lg p-3 shadow-xl text-xs space-y-1 min-w-[200px]">
       <p className="font-semibold text-text-primary mb-1">{formatMonth(label)}</p>
       {isForecast && (
-        <span className="inline-block bg-violet-500/20 text-violet-300 text-[10px] px-1.5 py-0.5 rounded mb-1">
+        <span className="inline-block border msg-info text-[10px] px-1.5 py-0.5 rounded mb-1">
           Prognose
         </span>
       )}
@@ -186,7 +186,7 @@ function CustomTooltip({ active, payload, label, peerNet, empiricalNet }: any) {
         </div>
       )}
       {isForecast && payload[0]?.payload?.peer_calibrated && (
-        <div className="text-[10px] text-violet-400 pt-0.5">⊕ Peer-Gruppe kalibriert</div>
+        <div className="text-[10px] txt-info pt-0.5">⊕ Peer-Gruppe kalibriert</div>
       )}
     </div>
   );

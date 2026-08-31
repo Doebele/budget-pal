@@ -1,17 +1,19 @@
 import { Check } from "@/lib/icons";
 import { clsx } from "clsx";
+import { useTranslation } from "react-i18next";
 
 // ── Step labels ────────────────────────────────────────────────
 
+// i18n-Schluessel — erst beim Rendern uebersetzt
 const STEP_LABELS = [
-  "Profil",
-  "Einkommen",
-  "Peer-Gruppe",
-  "Wohnen",
-  "Alltag",
-  "Vermögen",
-  "Vorsorge",
-  "Ziele",
+  "pages:wizard.w175",
+  "pages:wizard.w176",
+  "pages:wizard.w177",
+  "pages:wizard.w178",
+  "pages:wizard.w179",
+  "pages:wizard.w180",
+  "pages:wizard.w181",
+  "pages:wizard.w182",
 ];
 
 interface StepIndicatorProps {
@@ -20,6 +22,38 @@ interface StepIndicatorProps {
   className?: string;
   /** If provided, step circles become clickable links */
   onStepClick?: (step: number) => void;
+  /**
+   * Welche Schritte ueberhaupt vorkommen, in Original-Nummerierung. Die
+   * Kurzstrecke laesst Vorsorge und Vermoegen weg — ohne diese Angabe zeigte
+   * die Leiste acht Schritte an, von denen vier nie erscheinen.
+   */
+  stepNumbers?: number[];
+}
+
+interface StepBoxProps {
+  interactive: boolean;
+  isActive: boolean;
+  onClick: () => void;
+  title?: string;
+  className: string;
+  children: React.ReactNode;
+}
+
+/**
+ * Ein anklickbarer Schritt ist ein `<button>`, kein `<div role="button">`.
+ * Die Vorgaenger-Fassung war per Tastatur nicht ausloesbar (WCAG 2.1.1) —
+ * ein echtes Button-Element bringt Enter, Leertaste und Fokus schon mit.
+ */
+function StepBox({ interactive, isActive, onClick, title, className, children }: StepBoxProps) {
+  const current = isActive ? "step" : undefined;
+  if (!interactive) {
+    return <div className={className} aria-current={current}>{children}</div>;
+  }
+  return (
+    <button type="button" onClick={onClick} title={title} className={className} aria-current={current}>
+      {children}
+    </button>
+  );
 }
 
 export default function StepIndicator({
@@ -27,38 +61,40 @@ export default function StepIndicator({
   totalSteps = 8,
   className,
   onStepClick,
+  stepNumbers,
 }: StepIndicatorProps) {
+  const { t } = useTranslation();
   const clickable = Boolean(onStepClick);
+  // `step` ist die Nummer im vollen Wizard (fuer Beschriftung und Sprung),
+  // `i` die laufende Nummer in dieser Auswahl (fuer die Anzeige).
+  const steps = stepNumbers ?? Array.from({ length: totalSteps }, (_, i) => i + 1);
+  const position = Math.max(0, steps.indexOf(currentStep));
 
   return (
     <>
       {/* ── Desktop: full step circles ─────────────────────── */}
       <div className={clsx("hidden md:flex items-center w-full", className)}>
-        {Array.from({ length: totalSteps }, (_, i) => {
-          const step = i + 1;
-          const isCompleted = step < currentStep;
+        {steps.map((step, i) => {
+          const isCompleted = i < position;
           const isActive = step === currentStep;
-          const isPending = step > currentStep;
+          const isPending = i > position;
+          const interactive = clickable && !isActive;
 
           return (
             <div key={step} className="flex items-center flex-1 last:flex-none">
               {/* Circle */}
-              <div
+              <StepBox
+                interactive={interactive}
+                isActive={isActive}
+                onClick={() => onStepClick?.(step)}
+                title={clickable ? t(STEP_LABELS[step - 1]) : undefined}
                 className={clsx(
-                  "flex flex-col items-center gap-1.5",
+                  "flex flex-col items-center gap-1.5 rounded-lg",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base",
                   clickable && "group",
-                  clickable && !isActive && "cursor-pointer",
+                  interactive && "cursor-pointer",
                   isActive && "cursor-default",
                 )}
-                onClick={() => clickable && !isActive && onStepClick?.(step)}
-                title={clickable ? STEP_LABELS[i] : undefined}
-                role={clickable && !isActive ? "button" : undefined}
-                tabIndex={clickable && !isActive ? 0 : undefined}
-                onKeyDown={(e) => {
-                  if (clickable && !isActive && (e.key === "Enter" || e.key === " ")) {
-                    onStepClick?.(step);
-                  }
-                }}
               >
                 <div
                   className={clsx(
@@ -73,7 +109,7 @@ export default function StepIndicator({
                   {isCompleted ? (
                     <Check className="w-4 h-4" />
                   ) : (
-                    <span>{step}</span>
+                    <span>{i + 1}</span>
                   )}
                 </div>
                 <span
@@ -86,12 +122,12 @@ export default function StepIndicator({
                     isPending && clickable && "group-hover:text-text-secondary",
                   )}
                 >
-                  {STEP_LABELS[i]}
+                  {t(STEP_LABELS[step - 1])}
                 </span>
-              </div>
+              </StepBox>
 
               {/* Connector line (not after last) */}
-              {step < totalSteps && (
+              {i < steps.length - 1 && (
                 <div
                   className={clsx(
                     "flex-1 h-[2px] mx-2 rounded-full transition-all duration-500",
@@ -108,36 +144,38 @@ export default function StepIndicator({
       <div className={clsx("flex md:hidden items-center gap-3", className)}>
         {/* Mini dots */}
         <div className="flex items-center gap-1.5">
-          {Array.from({ length: totalSteps }, (_, i) => {
-            const step = i + 1;
-            const isCompleted = step < currentStep;
+          {steps.map((step, i) => {
+            const isCompleted = i < position;
             const isActive = step === currentStep;
+            const interactive = clickable && !isActive;
             return (
-              <div
+              <StepBox
                 key={step}
-                onClick={() => clickable && !isActive && onStepClick?.(step)}
-                role={clickable && !isActive ? "button" : undefined}
-                tabIndex={clickable && !isActive ? 0 : undefined}
-                title={clickable ? STEP_LABELS[i] : undefined}
+                interactive={interactive}
+                isActive={isActive}
+                onClick={() => onStepClick?.(step)}
+                title={clickable ? t(STEP_LABELS[step - 1]) : undefined}
                 className={clsx(
                   "rounded-full transition-all duration-300",
-                  clickable && !isActive && "cursor-pointer",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+                  interactive && "cursor-pointer",
                   isActive && "w-4 h-2 bg-accent",
                   isCompleted && "w-2 h-2 bg-accent/60",
                   isCompleted && clickable && "hover:bg-accent",
                   !isActive && !isCompleted && "w-2 h-2 bg-white/15",
                   !isActive && !isCompleted && clickable && "hover:bg-white/30",
                 )}
-              />
+              >
+                {/* Der Punkt allein sagt nichts — die Beschriftung traegt ihn. */}
+                <span className="sr-only">{t(STEP_LABELS[step - 1])}</span>
+              </StepBox>
             );
           })}
         </div>
         <span className="text-text-tertiary text-xs">
-          Schritt{" "}
-          <span className="text-text-primary font-semibold">{currentStep}</span>{" "}
-          von <span className="text-text-primary font-semibold">{totalSteps}</span>
+          {t("pages:wizard.stepOf", { current: position + 1, total: steps.length })}
           {" "}—{" "}
-          <span className="text-text-secondary">{STEP_LABELS[currentStep - 1]}</span>
+          <span className="text-text-secondary">{t(STEP_LABELS[currentStep - 1])}</span>
         </span>
       </div>
     </>

@@ -14,6 +14,7 @@ import { formatAmount } from "@/lib/theme";
 import { GraphDown, InfoCircle, Wallet } from "@/lib/icons";
 import { clsx } from "clsx";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 // Swiss employee social insurance contributions 2024
 const AHV_RATE   = 0.053;   // 5.30%
@@ -56,6 +57,7 @@ interface Props {
 }
 
 export default function NetIncomeCard({ compact = false }: Props) {
+  const { t } = useTranslation();
   const [showBreakdown, setShowBreakdown] = useState(false);
 
   const { data: wizardState, isLoading } = useQuery({
@@ -84,7 +86,7 @@ export default function NetIncomeCard({ compact = false }: Props) {
       <div className="card">
         <div className="flex items-center gap-2 text-text-tertiary text-xs uppercase tracking-widest mb-2">
           <Wallet className="w-3.5 h-3.5" />
-          Netto-Einkommen (Ist)
+          {t("pages:ui.netto_einkommen_ist")}
         </div>
         <p className="text-2xl font-mono font-bold text-gain">
           {formatAmount(netto, "CHF")}
@@ -102,11 +104,11 @@ export default function NetIncomeCard({ compact = false }: Props) {
       <div className="card">
         <div className="flex items-center gap-2 text-text-tertiary text-[10px] uppercase tracking-widest mb-2">
           <Wallet className="w-3.5 h-3.5" />
-          Netto-Einkommen / Mt.
+          {t("pages:ui.netto_einkommen_mt")}
         </div>
         <p className="text-xl font-mono font-bold text-gain">{formatAmount(netto, "CHF")}</p>
         <p className="text-text-tertiary text-[11px] mt-1">
-          Brutto {formatAmount(brutto, "CHF")} − Abzüge {formatAmount(socialTotal + steuern, "CHF")}
+          {t("pages:ui.grossMinusDeductions", { gross: formatAmount(brutto, "CHF"), deductions: formatAmount(socialTotal + steuern, "CHF") })}
         </p>
       </div>
     );
@@ -118,12 +120,12 @@ export default function NetIncomeCard({ compact = false }: Props) {
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2 text-text-tertiary text-xs uppercase tracking-widest">
           <Wallet className="w-3.5 h-3.5" />
-          Netto-Einkommen / Monat
+          {t("pages:ui.netto_einkommen_monat")}
         </div>
         <button
           onClick={() => setShowBreakdown((v) => !v)}
           className="text-text-tertiary hover:text-text-primary transition-colors"
-          title="Berechnung anzeigen"
+          title={t("pages:ui.berechnung_anzeigen")}
         >
           <InfoCircle className="w-3.5 h-3.5" />
         </button>
@@ -137,9 +139,9 @@ export default function NetIncomeCard({ compact = false }: Props) {
 
       {/* Summary bar */}
       <div className="flex h-2 rounded-full overflow-hidden mb-2 bg-bg-surface2">
-        <div className="bg-gain h-full" style={{ width: `${Math.max(5, (netto / brutto) * 100)}%` }} title="Netto" />
+        <div className="bg-gain h-full" style={{ width: `${Math.max(5, (netto / brutto) * 100)}%` }} title={t("pages:ui.netto")} />
         <div className="bg-warning/70 h-full" style={{ width: `${(socialTotal / brutto) * 100}%` }} title="Sozialabgaben" />
-        <div className="bg-loss/70 h-full" style={{ width: `${(steuern / brutto) * 100}%` }} title="Steuern" />
+        <div className="bg-loss/70 h-full" style={{ width: `${(steuern / brutto) * 100}%` }} title={t("pages:ui.steuern")} />
       </div>
       <div className="flex gap-3 text-[10px] text-text-tertiary mb-3">
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gain" />Netto {(netto / brutto * 100).toFixed(0)}%</span>
@@ -150,16 +152,16 @@ export default function NetIncomeCard({ compact = false }: Props) {
       {/* Breakdown */}
       {showBreakdown && (
         <div className="border-t border-border/50 pt-3 space-y-1.5 animate-fade-in">
-          <Row label="Brutto" value={brutto} sign="+" />
+          <Row label={t("pages:ui.brutto")} value={brutto} sign="+" />
           <Row label="AHV (5.3%)" value={computeNetIncome(wizardState).ahv} sign="-" />
           <Row label="IV/EO/ALV (2.05%)" value={computeNetIncome(wizardState).iv + computeNetIncome(wizardState).eo + computeNetIncome(wizardState).alv} sign="-" />
-          <Row label="Direkte Steuern" value={steuern} sign="-" />
+          <Row label={t("pages:ui.direkte_steuern")} value={steuern} sign="-" />
           <div className="flex justify-between items-center pt-1.5 border-t border-border/40">
-            <span className="text-xs font-semibold text-text-primary">Netto</span>
+            <span className="text-xs font-semibold text-text-primary">{t("pages:ui.netto")}</span>
             <span className="text-xs font-mono font-bold text-gain">{formatAmount(netto, "CHF")}</span>
           </div>
           <p className="text-[10px] text-text-tertiary pt-1">
-            *Schätzung: AHV/IV/EO/ALV Arbeitnehmer-Anteil 2024. PKK (BVG) nicht eingerechnet.
+            {t("pages:ui.schaetzung_ahv_iv_eo_alv_arbeitnehmer_anteil")}
           </p>
         </div>
       )}

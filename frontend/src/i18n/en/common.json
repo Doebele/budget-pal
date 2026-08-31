@@ -43,7 +43,12 @@
   "notifications": {
     "title": "Notifications",
     "empty": "No anomalies detected.",
-    "allGood": "Everything looks normal 🎉"
+    "allGood": "Everything looks normal 🎉",
+    "severity": {
+      "alert": "Alert",
+      "warning": "Warning",
+      "info": "Notice"
+    }
   },
   "common": {
     "loading": "Loading…",
@@ -51,5 +56,35 @@
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
     "more": "More"
+  },
+  "txn": {
+    "uncategorized": "Uncategorized"
+  },
+  "periodicity": {
+    "weekly": "Weekly",
+    "monthly": "Monthly",
+    "quarterly": "Quarterly",
+    "halfyearly": "Semi-annually",
+    "yearly": "Annually",
+    "once": "One-time",
+    "quarterlyAlt": "Quarterly"
+  },
+  "table": {
+    "date": "Date",
+    "description": "Description",
+    "account": "Account",
+    "category": "Category",
+    "recurring": "Recurring",
+    "amount": "Amount",
+    "reference": "Reference",
+    "monthlyEquiv": "Monthly equiv."
+  },
+  "filters": {
+    "search": "Search...",
+    "allCategories": "All categories",
+    "allAccounts": "All accounts",
+    "filterByCategory": "Filter by category",
+    "overview": "Overview:",
+    "current": "Current"
   }
 }

@@ -12,6 +12,7 @@ import {
   getBankByName,
   type BankWithLogo,
 } from "@/data/banks-with-logos";
+import { useTranslation } from "react-i18next";
 
 const ACCOUNT_TYPE_LABELS: Record<string, string> = {
   checking: "Girokonto",
@@ -93,6 +94,7 @@ const formatCurrency = (amount: number, currency: string): string => {
 };
 
 export default function Accounts() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [editingAccountId, setEditingAccountId] = useState<number | null>(null);
@@ -142,7 +144,7 @@ export default function Accounts() {
     },
     onError: (error) => {
       console.error("[Accounts] Delete error:", error);
-      alert(`Fehler beim Löschen: ${error instanceof Error ? error.message : "Unbekannter Fehler"}`);
+      alert(t("pages:accounts.deleteFailed", { msg: error instanceof Error ? error.message : t("pages:accounts.unknownError") }));
     },
   });
 
@@ -203,7 +205,7 @@ export default function Accounts() {
   const handleSubmit = () => {
     // Validierung: Währung, Kontoname und Kontotyp sind Pflichtfelder
     if (!form.currency || !form.name || !form.account_type) {
-      alert("Bitte alle Pflichtfelder ausfüllen: Währung, Kontoname und Kontotyp");
+      alert(t("pages:accounts.requiredFields"));
       return;
     }
     createMutation.mutate();
@@ -219,7 +221,7 @@ export default function Accounts() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-display text-text-primary">Konten</h1>
+          <h1 className="text-2xl font-display text-text-primary">{t("pages:accounts.title")}</h1>
           <p className="text-text-tertiary text-sm mt-0.5">
             Gesamtsaldo:{" "}
             <span className="text-text-primary font-mono font-semibold">
@@ -237,19 +239,19 @@ export default function Accounts() {
           }}
           className="btn-primary flex items-center gap-2"
         >
-          <Plus className="w-4 h-4" /> Konto hinzufügen
+          <Plus className="w-4 h-4" /> {t("pages:ui.konto_hinzufuegen")}
         </button>
       </div>
 
       {showForm && (
         <div className="card">
           <h2 className="text-text-primary font-semibold text-sm mb-4">
-            {editingAccountId ? "Konto bearbeiten" : "Neues Konto"}
+            {editingAccountId ? t("pages:accounts.editAccount") : t("pages:accounts.newAccount")}
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
             {/* Position 1: Währung */}
             <div>
-              <label className="label">Währung *</label>
+              <label className="label">{t("pages:accounts.currencyLabel")}</label>
               <select
                 className="input"
                 value={form.currency}
@@ -257,7 +259,7 @@ export default function Accounts() {
                   setForm((f) => ({ ...f, currency: e.target.value }))
                 }
               >
-                <option value="">Währung wählen</option>
+                <option value="">{t("pages:accounts.chooseCurrency")}</option>
                 {CURRENCIES.map((c) => (
                   <option key={c} value={c}>
                     {c}
@@ -282,7 +284,7 @@ export default function Accounts() {
             </div>
             {/* Position 3: Kontoname */}
             <div>
-              <label className="label">Kontoname *</label>
+              <label className="label">{t("pages:ui.kontoname")}</label>
               <input
                 type="text"
                 className="input"
@@ -430,7 +432,7 @@ export default function Accounts() {
             </div>
             {/* Position 5: Kontotyp */}
             <div>
-              <label className="label">Kontotyp *</label>
+              <label className="label">{t("pages:ui.kontotyp")}</label>
               <select
                 className="input"
                 value={form.account_type}
@@ -438,7 +440,7 @@ export default function Accounts() {
                   setForm((f) => ({ ...f, account_type: e.target.value }))
                 }
               >
-                <option value="">Kontotyp wählen</option>
+                <option value="">{t("pages:accounts.chooseType")}</option>
                 {Object.entries(ACCOUNT_TYPE_LABELS).map(([v, l]) => (
                   <option key={v} value={v}>
                     {l}
@@ -454,13 +456,13 @@ export default function Accounts() {
               disabled={!form.currency || !form.name || !form.account_type || createMutation.isPending}
             >
               {createMutation.isPending
-                ? "Speichern..."
+                ? t("pages:accounts.saving")
                 : editingAccountId
                 ? "Aktualisieren"
                 : "Erstellen"}
             </button>
             <button onClick={resetForm} className="btn-secondary">
-              Abbrechen
+              {t("pages:ui.abbrechen")}
             </button>
             {editingAccountId && (
               <button
@@ -476,7 +478,7 @@ export default function Accounts() {
                 disabled={deleteMutation.isPending}
               >
                 <Trash className="w-4 h-4" />
-                {deleteMutation.isPending ? "Löschen..." : "Löschen"}
+                {deleteMutation.isPending ? t("pages:accounts.deleting") : t("buttons.delete")}
               </button>
             )}
           </div>
@@ -496,28 +498,28 @@ export default function Accounts() {
                 <Trash className="w-5 h-5 text-red-500" />
               </div>
               <h3 className="text-lg font-semibold text-text-primary">
-                Konto löschen?
+                {t("pages:ui.konto_loeschen")}
               </h3>
             </div>
             <p className="text-text-secondary mb-2">
-              Möchtest du das Konto <strong className="text-text-primary">"{accountToDelete.name}"</strong> wirklich löschen?
+              {t("pages:ui.moechtest_du_das_konto")} <strong className="text-text-primary">"{accountToDelete.name}"</strong> {t("pages:ui.wirklich_loeschen")}
             </p>
             <p className="text-sm text-text-disabled">
-              Diese Aktion kann nicht rückgängig gemacht werden!
+              {t("pages:ui.diese_aktion_kann_nicht_rueckgaengig_gemacht")}
             </p>
             <div className="mt-6 flex justify-end gap-3">
               <button
                 onClick={() => setShowDeleteModal(false)}
                 className="btn-secondary"
               >
-                Abbrechen
+                {t("pages:ui.abbrechen")}
               </button>
               <button
                 onClick={confirmDelete}
                 className="btn-danger"
                 disabled={deleteMutation.isPending}
               >
-                {deleteMutation.isPending ? "Wird gelöscht..." : "Ja, löschen"}
+                {deleteMutation.isPending ? t("pages:accounts.deletingLong") : t("pages:accounts.confirmDelete")}
               </button>
             </div>
           </div>
@@ -573,7 +575,7 @@ export default function Accounts() {
                         ? "bg-accent/20 text-accent"
                         : "text-text-tertiary hover:text-text-primary hover:bg-white/5"
                     )}
-                    title="Bearbeiten"
+                    title={t("buttons.edit")}
                   >
                     <EditPencil className="w-4 h-4" />
                   </button>

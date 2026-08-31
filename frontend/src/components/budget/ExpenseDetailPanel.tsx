@@ -11,6 +11,8 @@ import { WarningTriangle, Xmark } from "@/lib/icons";
 import { clsx } from "clsx";
 import { formatCHF } from "@/lib/theme";
 import type { SuperCategory } from "@/lib/categories";
+import { translateCategory } from "@/lib/categoryLabel";
+import { useTranslation } from "react-i18next";
 
 export interface ExpenseTxnEntry {
   amount: number;
@@ -42,6 +44,7 @@ export default function ExpenseDetailPanel({
   excludeTransfers,
   onClose,
 }: Props) {
+  const { t } = useTranslation();
   // Close on Escape
   useEffect(() => {
     const fn = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -93,7 +96,7 @@ export default function ExpenseDetailPanel({
         <div className="shrink-0 px-5 py-4 border-b border-border bg-bg-surface2/90">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <h2 className="text-text-primary font-semibold text-base">Ausgaben-Aufschlüsselung</h2>
+              <h2 className="text-text-primary font-semibold text-base">{t("pages:misc.r07")}</h2>
               <p className="text-text-tertiary text-xs mt-0.5">{periodLabel}</p>
             </div>
             <button
@@ -110,17 +113,16 @@ export default function ExpenseDetailPanel({
               {formatCHF(grandTotal)}
             </span>
             {excludeTransfers && (
-              <span className="text-amber-400 text-xs">Kontoüberträge ausgeblendet</span>
+              <span className="txt-warning text-xs">{t("pages:misc.r08")}</span>
             )}
           </div>
 
           {/* Warning if stats API total differs */}
           {hasDiscrepancy && (
-            <div className="mt-2 flex items-start gap-1.5 text-xs text-amber-400/80 bg-amber-500/10 rounded-lg px-2.5 py-1.5">
-              <WarningTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+            <div className="msg msg-warning mt-2">
+              <WarningTriangle />
               <span>
-                KPI-Kachel zeigt {formatCHF(statsExpenses!)} (aus der Stats-API inkl. alle Transaktionen).
-                Diese Ansicht basiert auf den zuletzt geladenen {transactions.length} Transaktionen.
+                {t("pages:hints.kpiMismatch", { amount: formatCHF(statsExpenses!), count: transactions.length })}
               </span>
             </div>
           )}
@@ -130,7 +132,7 @@ export default function ExpenseDetailPanel({
         <div className="flex-1 overflow-y-auto divide-y divide-border-subtle">
           {groups.length === 0 && (
             <p className="text-text-tertiary text-sm text-center py-12">
-              Keine Ausgaben im gewählten Zeitraum.
+              {t("pages:ui.keine_ausgaben_im_gewaehlten_zeitraum")}
             </p>
           )}
 
@@ -151,8 +153,8 @@ export default function ExpenseDetailPanel({
                       {sc.label}
                     </span>
                     {isSavings && (
-                      <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 shrink-0">
-                        Kontoübertrag / Sparen
+                      <span className="text-xs px-1.5 py-0.5 rounded-full border msg-warning shrink-0">
+                        {t("pages:ui.kontouebertrag_sparen")}
                       </span>
                     )}
                   </div>
@@ -177,7 +179,7 @@ export default function ExpenseDetailPanel({
                     return (
                       <div key={sub.label} className="flex items-center gap-3">
                         <span className="text-text-tertiary text-xs truncate flex-1 min-w-0">
-                          {sub.label}
+                          {translateCategory(sub.label)}
                         </span>
                         <div className="flex items-center gap-2 shrink-0">
                           {/* Mini bar */}
@@ -208,12 +210,12 @@ export default function ExpenseDetailPanel({
         {/* ── Footer total ─────────────────────── */}
         <div className="shrink-0 border-t border-border bg-bg-surface2 px-5 py-3">
           <div className="flex items-center justify-between text-sm font-semibold">
-            <span className="text-text-secondary">Total Ausgaben</span>
+            <span className="text-text-secondary">{t("pages:misc.r09")}</span>
             <span className="text-text-primary font-mono">{formatCHF(grandTotal)}</span>
           </div>
           {groups.some((g) => g.isSavings) && !excludeTransfers && (
-            <p className="text-amber-400/70 text-xs mt-1">
-              Inkl. {formatCHF(groups.find((g) => g.isSavings)!.total)} Kontoüberträge/Sparen — Toggle aktivieren um diese auszublenden.
+            <p className="txt-warning text-xs mt-1">
+              {t("pages:hints.transfersIncluded", { amount: formatCHF(groups.find((g) => g.isSavings)!.total) })}
             </p>
           )}
         </div>

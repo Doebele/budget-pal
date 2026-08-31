@@ -6,6 +6,7 @@ import { clsx } from "clsx";
 import { Dollar, FloppyDisk, NavArrowDown, WarningCircle, Xmark } from "@/lib/icons";
 import { useTaxonomy, type SuperCategory } from "@/lib/categories";
 import { deduplicateWizardBatch } from "@/lib/wizardUtils";
+import { useTranslation } from "react-i18next";
 
 interface WizardBudget {
   id: number;
@@ -27,6 +28,7 @@ interface Props {
 }
 
 export default function WizardBudgetSidebar({ periodLabel, months, initialScId, onClose }: Props) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { superCategories, resolveSuperCategory } = useTaxonomy();
 
@@ -238,7 +240,7 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
                         )}
                         {isDirty && !isSaved && (
                           <span className="text-xs text-warning bg-warning/10 px-2 py-0.5 rounded-full border border-warning/30">
-                            Geändert
+                            {t("pages:ui.geaendert")}
                           </span>
                         )}
                       </div>
@@ -248,7 +250,7 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
                       {/* Monthly amount input */}
                       <div className="flex-1">
                         <label className="flex items-center gap-1 text-xs text-text-tertiary mb-1">
-                          <Dollar className="w-3 h-3" /> Monatlich (CHF)
+                          <Dollar className="w-3 h-3" /> {t("pages:ui.monatlich_chf")}
                         </label>
                         <input
                           type="number"
@@ -264,7 +266,7 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
                       {months > 1 && (
                         <div className="shrink-0 text-right">
                           <p className="text-xs text-text-tertiary mb-1">× {months} Monate</p>
-                          <p className="text-sm font-mono text-violet-400">{formatCHF(periodVal)}</p>
+                          <p className="text-sm font-mono txt-info">{formatCHF(periodVal)}</p>
                         </div>
                       )}
 
@@ -304,14 +306,14 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
                 <span className="text-text-tertiary">
                   {activeSc ? "Kategorie-Summe" : "Gesamtausgaben"} / Periode ({months} Monate)
                 </span>
-                <span className="font-mono text-violet-400">{formatCHF(periodTotal)}</span>
+                <span className="font-mono txt-info">{formatCHF(periodTotal)}</span>
               </div>
             )}
 
             {saveMutation.isError && (
               <div className="flex items-center gap-2 text-loss text-xs bg-loss/10 border border-loss/30 rounded-lg px-3 py-2 mb-3">
                 <WarningCircle className="w-4 h-4 shrink-0" />
-                Fehler beim Speichern. Bitte erneut versuchen.
+                {t("pages:ui.fehler_beim_speichern_bitte_erneut_versuchen")}
               </div>
             )}
 
