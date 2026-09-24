@@ -140,6 +140,15 @@ Ohne Anbieter läuft alles weiter — nur die KI-Stufe entfällt.
   Rohtext — der Endpunkt ist frei wählbar.
 - Keys werden pro Nutzer in der Datenbank abgelegt, nicht in der `.env`.
 
+**Nur öffentliche Endpunkte auf dem Server**
+
+Die Registrierung ist offen, und den KI-Endpunkt ruft der Server selbst auf. Mit
+`ENVIRONMENT=production` akzeptiert er deshalb nur `https`-Adressen, die auf eine öffentliche
+IP zeigen — sonst könnte jeder Nutzer interne Dienste ansprechen (Datenbank, andere
+Container, `127.0.0.1`). LM Studio und Ollama gehen dort nicht, dafür einen Cloud-Anbieter
+wählen. Lokal (`ENVIRONMENT=development`) sind sie erlaubt, auf einem NAS im Heimnetz mit
+`AI_ALLOW_PRIVATE_ENDPOINTS=true`.
+
 ### Kategorie-Taxonomie
 - 11 Superkategorien: Wohnen, Essen, Mobilität, Versicherungen, Freizeit, Abos, Shopping, Bildung, Steuern, Sparen, Sonstiges
 - Zentrale Definition in `shared/taxonomy.json` (txnCategories, wizardLabels, legacyAliases)
@@ -265,6 +274,8 @@ MISTRAL_API_KEY=...          # OCR-Fallback beim PDF-Import (Mistral OCR)
 BACKEND_PORT=8010            # Standard-Port Backend
 FRONTEND_PORT=8011           # Standard-Port Frontend
 AUTO_CREATE_SCHEMA=false     # true = DB ohne Alembic beim ersten Start
+ENVIRONMENT=production       # development = lokal, erlaubt LM Studio/Ollama
+AI_ALLOW_PRIVATE_ENDPOINTS=false  # true = LM Studio/Ollama im Heimnetz (NAS)
 ```
 
 KI-Anbieter und ihre API-Keys gehören **nicht** in die `.env` — jeder Nutzer hinterlegt sie
@@ -331,55 +342,117 @@ Einstellungen (`test_backup_settings.py`), Monte-Carlo-Projektion.
 
 ## Deployment auf Strato (Produktion)
 
+**Auto-Publish:** Jeder Push auf `main` (also jeder gemergte Pull Request) wird getestet,
+gebaut und auf den Strato-VPS ausgerollt. Pull Requests werden nur getestet.
+
+```text
+Push auf main ─▶ backend-tests + frontend-build
+               ─▶ build-and-push: Images nach GHCR, Tags latest und 7-stelliger Commit-Hash
+                    ghcr.io/doebele/budget-pal/backend, …/frontend
+               ─▶ deploy (nur mit DEPLOY_ENABLED=true): per SSH git pull, .env aus Secret,
+                    ./deploy.sh <hash>, danach /api/health von aussen
+```
+
+`deploy.sh` auf dem Server sichert zuerst die Datenbank (`backups/`), holt die Images,
+startet mit `docker-compose.prod.yml` und wartet, bis alle Container healthy sind. Wird die
+neue Version nicht healthy, startet es wieder den letzten funktionierenden Stand.
+
+```text
+Browser ─HTTPS─▶ nginx auf dem Host (443, Let's Encrypt)
+                   └─▶ 127.0.0.1:18081 ─▶ budget-pal-frontend (nginx)
+                                            ├─ /api/ ─▶ budget-pal-backend :8000 (kein Host-Port)
+                                            └─ /     ─▶ statisches Frontend
+                                          budget-pal-db (nur intern)
+```
+
+In Produktion hängt nur das Frontend an `127.0.0.1`; von aussen ist nichts ausser 443
+erreichbar, auch wenn die Server-Firewall aus ist.
+
+### Einmalige Einrichtung
+
+1. **DNS:** A-Record `budgetpal.doebele12.de` → IP des VPS.
+2. **Checkout auf dem Server** (Repo ist öffentlich, kein Token nötig):
+   ```bash
+   git clone https://github.com/Doebele/budget-pal.git /opt/budgetpal
+   ```
+3. **Host-nginx** `/etc/nginx/sites-available/budgetpal`, danach verlinken und Zertifikat holen:
+   ```nginx
+   server {
+       listen 80;
+       server_name budgetpal.doebele12.de;
+       client_max_body_size 50M;
+       location / {
+           proxy_pass http://127.0.0.1:18081;
+           proxy_set_header Host $host;
+           proxy_set_header X-Real-IP $remote_addr;
+           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+           proxy_set_header X-Forwarded-Proto $scheme;
+       }
+   }
+   ```
+   ```bash
+   ln -s /etc/nginx/sites-available/budgetpal /etc/nginx/sites-enabled/
+   nginx -t && systemctl reload nginx
+   certbot --nginx -d budgetpal.doebele12.de --redirect   # HTTPS + Weiterleitung 80 → 443
+   ```
+4. **Deploy-Key:** eigenes Schlüsselpaar nur für GitHub Actions, öffentlichen Teil auf dem
+   Server in `~/.ssh/authorized_keys`:
+   ```bash
+   ssh-keygen -t ed25519 -N "" -C budgetpal-deploy -f budgetpal_deploy
+   ssh-keyscan -t ed25519 <server-ip>     # Ausgabe → Secret STRATO_KNOWN_HOSTS
+   ```
+5. **GitHub-Secrets** (Settings → Secrets and variables → Actions):
+
+   | Secret | Inhalt |
+   |---|---|
+   | `STRATO_HOST` | IP oder Hostname des VPS |
+   | `STRATO_USER` | SSH-Benutzer |
+   | `STRATO_SSH_KEY` | privater Deploy-Key (`budgetpal_deploy`) |
+   | `STRATO_KNOWN_HOSTS` | Zeile aus `ssh-keyscan`, schützt vor falschem Server |
+   | `STRATO_DEPLOY_PATH` | `/opt/budgetpal` |
+   | `STRATO_ENV_FILE` | Inhalt der `.env` für den Server, mindestens `POSTGRES_PASSWORD` und `JWT_SECRET_KEY` (`openssl rand -hex 32`), optional `MISTRAL_API_KEY` |
+
+   `ENVIRONMENT=production` und `ALLOWED_ORIGINS` setzt `docker-compose.prod.yml` fest.
+6. **Images öffentlich machen:** Nach dem ersten Build auf `main` unter GitHub → Profil →
+   Packages die Pakete `budget-pal/backend` und `budget-pal/frontend` auf *Public* stellen.
+   Dann braucht der Server keinen Token zum Herunterladen.
+7. **Einschalten:** Repository-Variable `DEPLOY_ENABLED=true` (Settings → Secrets and
+   variables → Actions → Variables). Danach den letzten `main`-Lauf neu starten (siehe unten).
+8. **Nächtliches Backup** per Cron auf dem Server:
+   ```bash
+   (crontab -l; echo "0 3 * * * /opt/budgetpal/scripts/backup-db.sh nightly >/dev/null") | crontab -
+   ```
+
+### Befehle
+
 ```bash
-# 1. SSH auf Strato VPS
-ssh user@strato-vps-ip
-
-# 2. Repository klonen
-git clone <repo-url> /opt/budget-pal
-cd /opt/budget-pal
-
-# 3. .env konfigurieren
-cp .env.example .env
-nano .env
-# ENVIRONMENT=production
-# ALLOWED_ORIGINS=https://budgetpal.doebele12.de
-# STRATO_DOMAIN=budgetpal.doebele12.de
-# starke Passwörter für POSTGRES_PASSWORD und JWT_SECRET_KEY
-
-# 4. Starten
-docker compose up -d --build
-
-# 5. Updates
-git pull
-docker compose build
-docker compose up -d
+gh run watch                                   # Deploy verfolgen
+gh run rerun $(gh run list --branch main --event push --limit 1 --json databaseId --jq '.[0].databaseId')
+                                               # letzten Deploy wiederholen, z. B. nach Änderung an STRATO_ENV_FILE
+curl -s https://budgetpal.doebele12.de/api/health
 ```
 
-### Nginx Reverse Proxy Beispiel (Host-Ebene)
+Auf dem Server (`cd /opt/budgetpal`):
 
-```nginx
-server {
-    listen 443 ssl;
-    server_name budgetpal.doebele12.de;
-
-    ssl_certificate /etc/letsencrypt/live/budgetpal.doebele12.de/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/budgetpal.doebele12.de/privkey.pem;
-
-    location / {
-        proxy_pass http://localhost:8011;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-Proto https;
-    }
-}
-
-server {
-    listen 80;
-    server_name budgetpal.doebele12.de;
-    return 301 https://$host$request_uri;
-}
+```bash
+docker compose -f docker-compose.prod.yml ps            # Status
+docker logs -f --tail=100 budget-pal-backend            # Backend-Logs
+IMAGE_TAG=<hash> ./deploy.sh                            # auf älteren Stand zurückrollen
+scripts/backup-db.sh                                    # Datenbank-Backup nach backups/
 ```
+
+Backup einspielen — **löscht alle aktuellen Daten**:
+
+```bash
+docker stop budget-pal-backend
+docker exec budget-pal-db psql -U budgetpal budgetpal -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
+gunzip -c backups/<datei>.sql.gz | docker exec -i budget-pal-db psql -q -U budgetpal budgetpal
+IMAGE_TAG=<hash> ./deploy.sh                            # Stand, der zum Backup passt
+```
+
+Beim Zurückrollen bleibt die Datenbank, wie sie ist. Hat die neuere Version sie migriert,
+startet ein älteres Image unter Umständen nicht mehr; dann das Backup von vor dem Deploy
+(`backups/budgetpal_*_pre-deploy_<hash>.sql.gz`) wie oben einspielen.
 
 ---
 
@@ -403,6 +476,9 @@ docker compose up -d --build
 
 # Zugriff: http://nas-ip:8011
 ```
+
+Mit `ENVIRONMENT=production` sind KI-Endpunkte im Heimnetz gesperrt. Für LM Studio oder
+Ollama auf dem NAS oder im LAN zusätzlich `AI_ALLOW_PRIVATE_ENDPOINTS=true` setzen.
 
 ---
 

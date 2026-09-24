@@ -13,6 +13,7 @@ Es gehen keine echten Netzwerk-Requests raus: httpx.AsyncClient ist gemockt.
 
 from unittest.mock import patch
 
+import httpx
 import pytest
 
 from app.services import ai_client
@@ -831,3 +832,45 @@ async def test_check_connection_without_key_does_not_call_out():
         result = await ai_client.check_connection(cfg)
     assert result.ok is False
     assert "Key" in result.error
+
+
+# ── Oeffentliche Endpunkte (Schutz vor Zugriffen auf interne Dienste) ──
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://8.8.8.8/v1",  # kein https
+        "https://127.0.0.1:1234/v1",
+        "https://10.0.0.5/v1",
+        "https://172.18.0.2:8000/api",  # Docker-Netz
+        "https://169.254.169.254/latest",  # Cloud-Metadaten
+        "https://[::1]/v1",
+        "https://[::ffff:127.0.0.1]/v1",
+    ],
+)
+async def test_internal_endpoints_are_refused(url):
+    with pytest.raises(ai_client.AiHttpError):
+        await ai_client.ensure_public_endpoint(url)
+
+
+@pytest.mark.asyncio
+async def test_public_https_endpoint_passes():
+    await ai_client.ensure_public_endpoint("https://8.8.8.8/v1/models")
+
+
+@pytest.mark.asyncio
+async def test_guard_applies_outside_development(monkeypatch):
+    request = httpx.Request("GET", "http://budget-pal-db:5432/")
+    monkeypatch.setattr(ai_client.settings, "environment", "development")
+    await ai_client._guard_request(request)  # lokal: LM Studio & Co. erlaubt
+    monkeypatch.setattr(ai_client.settings, "environment", "production")
+    with pytest.raises(ai_client.AiHttpError):
+        await ai_client._guard_request(request)
+    monkeypatch.setattr(ai_client.settings, "ai_allow_private_endpoints", True)
+    await ai_client._guard_request(request)  # NAS im Heimnetz
+
+
+def test_every_client_carries_the_guard():
+    assert ai_client._client(1.0).event_hooks["request"] == [ai_client._guard_request]
