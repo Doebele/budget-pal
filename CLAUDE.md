@@ -112,7 +112,8 @@ models/
                   # Scenario, ImportLog, ActivityLog, PeerGroupBenchmark
 
 api/              # One router per domain, all mounted in main.py under /api/<name>
-  auth.py         # /auth — register, login, /me, update profile
+  auth.py         # /auth — register, login, /me, update profile, password
+                  #   forgot/reset (mail link) and change
   transactions.py # /transactions — CRUD, stats, bulk-categorize, archived, restore
   accounts.py     # /accounts — CRUD + bulk-delete/preview (soft & hard delete)
   imports.py      # /imports — CSV/PDF upload, preview, history
@@ -167,6 +168,14 @@ request goes through `ai_client._client()`, whose request hook allows only
 public `https` addresses unless `ENVIRONMENT=development` or
 `AI_ALLOW_PRIVATE_ENDPOINTS=true`. Create new AI HTTP clients only via
 `_client()`, never `httpx.AsyncClient` directly.
+
+### Passwords and sessions
+Set a password only via `auth._set_password()`: it stamps
+`users.password_changed_at`, and `get_current_user` rejects every token issued
+before that second — this is how a password change signs out other devices.
+Reset links store only the SHA-256 of the token and are built from
+`settings.app_base_url`, never from the request's Host header. Mail goes out
+through `services/mailer.py` (plain SMTP); without `SMTP_HOST` it only logs.
 
 ### Test environment caveats
 Tests run against **in-memory SQLite**, which ignores `VARCHAR(n)` limits. A string

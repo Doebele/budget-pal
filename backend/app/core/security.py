@@ -76,11 +76,11 @@ def create_access_token(subject: str, expires_delta: Optional[timedelta] = None)
     return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 
-def decode_access_token(token: str) -> str:
+def decode_access_token(token: str) -> tuple[str, int]:
     """Decode and validate a JWT access token.
 
     Returns:
-        The subject (user ID) extracted from the token.
+        The subject (user ID) and the issue time (``iat``, Unix seconds).
 
     Raises:
         HTTPException 401 if token is invalid or expired.
@@ -95,9 +95,24 @@ def decode_access_token(token: str) -> str:
         subject: Optional[str] = payload.get("sub")
         if subject is None:
             raise credentials_exception
-        return subject
+        return subject, int(payload.get("iat") or 0)
     except JWTError:
         raise credentials_exception
+
+
+def password_changed_epoch(user) -> int:
+    """Letzter Passwortwechsel in ganzen Unix-Sekunden, 0 wenn nie.
+
+    Ganze Sekunden, weil `iat` im Token ganze Sekunden sind: ein Token aus
+    derselben Sekunde wie der Wechsel (das neue der eigenen Sitzung) gilt.
+    SQLite liefert die Spalte ohne Zeitzone zurueck; gespeichert ist UTC.
+    """
+    changed = user.password_changed_at
+    if changed is None:
+        return 0
+    if changed.tzinfo is None:
+        changed = changed.replace(tzinfo=timezone.utc)
+    return int(changed.timestamp())
 
 
 # ── Current User Dependency ───────────────────────────────────
@@ -112,7 +127,7 @@ async def get_current_user(
     """
     from app.models.models import User  # local import to avoid circular
 
-    user_id_str = decode_access_token(token)
+    user_id_str, issued_at = decode_access_token(token)
     try:
         user_id = int(user_id_str)
     except ValueError:
@@ -125,5 +140,8 @@ async def get_current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found.")
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user account.")
+    if issued_at < password_changed_epoch(user):
+        # Vor dem letzten Passwortwechsel ausgestellt — diese Sitzung ist beendet
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session ended by password change.")
 
     return user

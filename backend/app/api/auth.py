@@ -5,10 +5,15 @@ POST /auth/register  — create new user
 POST /auth/login     — returns JWT
 GET  /auth/me        — current user profile
 PUT  /auth/me        — update profile
+POST /auth/password/forgot — Link zum Zuruecksetzen per E-Mail
+POST /auth/password/reset  — neues Passwort mit diesem Link
+POST /auth/password/change — Passwort aendern (angemeldet)
 """
 
-from datetime import date, datetime
-from typing import Optional
+import hashlib
+import secrets
+from datetime import date, datetime, timedelta, timezone
+from typing import Annotated, Optional
 
 from app.core.database import get_db
 from app.core.rate_limit import SlidingWindowRateLimiter
@@ -20,11 +25,13 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
+from app.core.config import settings
 from app.models.models import User
+from app.services import mailer
 from app.services.currency_service import REFERENCE_CURRENCIES
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import AfterValidator, BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,6 +40,25 @@ SUPPORTED_UI_LANGUAGES = {"de", "en"}
 
 router = APIRouter()
 login_rate_limiter = SlidingWindowRateLimiter(max_requests=8, window_seconds=60)
+# Passwort vergessen: je IP und je Adresse, damit niemand Postfaecher flutet
+forgot_ip_limiter = SlidingWindowRateLimiter(max_requests=10, window_seconds=900)
+forgot_email_limiter = SlidingWindowRateLimiter(max_requests=3, window_seconds=900)
+reset_limiter = SlidingWindowRateLimiter(max_requests=10, window_seconds=900)
+# Je Nutzer: mit einer gestohlenen Sitzung das aktuelle Passwort durchprobieren
+change_limiter = SlidingWindowRateLimiter(max_requests=5, window_seconds=300)
+
+RESET_LINK_TTL = timedelta(minutes=30)
+MIN_PASSWORD_LENGTH = 8
+
+
+def _check_password_length(v: str) -> str:
+    if len(v) < MIN_PASSWORD_LENGTH:
+        raise ValueError(f"Password must be at least {MIN_PASSWORD_LENGTH} characters.")
+    return v
+
+
+# Gleiche Regel fuer Registrierung, Zuruecksetzen und Aendern
+Password = Annotated[str, AfterValidator(_check_password_length)]
 
 
 # ── Schemas ───────────────────────────────────────────────────
@@ -40,15 +66,8 @@ login_rate_limiter = SlidingWindowRateLimiter(max_requests=8, window_seconds=60)
 
 class UserRegisterRequest(BaseModel):
     email: EmailStr
-    password: str
+    password: Password
     name: str
-
-    @field_validator("password")
-    @classmethod
-    def password_min_length(cls, v: str) -> str:
-        if len(v) < 8:
-            raise ValueError("Password must be at least 8 characters.")
-        return v
 
 
 class UserLoginRequest(BaseModel):
@@ -92,8 +111,6 @@ class UserUpdateRequest(BaseModel):
     ui_language: Optional[str] = None
     session_timeout: Optional[str] = None
     saron_reference_annual_pct: Optional[float] = Field(default=None, ge=0.0, le=25.0)
-    current_password: Optional[str] = None
-    new_password: Optional[str] = None
 
     @field_validator("session_timeout")
     @classmethod
@@ -104,12 +121,19 @@ class UserUpdateRequest(BaseModel):
             )
         return v
 
-    @field_validator("new_password")
-    @classmethod
-    def new_password_min_length(cls, v: Optional[str]) -> Optional[str]:
-        if v is not None and len(v) < 8:
-            raise ValueError("New password must be at least 8 characters.")
-        return v
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(min_length=20, max_length=200)
+    new_password: Password
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: Password
 
 
 # ── Routes ────────────────────────────────────────────────────
@@ -194,6 +218,184 @@ async def login(
     )
 
 
+# ── Passwort ──────────────────────────────────────────────────
+
+_MAILS = {
+    "de": {
+        "reset_subject": "Budget-Pal: Passwort zurücksetzen",
+        "reset_text": (
+            "Hallo {name}\n\n"
+            "Für dein Budget-Pal-Konto wurde ein neues Passwort angefordert. "
+            "Mit diesem Link setzt du es. Er gilt 30 Minuten und nur einmal:\n\n"
+            "{link}\n\n"
+            "Hast du das nicht angefordert, ignoriere diese Mail. Dein Passwort bleibt, wie es ist."
+        ),
+        "changed_subject": "Budget-Pal: Passwort geändert",
+        "changed_text": (
+            "Hallo {name}\n\n"
+            "Das Passwort deines Budget-Pal-Kontos wurde eben geändert. "
+            "Alle anderen Geräte sind abgemeldet.\n\n"
+            "Warst du das nicht, setze das Passwort sofort über „Passwort vergessen?“ zurück:\n"
+            "{link}"
+        ),
+    },
+    "en": {
+        "reset_subject": "Budget-Pal: reset your password",
+        "reset_text": (
+            "Hello {name}\n\n"
+            "A new password was requested for your Budget-Pal account. "
+            "Use this link to set it. It is valid for 30 minutes and works once:\n\n"
+            "{link}\n\n"
+            "If you did not request this, ignore this email. Your password stays as it is."
+        ),
+        "changed_subject": "Budget-Pal: password changed",
+        "changed_text": (
+            "Hello {name}\n\n"
+            "The password of your Budget-Pal account was just changed. "
+            "All other devices have been signed out.\n\n"
+            "If this wasn't you, reset your password right away via “Forgot password?”:\n"
+            "{link}"
+        ),
+    },
+}
+
+
+def _mail_text(user: User, kind: str, link: str) -> tuple[str, str]:
+    texts = _MAILS.get(user.ui_language, _MAILS["en"])
+    return texts[f"{kind}_subject"], texts[f"{kind}_text"].format(name=user.name, link=link)
+
+
+def _app_url(path: str) -> str:
+    # Immer aus der Konfiguration, nie aus dem Host-Header der Anfrage
+    return settings.app_base_url.rstrip("/") + path
+
+
+def _token_hash(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def _as_utc(value: Optional[datetime]) -> Optional[datetime]:
+    # SQLite liefert DateTime ohne Zeitzone zurueck; gespeichert ist UTC
+    if value is not None and value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value
+
+
+def _set_password(user: User, new_password: str) -> None:
+    """Einziger Weg, ein Passwort zu setzen: beendet alle bestehenden Sitzungen
+    (password_changed_at) und macht einen offenen Reset-Link ungueltig."""
+    user.hashed_password = hash_password(new_password)
+    user.password_changed_at = datetime.now(timezone.utc)
+    user.password_reset_hash = None
+    user.password_reset_expires = None
+
+
+def _limit(limiter: SlidingWindowRateLimiter, key: str) -> None:
+    decision = limiter.check(key)
+    if not decision.allowed:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Too many attempts. Try again in {decision.retry_after_seconds}s.",
+        )
+
+
+@router.post("/password/forgot", status_code=status.HTTP_202_ACCEPTED)
+async def forgot_password(
+    payload: ForgotPasswordRequest,
+    request: Request,
+    background: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    """Schickt einen Link zum Zuruecksetzen. Die Antwort ist immer dieselbe —
+    sie verraet nicht, ob es zur Adresse ein Konto gibt. Die Mail geht im
+    Hintergrund raus, damit auch die Antwortzeit nichts verraet."""
+    email = payload.email.lower()
+    _limit(forgot_ip_limiter, request.client.host if request.client else "unknown")
+    _limit(forgot_email_limiter, email)
+
+    user = (
+        await db.execute(select(User).where(func.lower(User.email) == email))
+    ).scalar_one_or_none()
+    if user and user.is_active:
+        token = secrets.token_urlsafe(32)
+        user.password_reset_hash = _token_hash(token)
+        user.password_reset_expires = datetime.now(timezone.utc) + RESET_LINK_TTL
+        await db.commit()
+        # Token im Fragment: der Browser schickt es nie an einen Server,
+        # es steht also in keinem Zugriffslog und keinem Referer
+        link = _app_url(f"/reset-password#token={token}")
+        background.add_task(mailer.send_mail, user.email, *_mail_text(user, "reset", link))
+
+    return {"detail": "If an account exists for this address, an email is on its way."}
+
+
+@router.post("/password/reset")
+async def reset_password(
+    payload: ResetPasswordRequest,
+    request: Request,
+    background: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    """Setzt das Passwort mit dem Link aus der Mail. Danach ist der Link
+    verbraucht und jede bestehende Sitzung beendet."""
+    _limit(reset_limiter, request.client.host if request.client else "unknown")
+
+    user = (
+        await db.execute(
+            select(User).where(User.password_reset_hash == _token_hash(payload.token))
+        )
+    ).scalar_one_or_none()
+    expires = _as_utc(user.password_reset_expires) if user else None
+    if not user or not user.is_active or not expires or expires < datetime.now(timezone.utc):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This link is invalid or has expired.",
+        )
+
+    _set_password(user, payload.new_password)
+    await db.commit()
+    background.add_task(
+        mailer.send_mail, user.email, *_mail_text(user, "changed", _app_url("/forgot-password"))
+    )
+    return {"detail": "Password has been reset."}
+
+
+@router.post("/password/change", response_model=TokenResponse)
+async def change_password(
+    payload: ChangePasswordRequest,
+    background: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Passwort aendern. Alle anderen Sitzungen enden; diese bekommt ein neues
+    Token. Falsches aktuelles Passwort ist 400, nicht 401 — ein 401 meldet das
+    Frontend ab."""
+    _limit(change_limiter, str(current_user.id))
+    if not verify_password(payload.current_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect.",
+        )
+
+    _set_password(current_user, payload.new_password)
+    await db.commit()
+    # Nach dem Wechsel ausgestellt, gilt also weiter
+    token = create_access_token(
+        str(current_user.id), session_timeout_delta(current_user.session_timeout)
+    )
+    background.add_task(
+        mailer.send_mail,
+        current_user.email,
+        *_mail_text(current_user, "changed", _app_url("/forgot-password")),
+    )
+    return TokenResponse(
+        access_token=token,
+        user_id=current_user.id,
+        name=current_user.name,
+        email=current_user.email,
+    )
+
+
 @router.get("/me", response_model=UserProfileResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
     """Return the current user's profile."""
@@ -267,20 +469,6 @@ async def update_me(
         current_user.saron_reference_annual_pct = float(
             payload.saron_reference_annual_pct
         )
-
-    # Handle password change
-    if payload.new_password:
-        if not payload.current_password:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="current_password is required to change password.",
-            )
-        if not verify_password(payload.current_password, current_user.hashed_password):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Current password is incorrect.",
-            )
-        current_user.hashed_password = hash_password(payload.new_password)
 
     await db.flush()
     await db.commit()

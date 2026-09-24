@@ -243,9 +243,9 @@ class TestUpdateMe:
         data = response.json()
         assert data["birthdate"] is None
 
-    def test_update_password_success(self, client, test_user):
-        """Test successful password change."""
-        # First update password
+    def test_update_me_no_longer_changes_password(self, client, test_user):
+        """Passwoerter aendern nur noch /auth/password/change — der beendet
+        auch die anderen Sitzungen. PUT /me ignoriert die Felder."""
         response = client.put(
             "/api/auth/me",
             json={
@@ -253,58 +253,13 @@ class TestUpdateMe:
                 "new_password": "newsecurepassword123",
             },
         )
-
         assert response.status_code == 200
 
-        # Verify login with new password works
-        response = client.post(
+        old = client.post(
             "/api/auth/login",
-            json={
-                "email": "test@example.com",
-                "password": "newsecurepassword123",
-            },
+            json={"email": "test@example.com", "password": "testpassword123"},
         )
-
-        assert response.status_code == 200
-        assert "access_token" in response.json()
-
-    def test_update_password_wrong_current(self, client, test_user):
-        """Test password change with wrong current password."""
-        response = client.put(
-            "/api/auth/me",
-            json={
-                "current_password": "wrongpassword",
-                "new_password": "newsecurepassword123",
-            },
-        )
-
-        assert response.status_code == 400
-        assert "incorrect" in response.json()["detail"].lower()
-
-    def test_update_password_missing_current(self, client, test_user):
-        """Test password change without current password."""
-        response = client.put(
-            "/api/auth/me",
-            json={
-                "new_password": "newsecurepassword123",
-                # Missing current_password
-            },
-        )
-
-        assert response.status_code == 400
-        assert "required" in response.json()["detail"].lower()
-
-    def test_update_password_new_too_short(self, client, test_user):
-        """Test password change with new password too short."""
-        response = client.put(
-            "/api/auth/me",
-            json={
-                "current_password": "testpassword123",
-                "new_password": "1234567",  # Only 7 characters
-            },
-        )
-
-        assert response.status_code == 422  # Validation error
+        assert old.status_code == 200
 
     def test_update_partial_fields(self, client, test_user):
         """Test updating only some fields."""

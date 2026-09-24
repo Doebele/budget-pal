@@ -87,6 +87,11 @@ export default function Login() {
                 required
                 autoComplete="current-password"
               />
+              <div className="text-right mt-1.5">
+                <Link to="/forgot-password" className="text-accent hover:text-accent-light text-xs">
+                  {t("login.forgot")}
+                </Link>
+              </div>
             </div>
 
             {error && (

@@ -228,6 +228,14 @@ Sprache, Session-Dauer und aktiven KI-Anbieter ersetzt. Ungültige Werte in der 
 - Multi-User mit JWT (python-jose, bcrypt)
 - Registrierung und Login, Passkeys (WebAuthn)
 - Session-Dauer pro Nutzer einstellbar
+- **Passwort ändern** unter *Einstellungen → Sicherheit*; alle anderen Geräte werden dabei
+  abgemeldet, die eigene Sitzung bleibt
+- **Passwort vergessen** auf der Login-Seite: ein Link per E-Mail, 30 Minuten und nur einmal
+  gültig. Die Antwort ist immer gleich, sie verrät nicht, ob es die Adresse gibt. In der
+  Datenbank liegt nur der SHA-256 des Links; das Token steht im URL-Fragment und damit in
+  keinem Server-Log. Nach jedem Wechsel geht eine Info-Mail an den Kontoinhaber.
+- Mails per SMTP (`SMTP_*`), produktiv über ein Strato-Postfach. Ohne SMTP und mit
+  `ENVIRONMENT=development` steht der Link im Backend-Log.
 
 ---
 
@@ -276,6 +284,12 @@ FRONTEND_PORT=8011           # Standard-Port Frontend
 AUTO_CREATE_SCHEMA=false     # true = DB ohne Alembic beim ersten Start
 ENVIRONMENT=production       # development = lokal, erlaubt LM Studio/Ollama
 AI_ALLOW_PRIVATE_ENDPOINTS=false  # true = LM Studio/Ollama im Heimnetz (NAS)
+SMTP_HOST=smtp.strato.de     # Mails für "Passwort vergessen"; leer = keine Mails
+SMTP_PORT=465                # 465 = SSL, sonst STARTTLS
+SMTP_USER=noreply@example.ch
+SMTP_PASSWORD=...
+SMTP_FROM=noreply@example.ch
+APP_BASE_URL=http://localhost:8011  # Basis für Links in Mails (nie aus dem Host-Header)
 ```
 
 KI-Anbieter und ihre API-Keys gehören **nicht** in die `.env` — jeder Nutzer hinterlegt sie
@@ -410,7 +424,7 @@ erreichbar, auch wenn die Server-Firewall aus ist.
    | `STRATO_SSH_KEY` | privater Deploy-Key (`budgetpal_deploy`) |
    | `STRATO_KNOWN_HOSTS` | Zeile aus `ssh-keyscan`, schützt vor falschem Server |
    | `STRATO_DEPLOY_PATH` | `/opt/budgetpal` |
-   | `STRATO_ENV_FILE` | Inhalt der `.env` für den Server, mindestens `POSTGRES_PASSWORD` und `JWT_SECRET_KEY` (`openssl rand -hex 32`), optional `MISTRAL_API_KEY` |
+   | `STRATO_ENV_FILE` | Inhalt der `.env` für den Server, mindestens `POSTGRES_PASSWORD` und `JWT_SECRET_KEY` (`openssl rand -hex 32`), optional `MISTRAL_API_KEY` und die `SMTP_*`-Zeilen für „Passwort vergessen“. **`POSTGRES_PASSWORD` nach dem ersten Deploy nicht mehr ändern** — es gilt nur beim Anlegen der Datenbank |
 
    `ENVIRONMENT=production` und `ALLOWED_ORIGINS` setzt `docker-compose.prod.yml` fest.
 6. **Images öffentlich machen:** Nach dem ersten Build auf `main` unter GitHub → Profil →

@@ -75,7 +75,20 @@
     "lastUsed": "zuletzt genutzt: {{date}}",
     "passkeyCancelled": "Abgebrochen — es wurde kein Passkey angelegt.",
     "passkeyFailed": "Passkey konnte nicht registriert werden. Passkeys brauchen HTTPS oder localhost.",
-    "passkeyUnsupported": "Dieser Browser unterstützt keine Passkeys."
+    "passkeyUnsupported": "Dieser Browser unterstützt keine Passkeys.",
+    "passwordTitle": "Passwort ändern",
+    "passwordHint": "Nach dem Ändern werden alle anderen Geräte abgemeldet. Diese Sitzung bleibt aktiv.",
+    "passwordCurrent": "Aktuelles Passwort",
+    "passwordNew": "Neues Passwort (min. 8 Zeichen)",
+    "passwordConfirm": "Neues Passwort wiederholen",
+    "passwordSave": "Passwort ändern",
+    "passwordSaving": "Wird gespeichert …",
+    "passwordDone": "Passwort geändert. Andere Geräte wurden abgemeldet.",
+    "passwordWrong": "Das aktuelle Passwort ist falsch.",
+    "passwordMismatch": "Die neuen Passwörter stimmen nicht überein.",
+    "passwordTooShort": "Das neue Passwort braucht mindestens 8 Zeichen.",
+    "passwordTooMany": "Zu viele Versuche — bitte in ein paar Minuten erneut.",
+    "passwordFailed": "Ändern fehlgeschlagen. Bitte erneut versuchen."
   },
   "backup": {
     "title": "Datensicherung",
