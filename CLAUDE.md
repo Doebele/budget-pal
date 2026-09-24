@@ -121,9 +121,19 @@ api/              # One router per domain, all mounted in main.py under /api/<na
   currency.py     # /currency — live exchange rates (ECB, cached)
   goals.py        # /goals — financial goals
   forecasting.py  # /forecasting — predictive budget scenarios
+  backup.py       # /backup — JSON export/import of all data + settings (v1.1).
+                  #   GET /export never contains API keys; POST /export-secrets does,
+                  #   but only with the account password (rate-limited, 403 not 401 —
+                  #   a 401 logs the frontend out). Restoring settings is opt-in.
 
 services/
-  categorization.py   # 5-stage AI pipeline: manual cache → keyword → fuzzy → embedding → OpenAI
+  categorization.py   # 5-stage pipeline: manual cache → keyword → fuzzy → embedding → LLM
+                      #   (the LLM is whatever the user picked, via ai_client)
+  ai_client.py        # Provider-agnostic LLM client. 18 providers in PROVIDER_CATALOG
+                      #   (same list as fintools); Anthropic uses its Messages API,
+                      #   every other provider the OpenAI-compatible API. One profile
+                      #   per provider in users.ai_config_json; the old flat format is
+                      #   still read. API keys never leave the server (has_key only).
   projection.py       # Monte Carlo simulation + Swiss AHV/BVG/3a pension math
   currency_service.py # ECB rate fetch with file cache (rates.json)
   import_parsers/     # Bank CSV/PDF parsers: UBS, N26, Revolut, comdirect
@@ -137,6 +147,13 @@ services/
                       #   Frontend twin: frontend/src/lib/planSchedule.ts — keep in sync.
   demo_data.py        # Anonymous sample household (fixed seed → reproducible)
 ```
+
+### API keys
+Stored AI keys never leave the server in normal responses (`has_key` only).
+A stored key is only ever sent to the endpoint it was saved with
+(`ai_client.endpoint_moves`): the connection test, the model list, saving a
+new endpoint and a backup import all enforce this. Otherwise a stolen session
+token could point a provider at a foreign server and receive the key.
 
 ### Test environment caveats
 Tests run against **in-memory SQLite**, which ignores `VARCHAR(n)` limits. A string

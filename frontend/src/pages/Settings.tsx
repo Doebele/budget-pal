@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { clsx } from "clsx";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
-import { api, authApi, settingsApi, taxonomyApi, backupApi, aiApi, passkeysApi, SESSION_TIMEOUTS, type AiProvider, type AiSettings, type SessionTimeout } from "@/lib/api";
+import { api, authApi, settingsApi, taxonomyApi, backupApi, aiApi, passkeysApi, SESSION_TIMEOUTS, type AiProfileUpdate, type AiSettingsUpdate, type AiTestResult, type SessionTimeout } from "@/lib/api";
 import { startRegistration } from "@simplewebauthn/browser";
 import { DEFAULT_SARON_REFERENCE_ANNUAL_PCT, SARON_INDEX_URL } from "@/lib/saron";
 import { Check, CheckCircle, Download, EditPencil, Eye, FloppyDisk, Group, Label, MagicWand, NavArrowDown, NavArrowUp, OpenNewWindow, Plus, Refresh, ShieldCheck, Sparks, Trash, Undo, Upload, WarningCircle, Xmark } from "@/lib/icons";
@@ -103,6 +103,10 @@ export default function Settings() {
   // ── Backup / Restore ─────────────────────────────────────────
   const [backupExporting, setBackupExporting] = useState(false);
   const [backupExportError, setBackupExportError] = useState<string | null>(null);
+  // API-Keys nur auf ausdrücklichen Wunsch und mit Passwort (fintools gibt sie
+  // ohne Rückfrage heraus; BudgetPal läuft öffentlich)
+  const [includeKeys, setIncludeKeys] = useState(false);
+  const [exportPassword, setExportPassword] = useState("");
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importOptions, setImportOptions] = useState({
     overwrite_profile: false,
@@ -110,6 +114,8 @@ export default function Settings() {
     import_recurring_plan: true,
     import_wizard_config: true,
     import_pension_assets: true,
+    // Überschreibt Sprache, Session-Dauer und KI-Anbieter — darum nicht vorbelegt
+    import_settings: false,
   });
   const [importResult, setImportResult] = useState<Record<string, unknown> | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -119,18 +125,30 @@ export default function Settings() {
     setBackupExporting(true);
     setBackupExportError(null);
     try {
-      const resp = await backupApi.export();
+      const resp = includeKeys
+        ? await backupApi.exportWithSecrets(exportPassword)
+        : await backupApi.export();
       const blob = new Blob([resp.data], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       const now = new Date();
       const ts = now.toISOString().replace(/[:.]/g, "-").slice(0, 19);
       a.href = url;
-      a.download = `budgetpal_backup_${ts}.json`;
+      a.download = `budgetpal_backup_${ts}${includeKeys ? "_mit_keys" : ""}.json`;
       a.click();
       URL.revokeObjectURL(url);
-    } catch {
-      setBackupExportError("Export fehlgeschlagen. Bitte erneut versuchen.");
+      // Das Passwort bleibt nicht im Zustand liegen
+      setExportPassword("");
+      setIncludeKeys(false);
+    } catch (e) {
+      const status = (e as { response?: { status?: number } })?.response?.status;
+      setBackupExportError(
+        status === 403
+          ? t("settings:backup.wrongPassword")
+          : status === 429
+            ? t("settings:backup.tooManyAttempts")
+            : t("settings:backup.exportError"),
+      );
     } finally {
       setBackupExporting(false);
     }
@@ -149,8 +167,8 @@ export default function Settings() {
       queryClient.invalidateQueries();
     } catch (e) {
       const msg = e instanceof SyntaxError
-        ? "Ungültige JSON-Datei."
-        : "Import fehlgeschlagen. Bitte Backup-Datei überprüfen.";
+        ? t("settings:backup.invalidJson")
+        : t("settings:backup.importError");
       setImportError(msg);
     } finally {
       setImportPending(false);
@@ -1494,7 +1512,7 @@ export default function Settings() {
       <div className="card space-y-5">
         <h2 className="text-text-primary font-semibold text-sm flex items-center gap-2">
           <ShieldCheck className="w-4 h-4 text-accent" />
-          Datensicherung
+          {t("settings:backup.title")}
         </h2>
 
         {/* Export */}
@@ -1503,17 +1521,55 @@ export default function Settings() {
           <p className="text-text-tertiary text-xs">
             {t("pages:hints.exportNote")}
           </p>
+
+          <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer w-fit">
+            <input
+              type="checkbox"
+              checked={includeKeys}
+              onChange={(e) => {
+                setIncludeKeys(e.target.checked);
+                setExportPassword("");
+                setBackupExportError(null);
+              }}
+              className="accent-accent"
+            />
+            {t("settings:backup.includeKeys")}
+          </label>
+
+          {includeKeys && (
+            <div className="space-y-2">
+              <p className="msg msg-warning text-xs flex items-start gap-1.5">
+                <WarningCircle className="w-3.5 h-3.5 shrink-0 mt-px" />
+                {t("settings:backup.keysWarn")}
+              </p>
+              <input
+                type="password"
+                className="input text-sm max-w-xs"
+                value={exportPassword}
+                onChange={(e) => setExportPassword(e.target.value)}
+                placeholder={t("settings:backup.password")}
+                aria-label={t("settings:backup.password")}
+                autoComplete="current-password"
+              />
+              <p className="text-text-disabled text-[11px]">{t("settings:backup.passwordHint")}</p>
+            </div>
+          )}
+
           <button
             type="button"
             onClick={handleExport}
-            disabled={backupExporting}
+            disabled={backupExporting || (includeKeys && !exportPassword)}
             className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent/90 disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
           >
             <Download className="w-4 h-4" />
-            {backupExporting ? "Wird exportiert…" : "JSON-Backup herunterladen"}
+            {backupExporting
+              ? t("settings:backup.exporting")
+              : includeKeys
+                ? t("settings:backup.exportWithKeys")
+                : t("settings:backup.exportButton")}
           </button>
           {backupExportError && (
-            <p className="text-loss text-xs flex items-center gap-1">
+            <p className="text-loss text-xs flex items-center gap-1" role="alert">
               <WarningCircle className="w-3.5 h-3.5" /> {backupExportError}
             </p>
           )}
@@ -1532,7 +1588,7 @@ export default function Settings() {
           <label className="flex items-center gap-2 cursor-pointer w-fit">
             <span className="flex items-center gap-2 px-3 py-2 bg-bg-surface2 hover:bg-bg-surface border border-border text-text-secondary hover:text-text-primary rounded-lg text-sm transition-colors">
               <Upload className="w-4 h-4" />
-              {importFile ? importFile.name : "Backup-Datei auswählen (.json)"}
+              {importFile ? importFile.name : t("settings:backup.chooseFile")}
             </span>
             <input
               type="file"
@@ -1547,12 +1603,13 @@ export default function Settings() {
             <div className="space-y-2 text-xs text-text-secondary">
               <p className="text-text-tertiary font-medium">{t("pages:settings2.g31")}</p>
               {([
-                ["import_transactions", "Transaktionen importieren"],
-                ["import_recurring_plan", "Wiederkehrende Einträge importieren"],
-                ["import_wizard_config", "Wizard-Konfiguration wiederherstellen"],
-                ["import_pension_assets", "Säulen & Assets importieren"],
-                ["overwrite_profile", "Profil-Felder überschreiben (Name, Währung, …)"],
-              ] as [keyof typeof importOptions, string][]).map(([key, label]) => (
+                ["import_transactions", "optTransactions"],
+                ["import_recurring_plan", "optRecurring"],
+                ["import_wizard_config", "optWizard"],
+                ["import_pension_assets", "optPension"],
+                ["overwrite_profile", "optProfile"],
+                ["import_settings", "optSettings"],
+              ] as [keyof typeof importOptions, string][]).map(([key, labelKey]) => (
                 <label key={key} className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -1560,7 +1617,7 @@ export default function Settings() {
                     onChange={(e) => setImportOptions((o) => ({ ...o, [key]: e.target.checked }))}
                     className="accent-accent"
                   />
-                  {label}
+                  {t(`settings:backup.${labelKey}`)}
                 </label>
               ))}
               <button
@@ -1570,24 +1627,39 @@ export default function Settings() {
                 className="mt-2 flex items-center gap-2 px-4 py-2 bg-gain/80 hover:bg-gain disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
               >
                 <Upload className="w-4 h-4" />
-                {importPending ? "Wird importiert…" : "Backup importieren"}
+                {importPending ? t("settings:backup.importing") : t("settings:backup.importButton")}
               </button>
             </div>
           )}
 
           {/* Result */}
           {importResult && (
-            <div className="p-3 rounded-xl bg-gain/10 border border-gain/30 text-xs space-y-1 text-gain">
-              <p className="font-medium flex items-center gap-1"><Check className="w-3.5 h-3.5" /> Import abgeschlossen</p>
-              <p>Konten: +{String(importResult.accounts_created ?? 0)} · Transaktionen: +{String(importResult.transactions_created ?? 0)} übersprungen: {String(importResult.transactions_skipped ?? 0)}</p>
-              <p>Wiederkehrend: +{String(importResult.recurring_plan_created ?? 0)} · Säulen: +{String(importResult.pension_created ?? 0)} · Assets: +{String(importResult.assets_created ?? 0)}</p>
+            <div className="p-3 rounded-xl bg-gain/10 border border-gain/30 text-xs space-y-1 text-gain" role="status">
+              <p className="font-medium flex items-center gap-1"><Check className="w-3.5 h-3.5" /> {t("settings:backup.importDone")}</p>
+              <p>
+                {t("settings:backup.resultData", {
+                  accounts: importResult.accounts_created ?? 0,
+                  created: importResult.transactions_created ?? 0,
+                  skipped: importResult.transactions_skipped ?? 0,
+                })}
+              </p>
+              <p>
+                {t("settings:backup.resultPlan", {
+                  recurring: importResult.recurring_plan_created ?? 0,
+                  pension: importResult.pension_created ?? 0,
+                  assets: importResult.assets_created ?? 0,
+                })}
+              </p>
+              {Boolean(importResult.settings_restored) && (
+                <p>{t("settings:backup.settingsRestored", { count: Number(importResult.api_keys_restored ?? 0) })}</p>
+              )}
               {(importResult.warnings as string[] | undefined)?.length ? (
                 <p className="txt-warning">⚠ {(importResult.warnings as string[]).join("; ")}</p>
               ) : null}
             </div>
           )}
           {importError && (
-            <p className="text-loss text-xs flex items-center gap-1">
+            <p className="text-loss text-xs flex items-center gap-1" role="alert">
               <WarningCircle className="w-3.5 h-3.5" /> {importError}
             </p>
           )}
@@ -1776,43 +1848,12 @@ function SecuritySection() {
 }
 
 // ── KI-Modell — Anbieter- und Modellauswahl ────────────────────
-// Provider und Modell liegen serverseitig pro User (users.ai_config_json);
-// API-Keys kommen nie zurück, die API meldet nur has_*_key.
-const AI_PROVIDERS: { id: AiProvider; label: string; color?: string }[] = [
-  { id: "none", label: "Aus" },
-  { id: "lm-studio", label: "LM Studio", color: "#10b981" },
-  { id: "ollama", label: "Ollama", color: "#e05d44" },
-  { id: "anthropic", label: "Anthropic", color: "#f59e0b" },
-  { id: "openai", label: "OpenAI", color: "#74aa9c" },
-  { id: "gemini", label: "Gemini", color: "#4285f4" },
-  { id: "openrouter", label: "OpenRouter", color: "#a855f7" },
-];
+// Aufbau wie im Schwesterprojekt fintools (Einstellungen → KI-Modell):
+// Anbieterliste mit Lokal/Cloud-Gruppen, ein Profil je Anbieter, Modellliste
+// live vom Anbieter, Verbindungstest. Abweichung: der gespeicherte API-Key
+// kommt nie zurück in den Browser — die API meldet nur has_key.
 
-// Provider mit lokalem Server → Modellliste wird live abgefragt
-const LOCAL_PROVIDERS: AiProvider[] = ["lm-studio", "ollama"];
-// Provider mit Freitext-Modellfeld statt Auswahlliste
-const FREETEXT_MODEL_PROVIDERS: AiProvider[] = ["openrouter"];
-
-const AI_KEY_FIELD: Partial<Record<AiProvider, { field: string; has: keyof AiSettings; placeholder: string }>> = {
-  anthropic:  { field: "anthropic_api_key",  has: "has_anthropic_key",  placeholder: "sk-ant-…" },
-  openai:     { field: "openai_api_key",     has: "has_openai_key",     placeholder: "sk-…" },
-  gemini:     { field: "gemini_api_key",     has: "has_gemini_key",     placeholder: "AIza…" },
-  openrouter: { field: "openrouter_api_key", has: "has_openrouter_key", placeholder: "sk-or-…" },
-};
-
-const AI_MODEL_FIELD: Partial<Record<AiProvider, keyof AiSettings>> = {
-  "lm-studio": "lm_studio_model",
-  ollama: "ollama_model",
-  anthropic: "anthropic_model",
-  openai: "openai_model",
-  gemini: "gemini_model",
-  openrouter: "openrouter_model",
-};
-
-const AI_URL_FIELD: Partial<Record<AiProvider, keyof AiSettings>> = {
-  "lm-studio": "lm_studio_url",
-  ollama: "ollama_url",
-};
+type TestState = null | "testing" | AiTestResult;
 
 function AiModelSection() {
   const { t } = useTranslation("settings");
@@ -1822,46 +1863,125 @@ function AiModelSection() {
     queryKey: ["ai-settings"],
     queryFn: async () => (await aiApi.get()).data,
   });
-
-  // Entwurf: nur geänderte Felder werden gesendet, damit ein weggelassener
-  // API-Key den gespeicherten serverseitig nicht überschreibt.
-  const [draft, setDraft] = useState<Record<string, string>>({});
-  const [showKey, setShowKey] = useState(false);
-  const [saved, setSaved] = useState(false);
-
-  const provider = (draft.provider ?? settings?.provider ?? "none") as AiProvider;
-  const urlField = AI_URL_FIELD[provider];
-  const modelField = AI_MODEL_FIELD[provider];
-  const keyMeta = AI_KEY_FIELD[provider];
-
-  const value = (field?: keyof AiSettings | string) => {
-    if (!field) return "";
-    return draft[field as string] ?? ((settings?.[field as keyof AiSettings] as string) ?? "");
-  };
-  const set = (field: string, v: string) => {
-    setSaved(false);
-    setDraft((d) => ({ ...d, [field]: v }));
-  };
-
-  const currentUrl = urlField ? value(urlField) : undefined;
-  const { data: models = [], isFetching: modelsLoading, isError: modelsError, refetch } = useQuery({
-    queryKey: ["ai-models", provider, currentUrl],
-    queryFn: async () => (await aiApi.models(provider, currentUrl)).data,
-    enabled: provider !== "none",
+  const { data: catalog = [] } = useQuery({
+    queryKey: ["ai-providers"],
+    queryFn: async () => (await aiApi.providers()).data,
+    staleTime: Infinity,
   });
 
+  // Entwürfe je Anbieter: nur geänderte Felder werden gesendet, damit ein
+  // weggelassener API-Key den gespeicherten serverseitig nicht überschreibt.
+  // Beim Anbieterwechsel bleibt jeder Entwurf stehen.
+  const [draftProvider, setDraftProvider] = useState<string | null>(null);
+  const [drafts, setDrafts] = useState<Record<string, AiProfileUpdate>>({});
+  const [contextDraft, setContextDraft] = useState<number | null>(null);
+  const [showKey, setShowKey] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [testState, setTestState] = useState<TestState>(null);
+
+  const provider = draftProvider ?? settings?.provider ?? "none";
+  const info = catalog.find((p) => p.id === provider);
+  const stored = settings?.profiles[provider];
+  const draft = drafts[provider] ?? {};
+
+  const endpoint = draft.endpoint ?? (stored?.endpoint || info?.url || "");
+  const model = draft.model ?? stored?.model ?? "";
+  // Ein gespeicherter Key geht nur an den Endpunkt, mit dem er gespeichert
+  // wurde (serverseitig erzwungen). Wer den Endpunkt ändert, tippt ihn neu.
+  const norm = (u: string) => u.trim().replace(/\/+$/, "");
+  const endpointMoved =
+    draft.endpoint !== undefined && norm(draft.endpoint) !== norm(stored?.endpoint || info?.url || "");
+  const keyMustBeRetyped = Boolean(info && !info.local && stored?.has_key && endpointMoved && !draft.key);
+  const hasStoredKey = Boolean(stored?.has_key) && draft.key !== "" && !endpointMoved;
+  const hasKey = hasStoredKey || Boolean(draft.key);
+  const contextOverride = contextDraft ?? settings?.context_chars_override ?? 0;
+
+  // ✓ = Verbindung getestet, 🔑 = Key hinterlegt (wie fintools)
+  const mark = (id: string) => {
+    const d = drafts[id];
+    const s = settings?.profiles[id];
+    const ok = d?.ok ?? s?.ok;
+    const key = d?.key !== undefined ? Boolean(d.key) : s?.has_key;
+    return ok ? "  ✓" : key ? "  🔑" : "";
+  };
+
+  const patchDraft = (patch: AiProfileUpdate, { keepTest = false } = {}) => {
+    setSaved(false);
+    setDrafts((prev) => {
+      const next = { ...prev[provider], ...patch };
+      // Wer Endpunkt, Modell oder Key ändert, verliert den Test-Haken
+      if (!keepTest) delete next.ok;
+      return { ...prev, [provider]: next };
+    });
+    if (!keepTest) setTestState(null);
+  };
+
+  const switchProvider = (next: string) => {
+    setSaved(false);
+    setDraftProvider(next);
+    setTestState(null);
+    setShowKey(false);
+  };
+
+  // Modellliste vom Anbieter. Mit gespeichertem Key fragt der Server selbst;
+  // ein frisch eingetippter Key kommt erst über den Verbindungstest zum Zug.
+  const canList = provider !== "none" && Boolean(info) && (info!.local || hasStoredKey) && !draft.key;
+  const { data: listedModels = [] } = useQuery({
+    queryKey: ["ai-models", provider, endpoint],
+    queryFn: async () => (await aiApi.models(provider, endpoint)).data,
+    enabled: canList,
+    staleTime: 60_000,
+  });
+  const testedModels =
+    testState && testState !== "testing" && testState.models ? testState.models : null;
+  const models = testedModels ?? listedModels;
+
+  const runTest = async () => {
+    if (!info) return;
+    setTestState("testing");
+    try {
+      const { data } = await aiApi.test({
+        provider,
+        endpoint,
+        model: model || undefined,
+        key: draft.key || undefined,
+      });
+      setTestState(data);
+      patchDraft({ ok: data.ok }, { keepTest: true });
+    } catch {
+      setTestState({ ok: false, models: null, model: "", reply: "", latency_ms: 0, error: t("ai.testFailed") });
+    }
+  };
+
   const save = useMutation({
-    mutationFn: async () => (await aiApi.update(draft)).data,
+    mutationFn: async () => {
+      const payload: AiSettingsUpdate = {};
+      if (draftProvider !== null && draftProvider !== settings?.provider) {
+        payload.provider = draftProvider;
+      }
+      const changed = Object.entries(drafts).filter(([, d]) => Object.keys(d).length > 0);
+      if (changed.length) payload.profiles = Object.fromEntries(changed);
+      if (contextDraft !== null) payload.context_chars_override = contextDraft;
+      return (await aiApi.update(payload)).data;
+    },
     onSuccess: (data) => {
       queryClient.setQueryData(["ai-settings"], data);
-      setDraft({});
+      queryClient.invalidateQueries({ queryKey: ["ai-models"] });
+      setDraftProvider(null);
+      setDrafts({});
+      setContextDraft(null);
       setShowKey(false);
       setSaved(true);
     },
   });
 
-  const optionBtn = (active: boolean) => clsx("toggle-btn", active && "active");
-  const dirty = Object.keys(draft).length > 0;
+  const dirty =
+    (draftProvider !== null && draftProvider !== settings?.provider) ||
+    Object.values(drafts).some((d) => Object.keys(d).length > 0) ||
+    contextDraft !== null;
+
+  const local = catalog.filter((p) => p.local);
+  const cloud = catalog.filter((p) => !p.local);
 
   return (
     <div className="card">
@@ -1872,145 +1992,189 @@ function AiModelSection() {
 
       <div className="space-y-4">
         <div>
-          <label className="label mb-2 block">{t("ai.provider")}</label>
-          <div className="toggle-group flex-wrap">
-            {AI_PROVIDERS.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => set("provider", p.id)}
-                className={optionBtn(provider === p.id)}
-              >
-                {p.color && (
-                  <span
-                    className="w-2 h-2 rounded-full inline-block"
-                    style={{ backgroundColor: p.color }}
-                  />
-                )}
-                {p.id === "none" ? t("ai.providerNone") : p.label}
-              </button>
-            ))}
-          </div>
+          <label className="label mb-2 block" htmlFor="ai-provider">{t("ai.provider")}</label>
+          <select
+            id="ai-provider"
+            className="input text-sm"
+            value={provider}
+            onChange={(e) => switchProvider(e.target.value)}
+          >
+            <optgroup label={t("ai.providerLocal")}>
+              {local.map((p) => (
+                <option key={p.id} value={p.id}>{p.label}{mark(p.id)}</option>
+              ))}
+            </optgroup>
+            <optgroup label={t("ai.providerCloud")}>
+              {cloud.map((p) => (
+                <option key={p.id} value={p.id}>{p.label}{mark(p.id)}</option>
+              ))}
+            </optgroup>
+            <option value="none">{t("ai.providerNone")}</option>
+          </select>
+          <p className="text-text-disabled text-[11px] mt-1">{t("ai.legend")}</p>
         </div>
 
         {provider === "none" && (
           <p className="text-text-disabled text-xs">{t("ai.providerNoneHint")}</p>
         )}
 
-        {urlField && (
-          <div>
-            <label className="label mb-2 block">{t("ai.serverUrl")}</label>
-            <div className="flex items-center gap-2">
+        {info && (
+          <>
+            <div>
+              <label className="label mb-2 block" htmlFor="ai-endpoint">{t("ai.endpoint")}</label>
               <input
-                className="input font-mono text-xs flex-1"
-                value={value(urlField)}
-                onChange={(e) => set(urlField as string, e.target.value)}
-                placeholder={provider === "ollama" ? "http://localhost:11434" : "http://localhost:1234"}
-              />
-              <button
-                type="button"
-                className="btn btn-secondary shrink-0"
-                onClick={() => refetch()}
-                title={t("ai.testConnection")}
-              >
-                <Refresh className={clsx("w-3.5 h-3.5", modelsLoading && "animate-spin")} />
-              </button>
-              {!modelsLoading && models.length > 0 && (
-                <CheckCircle className="w-4 h-4 text-gain shrink-0" />
-              )}
-              {!modelsLoading && (modelsError || models.length === 0) && (
-                <WarningCircle className="w-4 h-4 text-loss shrink-0" />
-              )}
-            </div>
-            <p className="text-text-disabled text-[11px] mt-1">{t("ai.serverUrlHint")}</p>
-          </div>
-        )}
-
-        {modelField && (
-          <div>
-            <label className="label mb-2 block">{t("ai.model")}</label>
-            {models.length > 0 && !FREETEXT_MODEL_PROVIDERS.includes(provider) ? (
-              <select
+                id="ai-endpoint"
                 className="input font-mono text-xs"
-                value={value(modelField)}
-                onChange={(e) => set(modelField as string, e.target.value)}
-              >
-                <option value="">—</option>
-                {models.map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-            ) : (
-              <input
-                className="input font-mono text-xs"
-                value={value(modelField)}
-                onChange={(e) => set(modelField as string, e.target.value)}
-                placeholder={t("ai.modelPlaceholder")}
+                value={endpoint}
+                onChange={(e) => patchDraft({ endpoint: e.target.value })}
+                placeholder={info.url}
+                spellCheck={false}
               />
-            )}
-            {LOCAL_PROVIDERS.includes(provider) && (
               <p className="text-text-disabled text-[11px] mt-1">
-                {modelsError
-                  ? t("ai.modelsUnreachable")
-                  : models.length > 0
-                    ? t("ai.modelsFound", { count: models.length })
-                    : t("ai.modelsIdle")}
+                {info.local ? t("ai.endpointHintLocal") : t("ai.endpointHintCloud")}
               </p>
-            )}
-          </div>
-        )}
+            </div>
 
-        {keyMeta && (
-          <div>
-            <label className="label mb-2 block">{t("ai.apiKey")}</label>
-            <div className="flex items-center gap-2">
-              <input
-                type={showKey ? "text" : "password"}
-                className="input font-mono text-xs flex-1"
-                value={draft[keyMeta.field] ?? ""}
-                onChange={(e) => set(keyMeta.field, e.target.value)}
-                placeholder={settings?.[keyMeta.has] ? "••••••••" : keyMeta.placeholder}
-                autoComplete="off"
-              />
+            {!info.local && (
+              <div>
+                <div className="flex items-baseline justify-between mb-2">
+                  <label className="label block" htmlFor="ai-key">{t("ai.apiKey")}</label>
+                  <a
+                    href={info.key_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-accent text-[11px] font-medium hover:underline inline-flex items-center gap-1"
+                  >
+                    {t("ai.getKey")} <OpenNewWindow className="w-3 h-3" />
+                  </a>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    id="ai-key"
+                    type={showKey ? "text" : "password"}
+                    className="input font-mono text-xs flex-1"
+                    value={draft.key ?? ""}
+                    onChange={(e) => patchDraft({ key: e.target.value })}
+                    placeholder={hasStoredKey ? "••••••••" : info.placeholder || t("ai.apiKey")}
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-ghost shrink-0 text-xs"
+                    onClick={() => setShowKey((s) => !s)}
+                  >
+                    {showKey ? t("ai.hide") : t("ai.show")}
+                  </button>
+                </div>
+                {keyMustBeRetyped && (
+                  <p className="txt-warning text-[11px] mt-1">{t("ai.keyRetype")}</p>
+                )}
+                {hasStoredKey && (
+                  <p className="text-text-disabled text-[11px] mt-1 flex items-center gap-2">
+                    {t("ai.apiKeySaved")}
+                    <button
+                      type="button"
+                      className="text-loss hover:underline"
+                      onClick={() => patchDraft({ key: "" })}
+                    >
+                      {t("ai.apiKeyClear")}
+                    </button>
+                  </p>
+                )}
+                {info.note && (
+                  <p className="msg msg-warning text-[11px] mt-2 flex items-start gap-1.5">
+                    <WarningCircle className="w-3.5 h-3.5 shrink-0 mt-px" />
+                    {t(info.note)}
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div>
+              <label className="label mb-2 block" htmlFor="ai-model">{t("ai.model")}</label>
+              {models.length > 0 ? (
+                <select
+                  id="ai-model"
+                  className="input font-mono text-xs"
+                  value={model}
+                  onChange={(e) => patchDraft({ model: e.target.value })}
+                >
+                  {!models.includes(model) && (
+                    <option value={model}>{model || t("ai.chooseModel")}</option>
+                  )}
+                  {models.map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  id="ai-model"
+                  className="input font-mono text-xs"
+                  value={model}
+                  onChange={(e) => patchDraft({ model: e.target.value })}
+                  placeholder={t("ai.modelPlaceholder")}
+                  spellCheck={false}
+                />
+              )}
+              <p className="text-text-disabled text-[11px] mt-1">
+                {models.length > 0
+                  ? t("ai.modelsFound", { count: models.length })
+                  : t("ai.modelHint")}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
-                className="btn btn-ghost shrink-0 text-xs"
-                onClick={() => setShowKey((s) => !s)}
+                className="btn btn-secondary"
+                onClick={runTest}
+                disabled={testState === "testing" || !endpoint || (!info.local && !hasKey)}
               >
-                {showKey ? t("ai.hide") : t("ai.show")}
+                <Refresh className={clsx("w-3.5 h-3.5", testState === "testing" && "animate-spin")} />
+                {testState === "testing" ? t("ai.testing") : t("ai.testConnection")}
               </button>
+              {testState && testState !== "testing" && (
+                testState.ok ? (
+                  <span className="text-gain text-xs flex items-center gap-1" role="status">
+                    <CheckCircle className="w-3.5 h-3.5" />
+                    {t("ai.connOk")}
+                    {testState.models && <> — {t("ai.modelsFound", { count: testState.models.length })}</>}
+                    {testState.model && (
+                      <>
+                        {" "}— {testState.latency_ms} ms
+                        <span className="text-text-tertiary font-mono">&nbsp;({testState.model})</span>
+                      </>
+                    )}
+                  </span>
+                ) : (
+                  <span className="text-loss text-xs flex items-center gap-1 break-all" role="alert">
+                    <WarningCircle className="w-3.5 h-3.5 shrink-0" />
+                    {testState.error || t("ai.testFailed")}
+                  </span>
+                )
+              )}
             </div>
-            {settings?.[keyMeta.has] && (
-              <p className="text-text-disabled text-[11px] mt-1 flex items-center gap-2">
-                {t("ai.apiKeySaved")}
-                <button
-                  type="button"
-                  className="text-loss hover:underline"
-                  onClick={() => set(keyMeta.field, "")}
-                >
-                  {t("ai.apiKeyClear")}
-                </button>
-              </p>
-            )}
-          </div>
+          </>
         )}
 
         {provider !== "none" && (
           <div>
-            <label className="label mb-2 block">{t("ai.contextSize")}</label>
+            <label className="label mb-2 block" htmlFor="ai-context">{t("ai.contextSize")}</label>
             <div className="flex items-center gap-3">
               <input
+                id="ai-context"
                 type="range"
                 min={0}
                 max={120000}
                 step={4000}
-                value={Number(value("context_chars_override")) || 0}
-                onChange={(e) => set("context_chars_override", e.target.value)}
+                value={contextOverride}
+                onChange={(e) => { setSaved(false); setContextDraft(Number(e.target.value)); }}
                 className="flex-1 accent-accent cursor-pointer"
               />
               <span className="text-text-secondary text-xs font-mono w-28 text-right tabular-nums">
-                {Number(value("context_chars_override")) > 0
-                  ? `${Number(value("context_chars_override")).toLocaleString("de-CH")} Z.`
+                {contextOverride > 0
+                  ? `${contextOverride.toLocaleString(displayLocale())} Z.`
                   : t("ai.contextAuto")}
               </span>
             </div>
@@ -2018,10 +2182,10 @@ function AiModelSection() {
               {settings?.detected_context_tokens ? (
                 <>
                   {t("ai.contextDetected", {
-                    tokens: settings.detected_context_tokens.toLocaleString("de-CH"),
+                    tokens: settings.detected_context_tokens.toLocaleString(displayLocale()),
                   })}{" "}
                   {t("ai.contextEffective", {
-                    chars: (settings?.effective_context_chars ?? 0).toLocaleString("de-CH"),
+                    chars: (settings?.effective_context_chars ?? 0).toLocaleString(displayLocale()),
                   })}
                 </>
               ) : (
@@ -2035,7 +2199,7 @@ function AiModelSection() {
           <button
             type="button"
             className="btn btn-primary"
-            disabled={!dirty || save.isPending}
+            disabled={!dirty || save.isPending || keyMustBeRetyped}
             onClick={() => save.mutate()}
           >
             <FloppyDisk className="w-3.5 h-3.5" />

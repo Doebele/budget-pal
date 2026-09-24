@@ -417,31 +417,34 @@ export const passkeysApi = {
   remove: (id: number) => api.delete(`/auth/webauthn/credentials/${id}`),
 };
 
-// KI-Provider / Modellauswahl — siehe backend/app/services/ai_client.py
-export type AiProvider =
-  | "none"
-  | "lm-studio"
-  | "ollama"
-  | "anthropic"
-  | "openai"
-  | "gemini"
-  | "openrouter";
+// KI-Anbieter / Modellauswahl — siehe backend/app/services/ai_client.py
+// Anbieterliste und Profil-Modell wie im Schwesterprojekt fintools.
+export type AiProvider = string; // "none" oder eine ID aus /settings/ai/providers
+
+export interface AiProviderInfo {
+  id: string;
+  label: string;
+  url: string;
+  // Leer = lokaler Anbieter ohne Key
+  key_url: string;
+  placeholder: string;
+  // i18n-Schlüssel eines Warnhinweises unter dem Key-Feld
+  note: string;
+  local: boolean;
+}
+
+export interface AiProfile {
+  endpoint: string;
+  model: string;
+  // API-Keys kommen nie zurück — nur ob einer hinterlegt ist
+  has_key: boolean;
+  // Der letzte Verbindungstest mit genau diesen Werten war erfolgreich
+  ok: boolean;
+}
 
 export interface AiSettings {
   provider: AiProvider;
-  lm_studio_url: string;
-  lm_studio_model: string;
-  ollama_url: string;
-  ollama_model: string;
-  anthropic_model: string;
-  openai_model: string;
-  gemini_model: string;
-  openrouter_model: string;
-  // API-Keys kommen nie zurück — nur ob einer hinterlegt ist
-  has_anthropic_key: boolean;
-  has_openai_key: boolean;
-  has_gemini_key: boolean;
-  has_openrouter_key: boolean;
+  profiles: Record<string, AiProfile>;
   // Textmenge pro KI-Anfrage. 0 = automatisch aus dem Kontextfenster ableiten.
   context_chars_override: number;
   // Erkanntes Kontextfenster des Modells (Tokens), null wenn unbekannt
@@ -450,12 +453,39 @@ export interface AiSettings {
   effective_context_chars: number;
 }
 
+export interface AiProfileUpdate {
+  endpoint?: string;
+  model?: string;
+  // Weglassen = unverändert, "" = löschen
+  key?: string;
+  ok?: boolean;
+}
+
+export interface AiSettingsUpdate {
+  provider?: AiProvider;
+  profiles?: Record<string, AiProfileUpdate>;
+  context_chars_override?: number;
+}
+
+export interface AiTestResult {
+  ok: boolean;
+  models: string[] | null;
+  model: string;
+  reply: string;
+  latency_ms: number;
+  error: string;
+}
+
 export const aiApi = {
   get: () => api.get<AiSettings>("/settings/ai"),
-  // Weggelassene Felder bleiben serverseitig unverändert; "" löscht einen Key
-  update: (data: Partial<Record<string, string>>) => api.put<AiSettings>("/settings/ai", data),
-  models: (provider?: AiProvider, url?: string) =>
-    api.get<string[]>("/settings/ai/models", { params: { provider, url } }),
+  update: (data: AiSettingsUpdate) => api.put<AiSettings>("/settings/ai", data),
+  providers: () => api.get<AiProviderInfo[]>("/settings/ai/providers"),
+  models: (provider: AiProvider, endpoint?: string) =>
+    api.get<string[]>("/settings/ai/models", { params: { provider, endpoint } }),
+  // Ohne `key` prüft der Server mit dem gespeicherten — der Browser kennt ihn nicht.
+  // Ein Modell, das erst geladen werden muss, braucht länger als die üblichen 30 s.
+  test: (data: { provider: AiProvider; endpoint?: string; model?: string; key?: string }) =>
+    api.post<AiTestResult>("/settings/ai/test", data, { timeout: 120_000 }),
 };
 
 // Wizard state (raw data blob from wizard onboarding)
@@ -506,6 +536,10 @@ export const backupApi = {
   /** Download a full JSON backup for the current user. Returns raw blob response. */
   export: () => api.get("/backup/export", { responseType: "blob" }),
 
+  /** Dasselbe inkl. API-Keys im Klartext. Nur mit Passwort — im Body, nie in der URL. */
+  exportWithSecrets: (password: string) =>
+    api.post("/backup/export-secrets", { password }, { responseType: "blob" }),
+
   /** Restore from a parsed backup JSON object. Returns BackupImportResult. */
   import: (payload: {
     backup: Record<string, unknown>;
@@ -514,6 +548,7 @@ export const backupApi = {
     import_recurring_plan?: boolean;
     import_wizard_config?: boolean;
     import_pension_assets?: boolean;
+    import_settings?: boolean;
   }) => api.post("/backup/import", payload),
 };
 

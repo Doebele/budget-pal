@@ -792,7 +792,7 @@
     "noActiveTxns": "Es gibt keine aktiven Transaktionen mehr für dieses Konto (alle archiviert oder leer). Archivieren oder Hard-Delete ist nicht möglich.",
     "archiveNote": "Nach dem Archivieren erscheinen diese Buchungen nicht mehr in der Transaktionsübersicht (Soft-Delete). Daten bleiben in der Datenbank für Nachvollziehbarkeit.",
     "permanentDeleteNote": "Diese Transaktion wird unwiderruflich aus der Datenbank entfernt. Diese Aktion kann nicht rückgängig gemacht werden.",
-    "exportNote": "Exportiert alle deine Daten als JSON-Backup: Transaktionen, Konten, Budgets, Wiederkehrende Einträge, Wizard-Konfiguration, Säulen 1–3a und Assets.",
+    "exportNote": "Exportiert alle deine Daten als JSON-Backup: Transaktionen, Konten, Budgets, Wiederkehrende Einträge, Wizard-Konfiguration, Säulen 1–3a, Assets und Einstellungen samt KI-Anbietern. API-Keys nur, wenn du sie ausdrücklich einschliesst.",
     "restoreNote": "Stellt Daten aus einem vorherigen JSON-Backup wieder her. Bestehende Einträge werden nicht überschrieben — nur fehlende Daten werden ergänzt.",
     "mappingNote": "Ordnet jedes Budget-Label aus empirischen Angaben einer Superkategorie zu. Die Budgetanalyse nutzt daraus die passende Ist-Transaktionskategorie und Peer-Gruppe.",
     "transfersIncluded": "Inkl. {{amount}} Kontoüberträge/Sparen — Toggle aktivieren um diese auszublenden.",

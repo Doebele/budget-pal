@@ -55,10 +55,46 @@ def test_from_user_defaults_to_none_provider():
 
 
 def test_from_user_reads_saved_config():
-    cfg = ai_client.from_user(_FakeUser({"provider": "openai", "openai_model": "gpt-4o"}))
+    cfg = ai_client.from_user(_FakeUser({
+        "provider": "openai",
+        "profiles": {"openai": {"model": "gpt-4o", "key": "sk-x"}},
+    }))
     assert cfg.provider == "openai"
-    assert cfg.openai_model == "gpt-4o"
+    assert cfg.profile().model == "gpt-4o"
     assert cfg.enabled is True
+
+
+def test_from_user_reads_the_old_flat_format():
+    """Gespeicherte Konfigurationen aus der Zeit vor den Profilen. Ein Nutzer,
+    der nach dem Update seinen Key los waere, merkt es erst beim naechsten
+    Import — und dann ohne Hinweis, warum die KI schweigt."""
+    cfg = ai_client.from_user(_FakeUser({
+        "provider": "anthropic",
+        "anthropic_api_key": "sk-ant-alt",
+        "anthropic_model": "claude-sonnet-5",
+        "openai_api_key": "sk-openai-alt",
+        "lm_studio_url": "http://192.168.1.50:1234",
+        "lm_studio_model": "qwen3-30b",
+    }))
+    assert cfg.provider == "anthropic"
+    assert cfg.profile("anthropic").key == "sk-ant-alt"
+    assert cfg.profile("anthropic").model == "claude-sonnet-5"
+    # Inaktive Anbieter behalten ihre Werte ebenso
+    assert cfg.profile("openai").key == "sk-openai-alt"
+    assert cfg.profile("lm-studio").endpoint == "http://192.168.1.50:1234"
+    assert cfg.profile("lm-studio").model == "qwen3-30b"
+
+
+def test_old_format_active_provider_keeps_its_former_default_model():
+    """Damals galt ohne gesetztes Modell ein Vorgabewert; der muss mitkommen,
+    sonst schickt der erste Aufruf nach dem Update ein leeres Modell."""
+    cfg = ai_client.from_user(_FakeUser({"provider": "openai", "openai_api_key": "sk-x"}))
+    assert cfg.profile().model == "gpt-4o-mini"
+
+
+def test_profiles_fill_in_the_catalog_endpoint():
+    cfg = AiConfig(provider="mistral", profiles={"mistral": {"key": "k"}})
+    assert cfg.profile().endpoint == "https://api.mistral.ai/v1"
 
 
 def test_enabled_is_false_for_none_provider():
@@ -103,8 +139,8 @@ class _FakeAsyncClient:
         type(self).last_call = {"url": url, "json": json, "headers": headers}
         return _FakeResponse(self._payload)
 
-    async def get(self, url):
-        type(self).last_call = {"url": url}
+    async def get(self, url, headers=None):
+        type(self).last_call = {"url": url, "headers": headers}
         return _FakeResponse(self._payload)
 
 
@@ -226,18 +262,21 @@ async def test_anthropic_refusal_returns_none():
 
 
 @pytest.mark.asyncio
-async def test_gemini_sends_key_as_header_not_query():
-    fake = _FakeAsyncClient(
-        {"candidates": [{"content": {"parts": [{"text": "hallo"}]}}]}
-    )
+async def test_gemini_uses_the_openai_compatible_endpoint():
+    """Wie in fintools: Gemini ueber /v1beta/openai statt eines eigenen
+    Codepfads. Der Key bleibt im Header, nicht in der URL."""
+    fake = _FakeAsyncClient({"choices": [{"message": {"content": "hallo"}}]})
     cfg = AiConfig(provider="gemini", gemini_api_key="AIza-test")
 
     with patch("app.services.ai_client.httpx.AsyncClient", fake):
         assert await ai_client.complete(cfg, "sys", "user") == "hallo"
 
     call = _FakeAsyncClient.last_call
+    assert call["url"] == (
+        "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+    )
     assert "AIza-test" not in call["url"]  # Key gehört nicht in die URL
-    assert call["headers"]["x-goog-api-key"] == "AIza-test"
+    assert call["headers"]["Authorization"] == "Bearer AIza-test"
 
 
 # ── Modell und Tokenverbrauch ─────────────────────────────────
@@ -286,11 +325,12 @@ async def test_anthropic_maps_input_output_tokens():
 
 
 @pytest.mark.asyncio
-async def test_gemini_maps_usage_metadata():
+async def test_gemini_maps_openai_style_usage():
     fake = _FakeAsyncClient(
         {
-            "candidates": [{"content": {"parts": [{"text": "hallo"}]}}],
-            "usageMetadata": {"promptTokenCount": 80, "candidatesTokenCount": 20},
+            "model": "gemini-2.5-flash",
+            "choices": [{"message": {"content": "hallo"}}],
+            "usage": {"prompt_tokens": 80, "completion_tokens": 20},
         }
     )
     cfg = AiConfig(provider="gemini", gemini_api_key="AIza-test")
@@ -298,7 +338,7 @@ async def test_gemini_maps_usage_metadata():
     with patch("app.services.ai_client.httpx.AsyncClient", fake):
         result = await ai_client.complete_detailed(cfg, "sys", "user")
 
-    assert result.model == "gemini-2.0-flash"
+    assert result.model == "gemini-2.5-flash"
     assert (result.prompt_tokens, result.completion_tokens) == (80, 20)
 
 
@@ -348,14 +388,14 @@ async def test_list_models_local_provider_queries_server():
     with patch("app.services.ai_client.httpx.AsyncClient", fake):
         models = await ai_client.list_models(AiConfig(provider="ollama"))
 
-    assert models == ["ornith-35b", "gemma3:12b"]
-    assert _FakeAsyncClient.last_call["url"].startswith("http://host.docker.internal:11434")
+    assert models == ["gemma3:12b", "ornith-35b"]  # sortiert
+    assert _FakeAsyncClient.last_call["url"] == "http://host.docker.internal:11434/v1/models"
 
 
 @pytest.mark.asyncio
 async def test_list_models_unreachable_server_returns_empty():
     class _Boom(_FakeAsyncClient):
-        async def get(self, url):
+        async def get(self, url, headers=None):
             raise RuntimeError("nicht erreichbar")
 
     with patch("app.services.ai_client.httpx.AsyncClient", _Boom({})):
@@ -363,11 +403,51 @@ async def test_list_models_unreachable_server_returns_empty():
 
 
 @pytest.mark.asyncio
-async def test_list_models_cloud_provider_is_static():
-    models = await ai_client.list_models(AiConfig(provider="anthropic"))
-    assert "claude-opus-5" in models
-    # Modell-IDs tragen kein Datums-Suffix
-    assert all("-2025" not in m and "-2026" not in m for m in models)
+async def test_list_models_cloud_provider_is_live():
+    """Vorher eine feste Liste, die mit jedem neuen Modell veraltete (sie
+    kannte noch gpt-4o und gemini-1.5). Jetzt vom /models-Endpunkt."""
+    fake = _FakeAsyncClient({"data": [
+        {"id": "claude-sonnet-5"}, {"id": "claude-opus-5"},
+    ]})
+    cfg = AiConfig(provider="anthropic", anthropic_api_key="sk-ant-test")
+    with patch("app.services.ai_client.httpx.AsyncClient", fake):
+        models = await ai_client.list_models(cfg)
+
+    assert models == ["claude-opus-5", "claude-sonnet-5"]
+    call = _FakeAsyncClient.last_call
+    # Anthropic liefert ohne limit nur die erste Seite
+    assert call["url"] == "https://api.anthropic.com/v1/models?limit=1000"
+    assert call["headers"]["x-api-key"] == "sk-ant-test"
+
+
+@pytest.mark.asyncio
+async def test_list_models_without_key_asks_nobody():
+    """Ohne Key keine Anfrage — sie wuerde nur mit 401 scheitern."""
+    class _Unused(_FakeAsyncClient):
+        async def get(self, url, headers=None):
+            raise AssertionError("darf nicht aufgerufen werden")
+
+    with patch("app.services.ai_client.httpx.AsyncClient", _Unused({})):
+        assert await ai_client.list_models(AiConfig(provider="openai")) == []
+
+
+@pytest.mark.asyncio
+async def test_list_models_drops_non_chat_models():
+    fake = _FakeAsyncClient({"data": [
+        {"id": "gpt-5"}, {"id": "text-embedding-3-large"}, {"id": "whisper-1"},
+        {"id": "tts-1-hd"}, {"id": "dall-e-3"}, {"id": "omni-moderation-latest"},
+    ]})
+    cfg = AiConfig(provider="openai", openai_api_key="sk-test")
+    with patch("app.services.ai_client.httpx.AsyncClient", fake):
+        assert await ai_client.list_models(cfg) == ["gpt-5"]
+
+
+@pytest.mark.asyncio
+async def test_gemini_model_ids_lose_their_prefix():
+    fake = _FakeAsyncClient({"data": [{"id": "models/gemini-2.5-pro"}]})
+    cfg = AiConfig(provider="gemini", gemini_api_key="AIza-test")
+    with patch("app.services.ai_client.httpx.AsyncClient", fake):
+        assert await ai_client.list_models(cfg) == ["gemini-2.5-pro"]
 
 
 # ── Kontextfenster und Zuschnitt ──────────────────────────────
@@ -539,3 +619,215 @@ def test_returns_none_for_unbalanced_fragment():
 def test_ignores_json_arrays_at_top_level():
     # Die Aufrufer erwarten ein Objekt; eine nackte Liste ist keins
     assert ai_client.parse_json_object('[1, 2, 3]') is None
+
+
+# ── Anbieterkatalog ───────────────────────────────────────────
+
+
+def test_catalog_has_the_fintools_providers():
+    """Dieselbe Liste wie fintools (frontend/src/App.jsx, AI_PROVIDERS)."""
+    expected = {
+        "lm-studio", "ollama", "anthropic", "openai", "gemini", "xai", "meta",
+        "mistral", "deepseek", "qwen", "moonshot", "kimi-code", "zai", "zai-cn",
+        "minimax", "mimo", "stepfun", "openrouter",
+    }
+    assert set(ai_client.CATALOG) == expected
+    assert len(ai_client.PROVIDER_CATALOG) == len(expected), "doppelte IDs"
+
+
+def test_local_means_no_key_and_cloud_means_https():
+    for p in ai_client.PROVIDER_CATALOG:
+        if p.local:
+            assert p.key_url == ""
+            assert p.url.startswith("http://localhost")
+        else:
+            # Ein Cloud-Key darf nie im Klartext ueber die Leitung gehen
+            assert p.url.startswith("https://"), p.id
+            assert p.key_url.startswith("https://"), p.id
+
+
+def test_none_is_selectable_but_not_in_the_catalog():
+    assert "none" in ai_client.PROVIDERS
+    assert "none" not in ai_client.CATALOG
+
+
+# ── Endpunkt-Aufloesung ───────────────────────────────────────
+
+
+@pytest.mark.parametrize("endpoint,expected", [
+    # Nackter Host bekommt /v1
+    ("http://localhost:1234", "http://host.docker.internal:1234/v1"),
+    ("http://192.168.1.50:11434/", "http://192.168.1.50:11434/v1"),
+    # Ein Pfad bleibt, wie er ist
+    ("https://api.z.ai/api/paas/v4", "https://api.z.ai/api/paas/v4"),
+    ("https://generativelanguage.googleapis.com/v1beta/openai",
+     "https://generativelanguage.googleapis.com/v1beta/openai"),
+    # Wer /v1 selbst anhaengt, bekommt kein /v1/v1
+    ("http://localhost:1234/v1", "http://host.docker.internal:1234/v1"),
+])
+def test_api_base(endpoint, expected):
+    assert ai_client.api_base(endpoint) == expected
+
+
+# ── Anfragekoerper je Anbieterart ─────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_openai_gets_max_completion_tokens_and_no_temperature():
+    """Neuere OpenAI-Modelle lehnen max_tokens ab, Reasoning-Modelle jede
+    temperature ausser der Vorgabe."""
+    fake = _FakeAsyncClient({"choices": [{"message": {"content": "ok"}}]})
+    cfg = AiConfig(provider="openai", openai_api_key="sk-test")
+    with patch("app.services.ai_client.httpx.AsyncClient", fake):
+        await ai_client.complete(cfg, "sys", "user", max_tokens=321)
+
+    body = _FakeAsyncClient.last_call["json"]
+    assert body["max_completion_tokens"] == 321
+    assert "max_tokens" not in body
+    assert "temperature" not in body
+
+
+@pytest.mark.asyncio
+async def test_other_cloud_providers_get_max_tokens():
+    fake = _FakeAsyncClient({"choices": [{"message": {"content": "ok"}}]})
+    cfg = AiConfig(provider="deepseek", profiles={"deepseek": {"key": "sk", "model": "deepseek-chat"}})
+    with patch("app.services.ai_client.httpx.AsyncClient", fake):
+        await ai_client.complete(cfg, "sys", "user", max_tokens=321)
+
+    call = _FakeAsyncClient.last_call
+    assert call["url"] == "https://api.deepseek.com/v1/chat/completions"
+    assert call["json"]["max_tokens"] == 321
+    assert "temperature" not in call["json"]
+
+
+@pytest.mark.asyncio
+async def test_local_models_are_asked_not_to_think():
+    """Lokale Reasoning-Modelle verbrauchen sonst das Token-Budget beim
+    Denken und liefern ein leeres content-Feld."""
+    fake = _FakeAsyncClient({"choices": [{"message": {"content": "ok"}}]})
+    cfg = AiConfig(provider="lm-studio", lm_studio_model="qwen3-30b")
+    with patch("app.services.ai_client.httpx.AsyncClient", fake):
+        await ai_client.complete(cfg, "sys", "user")
+
+    body = _FakeAsyncClient.last_call["json"]
+    assert body["reasoning_effort"] == "none"
+    assert body["messages"][0]["content"].startswith("/no_think ")
+    assert body["temperature"] == 0
+
+
+@pytest.mark.asyncio
+async def test_json_object_only_where_it_is_known_to_work():
+    """Ein unbekannter Anbieter bekommt kein response_format — lieber die
+    JSON-Form per Prompt und tolerant lesen, als ein 400 riskieren."""
+    fake = _FakeAsyncClient({"choices": [{"message": {"content": "{}"}}]})
+    cfg = AiConfig(provider="mistral", profiles={"mistral": {"key": "k", "model": "m"}})
+    with patch("app.services.ai_client.httpx.AsyncClient", fake):
+        await ai_client.complete(cfg, "sys", "user", json_mode=True)
+    assert "response_format" not in _FakeAsyncClient.last_call["json"]
+
+
+@pytest.mark.asyncio
+async def test_openrouter_identifies_the_app():
+    fake = _FakeAsyncClient({"choices": [{"message": {"content": "ok"}}]})
+    cfg = AiConfig(provider="openrouter", openrouter_api_key="sk-or")
+    with patch("app.services.ai_client.httpx.AsyncClient", fake):
+        await ai_client.complete(cfg, "sys", "user")
+    assert _FakeAsyncClient.last_call["headers"]["X-Title"] == "Budget-Pal"
+
+
+# ── Verbindungstest ───────────────────────────────────────────
+
+
+class _ErrorResponse(_FakeResponse):
+    def __init__(self, status, payload=None, text=""):
+        super().__init__(payload)
+        self.status_code = status
+        self.text = text
+
+    def json(self):
+        if self._payload is None:
+            raise ValueError("kein JSON")
+        return self._payload
+
+
+def _client_returning(response):
+    class _C(_FakeAsyncClient):
+        async def post(self, url, json=None, headers=None):
+            return response
+
+        async def get(self, url, headers=None):
+            return response
+
+    return _C({})
+
+
+@pytest.mark.asyncio
+async def test_check_connection_pings_the_model():
+    fake = _FakeAsyncClient({
+        "data": [{"id": "gpt-5"}],
+        "model": "gpt-5",
+        "choices": [{"message": {"content": "OK"}}],
+    })
+    cfg = AiConfig(provider="openai", profiles={"openai": {"key": "sk", "model": "gpt-5"}})
+    with patch("app.services.ai_client.httpx.AsyncClient", fake):
+        result = await ai_client.check_connection(cfg)
+
+    assert result.ok is True
+    assert result.models == ["gpt-5"]
+    assert result.model == "gpt-5"
+    assert result.reply == "OK"
+    assert result.latency_ms >= 0
+
+
+@pytest.mark.asyncio
+async def test_check_connection_without_model_only_lists():
+    fake = _FakeAsyncClient({"data": [{"id": "a"}, {"id": "b"}]})
+    cfg = AiConfig(provider="ollama")
+    with patch("app.services.ai_client.httpx.AsyncClient", fake):
+        result = await ai_client.check_connection(cfg)
+    assert result.ok is True
+    assert result.models == ["a", "b"]
+    assert result.reply == ""
+
+
+@pytest.mark.asyncio
+async def test_error_message_comes_from_the_api_error_field():
+    response = _ErrorResponse(401, {"error": {"message": "Incorrect API key provided"}})
+    cfg = AiConfig(provider="openai", profiles={"openai": {"key": "falsch", "model": "gpt-5"}})
+    with patch("app.services.ai_client.httpx.AsyncClient", _client_returning(response)):
+        result = await ai_client.check_connection(cfg)
+    assert result.ok is False
+    assert result.error == "HTTP 401: Incorrect API key provided"
+
+
+@pytest.mark.asyncio
+async def test_raw_response_body_is_never_echoed():
+    """Der Endpunkt ist frei waehlbar. Zeigt ihn jemand auf eine interne
+    Adresse, darf deren Seiteninhalt nicht in der Fehlermeldung landen —
+    BudgetPal laeuft oeffentlich mit offener Registrierung."""
+    secret_page = "<html>Router-Admin: passwort=hunter2</html>"
+    response = _ErrorResponse(403, payload=None, text=secret_page)
+    cfg = AiConfig(provider="lm-studio", profiles={"lm-studio": {
+        "endpoint": "http://10.0.0.1", "model": "x",
+    }})
+    with patch("app.services.ai_client.httpx.AsyncClient", _client_returning(response)):
+        result = await ai_client.check_connection(cfg)
+    assert result.ok is False
+    assert "hunter2" not in result.error
+    assert result.error == "HTTP 403"
+
+
+@pytest.mark.asyncio
+async def test_check_connection_without_key_does_not_call_out():
+    class _Unused(_FakeAsyncClient):
+        async def post(self, url, json=None, headers=None):
+            raise AssertionError("darf nicht aufgerufen werden")
+
+        async def get(self, url, headers=None):
+            raise AssertionError("darf nicht aufgerufen werden")
+
+    cfg = AiConfig(provider="anthropic", profiles={"anthropic": {"model": "claude-opus-5"}})
+    with patch("app.services.ai_client.httpx.AsyncClient", _Unused({})):
+        result = await ai_client.check_connection(cfg)
+    assert result.ok is False
+    assert "Key" in result.error

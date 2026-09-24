@@ -2,8 +2,16 @@
 Backup API — full JSON export and selective import of all user data.
 
 Routes:
-  GET  /api/backup/export   → download complete JSON backup
-  POST /api/backup/import   → restore from JSON backup (upsert, no hard deletes)
+  GET  /api/backup/export           → download complete JSON backup (ohne API-Keys)
+  POST /api/backup/export-secrets   → dasselbe inkl. API-Keys, nur mit Passwort
+  POST /api/backup/import           → restore from JSON backup (upsert, no hard deletes)
+
+Seit Version 1.1 enthaelt das Backup auch die Einstellungen — KI-Anbieter
+mit Endpunkt und Modell, Sprache, Session-Dauer, SARON-Referenz — nach dem
+Vorbild des Einstellungs-Backups in fintools. Die API-Keys kommen nur mit,
+wenn ausdruecklich angefordert *und* das Passwort bestaetigt ist: fintools
+gibt sie jedem angemeldeten Aufruf, BudgetPal laeuft oeffentlich, und ein
+Session-Token liegt im localStorage.
 """
 from __future__ import annotations
 
@@ -12,14 +20,15 @@ import logging
 from datetime import datetime, date
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.rate_limit import SlidingWindowRateLimiter
+from app.core.security import SESSION_TIMEOUTS, get_current_user, verify_password
 from app.models.models import (
     Account,
     Asset,
@@ -34,10 +43,19 @@ from app.models.models import (
     WizardCategoryMapping,
 )
 
+from app.services import ai_client
+
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-BACKUP_VERSION = "1.0"
+BACKUP_FORMAT = "budgetpal-backup"
+BACKUP_VERSION = "1.1"
+# 1.0 kannte noch keine Einstellungen — laesst sich aber weiter einspielen
+SUPPORTED_VERSIONS = {"1.0", BACKUP_VERSION}
+SUPPORTED_UI_LANGUAGES = {"de", "en"}
+
+# Wer das Passwort fuer den Key-Export durchprobiert, wird gebremst wie beim Login
+secrets_export_limiter = SlidingWindowRateLimiter(max_requests=5, window_seconds=300)
 
 
 # ── Serialisation helpers ─────────────────────────────────────
@@ -66,14 +84,13 @@ def _row(model_instance: Any, exclude: tuple = ()) -> Dict[str, Any]:
 # ── Export ────────────────────────────────────────────────────
 
 
-@router.get("/export")
-async def export_backup(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
+async def _build_backup(current_user: User, db: AsyncSession, *, include_secrets: bool) -> JSONResponse:
     """
     Export all user data as a structured JSON backup.
-    Excludes: hashed_password, internal IDs that would conflict on import.
+    Excludes: hashed_password, internal IDs that would conflict on import,
+    passkeys (an Geraet und Domain gebunden — in einem anderen Konto
+    eingespielt, oeffneten sie dieses fuer das alte Geraet).
+    API-Keys nur mit include_secrets.
     """
     uid = current_user.id
 
@@ -156,10 +173,24 @@ async def export_backup(
     )).scalars().all()
     assets = [_row(a, exclude=("user_id",)) for a in asset_rows]
 
+    # ── Einstellungen ─────────────────────────────────────────
+    settings_data = {
+        "ui_language": current_user.ui_language,
+        "session_timeout": current_user.session_timeout,
+        "saron_reference_annual_pct": current_user.saron_reference_annual_pct,
+        "ai": ai_client.export_config(
+            ai_client.from_user(current_user), include_keys=include_secrets
+        ),
+    }
+
     payload = {
+        "format": BACKUP_FORMAT,
         "version": BACKUP_VERSION,
         "exported_at": datetime.utcnow().isoformat() + "Z",
+        # Steht oben in der Datei, damit man ihr ansieht, wie sie zu behandeln ist
+        "contains_secrets": include_secrets,
         "user": user_data,
+        "settings": settings_data,
         "accounts": accounts,
         "transactions": transactions,
         "labels": labels,
@@ -173,11 +204,58 @@ async def export_backup(
     }
 
     # Return as downloadable JSON
-    filename = f"budgetpal_backup_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.json"
+    suffix = "_mit_keys" if include_secrets else ""
+    filename = f"budgetpal_backup_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}{suffix}.json"
     return JSONResponse(
         content=payload,
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            # Keine Zwischenspeicherung — erst recht nicht mit Keys darin
+            "Cache-Control": "no-store",
+        },
     )
+
+
+@router.get("/export")
+async def export_backup(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Vollstaendiges Backup ohne API-Keys."""
+    return await _build_backup(current_user, db, include_secrets=False)
+
+
+class SecretsExportRequest(BaseModel):
+    password: str
+
+
+@router.post("/export-secrets")
+async def export_backup_with_secrets(
+    payload: SecretsExportRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Backup inkl. API-Keys im Klartext — nur nach Passwortbestaetigung.
+
+    Ein Session-Token allein genuegt hier nicht: es liegt im localStorage und
+    ist damit einem Skript auf der Seite zugaenglich. Das Passwort steht im
+    Body, nicht in der URL, damit es in keinem Zugriffslog landet.
+    """
+    client_ip = request.client.host if request.client else "unknown"
+    limit_key = f"{client_ip}:{current_user.id}"
+    decision = secrets_export_limiter.check(limit_key)
+    if not decision.allowed:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Zu viele Versuche. Bitte in {decision.retry_after_seconds}s erneut.",
+        )
+    # 403, nicht 401: ein 401 meldet das Frontend automatisch ab
+    if not verify_password(payload.password, current_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Passwort falsch.")
+    secrets_export_limiter.reset(limit_key)
+    logger.info("Backup mit API-Keys exportiert (user_id=%s)", current_user.id)
+    return await _build_backup(current_user, db, include_secrets=True)
 
 
 # ── Import ────────────────────────────────────────────────────
@@ -190,6 +268,8 @@ class BackupImportRequest(BaseModel):
     import_recurring_plan: bool = True
     import_wizard_config: bool = True
     import_pension_assets: bool = True
+    # Ueberschreibt Sprache, Session-Dauer und KI-Anbieter — darum nicht vorbelegt
+    import_settings: bool = False
 
 
 class BackupImportResult(BaseModel):
@@ -203,6 +283,8 @@ class BackupImportResult(BaseModel):
     wizard_config_restored: bool = False
     pension_created: int = 0
     assets_created: int = 0
+    settings_restored: bool = False
+    api_keys_restored: int = 0
     warnings: List[str] = []
 
 
@@ -221,11 +303,38 @@ async def import_backup(
     result = BackupImportResult()
     uid = current_user.id
 
-    if backup.get("version") != BACKUP_VERSION:
+    if backup.get("version") not in SUPPORTED_VERSIONS:
         result.warnings.append(
             f"Backup version '{backup.get('version')}' differs from expected '{BACKUP_VERSION}'. "
             "Proceeding anyway."
         )
+
+    # ── Einstellungen (optional) ──────────────────────────────
+    # Die Datei ist Nutzereingabe: jeder Wert wird gegen die erlaubten
+    # geprueft, Unbekanntes uebersprungen statt uebernommen.
+    if payload.import_settings:
+        settings_in = backup.get("settings")
+        if not isinstance(settings_in, dict):
+            result.warnings.append("Backup enthält keine Einstellungen (vor Version 1.1 erstellt).")
+        else:
+            lang = settings_in.get("ui_language")
+            if lang in SUPPORTED_UI_LANGUAGES:
+                current_user.ui_language = lang
+            timeout = settings_in.get("session_timeout")
+            if timeout in SESSION_TIMEOUTS:
+                current_user.session_timeout = timeout
+            saron = settings_in.get("saron_reference_annual_pct")
+            if isinstance(saron, (int, float)) and -5 <= saron <= 20:
+                current_user.saron_reference_annual_pct = float(saron)
+            if "ai" in settings_in:
+                cfg, keys, ai_warnings = ai_client.import_config(
+                    ai_client.from_user(current_user), settings_in["ai"]
+                )
+                # Neue Zuweisung, sonst erkennt SQLAlchemy die Aenderung nicht
+                current_user.ai_config_json = cfg.model_dump()
+                result.api_keys_restored = keys
+                result.warnings.extend(ai_warnings)
+            result.settings_restored = True
 
     # ── User profile (optional) ───────────────────────────────
     if payload.overwrite_profile and "user" in backup:
