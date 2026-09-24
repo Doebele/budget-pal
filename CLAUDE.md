@@ -123,7 +123,13 @@ api/              # One router per domain, all mounted in main.py under /api/<na
   forecasting.py  # /forecasting — predictive budget scenarios
 
 services/
-  categorization.py   # 5-stage AI pipeline: manual cache → keyword → fuzzy → embedding → OpenAI
+  categorization.py   # 5-stage pipeline: manual cache → keyword → fuzzy → embedding → LLM
+                      #   (the LLM is whatever the user picked, via ai_client)
+  ai_client.py        # Provider-agnostic LLM client. 18 providers in PROVIDER_CATALOG
+                      #   (same list as fintools); Anthropic uses its Messages API,
+                      #   every other provider the OpenAI-compatible API. One profile
+                      #   per provider in users.ai_config_json; the old flat format is
+                      #   still read. API keys never leave the server (has_key only).
   projection.py       # Monte Carlo simulation + Swiss AHV/BVG/3a pension math
   currency_service.py # ECB rate fetch with file cache (rates.json)
   import_parsers/     # Bank CSV/PDF parsers: UBS, N26, Revolut, comdirect
