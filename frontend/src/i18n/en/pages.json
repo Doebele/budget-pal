@@ -792,7 +792,7 @@
     "noActiveTxns": "There are no active transactions left for this account (all archived or empty). Archiving or hard delete is not possible.",
     "archiveNote": "After archiving, these entries no longer appear in the transaction overview (soft delete). The data stays in the database for traceability.",
     "permanentDeleteNote": "This transaction will be removed irreversibly from the database. This action cannot be undone.",
-    "exportNote": "Exports all your data as a JSON backup: transactions, accounts, budgets, recurring entries, wizard configuration, pillars 1–3a and assets.",
+    "exportNote": "Exports all your data as a JSON backup: transactions, accounts, budgets, recurring entries, wizard configuration, pillars 1–3a, assets and settings including AI providers. API keys only if you explicitly include them.",
     "restoreNote": "Restores data from a previous JSON backup. Existing entries are not overwritten — only missing data is added.",
     "mappingNote": "Assigns each budget label from the empirical data to a supercategory. Budget Analysis uses this to pick the matching actual transaction category and peer group.",
     "transfersIncluded": "Incl. {{amount}} account transfers/savings — enable the toggle to hide them.",

@@ -103,6 +103,10 @@ export default function Settings() {
   // ── Backup / Restore ─────────────────────────────────────────
   const [backupExporting, setBackupExporting] = useState(false);
   const [backupExportError, setBackupExportError] = useState<string | null>(null);
+  // API-Keys nur auf ausdrücklichen Wunsch und mit Passwort (fintools gibt sie
+  // ohne Rückfrage heraus; BudgetPal läuft öffentlich)
+  const [includeKeys, setIncludeKeys] = useState(false);
+  const [exportPassword, setExportPassword] = useState("");
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importOptions, setImportOptions] = useState({
     overwrite_profile: false,
@@ -110,6 +114,8 @@ export default function Settings() {
     import_recurring_plan: true,
     import_wizard_config: true,
     import_pension_assets: true,
+    // Überschreibt Sprache, Session-Dauer und KI-Anbieter — darum nicht vorbelegt
+    import_settings: false,
   });
   const [importResult, setImportResult] = useState<Record<string, unknown> | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -119,18 +125,30 @@ export default function Settings() {
     setBackupExporting(true);
     setBackupExportError(null);
     try {
-      const resp = await backupApi.export();
+      const resp = includeKeys
+        ? await backupApi.exportWithSecrets(exportPassword)
+        : await backupApi.export();
       const blob = new Blob([resp.data], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       const now = new Date();
       const ts = now.toISOString().replace(/[:.]/g, "-").slice(0, 19);
       a.href = url;
-      a.download = `budgetpal_backup_${ts}.json`;
+      a.download = `budgetpal_backup_${ts}${includeKeys ? "_mit_keys" : ""}.json`;
       a.click();
       URL.revokeObjectURL(url);
-    } catch {
-      setBackupExportError("Export fehlgeschlagen. Bitte erneut versuchen.");
+      // Das Passwort bleibt nicht im Zustand liegen
+      setExportPassword("");
+      setIncludeKeys(false);
+    } catch (e) {
+      const status = (e as { response?: { status?: number } })?.response?.status;
+      setBackupExportError(
+        status === 403
+          ? t("settings:backup.wrongPassword")
+          : status === 429
+            ? t("settings:backup.tooManyAttempts")
+            : t("settings:backup.exportError"),
+      );
     } finally {
       setBackupExporting(false);
     }
@@ -149,8 +167,8 @@ export default function Settings() {
       queryClient.invalidateQueries();
     } catch (e) {
       const msg = e instanceof SyntaxError
-        ? "Ungültige JSON-Datei."
-        : "Import fehlgeschlagen. Bitte Backup-Datei überprüfen.";
+        ? t("settings:backup.invalidJson")
+        : t("settings:backup.importError");
       setImportError(msg);
     } finally {
       setImportPending(false);
@@ -1494,7 +1512,7 @@ export default function Settings() {
       <div className="card space-y-5">
         <h2 className="text-text-primary font-semibold text-sm flex items-center gap-2">
           <ShieldCheck className="w-4 h-4 text-accent" />
-          Datensicherung
+          {t("settings:backup.title")}
         </h2>
 
         {/* Export */}
@@ -1503,17 +1521,55 @@ export default function Settings() {
           <p className="text-text-tertiary text-xs">
             {t("pages:hints.exportNote")}
           </p>
+
+          <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer w-fit">
+            <input
+              type="checkbox"
+              checked={includeKeys}
+              onChange={(e) => {
+                setIncludeKeys(e.target.checked);
+                setExportPassword("");
+                setBackupExportError(null);
+              }}
+              className="accent-accent"
+            />
+            {t("settings:backup.includeKeys")}
+          </label>
+
+          {includeKeys && (
+            <div className="space-y-2">
+              <p className="msg msg-warning text-xs flex items-start gap-1.5">
+                <WarningCircle className="w-3.5 h-3.5 shrink-0 mt-px" />
+                {t("settings:backup.keysWarn")}
+              </p>
+              <input
+                type="password"
+                className="input text-sm max-w-xs"
+                value={exportPassword}
+                onChange={(e) => setExportPassword(e.target.value)}
+                placeholder={t("settings:backup.password")}
+                aria-label={t("settings:backup.password")}
+                autoComplete="current-password"
+              />
+              <p className="text-text-disabled text-[11px]">{t("settings:backup.passwordHint")}</p>
+            </div>
+          )}
+
           <button
             type="button"
             onClick={handleExport}
-            disabled={backupExporting}
+            disabled={backupExporting || (includeKeys && !exportPassword)}
             className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent/90 disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
           >
             <Download className="w-4 h-4" />
-            {backupExporting ? "Wird exportiert…" : "JSON-Backup herunterladen"}
+            {backupExporting
+              ? t("settings:backup.exporting")
+              : includeKeys
+                ? t("settings:backup.exportWithKeys")
+                : t("settings:backup.exportButton")}
           </button>
           {backupExportError && (
-            <p className="text-loss text-xs flex items-center gap-1">
+            <p className="text-loss text-xs flex items-center gap-1" role="alert">
               <WarningCircle className="w-3.5 h-3.5" /> {backupExportError}
             </p>
           )}
@@ -1532,7 +1588,7 @@ export default function Settings() {
           <label className="flex items-center gap-2 cursor-pointer w-fit">
             <span className="flex items-center gap-2 px-3 py-2 bg-bg-surface2 hover:bg-bg-surface border border-border text-text-secondary hover:text-text-primary rounded-lg text-sm transition-colors">
               <Upload className="w-4 h-4" />
-              {importFile ? importFile.name : "Backup-Datei auswählen (.json)"}
+              {importFile ? importFile.name : t("settings:backup.chooseFile")}
             </span>
             <input
               type="file"
@@ -1547,12 +1603,13 @@ export default function Settings() {
             <div className="space-y-2 text-xs text-text-secondary">
               <p className="text-text-tertiary font-medium">{t("pages:settings2.g31")}</p>
               {([
-                ["import_transactions", "Transaktionen importieren"],
-                ["import_recurring_plan", "Wiederkehrende Einträge importieren"],
-                ["import_wizard_config", "Wizard-Konfiguration wiederherstellen"],
-                ["import_pension_assets", "Säulen & Assets importieren"],
-                ["overwrite_profile", "Profil-Felder überschreiben (Name, Währung, …)"],
-              ] as [keyof typeof importOptions, string][]).map(([key, label]) => (
+                ["import_transactions", "optTransactions"],
+                ["import_recurring_plan", "optRecurring"],
+                ["import_wizard_config", "optWizard"],
+                ["import_pension_assets", "optPension"],
+                ["overwrite_profile", "optProfile"],
+                ["import_settings", "optSettings"],
+              ] as [keyof typeof importOptions, string][]).map(([key, labelKey]) => (
                 <label key={key} className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -1560,7 +1617,7 @@ export default function Settings() {
                     onChange={(e) => setImportOptions((o) => ({ ...o, [key]: e.target.checked }))}
                     className="accent-accent"
                   />
-                  {label}
+                  {t(`settings:backup.${labelKey}`)}
                 </label>
               ))}
               <button
@@ -1570,24 +1627,39 @@ export default function Settings() {
                 className="mt-2 flex items-center gap-2 px-4 py-2 bg-gain/80 hover:bg-gain disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
               >
                 <Upload className="w-4 h-4" />
-                {importPending ? "Wird importiert…" : "Backup importieren"}
+                {importPending ? t("settings:backup.importing") : t("settings:backup.importButton")}
               </button>
             </div>
           )}
 
           {/* Result */}
           {importResult && (
-            <div className="p-3 rounded-xl bg-gain/10 border border-gain/30 text-xs space-y-1 text-gain">
-              <p className="font-medium flex items-center gap-1"><Check className="w-3.5 h-3.5" /> Import abgeschlossen</p>
-              <p>Konten: +{String(importResult.accounts_created ?? 0)} · Transaktionen: +{String(importResult.transactions_created ?? 0)} übersprungen: {String(importResult.transactions_skipped ?? 0)}</p>
-              <p>Wiederkehrend: +{String(importResult.recurring_plan_created ?? 0)} · Säulen: +{String(importResult.pension_created ?? 0)} · Assets: +{String(importResult.assets_created ?? 0)}</p>
+            <div className="p-3 rounded-xl bg-gain/10 border border-gain/30 text-xs space-y-1 text-gain" role="status">
+              <p className="font-medium flex items-center gap-1"><Check className="w-3.5 h-3.5" /> {t("settings:backup.importDone")}</p>
+              <p>
+                {t("settings:backup.resultData", {
+                  accounts: importResult.accounts_created ?? 0,
+                  created: importResult.transactions_created ?? 0,
+                  skipped: importResult.transactions_skipped ?? 0,
+                })}
+              </p>
+              <p>
+                {t("settings:backup.resultPlan", {
+                  recurring: importResult.recurring_plan_created ?? 0,
+                  pension: importResult.pension_created ?? 0,
+                  assets: importResult.assets_created ?? 0,
+                })}
+              </p>
+              {Boolean(importResult.settings_restored) && (
+                <p>{t("settings:backup.settingsRestored", { count: Number(importResult.api_keys_restored ?? 0) })}</p>
+              )}
               {(importResult.warnings as string[] | undefined)?.length ? (
                 <p className="txt-warning">⚠ {(importResult.warnings as string[]).join("; ")}</p>
               ) : null}
             </div>
           )}
           {importError && (
-            <p className="text-loss text-xs flex items-center gap-1">
+            <p className="text-loss text-xs flex items-center gap-1" role="alert">
               <WarningCircle className="w-3.5 h-3.5" /> {importError}
             </p>
           )}
@@ -1814,7 +1886,13 @@ function AiModelSection() {
 
   const endpoint = draft.endpoint ?? (stored?.endpoint || info?.url || "");
   const model = draft.model ?? stored?.model ?? "";
-  const hasStoredKey = Boolean(stored?.has_key) && draft.key !== "";
+  // Ein gespeicherter Key geht nur an den Endpunkt, mit dem er gespeichert
+  // wurde (serverseitig erzwungen). Wer den Endpunkt ändert, tippt ihn neu.
+  const norm = (u: string) => u.trim().replace(/\/+$/, "");
+  const endpointMoved =
+    draft.endpoint !== undefined && norm(draft.endpoint) !== norm(stored?.endpoint || info?.url || "");
+  const keyMustBeRetyped = Boolean(info && !info.local && stored?.has_key && endpointMoved && !draft.key);
+  const hasStoredKey = Boolean(stored?.has_key) && draft.key !== "" && !endpointMoved;
   const hasKey = hasStoredKey || Boolean(draft.key);
   const contextOverride = contextDraft ?? settings?.context_chars_override ?? 0;
 
@@ -1989,6 +2067,9 @@ function AiModelSection() {
                     {showKey ? t("ai.hide") : t("ai.show")}
                   </button>
                 </div>
+                {keyMustBeRetyped && (
+                  <p className="txt-warning text-[11px] mt-1">{t("ai.keyRetype")}</p>
+                )}
                 {hasStoredKey && (
                   <p className="text-text-disabled text-[11px] mt-1 flex items-center gap-2">
                     {t("ai.apiKeySaved")}
@@ -2118,7 +2199,7 @@ function AiModelSection() {
           <button
             type="button"
             className="btn btn-primary"
-            disabled={!dirty || save.isPending}
+            disabled={!dirty || save.isPending || keyMustBeRetyped}
             onClick={() => save.mutate()}
           >
             <FloppyDisk className="w-3.5 h-3.5" />

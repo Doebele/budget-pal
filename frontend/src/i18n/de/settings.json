@@ -55,7 +55,8 @@
     "testing": "Teste …",
     "connOk": "Verbunden",
     "testFailed": "Test fehlgeschlagen",
-    "kimiCodeNote": "Das Kimi-Code-Abo ist laut Kimi für Coding-Tools gedacht. Für eigene Anwendungen empfiehlt Kimi die Kimi Platform (API, Pay-as-you-go)."
+    "kimiCodeNote": "Das Kimi-Code-Abo ist laut Kimi für Coding-Tools gedacht. Für eigene Anwendungen empfiehlt Kimi die Kimi Platform (API, Pay-as-you-go).",
+    "keyRetype": "Neuer Endpunkt — bitte den API-Key erneut eingeben. Ein gespeicherter Key geht nur an den Endpunkt, mit dem er gespeichert wurde."
   },
   "security": {
     "title": "Sicherheit",
@@ -75,5 +76,34 @@
     "passkeyCancelled": "Abgebrochen — es wurde kein Passkey angelegt.",
     "passkeyFailed": "Passkey konnte nicht registriert werden. Passkeys brauchen HTTPS oder localhost.",
     "passkeyUnsupported": "Dieser Browser unterstützt keine Passkeys."
+  },
+  "backup": {
+    "title": "Datensicherung",
+    "exportButton": "JSON-Backup herunterladen",
+    "exportWithKeys": "Backup mit API-Keys herunterladen",
+    "exporting": "Wird exportiert …",
+    "exportError": "Export fehlgeschlagen. Bitte erneut versuchen.",
+    "includeKeys": "API-Keys einschliessen",
+    "keysWarn": "Die Datei enthält deine API-Keys im Klartext. Sicher aufbewahren und nicht weitergeben.",
+    "password": "Passwort zur Bestätigung",
+    "passwordHint": "Die Keys gibt es nur mit Passwort — ein angemeldeter Browser allein genügt dafür nicht.",
+    "wrongPassword": "Passwort falsch.",
+    "tooManyAttempts": "Zu viele Versuche — bitte in ein paar Minuten erneut.",
+    "chooseFile": "Backup-Datei auswählen (.json)",
+    "optTransactions": "Transaktionen importieren",
+    "optRecurring": "Wiederkehrende Einträge importieren",
+    "optWizard": "Wizard-Konfiguration wiederherstellen",
+    "optPension": "Säulen & Assets importieren",
+    "optProfile": "Profil-Felder überschreiben (Name, Währung, …)",
+    "optSettings": "Einstellungen & API-Keys wiederherstellen (überschreibt Sprache, Session-Dauer und KI-Anbieter)",
+    "importButton": "Backup importieren",
+    "importing": "Wird importiert …",
+    "importDone": "Import abgeschlossen",
+    "resultData": "Konten: +{{accounts}} · Transaktionen: +{{created}}, übersprungen: {{skipped}}",
+    "resultPlan": "Wiederkehrend: +{{recurring}} · Säulen: +{{pension}} · Assets: +{{assets}}",
+    "settingsRestored_one": "Einstellungen wiederhergestellt · {{count}} API-Key",
+    "settingsRestored_other": "Einstellungen wiederhergestellt · {{count}} API-Keys",
+    "invalidJson": "Ungültige JSON-Datei.",
+    "importError": "Import fehlgeschlagen. Bitte Backup-Datei überprüfen."
   }
 }

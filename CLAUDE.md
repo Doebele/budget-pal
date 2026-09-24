@@ -121,6 +121,10 @@ api/              # One router per domain, all mounted in main.py under /api/<na
   currency.py     # /currency — live exchange rates (ECB, cached)
   goals.py        # /goals — financial goals
   forecasting.py  # /forecasting — predictive budget scenarios
+  backup.py       # /backup — JSON export/import of all data + settings (v1.1).
+                  #   GET /export never contains API keys; POST /export-secrets does,
+                  #   but only with the account password (rate-limited, 403 not 401 —
+                  #   a 401 logs the frontend out). Restoring settings is opt-in.
 
 services/
   categorization.py   # 5-stage pipeline: manual cache → keyword → fuzzy → embedding → LLM
@@ -143,6 +147,13 @@ services/
                       #   Frontend twin: frontend/src/lib/planSchedule.ts — keep in sync.
   demo_data.py        # Anonymous sample household (fixed seed → reproducible)
 ```
+
+### API keys
+Stored AI keys never leave the server in normal responses (`has_key` only).
+A stored key is only ever sent to the endpoint it was saved with
+(`ai_client.endpoint_moves`): the connection test, the model list, saving a
+new endpoint and a backup import all enforce this. Otherwise a stolen session
+token could point a provider at a foreign server and receive the key.
 
 ### Test environment caveats
 Tests run against **in-memory SQLite**, which ignores `VARCHAR(n)` limits. A string

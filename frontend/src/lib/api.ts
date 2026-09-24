@@ -536,6 +536,10 @@ export const backupApi = {
   /** Download a full JSON backup for the current user. Returns raw blob response. */
   export: () => api.get("/backup/export", { responseType: "blob" }),
 
+  /** Dasselbe inkl. API-Keys im Klartext. Nur mit Passwort — im Body, nie in der URL. */
+  exportWithSecrets: (password: string) =>
+    api.post("/backup/export-secrets", { password }, { responseType: "blob" }),
+
   /** Restore from a parsed backup JSON object. Returns BackupImportResult. */
   import: (payload: {
     backup: Record<string, unknown>;
@@ -544,6 +548,7 @@ export const backupApi = {
     import_recurring_plan?: boolean;
     import_wizard_config?: boolean;
     import_pension_assets?: boolean;
+    import_settings?: boolean;
   }) => api.post("/backup/import", payload),
 };
 
