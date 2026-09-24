@@ -66,13 +66,6 @@ class Settings(BaseSettings):
     def allowed_origins_list(self) -> List[str]:
         return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
 
-    # ── OpenAI (optional) ─────────────────────────────────────
-    openai_api_key: str = ""
-
-    @property
-    def openai_enabled(self) -> bool:
-        return bool(self.openai_api_key)
-
     # ── Mistral (optional — OCR fallback) ─────────────────────
     mistral_api_key: str = ""
 
