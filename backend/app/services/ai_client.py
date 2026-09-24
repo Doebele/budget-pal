@@ -21,15 +21,20 @@ sie roh an den Browser zurück; hier meldet die API nur `has_key`.
 """
 from __future__ import annotations
 
+import asyncio
+import ipaddress
 import json
 import logging
 import re
+import socket
 import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, NamedTuple, Optional, Tuple
 
 import httpx
 from pydantic import BaseModel, Field, model_validator
+
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -447,6 +452,48 @@ class AiHttpError(Exception):
     """Ein Anbieter hat mit einem Fehlerstatus geantwortet."""
 
 
+async def ensure_public_endpoint(url: str) -> None:
+    """Auf dem Server nur oeffentliche https-Adressen.
+
+    Die Registrierung ist offen, und den KI-Endpunkt ruft der Server selbst
+    auf. Ohne diese Pruefung koennte jeder Nutzer ihn auf interne Dienste
+    richten (Datenbank, andere Container, 127.0.0.1). Lokal (ENVIRONMENT=
+    development) und mit AI_ALLOW_PRIVATE_ENDPOINTS=true (NAS im Heimnetz)
+    bleiben LM Studio und Ollama erlaubt.
+    """
+    parsed = httpx.URL(url)
+    if parsed.scheme != "https":
+        raise AiHttpError("Auf dem Server sind nur https-Endpunkte erlaubt")
+    try:
+        infos = await asyncio.get_running_loop().getaddrinfo(
+            parsed.host, parsed.port or 443, type=socket.SOCK_STREAM
+        )
+    except socket.gaierror:
+        raise AiHttpError("Endpunkt nicht auffindbar (DNS)")
+    for *_, sockaddr in infos:
+        ip = ipaddress.ip_address(sockaddr[0])
+        if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
+            ip = ip.ipv4_mapped
+        if not ip.is_global:
+            raise AiHttpError("Endpunkt zeigt auf eine interne Adresse")
+
+
+async def _guard_request(request: httpx.Request) -> None:
+    # ponytail: prueft die DNS-Aufloesung, httpx loest danach selbst noch einmal
+    # auf. Ein Angreifer mit eigenem DNS und TTL 0 kaeme dazwischen (DNS
+    # rebinding); dicht wird es erst mit einem Transport, der an die hier
+    # gepruefte IP verbindet.
+    if not (settings.is_development or settings.ai_allow_private_endpoints):
+        await ensure_public_endpoint(str(request.url))
+
+
+def _client(timeout: float) -> httpx.AsyncClient:
+    """Jeder ausgehende KI-Request laeuft hierueber — und damit durch die
+    Pruefung. Weiterleitungen folgt httpx nicht (Default), sie umgehen sie
+    also nicht."""
+    return httpx.AsyncClient(timeout=timeout, event_hooks={"request": [_guard_request]})
+
+
 def _headers(provider: str, key: str) -> Dict[str, str]:
     if provider == "anthropic":
         return {
@@ -547,7 +594,7 @@ async def _complete_raw(
     if json_mode and info.json_object and provider != "anthropic":
         body["response_format"] = {"type": "json_object"}
 
-    async with httpx.AsyncClient(timeout=timeout) as client:
+    async with _client(timeout) as client:
         res = await client.post(url, json=body, headers=_headers(provider, prof.key))
     if res.status_code >= 400:
         # Fehlertext mitloggen — sonst ist ein 400 nicht diagnostizierbar
@@ -663,7 +710,7 @@ async def fetch_models(cfg: AiConfig) -> List[str]:
     if _needs_key(provider) and not prof.key:
         raise AiHttpError("Kein API-Key hinterlegt")
     query = "?limit=1000" if provider == "anthropic" else ""
-    async with httpx.AsyncClient(timeout=MODELS_TIMEOUT) as client:
+    async with _client(MODELS_TIMEOUT) as client:
         res = await client.get(
             f"{api_base(prof.endpoint)}/models{query}", headers=_headers(provider, prof.key)
         )
@@ -782,7 +829,7 @@ async def detect_context_tokens(cfg: AiConfig) -> Optional[int]:
 
     if cfg.provider == "lm-studio":
         try:
-            async with httpx.AsyncClient(timeout=LISTING_TIMEOUT) as client:
+            async with _client(LISTING_TIMEOUT) as client:
                 res = await client.get(f"{_host_root(prof.endpoint)}/api/v0/models")
                 res.raise_for_status()
                 for entry in res.json().get("data", []):
@@ -798,7 +845,7 @@ async def detect_context_tokens(cfg: AiConfig) -> Optional[int]:
 
     if cfg.provider == "ollama":
         try:
-            async with httpx.AsyncClient(timeout=LISTING_TIMEOUT) as client:
+            async with _client(LISTING_TIMEOUT) as client:
                 res = await client.post(
                     f"{_host_root(prof.endpoint)}/api/show", json={"model": prof.model}
                 )

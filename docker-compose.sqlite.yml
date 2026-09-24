@@ -37,6 +37,7 @@ services:
       UPLOADS_DIR: /app/data/uploads
       RATES_CACHE_PATH: /app/data/cache/rates.json
       ENVIRONMENT: ${ENVIRONMENT:-production}
+      AI_ALLOW_PRIVATE_ENDPOINTS: ${AI_ALLOW_PRIVATE_ENDPOINTS:-false}
       AUTO_CREATE_SCHEMA: ${AUTO_CREATE_SCHEMA:-true}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:8011,https://budgetpal.doebele12.de}
     volumes:

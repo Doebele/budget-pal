@@ -93,6 +93,12 @@ class Settings(BaseSettings):
     def is_development(self) -> bool:
         return self.environment.lower() in ("development", "dev", "local")
 
+    # KI-Endpunkte im eigenen Netz (LM Studio, Ollama) auch ausserhalb der
+    # Entwicklung erlauben — fuer ein NAS im Heimnetz. Nie auf einem Server
+    # mit offener Registrierung: dort koennte jeder Nutzer interne Dienste
+    # ansprechen.
+    ai_allow_private_endpoints: bool = False
+
     # ── Swiss Financial Constants ─────────────────────────────
     swiss_inflation_rate: float = 0.015
     ahv_max_pension_chf: float = 2520.0
