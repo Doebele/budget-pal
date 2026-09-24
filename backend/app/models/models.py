@@ -106,6 +106,13 @@ class User(Base):
     session_timeout: Mapped[str] = mapped_column(
         String(8), default="30m", server_default="30m", nullable=False
     )
+    # Jeder Passwortwechsel setzt den Zeitpunkt; Tokens, die davor ausgestellt
+    # wurden, lehnt get_current_user ab — so fliegen alle anderen Sitzungen raus.
+    password_changed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Offener Link "Passwort vergessen": nur der SHA-256 des Tokens, nie das
+    # Token selbst. Eine neue Anfrage ueberschreibt den alten Link.
+    password_reset_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    password_reset_expires: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     accounts: Mapped[List["Account"]] = relationship("Account", back_populates="user", cascade="all, delete-orphan")

@@ -46,6 +46,12 @@ const Accounts = lazy(() => import("@/pages/Accounts"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const Login = lazy(() => import("@/pages/Login"));
 const Register = lazy(() => import("@/pages/Register"));
+const ForgotPassword = lazy(() =>
+  import("@/pages/PasswordReset").then((m) => ({ default: m.ForgotPassword })),
+);
+const ResetPassword = lazy(() =>
+  import("@/pages/PasswordReset").then((m) => ({ default: m.ResetPassword })),
+);
 const Wizard = lazy(() => import("@/pages/Wizard"));
 const Forecast = lazy(() => import("@/pages/Forecast"));
 const Finanzplan = lazy(() => import("@/pages/Finanzplan"));
@@ -102,6 +108,22 @@ export default function App() {
           element={
             <Suspense fallback={<LoadingScreen />}>
               <Register />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/forgot-password"
+          element={
+            <Suspense fallback={<LoadingScreen />}>
+              <ForgotPassword />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/reset-password"
+          element={
+            <Suspense fallback={<LoadingScreen />}>
+              <ResetPassword />
             </Suspense>
           }
         />

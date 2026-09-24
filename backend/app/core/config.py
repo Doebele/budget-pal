@@ -69,6 +69,18 @@ class Settings(BaseSettings):
     # ── Mistral (optional — OCR fallback) ─────────────────────
     mistral_api_key: str = ""
 
+    # ── Mailversand (Passwort vergessen) ──────────────────────
+    # Leeres smtp_host: es geht nichts raus; in der Entwicklung steht der Link
+    # dann im Log. Port 465 = SSL (Strato), sonst STARTTLS.
+    smtp_host: str = ""
+    smtp_port: int = 465
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+    # Basis fuer Links in Mails. Nie aus dem Host-Header der Anfrage bauen —
+    # sonst liesse sich ein Reset-Link auf eine fremde Domain erzeugen.
+    app_base_url: str = "http://localhost:8011"
+
     @property
     def mistral_ocr_enabled(self) -> bool:
         return bool(self.mistral_api_key)

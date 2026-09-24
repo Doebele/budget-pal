@@ -75,7 +75,20 @@
     "lastUsed": "last used: {{date}}",
     "passkeyCancelled": "Cancelled — no passkey was created.",
     "passkeyFailed": "Could not register the passkey. Passkeys require HTTPS or localhost.",
-    "passkeyUnsupported": "This browser does not support passkeys."
+    "passkeyUnsupported": "This browser does not support passkeys.",
+    "passwordTitle": "Change password",
+    "passwordHint": "After changing it, all other devices are signed out. This session stays active.",
+    "passwordCurrent": "Current password",
+    "passwordNew": "New password (min. 8 characters)",
+    "passwordConfirm": "Repeat new password",
+    "passwordSave": "Change password",
+    "passwordSaving": "Saving …",
+    "passwordDone": "Password changed. Other devices have been signed out.",
+    "passwordWrong": "The current password is incorrect.",
+    "passwordMismatch": "The new passwords do not match.",
+    "passwordTooShort": "The new password needs at least 8 characters.",
+    "passwordTooMany": "Too many attempts — please try again in a few minutes.",
+    "passwordFailed": "Change failed. Please try again."
   },
   "backup": {
     "title": "Backup",

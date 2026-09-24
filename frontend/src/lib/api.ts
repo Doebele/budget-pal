@@ -35,13 +35,16 @@ api.interceptors.request.use(
 
 // ── Response interceptor: handle 401 ─────────────────────────
 
+const PUBLIC_PATHS = ["/login", "/register", "/forgot-password", "/reset-password"];
+
 api.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
     if (error.response?.status === 401) {
       localStorage.removeItem(TOKEN_KEY);
-      // Only redirect if not already on auth pages
-      if (!window.location.pathname.startsWith("/login") && !window.location.pathname.startsWith("/register")) {
+      // Nicht von den oeffentlichen Seiten weg — sonst ginge beim Reset-Link
+      // mit abgelaufener Sitzung das Token im Link verloren
+      if (!PUBLIC_PATHS.some((p) => window.location.pathname.startsWith(p))) {
         window.location.href = "/login";
       }
     }
@@ -73,6 +76,12 @@ export const authApi = {
     api.post("/auth/login", data),
   getMe: () => api.get("/auth/me"),
   updateMe: (data: Record<string, unknown>) => api.put("/auth/me", data),
+  forgotPassword: (email: string) => api.post("/auth/password/forgot", { email }),
+  resetPassword: (token: string, new_password: string) =>
+    api.post("/auth/password/reset", { token, new_password }),
+  /** Liefert ein neues Token — die anderen Sitzungen enden. */
+  changePassword: (current_password: string, new_password: string) =>
+    api.post<{ access_token: string }>("/auth/password/change", { current_password, new_password }),
 };
 
 // Accounts

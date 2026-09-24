@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { clsx } from "clsx";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
-import { api, authApi, settingsApi, taxonomyApi, backupApi, aiApi, passkeysApi, SESSION_TIMEOUTS, type AiProfileUpdate, type AiSettingsUpdate, type AiTestResult, type SessionTimeout } from "@/lib/api";
+import { api, authApi, setAuthToken, settingsApi, taxonomyApi, backupApi, aiApi, passkeysApi, SESSION_TIMEOUTS, type AiProfileUpdate, type AiSettingsUpdate, type AiTestResult, type SessionTimeout } from "@/lib/api";
 import { startRegistration } from "@simplewebauthn/browser";
 import { DEFAULT_SARON_REFERENCE_ANNUAL_PCT, SARON_INDEX_URL } from "@/lib/saron";
 import { Check, CheckCircle, Download, EditPencil, Eye, FloppyDisk, Group, Label, MagicWand, NavArrowDown, NavArrowUp, OpenNewWindow, Plus, Refresh, ShieldCheck, Sparks, Trash, Undo, Upload, WarningCircle, Xmark } from "@/lib/icons";
@@ -1696,6 +1696,98 @@ const SESSION_TIMEOUT_LABELS: Record<SessionTimeout, string> = {
   "30d": "30 Tage",
 };
 
+/** Passwort aendern. Der Server beendet dabei alle anderen Sitzungen und
+ *  gibt dieser ein neues Token — das alte gilt danach nicht mehr. */
+function ChangePassword() {
+  const { t } = useTranslation("settings");
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+
+  const change = useMutation({
+    mutationFn: async () => (await authApi.changePassword(current, next)).data,
+    onSuccess: (data) => {
+      setAuthToken(data.access_token);
+      setCurrent("");
+      setNext("");
+      setConfirm("");
+      setDone(true);
+    },
+    onError: (e: unknown) => {
+      const status = (e as { response?: { status?: number } })?.response?.status;
+      setError(
+        status === 400
+          ? t("security.passwordWrong")
+          : status === 429
+            ? t("security.passwordTooMany")
+            : t("security.passwordFailed"),
+      );
+    },
+  });
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setDone(false);
+    if (next.length < 8) return setError(t("security.passwordTooShort"));
+    if (next !== confirm) return setError(t("security.passwordMismatch"));
+    change.mutate();
+  }
+
+  return (
+    <form onSubmit={submit}>
+      <label className="label mb-2 block">{t("security.passwordTitle")}</label>
+      <p className="text-text-disabled text-[11px] mb-2">{t("security.passwordHint")}</p>
+      <div className="grid gap-2 sm:grid-cols-3">
+        <input
+          type="password"
+          className="input"
+          placeholder={t("security.passwordCurrent")}
+          aria-label={t("security.passwordCurrent")}
+          value={current}
+          onChange={(e) => setCurrent(e.target.value)}
+          autoComplete="current-password"
+          required
+        />
+        <input
+          type="password"
+          className="input"
+          placeholder={t("security.passwordNew")}
+          aria-label={t("security.passwordNew")}
+          value={next}
+          onChange={(e) => setNext(e.target.value)}
+          autoComplete="new-password"
+          minLength={8}
+          required
+        />
+        <input
+          type="password"
+          className="input"
+          placeholder={t("security.passwordConfirm")}
+          aria-label={t("security.passwordConfirm")}
+          value={confirm}
+          onChange={(e) => setConfirm(e.target.value)}
+          autoComplete="new-password"
+          required
+        />
+      </div>
+      <div className="flex items-center gap-3 mt-2">
+        <button type="submit" className="btn btn-primary" disabled={change.isPending}>
+          {change.isPending ? t("security.passwordSaving") : t("security.passwordSave")}
+        </button>
+        {error && <span className="text-loss text-xs">{error}</span>}
+        {done && (
+          <span className="text-gain text-xs flex items-center gap-1">
+            <CheckCircle className="w-3.5 h-3.5" /> {t("security.passwordDone")}
+          </span>
+        )}
+      </div>
+    </form>
+  );
+}
+
 function SecuritySection() {
   const { t } = useTranslation("settings");
   const queryClient = useQueryClient();
@@ -1755,6 +1847,8 @@ function SecuritySection() {
       <p className="text-text-disabled text-xs mb-4">{t("security.subtitle")}</p>
 
       <div className="space-y-5">
+        <ChangePassword />
+
         <div>
           <label className="label mb-2 block">{t("security.sessionDuration")}</label>
           <select
