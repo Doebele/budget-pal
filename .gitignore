@@ -183,3 +183,7 @@ letsencrypt/
 *.temp
 .scratch/
 scratch.*
+
+# Server: Datenbank-Dumps und zuletzt erfolgreicher Deploy (deploy.sh)
+backups/
+.last-good-tag

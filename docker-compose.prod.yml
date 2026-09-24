@@ -1,0 +1,82 @@
+# Produktion auf dem Strato-VPS — fertige Images aus GHCR, gebaut von der
+# GitHub Action bei jedem Push auf main. Start nur ueber deploy.sh.
+#
+# Nach aussen haengt nur das Frontend, und zwar an 127.0.0.1: den Weg ins
+# Internet macht der nginx auf dem Host (HTTPS). Das Backend hat keinen
+# Host-Port; der nginx im Frontend-Container leitet /api/ intern weiter.
+# Die Firewall auf dem Server ist aus, ein 0.0.0.0-Port waere direkt offen.
+
+name: budgetpal
+
+networks:
+  budget-pal-network:
+
+volumes:
+  budget-pal-postgres-data:
+  budget-pal-uploads:
+  budget-pal-cache:
+
+services:
+  budget-pal-db:
+    image: postgres:15-alpine
+    container_name: budget-pal-db
+    restart: unless-stopped
+    networks: [budget-pal-network]
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-budgetpal}
+      POSTGRES_USER: ${POSTGRES_USER:-budgetpal}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD fehlt in .env}
+    volumes:
+      - budget-pal-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-budgetpal} -d ${POSTGRES_DB:-budgetpal}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  budget-pal-backend:
+    image: ghcr.io/doebele/budget-pal/backend:${IMAGE_TAG:-latest}
+    container_name: budget-pal-backend
+    restart: unless-stopped
+    networks: [budget-pal-network]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-budgetpal}:${POSTGRES_PASSWORD}@budget-pal-db:5432/${POSTGRES_DB:-budgetpal}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY fehlt in .env}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+      UPLOADS_DIR: /app/data/uploads
+      RATES_CACHE_PATH: /app/data/cache/rates.json
+      # Fest: "production" sperrt KI-Endpunkte auf interne Adressen
+      ENVIRONMENT: production
+      ALLOWED_ORIGINS: https://budgetpal.doebele12.de
+    volumes:
+      - budget-pal-uploads:/app/data/uploads
+      - budget-pal-cache:/app/data/cache
+    depends_on:
+      budget-pal-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  budget-pal-frontend:
+    image: ghcr.io/doebele/budget-pal/frontend:${IMAGE_TAG:-latest}
+    container_name: budget-pal-frontend
+    restart: unless-stopped
+    networks: [budget-pal-network]
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-18081}:80"
+    depends_on:
+      budget-pal-backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s

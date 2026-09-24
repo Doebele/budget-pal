@@ -52,6 +52,13 @@ make sync                       # git fetch + rebase origin/main
 ```
 After cloning fresh: run `git config core.hooksPath .githooks` once to activate the pre-push guard.
 
+### Deployment (Strato)
+A push to `main` deploys: CI builds images to GHCR, then (if the repo variable
+`DEPLOY_ENABLED=true`) SSHes to the server and runs `./deploy.sh <sha7>` with
+`docker-compose.prod.yml`. So **merging a PR goes live**. `deploy.sh` dumps the DB
+first (`scripts/backup-db.sh`) and falls back to the last healthy tag. Setup and
+secrets: README, "Deployment auf Strato".
+
 ---
 
 ## Domain vocabulary — read this first
@@ -154,6 +161,12 @@ A stored key is only ever sent to the endpoint it was saved with
 (`ai_client.endpoint_moves`): the connection test, the model list, saving a
 new endpoint and a backup import all enforce this. Otherwise a stolen session
 token could point a provider at a foreign server and receive the key.
+
+Registration is open, and the server calls the AI endpoint itself. Every AI
+request goes through `ai_client._client()`, whose request hook allows only
+public `https` addresses unless `ENVIRONMENT=development` or
+`AI_ALLOW_PRIVATE_ENDPOINTS=true`. Create new AI HTTP clients only via
+`_client()`, never `httpx.AsyncClient` directly.
 
 ### Test environment caveats
 Tests run against **in-memory SQLite**, which ignores `VARCHAR(n)` limits. A string
