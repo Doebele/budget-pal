@@ -19,6 +19,18 @@ bank import, AI categorization, long-term financial projections, and the Swiss 3
 
 ## ✨ Neueste Updates / Latest Updates
 
+**September 2026 — KI-Anbieter und Einstellungs-Backup**
+
+- 🤖 **18 KI-Anbieter statt 7** — LM Studio und Ollama lokal, dazu Anthropic, OpenAI, Google,
+  xAI, Meta, Mistral, DeepSeek, Qwen, Kimi, Z.AI, MiniMax, MiMo, StepFun und OpenRouter;
+  dieselbe Liste wie im Schwesterprojekt FinTools
+- 🗂️ **Ein Profil je Anbieter** — Endpunkt, Modell und Key bleiben beim Wechsel erhalten
+- 🔌 **Verbindungstest** mit Modellliste live vom Anbieter und gemessener Antwortzeit
+- 💾 **Einstellungs-Backup** — KI-Anbieter, Sprache und Session-Dauer wandern mit ins
+  JSON-Backup; API-Keys nur auf ausdrücklichen Wunsch und mit Passwortbestätigung
+- 🔒 **Key-Schutz** — gespeicherte Keys verlassen den Server nie im Klartext, und ein Key
+  geht nur an den Endpunkt, mit dem er gespeichert wurde
+
 **August 2026 — Onboarding, Szenarien und Plan-Ist-Abgleich**
 
 - 🚪 **Drei Wege zum ersten Ergebnis** — statt eines achtstufigen Wizards vor dem Dashboard:
@@ -92,7 +104,41 @@ umgekehrt zur üblichen Wortbedeutung von „empirisch".
 2. Regelbasiertes Keyword-Matching (50+ Schweizer/Deutsche Händler)
 3. Fuzzy-Matching mit RapidFuzz
 4. Sentence-Transformer Embedding-Klassifizierung (lokal, `all-MiniLM-L6-v2`)
-5. OpenAI GPT-4o-mini Fallback (optional, wenn API-Key gesetzt)
+5. Das in den Einstellungen gewählte KI-Modell (optional, siehe [KI-Anbieter](#ki-anbieter))
+
+### KI-Anbieter
+
+Das KI-Modell wählt jeder Nutzer unter **Einstellungen → KI-Modell**. Es dient der
+PDF-Auswertung beim Import, der letzten Stufe der Kategorisierung und den Analysen.
+Ohne Anbieter läuft alles weiter — nur die KI-Stufe entfällt.
+
+| Art | Anbieter | Key |
+|---|---|---|
+| **Lokal** | LM Studio, Ollama | keiner |
+| **Cloud** | Anthropic, OpenAI, Google (Gemini), xAI (Grok), Meta, Mistral, DeepSeek, Alibaba (Qwen), Kimi Platform, Kimi Code, Z.AI, BigModel, MiniMax, Xiaomi (MiMo), StepFun, OpenRouter | eigener API-Key |
+
+- Anthropic spricht seine Messages-API, alle anderen die OpenAI-kompatible Schnittstelle.
+  Ein neuer Anbieter ist ein Eintrag in `PROVIDER_CATALOG` (`backend/app/services/ai_client.py`).
+- **Ein Profil je Anbieter** mit Endpunkt, Modell und Key. Beim Wechsel bleibt jedes erhalten;
+  ein Key wird nie auf einen anderen Anbieter übertragen. In der Auswahl markiert ✓ einen
+  getesteten Anbieter, 🔑 einen mit hinterlegtem Key.
+- **Modellliste live** vom `/models`-Endpunkt des Anbieters, gefiltert auf Chat-Modelle.
+- **Verbindung testen** prüft Endpunkt und Key und pingt das gewählte Modell an.
+- `localhost` wird im Container automatisch zu `host.docker.internal` — LM Studio und Ollama
+  laufen auf dem Host.
+- Das **Kontextfenster** wird erkannt (lokal vom Server, Cloud aus dem Katalog) und bestimmt,
+  wie viel Text pro Anfrage mitgeht; per Regler übersteuerbar.
+
+**Umgang mit API-Keys**
+
+- Gespeicherte Keys verlassen den Server nie im Klartext — die Oberfläche erfährt nur,
+  *dass* einer hinterlegt ist.
+- Ein gespeicherter Key geht **nur an den Endpunkt, mit dem er gespeichert wurde.** Wer den
+  Endpunkt ändert, gibt den Key neu ein. Sonst könnte ein gestohlenes Session-Token den Key
+  an einen fremden Server umlenken.
+- Fehlermeldungen eines Anbieters werden nur als dessen `error.message` angezeigt, nie als
+  Rohtext — der Endpunkt ist frei wählbar.
+- Keys werden pro Nutzer in der Datenbank abgelegt, nicht in der `.env`.
 
 ### Kategorie-Taxonomie
 - 11 Superkategorien: Wohnen, Essen, Mobilität, Versicherungen, Freizeit, Abos, Shopping, Bildung, Steuern, Sparen, Sonstiges
@@ -152,9 +198,27 @@ brauchbare Zahl, bevor jemand 50 Felder ausfüllt:
 - Live-Wechselkursabruf (ECB / fixer.io Fallback)
 - Alle Berechnungen und Anzeigen umgerechnet
 
+### Datensicherung
+Unter **Einstellungen → Datensicherung** als JSON-Datei (Format `budgetpal-backup`, Version 1.1):
+
+- **Daten:** Konten, Transaktionen, Labels, Budgets, Budgetplan, Wizard-Konfiguration,
+  Säulen 1–3a und Assets.
+- **Einstellungen:** KI-Anbieter mit Endpunkt und Modell, Sprache, Session-Dauer,
+  SARON-Referenz.
+- **API-Keys** nur mit dem Häkchen *API-Keys einschliessen* **und** dem Passwort des Kontos.
+  Die Datei enthält sie dann im Klartext — sicher aufbewahren. Das Passwort ist nötig, weil ein
+  angemeldeter Browser allein nicht genügen soll, um alle Keys herunterzuladen.
+- **Passkeys** sind nie enthalten — sie sind an Gerät und Domain gebunden.
+
+Beim Wiederherstellen werden bestehende Einträge nicht überschrieben. Einstellungen und Keys
+kommen nur mit dem Häkchen *Einstellungen & API-Keys wiederherstellen* zurück, weil das
+Sprache, Session-Dauer und aktiven KI-Anbieter ersetzt. Ungültige Werte in der Datei werden
+übersprungen und als Warnung gemeldet. Backups der Version 1.0 lassen sich weiter einspielen.
+
 ### Authentifizierung
 - Multi-User mit JWT (python-jose, bcrypt)
-- Registrierung und Login
+- Registrierung und Login, Passkeys (WebAuthn)
+- Session-Dauer pro Nutzer einstellbar
 
 ---
 
@@ -197,12 +261,14 @@ POSTGRES_PASSWORD=sicheres_passwort_hier
 JWT_SECRET_KEY=64_zeichen_hex_string_hier  # openssl rand -hex 32
 
 # Optional
-OPENAI_API_KEY=sk-...        # für KI-Fallback Kategorisierung
-MISTRAL_API_KEY=...          # alternatives KI-Modell
+MISTRAL_API_KEY=...          # OCR-Fallback beim PDF-Import (Mistral OCR)
 BACKEND_PORT=8010            # Standard-Port Backend
 FRONTEND_PORT=8011           # Standard-Port Frontend
 AUTO_CREATE_SCHEMA=false     # true = DB ohne Alembic beim ersten Start
 ```
+
+KI-Anbieter und ihre API-Keys gehören **nicht** in die `.env` — jeder Nutzer hinterlegt sie
+unter *Einstellungen → KI-Modell*, gespeichert pro Nutzer in der Datenbank.
 
 ---
 
@@ -257,7 +323,9 @@ docker compose exec budget-pal-backend pytest tests/test_transactions.py -v
 docker compose exec budget-pal-backend pytest tests/services/ -v
 ```
 
-Test-Abdeckung: Auth-Flows, Transaktions-CRUD, KI-Kategorisierung (5-stufige Pipeline), Monte-Carlo-Projektion.
+Test-Abdeckung: Auth-Flows, Transaktions-CRUD, KI-Kategorisierung (5-stufige Pipeline),
+KI-Anbieter und Key-Schutz (`test_ai_client.py`, `test_ai_settings.py`), Datensicherung inkl.
+Einstellungen (`test_backup_settings.py`), Monte-Carlo-Projektion.
 
 ---
 
