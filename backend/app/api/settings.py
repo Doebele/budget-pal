@@ -10,7 +10,8 @@ PUT  /api/settings/category-mappings  → upsert; empty string clears override (
 from __future__ import annotations
 
 import logging
-from typing import List, Optional
+import re
+from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -199,28 +200,27 @@ async def reset_category_mappings(
     await db.commit()
 
 
-# ── KI-Provider / Modellauswahl ───────────────────────────────
+# ── KI-Anbieter / Modellauswahl ───────────────────────────────
 #
-# GET  /api/settings/ai         → aktuelle Auswahl, API-Keys als has_*-Flags maskiert
-# PUT  /api/settings/ai         → Teil-Update; Key weglassen = unverändert, "" = löschen
-# GET  /api/settings/ai/models  → Modellliste (lokale Provider werden live abgefragt)
+# GET  /api/settings/ai            → aktiver Anbieter + ein Profil je Anbieter
+#                                     (API-Keys maskiert zu has_key)
+# PUT  /api/settings/ai            → Teil-Update; Key weglassen = unverändert, "" = löschen
+# GET  /api/settings/ai/providers  → Anbieterliste (Katalog, wie fintools)
+# GET  /api/settings/ai/models     → Modellliste live vom Anbieter
+# POST /api/settings/ai/test       → Endpunkt/Key prüfen, Modell anpingen
+
+
+class AiProfileOut(BaseModel):
+    endpoint: str
+    model: str
+    # Keys werden nie zurückgegeben — nur ob einer hinterlegt ist
+    has_key: bool
+    ok: bool
 
 
 class AiSettingsResponse(BaseModel):
     provider: str
-    lm_studio_url: str
-    lm_studio_model: str
-    ollama_url: str
-    ollama_model: str
-    anthropic_model: str
-    openai_model: str
-    gemini_model: str
-    openrouter_model: str
-    # Keys werden nie zurückgegeben — nur ob einer hinterlegt ist
-    has_anthropic_key: bool
-    has_openai_key: bool
-    has_gemini_key: bool
-    has_openrouter_key: bool
+    profiles: Dict[str, AiProfileOut]
     # 0 = automatisch. Daneben der erkannte Wert, damit die UI zeigen kann,
     # was ohne Uebersteuerung passieren wuerde.
     context_chars_override: int = 0
@@ -228,22 +228,80 @@ class AiSettingsResponse(BaseModel):
     effective_context_chars: int = 0
 
 
+class AiProfileIn(BaseModel):
+    endpoint: Optional[str] = None
+    model: Optional[str] = None
+    # None = unverändert lassen, "" = Key löschen
+    key: Optional[str] = None
+    # Vom Client gemeldet: der Test mit genau diesen Werten war erfolgreich.
+    # Nur ein Haken in der eigenen Anzeige — keine Sicherheitsfrage.
+    ok: Optional[bool] = None
+
+
 class AiSettingsRequest(BaseModel):
     provider: Optional[str] = None
-    lm_studio_url: Optional[str] = None
-    lm_studio_model: Optional[str] = None
-    ollama_url: Optional[str] = None
-    ollama_model: Optional[str] = None
-    anthropic_model: Optional[str] = None
-    openai_model: Optional[str] = None
-    gemini_model: Optional[str] = None
-    openrouter_model: Optional[str] = None
-    # None = unverändert lassen, "" = Key löschen
-    anthropic_api_key: Optional[str] = None
-    openai_api_key: Optional[str] = None
-    gemini_api_key: Optional[str] = None
-    openrouter_api_key: Optional[str] = None
+    profiles: Optional[Dict[str, AiProfileIn]] = None
     context_chars_override: Optional[int] = None
+
+
+class AiProviderOut(BaseModel):
+    id: str
+    label: str
+    url: str
+    key_url: str
+    placeholder: str
+    note: str
+    local: bool
+
+
+class AiTestRequest(BaseModel):
+    provider: str
+    # Weggelassen = gespeicherter Wert. Der Key MUSS weglassbar sein: der
+    # Browser kennt den gespeicherten nicht, er bekommt ihn nie zurück.
+    endpoint: Optional[str] = None
+    model: Optional[str] = None
+    key: Optional[str] = None
+
+
+class AiTestResponse(BaseModel):
+    ok: bool
+    models: Optional[List[str]] = None
+    model: str = ""
+    reply: str = ""
+    latency_ms: int = 0
+    error: str = ""
+
+
+def _check_provider(provider: str, *, allow_none: bool = True) -> None:
+    allowed = ai_client.PROVIDERS if allow_none else tuple(ai_client.CATALOG)
+    if provider not in allowed:
+        raise HTTPException(status_code=400, detail=f"Unbekannter Anbieter: {provider}")
+
+
+def _check_endpoint(endpoint: Optional[str]) -> None:
+    """Nur http(s). Der Server ruft diese Adresse selbst auf."""
+    if endpoint and not re.match(r"^https?://[^\s/]+", endpoint.strip()):
+        raise HTTPException(status_code=400, detail="Endpunkt muss mit http:// oder https:// beginnen")
+
+
+def _with_overrides(
+    cfg: ai_client.AiConfig,
+    provider: str,
+    endpoint: Optional[str] = None,
+    model: Optional[str] = None,
+    key: Optional[str] = None,
+) -> ai_client.AiConfig:
+    """Kopie der Konfiguration mit anderem Anbieter und ungespeicherten Werten —
+    fuer Modellliste und Test, bevor gespeichert wird."""
+    stored = cfg.profiles.get(provider) or ai_client.AiProfile()
+    profile = stored.model_copy(update={
+        k: v for k, v in {"endpoint": endpoint, "model": model, "key": key}.items()
+        if v is not None
+    })
+    return cfg.model_copy(update={
+        "provider": provider,
+        "profiles": {**cfg.profiles, provider: profile},
+    })
 
 
 async def _ai_response(cfg: ai_client.AiConfig) -> AiSettingsResponse:
@@ -253,18 +311,15 @@ async def _ai_response(cfg: ai_client.AiConfig) -> AiSettingsResponse:
     effective = await ai_client.resolve_chunk_chars(cfg, MAX_TOKENS_PER_CHUNK)
     return AiSettingsResponse(
         provider=cfg.provider,
-        lm_studio_url=cfg.lm_studio_url,
-        lm_studio_model=cfg.lm_studio_model,
-        ollama_url=cfg.ollama_url,
-        ollama_model=cfg.ollama_model,
-        anthropic_model=cfg.anthropic_model,
-        openai_model=cfg.openai_model,
-        gemini_model=cfg.gemini_model,
-        openrouter_model=cfg.openrouter_model,
-        has_anthropic_key=bool(cfg.anthropic_api_key),
-        has_openai_key=bool(cfg.openai_api_key),
-        has_gemini_key=bool(cfg.gemini_api_key),
-        has_openrouter_key=bool(cfg.openrouter_api_key),
+        profiles={
+            pid: AiProfileOut(
+                endpoint=prof.endpoint,
+                model=prof.model,
+                has_key=bool(prof.key),
+                ok=prof.ok,
+            )
+            for pid, prof in cfg.profiles.items()
+        },
         context_chars_override=cfg.context_chars_override,
         detected_context_tokens=detected,
         effective_context_chars=effective,
@@ -282,40 +337,83 @@ async def put_ai_settings(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    if payload.provider is not None and payload.provider not in ai_client.PROVIDERS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unbekannter Provider. Erlaubt: {', '.join(ai_client.PROVIDERS)}",
-        )
+    if payload.provider is not None:
+        _check_provider(payload.provider)
 
     cfg = ai_client.from_user(current_user)
-    # exclude_unset: weggelassene Felder bleiben unverändert — ein weggelassener
-    # API-Key darf den gespeicherten nicht überschreiben
-    for field, value in payload.model_dump(exclude_unset=True).items():
-        if value is not None:
-            setattr(cfg, field, value)
+    if payload.provider is not None:
+        cfg.provider = payload.provider
+    if payload.context_chars_override is not None:
+        cfg.context_chars_override = payload.context_chars_override
 
+    for pid, change in (payload.profiles or {}).items():
+        _check_provider(pid, allow_none=False)
+        _check_endpoint(change.endpoint)
+        stored = cfg.profiles.get(pid) or ai_client.AiProfile()
+        # exclude_unset: weggelassene Felder bleiben unverändert — ein
+        # weggelassener API-Key darf den gespeicherten nicht überschreiben
+        updates = {k: v for k, v in change.model_dump(exclude_unset=True).items() if v is not None}
+        values_changed = any(
+            k in updates and updates[k] != getattr(stored, k)
+            for k in ("endpoint", "model", "key")
+        )
+        # Wer Endpunkt, Modell oder Key aendert, verliert den Test-Haken —
+        # es sei denn, er meldet im selben Zug einen erfolgreichen Test.
+        if values_changed and "ok" not in updates:
+            updates["ok"] = False
+        cfg.profiles[pid] = stored.model_copy(update=updates)
+
+    # model_dump statt Referenz: SQLAlchemy erkennt Aenderungen an JSON-Spalten
+    # nur bei neuer Zuweisung.
     current_user.ai_config_json = cfg.model_dump()
     await db.commit()
     return await _ai_response(cfg)
 
 
+@router.get("/ai/providers", response_model=List[AiProviderOut])
+async def get_ai_providers(current_user: User = Depends(get_current_user)):
+    """Anbieterliste. Eine Quelle fuer Backend und Oberflaeche — fintools
+    haelt sie nur im Frontend, dort koennen Server und UI auseinanderlaufen."""
+    return [
+        AiProviderOut(
+            id=p.id, label=p.label, url=p.url, key_url=p.key_url,
+            placeholder=p.placeholder, note=p.note, local=p.local,
+        )
+        for p in ai_client.PROVIDER_CATALOG
+    ]
+
+
 @router.get("/ai/models", response_model=List[str])
 async def get_ai_models(
     provider: Optional[str] = None,
-    url: Optional[str] = None,
+    endpoint: Optional[str] = None,
     current_user: User = Depends(get_current_user),
 ):
-    """Modellliste. `provider`/`url` überschreiben die gespeicherte Konfiguration,
-    damit die UI eine Verbindung testen kann, bevor sie gespeichert wird."""
+    """Modellliste live vom Anbieter. `provider`/`endpoint` überschreiben die
+    gespeicherte Auswahl, der Key kommt immer aus dem gespeicherten Profil."""
     cfg = ai_client.from_user(current_user)
     if provider:
-        if provider not in ai_client.PROVIDERS:
-            raise HTTPException(status_code=400, detail="Unbekannter Provider.")
-        cfg.provider = provider
-    if url:
-        if cfg.provider == "lm-studio":
-            cfg.lm_studio_url = url
-        elif cfg.provider == "ollama":
-            cfg.ollama_url = url
+        _check_provider(provider)
+        _check_endpoint(endpoint)
+        cfg = _with_overrides(cfg, provider, endpoint=endpoint)
     return await ai_client.list_models(cfg)
+
+
+@router.post("/ai/test", response_model=AiTestResponse)
+async def test_ai_connection(
+    payload: AiTestRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Verbindung pruefen, ohne zu speichern. Antwortet 200 auch bei einem
+    fehlgeschlagenen Test — die Anfrage selbst hat ja funktioniert."""
+    _check_provider(payload.provider, allow_none=False)
+    _check_endpoint(payload.endpoint)
+    cfg = _with_overrides(
+        ai_client.from_user(current_user),
+        payload.provider,
+        endpoint=payload.endpoint,
+        model=payload.model,
+        key=payload.key or None,
+    )
+    result = await ai_client.check_connection(cfg)
+    return AiTestResponse(**result._asdict())
