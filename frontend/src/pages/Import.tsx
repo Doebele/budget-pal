@@ -80,18 +80,10 @@ interface PdfPreviewRow {
 }
 
 /** Normalise description for smart category grouping (strip digits, keep first 5 words ≥3 chars). */
-// Modellname des aktuell gewählten Providers — jeder Provider hat sein eigenes Feld.
+// Modellname des aktuell gewählten Anbieters — steht in dessen Profil.
 function modelNameFor(s?: AiSettings): string {
   if (!s || s.provider === "none") return "";
-  const byProvider: Record<string, string | undefined> = {
-    "lm-studio": s.lm_studio_model,
-    ollama: s.ollama_model,
-    anthropic: s.anthropic_model,
-    openai: s.openai_model,
-    gemini: s.gemini_model,
-    openrouter: s.openrouter_model,
-  };
-  return byProvider[s.provider] || s.provider;
+  return s.profiles[s.provider]?.model || s.provider;
 }
 
 function formatElapsed(seconds: number): string {

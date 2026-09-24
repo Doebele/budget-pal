@@ -302,6 +302,13 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
   .txt-error   { color: var(--msg-error-fg); }
   .txt-info    { color: var(--msg-info-fg); }
 
+  /* Basis fuer Knoepfe mit Icon und Text. Die Klasse wurde verwendet, war
+     aber nie definiert — Tailwinds Preflight setzt `svg { display: block }`,
+     das Icon rutschte deshalb ueber den Text. */
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
   .btn-primary {
     @apply bg-accent hover:bg-accent-dark text-white font-medium px-4 py-2 rounded transition-colors duration-150 text-sm;
   }

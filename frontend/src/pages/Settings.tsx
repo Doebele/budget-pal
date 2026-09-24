@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { clsx } from "clsx";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
-import { api, authApi, settingsApi, taxonomyApi, backupApi, aiApi, passkeysApi, SESSION_TIMEOUTS, type AiProvider, type AiSettings, type SessionTimeout } from "@/lib/api";
+import { api, authApi, settingsApi, taxonomyApi, backupApi, aiApi, passkeysApi, SESSION_TIMEOUTS, type AiProfileUpdate, type AiSettingsUpdate, type AiTestResult, type SessionTimeout } from "@/lib/api";
 import { startRegistration } from "@simplewebauthn/browser";
 import { DEFAULT_SARON_REFERENCE_ANNUAL_PCT, SARON_INDEX_URL } from "@/lib/saron";
 import { Check, CheckCircle, Download, EditPencil, Eye, FloppyDisk, Group, Label, MagicWand, NavArrowDown, NavArrowUp, OpenNewWindow, Plus, Refresh, ShieldCheck, Sparks, Trash, Undo, Upload, WarningCircle, Xmark } from "@/lib/icons";
@@ -1776,43 +1776,12 @@ function SecuritySection() {
 }
 
 // ── KI-Modell — Anbieter- und Modellauswahl ────────────────────
-// Provider und Modell liegen serverseitig pro User (users.ai_config_json);
-// API-Keys kommen nie zurück, die API meldet nur has_*_key.
-const AI_PROVIDERS: { id: AiProvider; label: string; color?: string }[] = [
-  { id: "none", label: "Aus" },
-  { id: "lm-studio", label: "LM Studio", color: "#10b981" },
-  { id: "ollama", label: "Ollama", color: "#e05d44" },
-  { id: "anthropic", label: "Anthropic", color: "#f59e0b" },
-  { id: "openai", label: "OpenAI", color: "#74aa9c" },
-  { id: "gemini", label: "Gemini", color: "#4285f4" },
-  { id: "openrouter", label: "OpenRouter", color: "#a855f7" },
-];
+// Aufbau wie im Schwesterprojekt fintools (Einstellungen → KI-Modell):
+// Anbieterliste mit Lokal/Cloud-Gruppen, ein Profil je Anbieter, Modellliste
+// live vom Anbieter, Verbindungstest. Abweichung: der gespeicherte API-Key
+// kommt nie zurück in den Browser — die API meldet nur has_key.
 
-// Provider mit lokalem Server → Modellliste wird live abgefragt
-const LOCAL_PROVIDERS: AiProvider[] = ["lm-studio", "ollama"];
-// Provider mit Freitext-Modellfeld statt Auswahlliste
-const FREETEXT_MODEL_PROVIDERS: AiProvider[] = ["openrouter"];
-
-const AI_KEY_FIELD: Partial<Record<AiProvider, { field: string; has: keyof AiSettings; placeholder: string }>> = {
-  anthropic:  { field: "anthropic_api_key",  has: "has_anthropic_key",  placeholder: "sk-ant-…" },
-  openai:     { field: "openai_api_key",     has: "has_openai_key",     placeholder: "sk-…" },
-  gemini:     { field: "gemini_api_key",     has: "has_gemini_key",     placeholder: "AIza…" },
-  openrouter: { field: "openrouter_api_key", has: "has_openrouter_key", placeholder: "sk-or-…" },
-};
-
-const AI_MODEL_FIELD: Partial<Record<AiProvider, keyof AiSettings>> = {
-  "lm-studio": "lm_studio_model",
-  ollama: "ollama_model",
-  anthropic: "anthropic_model",
-  openai: "openai_model",
-  gemini: "gemini_model",
-  openrouter: "openrouter_model",
-};
-
-const AI_URL_FIELD: Partial<Record<AiProvider, keyof AiSettings>> = {
-  "lm-studio": "lm_studio_url",
-  ollama: "ollama_url",
-};
+type TestState = null | "testing" | AiTestResult;
 
 function AiModelSection() {
   const { t } = useTranslation("settings");
@@ -1822,46 +1791,119 @@ function AiModelSection() {
     queryKey: ["ai-settings"],
     queryFn: async () => (await aiApi.get()).data,
   });
-
-  // Entwurf: nur geänderte Felder werden gesendet, damit ein weggelassener
-  // API-Key den gespeicherten serverseitig nicht überschreibt.
-  const [draft, setDraft] = useState<Record<string, string>>({});
-  const [showKey, setShowKey] = useState(false);
-  const [saved, setSaved] = useState(false);
-
-  const provider = (draft.provider ?? settings?.provider ?? "none") as AiProvider;
-  const urlField = AI_URL_FIELD[provider];
-  const modelField = AI_MODEL_FIELD[provider];
-  const keyMeta = AI_KEY_FIELD[provider];
-
-  const value = (field?: keyof AiSettings | string) => {
-    if (!field) return "";
-    return draft[field as string] ?? ((settings?.[field as keyof AiSettings] as string) ?? "");
-  };
-  const set = (field: string, v: string) => {
-    setSaved(false);
-    setDraft((d) => ({ ...d, [field]: v }));
-  };
-
-  const currentUrl = urlField ? value(urlField) : undefined;
-  const { data: models = [], isFetching: modelsLoading, isError: modelsError, refetch } = useQuery({
-    queryKey: ["ai-models", provider, currentUrl],
-    queryFn: async () => (await aiApi.models(provider, currentUrl)).data,
-    enabled: provider !== "none",
+  const { data: catalog = [] } = useQuery({
+    queryKey: ["ai-providers"],
+    queryFn: async () => (await aiApi.providers()).data,
+    staleTime: Infinity,
   });
 
+  // Entwürfe je Anbieter: nur geänderte Felder werden gesendet, damit ein
+  // weggelassener API-Key den gespeicherten serverseitig nicht überschreibt.
+  // Beim Anbieterwechsel bleibt jeder Entwurf stehen.
+  const [draftProvider, setDraftProvider] = useState<string | null>(null);
+  const [drafts, setDrafts] = useState<Record<string, AiProfileUpdate>>({});
+  const [contextDraft, setContextDraft] = useState<number | null>(null);
+  const [showKey, setShowKey] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [testState, setTestState] = useState<TestState>(null);
+
+  const provider = draftProvider ?? settings?.provider ?? "none";
+  const info = catalog.find((p) => p.id === provider);
+  const stored = settings?.profiles[provider];
+  const draft = drafts[provider] ?? {};
+
+  const endpoint = draft.endpoint ?? (stored?.endpoint || info?.url || "");
+  const model = draft.model ?? stored?.model ?? "";
+  const hasStoredKey = Boolean(stored?.has_key) && draft.key !== "";
+  const hasKey = hasStoredKey || Boolean(draft.key);
+  const contextOverride = contextDraft ?? settings?.context_chars_override ?? 0;
+
+  // ✓ = Verbindung getestet, 🔑 = Key hinterlegt (wie fintools)
+  const mark = (id: string) => {
+    const d = drafts[id];
+    const s = settings?.profiles[id];
+    const ok = d?.ok ?? s?.ok;
+    const key = d?.key !== undefined ? Boolean(d.key) : s?.has_key;
+    return ok ? "  ✓" : key ? "  🔑" : "";
+  };
+
+  const patchDraft = (patch: AiProfileUpdate, { keepTest = false } = {}) => {
+    setSaved(false);
+    setDrafts((prev) => {
+      const next = { ...prev[provider], ...patch };
+      // Wer Endpunkt, Modell oder Key ändert, verliert den Test-Haken
+      if (!keepTest) delete next.ok;
+      return { ...prev, [provider]: next };
+    });
+    if (!keepTest) setTestState(null);
+  };
+
+  const switchProvider = (next: string) => {
+    setSaved(false);
+    setDraftProvider(next);
+    setTestState(null);
+    setShowKey(false);
+  };
+
+  // Modellliste vom Anbieter. Mit gespeichertem Key fragt der Server selbst;
+  // ein frisch eingetippter Key kommt erst über den Verbindungstest zum Zug.
+  const canList = provider !== "none" && Boolean(info) && (info!.local || hasStoredKey) && !draft.key;
+  const { data: listedModels = [] } = useQuery({
+    queryKey: ["ai-models", provider, endpoint],
+    queryFn: async () => (await aiApi.models(provider, endpoint)).data,
+    enabled: canList,
+    staleTime: 60_000,
+  });
+  const testedModels =
+    testState && testState !== "testing" && testState.models ? testState.models : null;
+  const models = testedModels ?? listedModels;
+
+  const runTest = async () => {
+    if (!info) return;
+    setTestState("testing");
+    try {
+      const { data } = await aiApi.test({
+        provider,
+        endpoint,
+        model: model || undefined,
+        key: draft.key || undefined,
+      });
+      setTestState(data);
+      patchDraft({ ok: data.ok }, { keepTest: true });
+    } catch {
+      setTestState({ ok: false, models: null, model: "", reply: "", latency_ms: 0, error: t("ai.testFailed") });
+    }
+  };
+
   const save = useMutation({
-    mutationFn: async () => (await aiApi.update(draft)).data,
+    mutationFn: async () => {
+      const payload: AiSettingsUpdate = {};
+      if (draftProvider !== null && draftProvider !== settings?.provider) {
+        payload.provider = draftProvider;
+      }
+      const changed = Object.entries(drafts).filter(([, d]) => Object.keys(d).length > 0);
+      if (changed.length) payload.profiles = Object.fromEntries(changed);
+      if (contextDraft !== null) payload.context_chars_override = contextDraft;
+      return (await aiApi.update(payload)).data;
+    },
     onSuccess: (data) => {
       queryClient.setQueryData(["ai-settings"], data);
-      setDraft({});
+      queryClient.invalidateQueries({ queryKey: ["ai-models"] });
+      setDraftProvider(null);
+      setDrafts({});
+      setContextDraft(null);
       setShowKey(false);
       setSaved(true);
     },
   });
 
-  const optionBtn = (active: boolean) => clsx("toggle-btn", active && "active");
-  const dirty = Object.keys(draft).length > 0;
+  const dirty =
+    (draftProvider !== null && draftProvider !== settings?.provider) ||
+    Object.values(drafts).some((d) => Object.keys(d).length > 0) ||
+    contextDraft !== null;
+
+  const local = catalog.filter((p) => p.local);
+  const cloud = catalog.filter((p) => !p.local);
 
   return (
     <div className="card">
@@ -1872,145 +1914,186 @@ function AiModelSection() {
 
       <div className="space-y-4">
         <div>
-          <label className="label mb-2 block">{t("ai.provider")}</label>
-          <div className="toggle-group flex-wrap">
-            {AI_PROVIDERS.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => set("provider", p.id)}
-                className={optionBtn(provider === p.id)}
-              >
-                {p.color && (
-                  <span
-                    className="w-2 h-2 rounded-full inline-block"
-                    style={{ backgroundColor: p.color }}
-                  />
-                )}
-                {p.id === "none" ? t("ai.providerNone") : p.label}
-              </button>
-            ))}
-          </div>
+          <label className="label mb-2 block" htmlFor="ai-provider">{t("ai.provider")}</label>
+          <select
+            id="ai-provider"
+            className="input text-sm"
+            value={provider}
+            onChange={(e) => switchProvider(e.target.value)}
+          >
+            <optgroup label={t("ai.providerLocal")}>
+              {local.map((p) => (
+                <option key={p.id} value={p.id}>{p.label}{mark(p.id)}</option>
+              ))}
+            </optgroup>
+            <optgroup label={t("ai.providerCloud")}>
+              {cloud.map((p) => (
+                <option key={p.id} value={p.id}>{p.label}{mark(p.id)}</option>
+              ))}
+            </optgroup>
+            <option value="none">{t("ai.providerNone")}</option>
+          </select>
+          <p className="text-text-disabled text-[11px] mt-1">{t("ai.legend")}</p>
         </div>
 
         {provider === "none" && (
           <p className="text-text-disabled text-xs">{t("ai.providerNoneHint")}</p>
         )}
 
-        {urlField && (
-          <div>
-            <label className="label mb-2 block">{t("ai.serverUrl")}</label>
-            <div className="flex items-center gap-2">
+        {info && (
+          <>
+            <div>
+              <label className="label mb-2 block" htmlFor="ai-endpoint">{t("ai.endpoint")}</label>
               <input
-                className="input font-mono text-xs flex-1"
-                value={value(urlField)}
-                onChange={(e) => set(urlField as string, e.target.value)}
-                placeholder={provider === "ollama" ? "http://localhost:11434" : "http://localhost:1234"}
-              />
-              <button
-                type="button"
-                className="btn btn-secondary shrink-0"
-                onClick={() => refetch()}
-                title={t("ai.testConnection")}
-              >
-                <Refresh className={clsx("w-3.5 h-3.5", modelsLoading && "animate-spin")} />
-              </button>
-              {!modelsLoading && models.length > 0 && (
-                <CheckCircle className="w-4 h-4 text-gain shrink-0" />
-              )}
-              {!modelsLoading && (modelsError || models.length === 0) && (
-                <WarningCircle className="w-4 h-4 text-loss shrink-0" />
-              )}
-            </div>
-            <p className="text-text-disabled text-[11px] mt-1">{t("ai.serverUrlHint")}</p>
-          </div>
-        )}
-
-        {modelField && (
-          <div>
-            <label className="label mb-2 block">{t("ai.model")}</label>
-            {models.length > 0 && !FREETEXT_MODEL_PROVIDERS.includes(provider) ? (
-              <select
+                id="ai-endpoint"
                 className="input font-mono text-xs"
-                value={value(modelField)}
-                onChange={(e) => set(modelField as string, e.target.value)}
-              >
-                <option value="">—</option>
-                {models.map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-            ) : (
-              <input
-                className="input font-mono text-xs"
-                value={value(modelField)}
-                onChange={(e) => set(modelField as string, e.target.value)}
-                placeholder={t("ai.modelPlaceholder")}
+                value={endpoint}
+                onChange={(e) => patchDraft({ endpoint: e.target.value })}
+                placeholder={info.url}
+                spellCheck={false}
               />
-            )}
-            {LOCAL_PROVIDERS.includes(provider) && (
               <p className="text-text-disabled text-[11px] mt-1">
-                {modelsError
-                  ? t("ai.modelsUnreachable")
-                  : models.length > 0
-                    ? t("ai.modelsFound", { count: models.length })
-                    : t("ai.modelsIdle")}
+                {info.local ? t("ai.endpointHintLocal") : t("ai.endpointHintCloud")}
               </p>
-            )}
-          </div>
-        )}
+            </div>
 
-        {keyMeta && (
-          <div>
-            <label className="label mb-2 block">{t("ai.apiKey")}</label>
-            <div className="flex items-center gap-2">
-              <input
-                type={showKey ? "text" : "password"}
-                className="input font-mono text-xs flex-1"
-                value={draft[keyMeta.field] ?? ""}
-                onChange={(e) => set(keyMeta.field, e.target.value)}
-                placeholder={settings?.[keyMeta.has] ? "••••••••" : keyMeta.placeholder}
-                autoComplete="off"
-              />
+            {!info.local && (
+              <div>
+                <div className="flex items-baseline justify-between mb-2">
+                  <label className="label block" htmlFor="ai-key">{t("ai.apiKey")}</label>
+                  <a
+                    href={info.key_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-accent text-[11px] font-medium hover:underline inline-flex items-center gap-1"
+                  >
+                    {t("ai.getKey")} <OpenNewWindow className="w-3 h-3" />
+                  </a>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    id="ai-key"
+                    type={showKey ? "text" : "password"}
+                    className="input font-mono text-xs flex-1"
+                    value={draft.key ?? ""}
+                    onChange={(e) => patchDraft({ key: e.target.value })}
+                    placeholder={hasStoredKey ? "••••••••" : info.placeholder || t("ai.apiKey")}
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-ghost shrink-0 text-xs"
+                    onClick={() => setShowKey((s) => !s)}
+                  >
+                    {showKey ? t("ai.hide") : t("ai.show")}
+                  </button>
+                </div>
+                {hasStoredKey && (
+                  <p className="text-text-disabled text-[11px] mt-1 flex items-center gap-2">
+                    {t("ai.apiKeySaved")}
+                    <button
+                      type="button"
+                      className="text-loss hover:underline"
+                      onClick={() => patchDraft({ key: "" })}
+                    >
+                      {t("ai.apiKeyClear")}
+                    </button>
+                  </p>
+                )}
+                {info.note && (
+                  <p className="msg msg-warning text-[11px] mt-2 flex items-start gap-1.5">
+                    <WarningCircle className="w-3.5 h-3.5 shrink-0 mt-px" />
+                    {t(info.note)}
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div>
+              <label className="label mb-2 block" htmlFor="ai-model">{t("ai.model")}</label>
+              {models.length > 0 ? (
+                <select
+                  id="ai-model"
+                  className="input font-mono text-xs"
+                  value={model}
+                  onChange={(e) => patchDraft({ model: e.target.value })}
+                >
+                  {!models.includes(model) && (
+                    <option value={model}>{model || t("ai.chooseModel")}</option>
+                  )}
+                  {models.map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  id="ai-model"
+                  className="input font-mono text-xs"
+                  value={model}
+                  onChange={(e) => patchDraft({ model: e.target.value })}
+                  placeholder={t("ai.modelPlaceholder")}
+                  spellCheck={false}
+                />
+              )}
+              <p className="text-text-disabled text-[11px] mt-1">
+                {models.length > 0
+                  ? t("ai.modelsFound", { count: models.length })
+                  : t("ai.modelHint")}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
-                className="btn btn-ghost shrink-0 text-xs"
-                onClick={() => setShowKey((s) => !s)}
+                className="btn btn-secondary"
+                onClick={runTest}
+                disabled={testState === "testing" || !endpoint || (!info.local && !hasKey)}
               >
-                {showKey ? t("ai.hide") : t("ai.show")}
+                <Refresh className={clsx("w-3.5 h-3.5", testState === "testing" && "animate-spin")} />
+                {testState === "testing" ? t("ai.testing") : t("ai.testConnection")}
               </button>
+              {testState && testState !== "testing" && (
+                testState.ok ? (
+                  <span className="text-gain text-xs flex items-center gap-1" role="status">
+                    <CheckCircle className="w-3.5 h-3.5" />
+                    {t("ai.connOk")}
+                    {testState.models && <> — {t("ai.modelsFound", { count: testState.models.length })}</>}
+                    {testState.model && (
+                      <>
+                        {" "}— {testState.latency_ms} ms
+                        <span className="text-text-tertiary font-mono">&nbsp;({testState.model})</span>
+                      </>
+                    )}
+                  </span>
+                ) : (
+                  <span className="text-loss text-xs flex items-center gap-1 break-all" role="alert">
+                    <WarningCircle className="w-3.5 h-3.5 shrink-0" />
+                    {testState.error || t("ai.testFailed")}
+                  </span>
+                )
+              )}
             </div>
-            {settings?.[keyMeta.has] && (
-              <p className="text-text-disabled text-[11px] mt-1 flex items-center gap-2">
-                {t("ai.apiKeySaved")}
-                <button
-                  type="button"
-                  className="text-loss hover:underline"
-                  onClick={() => set(keyMeta.field, "")}
-                >
-                  {t("ai.apiKeyClear")}
-                </button>
-              </p>
-            )}
-          </div>
+          </>
         )}
 
         {provider !== "none" && (
           <div>
-            <label className="label mb-2 block">{t("ai.contextSize")}</label>
+            <label className="label mb-2 block" htmlFor="ai-context">{t("ai.contextSize")}</label>
             <div className="flex items-center gap-3">
               <input
+                id="ai-context"
                 type="range"
                 min={0}
                 max={120000}
                 step={4000}
-                value={Number(value("context_chars_override")) || 0}
-                onChange={(e) => set("context_chars_override", e.target.value)}
+                value={contextOverride}
+                onChange={(e) => { setSaved(false); setContextDraft(Number(e.target.value)); }}
                 className="flex-1 accent-accent cursor-pointer"
               />
               <span className="text-text-secondary text-xs font-mono w-28 text-right tabular-nums">
-                {Number(value("context_chars_override")) > 0
-                  ? `${Number(value("context_chars_override")).toLocaleString("de-CH")} Z.`
+                {contextOverride > 0
+                  ? `${contextOverride.toLocaleString(displayLocale())} Z.`
                   : t("ai.contextAuto")}
               </span>
             </div>
@@ -2018,10 +2101,10 @@ function AiModelSection() {
               {settings?.detected_context_tokens ? (
                 <>
                   {t("ai.contextDetected", {
-                    tokens: settings.detected_context_tokens.toLocaleString("de-CH"),
+                    tokens: settings.detected_context_tokens.toLocaleString(displayLocale()),
                   })}{" "}
                   {t("ai.contextEffective", {
-                    chars: (settings?.effective_context_chars ?? 0).toLocaleString("de-CH"),
+                    chars: (settings?.effective_context_chars ?? 0).toLocaleString(displayLocale()),
                   })}
                 </>
               ) : (
