@@ -217,3 +217,75 @@ class TestConnectionTest:
             "provider": "lm-studio", "endpoint": "file:///etc/passwd",
         })
         assert response.status_code == 400
+
+
+class TestKeyStaysWithItsEndpoint:
+    """Ein gespeicherter Key geht nur an den Endpunkt, mit dem er gespeichert
+    wurde. Sonst genuegt ein gestohlenes Session-Token: Test mit fremdem
+    Endpunkt ohne Key — und der Server schickt den gespeicherten Key dorthin."""
+
+    def test_test_with_foreign_endpoint_does_not_send_the_stored_key(self, client):
+        _put(client, profiles={"openai": {"key": "sk-gespeichert"}})
+        seen = {}
+
+        async def fake_check(cfg):
+            seen["key"] = cfg.profile().key
+            seen["endpoint"] = cfg.profile().endpoint
+            return ai_client.ConnectionResult(ok=False, error="x")
+
+        with patch.object(ai_client, "check_connection", fake_check):
+            client.post("/api/settings/ai/test", json={
+                "provider": "openai", "endpoint": "https://angreifer.example/v1",
+            })
+
+        assert seen["endpoint"] == "https://angreifer.example/v1"
+        assert seen["key"] == ""
+
+    def test_model_list_with_foreign_endpoint_does_not_send_it_either(self, client):
+        _put(client, profiles={"openai": {"key": "sk-gespeichert"}})
+        seen = {}
+
+        async def fake_fetch(cfg):
+            seen["key"] = cfg.profile().key
+            return []
+
+        with patch.object(ai_client, "fetch_models", fake_fetch):
+            client.get("/api/settings/ai/models?provider=openai&endpoint=https://angreifer.example/v1")
+        assert seen["key"] == ""
+
+    def test_same_endpoint_still_uses_the_stored_key(self, client):
+        """Die Bindung darf den normalen Fall nicht stoeren — auch nicht, wenn
+        der Endpunkt nur mit Schraegstrich am Ende mitkommt."""
+        _put(client, profiles={"openai": {"key": "sk-gespeichert"}})
+        seen = {}
+
+        async def fake_check(cfg):
+            seen["key"] = cfg.profile().key
+            return ai_client.ConnectionResult(ok=True)
+
+        with patch.object(ai_client, "check_connection", fake_check):
+            client.post("/api/settings/ai/test", json={
+                "provider": "openai", "endpoint": "https://api.openai.com/v1/",
+            })
+        assert seen["key"] == "sk-gespeichert"
+
+    def test_saving_a_new_endpoint_without_new_key_is_refused(self, client):
+        _put(client, profiles={"openai": {"key": "sk-gespeichert"}})
+        response = _put(client, profiles={"openai": {"endpoint": "https://angreifer.example/v1"}})
+        assert response.status_code == 400
+        # Nichts gespeichert
+        profile = client.get("/api/settings/ai").json()["profiles"]["openai"]
+        assert profile["endpoint"] == ""
+        assert profile["has_key"] is True
+
+    def test_new_endpoint_with_new_key_is_fine(self, client):
+        _put(client, profiles={"openai": {"key": "sk-alt"}})
+        response = _put(client, profiles={"openai": {
+            "endpoint": "https://proxy.example/v1", "key": "sk-neu",
+        }})
+        assert response.status_code == 200
+        assert response.json()["profiles"]["openai"]["endpoint"] == "https://proxy.example/v1"
+
+    def test_local_providers_have_no_key_to_protect(self, client):
+        _put(client, profiles={"lm-studio": {"model": "x"}})
+        assert _put(client, profiles={"lm-studio": {"endpoint": "http://192.168.1.50:1234"}}).status_code == 200

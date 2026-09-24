@@ -308,6 +308,100 @@ class AiConfig(BaseModel):
         )
 
 
+def effective_endpoint(provider: str, endpoint: Optional[str]) -> str:
+    """Endpunkt, wie er tatsaechlich angesprochen wird — leer heisst Vorgabe."""
+    info = CATALOG.get(provider)
+    return ((endpoint or "").strip() or (info.url if info else "")).rstrip("/")
+
+
+def endpoint_moves(provider: str, stored: AiProfile, endpoint: Optional[str]) -> bool:
+    """Zeigt `endpoint` woanders hin als der, mit dem der Key gespeichert wurde?
+
+    Die Regel dahinter: ein gespeicherter Key geht nur an den Endpunkt, mit
+    dem er gespeichert wurde. Test, Speichern und Backup-Import pruefen sie
+    alle hier — sonst genuegte ein gestohlenes Session-Token (oder eine
+    praeparierte Backup-Datei), um den Key an einen fremden Server zu lenken.
+    """
+    if endpoint is None:
+        return False
+    return effective_endpoint(provider, endpoint) != effective_endpoint(provider, stored.endpoint)
+
+
+def export_config(cfg: AiConfig, *, include_keys: bool) -> Dict[str, Any]:
+    """Konfiguration fuer das Backup. Keys nur auf ausdruecklichen Wunsch."""
+    profiles: Dict[str, Dict[str, Any]] = {}
+    for pid, prof in cfg.profiles.items():
+        entry: Dict[str, Any] = {"endpoint": prof.endpoint, "model": prof.model}
+        if include_keys and prof.key:
+            entry["key"] = prof.key
+        profiles[pid] = entry
+    return {
+        "provider": cfg.provider,
+        "context_chars_override": cfg.context_chars_override,
+        "profiles": profiles,
+    }
+
+
+def import_config(cfg: AiConfig, data: Any) -> Tuple[AiConfig, int, List[str]]:
+    """Konfiguration aus einem Backup uebernehmen.
+
+    Die Datei ist Nutzereingabe: unbekannte Anbieter, kaputte Endpunkte und
+    falsche Typen werden uebersprungen statt uebernommen. Test-Haken werden
+    zurueckgesetzt — getestet war die alte Umgebung, nicht diese.
+
+    Gibt (neue Konfiguration, Zahl uebernommener Keys, Warnungen) zurueck.
+    """
+    warnings: List[str] = []
+    if not isinstance(data, dict):
+        return cfg, 0, ["KI-Einstellungen im Backup unlesbar — übersprungen."]
+
+    result = cfg.model_copy(deep=True)
+    keys = 0
+
+    provider = data.get("provider")
+    if provider in PROVIDERS:
+        result.provider = provider
+    elif provider is not None:
+        warnings.append(f"Unbekannter KI-Anbieter '{provider}' — nicht übernommen.")
+
+    override = data.get("context_chars_override")
+    if isinstance(override, int) and override >= 0:
+        result.context_chars_override = override
+
+    for pid, raw in (data.get("profiles") or {}).items():
+        if pid not in CATALOG or not isinstance(raw, dict):
+            warnings.append(f"KI-Profil '{pid}' unbekannt — übersprungen.")
+            continue
+        endpoint = raw.get("endpoint")
+        if endpoint is not None and (
+            not isinstance(endpoint, str)
+            or (endpoint and not re.match(r"^https?://[^\s/]+", endpoint.strip()))
+        ):
+            warnings.append(f"KI-Profil '{pid}': ungültiger Endpunkt — übersprungen.")
+            continue
+
+        stored = result.profiles.get(pid) or AiProfile()
+        key = raw.get("key") if isinstance(raw.get("key"), str) else None
+        updated = stored.model_copy(update={"ok": False})
+        if isinstance(endpoint, str):
+            updated.endpoint = endpoint
+        if isinstance(raw.get("model"), str):
+            updated.model = raw["model"]
+        if key:
+            updated.key = key
+            keys += 1
+        elif stored.key and endpoint_moves(pid, stored, endpoint):
+            # Ohne Key in der Datei zieht der gespeicherte nicht mit um
+            updated.key = ""
+            warnings.append(
+                f"KI-Profil '{pid}': anderer Endpunkt ohne Key im Backup — "
+                "gespeicherter Key verworfen, bitte neu eingeben."
+            )
+        result.profiles[pid] = updated
+
+    return result, keys, warnings
+
+
 def resolve_host_url(url: str) -> str:
     """localhost → host.docker.internal.
 

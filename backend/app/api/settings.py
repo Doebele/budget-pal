@@ -298,6 +298,13 @@ def _with_overrides(
         k: v for k, v in {"endpoint": endpoint, "model": model, "key": key}.items()
         if v is not None
     })
+    # Ein gespeicherter Key geht nur an den Endpunkt, mit dem er gespeichert
+    # wurde. Sonst liesse sich mit einem gestohlenen Session-Token jeder Key
+    # abgreifen: Test mit fremdem Endpunkt, ohne Key — und der Server schickt
+    # den gespeicherten dorthin. Die Maskierung in den Antworten waere dann
+    # wertlos. (fintools hat dieselbe Luecke.)
+    if key is None and ai_client.endpoint_moves(provider, stored, endpoint):
+        profile.key = ""
     return cfg.model_copy(update={
         "provider": provider,
         "profiles": {**cfg.profiles, provider: profile},
@@ -350,6 +357,13 @@ async def put_ai_settings(
         _check_provider(pid, allow_none=False)
         _check_endpoint(change.endpoint)
         stored = cfg.profiles.get(pid) or ai_client.AiProfile()
+        # Dieselbe Bindung wie beim Test: der gespeicherte Key zieht nicht
+        # stillschweigend an einen neuen Endpunkt um.
+        if stored.key and change.key is None and ai_client.endpoint_moves(pid, stored, change.endpoint):
+            raise HTTPException(
+                status_code=400,
+                detail="Endpunkt geändert — bitte den API-Key erneut eingeben.",
+            )
         # exclude_unset: weggelassene Felder bleiben unverändert — ein
         # weggelassener API-Key darf den gespeicherten nicht überschreiben
         updates = {k: v for k, v in change.model_dump(exclude_unset=True).items() if v is not None}
