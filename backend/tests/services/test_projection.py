@@ -868,47 +868,6 @@ class TestBuildAnnualFlows:
         flows = build_annual_flows([], years=10, current_age=40, retirement_age=65)
         assert flows == [0.0] * 10
 
-    def test_early_retirement_only_affects_the_gap_years(self):
-        """Modelliert wird die DIFFERENZ zwischen vorgezogenem und geplantem
-        Ruhestand. Davor arbeitet man in beiden Welten, danach ist man in
-        beiden pensioniert — nur dazwischen unterscheiden sie sich."""
-        flows = build_annual_flows(
-            ["early_retirement"], years=30, current_age=40, retirement_age=62,
-            planned_retirement_age=65,
-            annual_savings=20_000, annual_expenses=60_000, inflation_rate=0.0,
-        )
-        assert all(f == 0.0 for f in flows[:22])   # bis Alter 61: identisch
-        assert all(f < 0 for f in flows[22:25])    # Alter 62-64: das Fenster
-        assert all(f == 0.0 for f in flows[25:])   # ab 65: wieder identisch
-
-    def test_early_retirement_cancels_the_savings_rate(self):
-        """Der Abzug muss exakt dem entsprechen, was die Jahresschleife in
-        run() addiert — sonst spart der Nutzer im Ruhestand weiter."""
-        infl = 0.02
-        flows = build_annual_flows(
-            ["early_retirement"], years=5, current_age=60, retirement_age=62,
-            planned_retirement_age=65,
-            annual_savings=10_000, annual_expenses=0.0, lifestyle_factor=0.0,
-            inflation_rate=infl,
-        )
-        assert flows[0] == flows[1] == 0.0
-        for yr in (2, 3, 4):
-            assert flows[yr] == pytest.approx(-10_000 * (1 + infl) ** yr)
-
-    def test_early_retirement_adds_pension_income(self):
-        common = dict(
-            years=5, current_age=60, retirement_age=62, planned_retirement_age=65,
-            annual_savings=0.0, annual_expenses=50_000, lifestyle_factor=1.0,
-            inflation_rate=0.0,
-        )
-        base = build_annual_flows(["early_retirement"], **common)
-        with_pension = build_annual_flows(
-            ["early_retirement"],
-            pension_series=[0, 0, 30_000, 30_000, 30_000],
-            **common,
-        )
-        assert with_pension[2] == pytest.approx(base[2] + 30_000)
-
     def test_care_costs_start_at_eighty(self):
         flows = build_annual_flows(
             ["care_costs_at_80"], years=10, current_age=75, retirement_age=65,

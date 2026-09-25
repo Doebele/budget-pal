@@ -618,8 +618,20 @@ Rentendiagramm über `/api/pension/estimate`):
   Die gesetzlichen 6.8 % gelten nur für den obligatorischen Teil; die meisten Kassen rechnen aufs
   ganze Guthaben mit 5.0–5.6 %. Die Rente wird in der Regel nicht der Teuerung angepasst.
 - **3a/3b:** Ansparen bis zum Rentenalter, danach 20 Jahre Auszahlung mit 2 % Restverzinsung.
-- Noch nicht abgebildet: Kapitalbezug und dessen Steuer, gestaffelter 3a-Bezug, AHV-Beiträge als
-  Nichterwerbstätige bei Frühpensionierung, Plafonierung für Ehepaare.
+- **Bezugsbeginn je Säule:** AHV 63–70, Pensionskasse ab 58 (davor verzinst auf dem
+  Freizügigkeitskonto; Umwandlungssatz −0.15 Prozentpunkte je Jahr vor 65, + je Jahr danach),
+  3a 60–70, 3b ab Rentenalter.
+- **Vermögen nach der Pensionierung:** Die Sparrate endet mit dem Rentenalter. Danach werden die
+  Lebenskosten entnommen, abzüglich der Renten, die schon fliessen. Frühpensionierte zahlen bis 65
+  AHV-Beiträge als Nichterwerbstätige (aus Vermögen + 20 × Renteneinkommen, 530–26'500 CHF/Jahr).
+  Die Anzeige zeigt, bis zu welchem Alter das Vermögen im Median reicht und in wie vielen
+  Simulationen es bis zum Ende hält.
+- **Lebenskosten im Ruhestand:** eigene Angabe, sonst Ausgaben aus dem Wizard × Lebensstilfaktor
+  (0.8), sonst 80 % von (72 % des Bruttolohns − Sparrate).
+- **Szenarien:** Frühpensionierung = dieselbe Rechnung mit früherem Rentenalter (lebenslang). Pflege
+  ab 80 ersetzt 60 % der normalen Lebenskosten.
+- Noch nicht abgebildet: Kapitalbezug und dessen Steuer, gestaffelter 3a-Bezug, Plafonierung für
+  Ehepaare, Befreiung von AHV-Beiträgen durch einen erwerbstätigen Ehepartner.
 
 ---
 

@@ -78,3 +78,30 @@ async def test_backup_import_keeps_every_3a_account(client, db_session, test_use
     assert sorted(r.current_balance for r in rows if r.pillar == PensionPillar.pillar_3a) == [25_000, 40_000]
     bvg = [r for r in rows if r.pillar == PensionPillar.pillar_2]
     assert len(bvg) == 1 and bvg[0].conversion_rate == 0.056
+
+
+def _scenario(client, **extra):
+    params = {"retirement_age": 65, "monthly_income": 8_000, "monthly_expenses": 6_000,
+              "ahv_avg_lohn": 100_000, **extra}
+    return client.post("/api/projections/scenarios", json={"name": "S", "parameters": params}).json()
+
+
+def _run(client, scenario_id=None, **body):
+    dob = f"{datetime.now().year - 50}-06-01"
+    url = "/api/projections/run" + (f"?scenario_id={scenario_id}" if scenario_id else "")
+    res = client.post(url, json={"current_net_worth": 200_000, "years_to_project": 40,
+                                 "date_of_birth": dob, **body})
+    assert res.status_code == 200, res.text
+    return res.json()
+
+
+def test_retirement_spending_comes_from_the_scenario(client):
+    """Ausgaben x Lebensstilfaktor (Vorgabe 0.8): 6'000 x 12 x 0.8."""
+    data = _run(client, _scenario(client)["id"])
+    assert data["retirement_spending"] == pytest.approx(57_600)
+    assert "depletion_age" in data and 0.0 <= data["success_rate"] <= 1.0
+
+
+def test_explicit_retirement_spending_wins(client):
+    data = _run(client, _scenario(client)["id"], retirement_spending=40_000)
+    assert data["retirement_spending"] == 40_000

@@ -190,9 +190,41 @@ export const importsApi = {
 };
 
 // Projections
+/** Antwort von /projections/run. Alle Betraege real (heutige CHF), Reihen
+ *  mit einem Wert pro Jahr ab heute. */
+export interface ProjectionResult {
+  years: number[];
+  p10: number[];
+  p25: number[];
+  p50: number[];
+  p75: number[];
+  p90: number[];
+  /** Vor dem Bezugsbeginn: Kapital (BVG, 3a, 3b) bzw. 0 (AHV); danach Jahresrente. */
+  pension_ahv: number[];
+  pension_bvg: number[];
+  pension_3a: number[];
+  pension_3b: number[];
+  /** Jaehrliches Renteneinkommen — nur Saeulen, die schon auszahlen. */
+  pension_income: number[];
+  retirement_idx: number | null;
+  /** Index, ab dem jede Saeule auszahlt: "1" AHV, "2" BVG, "3a", "3b". */
+  payout_start_idx: Record<"1" | "2" | "3a" | "3b", number>;
+  /** Jaehrliche Lebenskosten im Ruhestand, die die Rechnung verwendet hat. */
+  retirement_spending: number | null;
+  /** Alter, ab dem das Vermoegen im Median aufgebraucht ist; null = reicht. */
+  depletion_age: number | null;
+  /** Anteil der Simulationen mit Vermoegen am Ende des Horizonts (0-1). */
+  success_rate: number | null;
+  inflation_adjusted: boolean;
+  computed_at: string;
+  runs: number;
+}
+
 export const projectionsApi = {
   run: (params: Record<string, unknown>, scenarioId?: number) =>
-    api.post("/projections/run", params, { params: scenarioId ? { scenario_id: scenarioId } : {} }),
+    api.post<ProjectionResult>("/projections/run", params, {
+      params: scenarioId ? { scenario_id: scenarioId } : {},
+    }),
   listScenarios: () => api.get("/projections/scenarios"),
   createScenario: (data: Record<string, unknown>) => api.post("/projections/scenarios", data),
   updateScenario: (id: number, data: Record<string, unknown>) =>
