@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 
@@ -23,7 +23,9 @@ from app.services.projection import (
     AMORTIZATION_YEARS_DEFAULT,
     CARE_COST_ANNUAL_DEFAULT,
     ProjectionService,
+    _current_age,
     build_annual_flows,
+    default_retirement_spending,
 )
 
 router = APIRouter()
@@ -45,7 +47,10 @@ class ProjectionParameters(BaseModel):
     inflation_rate: float = 0.015
     include_pension: bool = True
     date_of_birth: Optional[str] = None  # ISO format: YYYY-MM-DD
-    retirement_age: int = 65
+    retirement_age: int = Field(default=65, ge=50, le=75)
+    # Jaehrliche Lebenskosten im Ruhestand in heutigen CHF. Ohne Angabe: aus
+    # dem Szenario (Ausgaben x Lebensstilfaktor), sonst geschaetzt.
+    retirement_spending: Optional[float] = Field(default=None, ge=0)
 
 
 class ProjectionResult(BaseModel):
@@ -59,6 +64,15 @@ class ProjectionResult(BaseModel):
     pension_bvg: List[float]
     pension_3a: List[float]
     pension_3b: List[float] = []   # Säule 3b / Lebensversicherung (optional — zero for old cached results)
+    # Jaehrliches Renteneinkommen (nur Saeulen, die schon auszahlen), real
+    pension_income: List[float] = []
+    # Index, ab dem jede Saeule auszahlt: {"1": AHV, "2": BVG, "3a", "3b"}
+    payout_start_idx: Dict[str, int] = {}
+    retirement_spending: Optional[float] = None
+    # Alter, ab dem das Vermoegen im Median aufgebraucht ist (None = reicht)
+    depletion_age: Optional[int] = None
+    # Anteil der Simulationen mit Vermoegen am Ende des Horizonts
+    success_rate: Optional[float] = None
     # run() liefert das seit jeher, das Schema hat es verschluckt — das
     # Frontend (RetirementPlanner.tsx:75) las darum immer undefined.
     retirement_idx: Optional[int] = None
@@ -117,10 +131,7 @@ def _params_from_scenario(parameters_json: Dict[str, Any]) -> Dict[str, Any]:
     if income is not None and expenses is not None:
         annual_savings = max(0.0, float(income) - float(expenses)) * 12
         # Szenario "Sparplan erhoehen": schlaegt einen Prozentsatz auf.
-        # ponytail: die heutige Jahresschleife in projection.py kennt kein
-        # Alters-Gate — die Sparrate fliesst auch nach dem Rentenalter weiter.
-        # Fuer Horizonte bis zum Rentenalter unerheblich, darueber hinaus nicht.
-        # Wird mit der Entnahmephase (annual_flows) fuer alle Szenarien behoben.
+        # Gespart wird nur bis zum Rentenalter (siehe ProjectionService.run).
         increase_pct = float(p.get("savings_increase_pct") or 0.0)
         if increase_pct:
             annual_savings *= 1 + increase_pct / 100
@@ -231,47 +242,40 @@ async def run_projection(
         for r in pension_records
     ]
 
-    # Frueher in Rente heisst: weniger Beitragsjahre, also auch weniger Rente.
-    # Dieses Alter gilt fuer die Entnahmephase UND fuer die angezeigten Renten —
-    # sonst zeigte das Diagramm im Szenario die Renten mit dem geplanten Alter.
+    # Fruehpensionierung = dieselbe Rechnung mit frueherem Rentenalter: Sparen
+    # endet frueher, Renten fallen kleiner aus und beginnen teils spaeter, die
+    # Luecke bis dahin traegt das Vermoegen. Das Alter gilt auch fuer die
+    # angezeigten Renten.
     planned_retirement = merged.get("retirement_age", 65)
     early_years = flow_inputs.pop("early_retirement_years", 3)
+    active_scenarios = flow_inputs.get("active_scenarios", [])
     retirement = (
         planned_retirement - early_years
-        if "early_retirement" in flow_inputs.get("active_scenarios", [])
+        if "early_retirement" in active_scenarios
         else planned_retirement
     )
 
-    # Szenario-Cashflows (Fruehpensionierung, Pflegekosten, Amortisation).
-    # Ohne aktive Szenarien bleibt annual_flows None und der Simulationspfad
-    # ist bit-identisch zum Verhalten ohne Szenario.
-    annual_flows = None
-    if flow_inputs.get("active_scenarios"):
-        current_age = 40
-        if date_of_birth:
-            try:
-                current_age = datetime.now().year - datetime.fromisoformat(date_of_birth).year
-            except ValueError:
-                pass
-        inflation = merged.get("inflation_rate", 0.015)
-        # Rentenserie vorab, damit die Entnahmephase die Rente als Einkommen
-        # gegenrechnen kann. Rein rechnerisch, kein Monte Carlo.
-        pension_series = projection_service.project_pension_series(
-            pension_records=pension_payload,
-            years=years_to_project,
-            annual_income=merged["annual_income"],
-            date_of_birth=date_of_birth,
-            retirement_age=retirement,
-            inflation_rate=inflation,
+    # Lebenskosten im Ruhestand: ausdruecklich gesendet > Szenario > Schaetzung
+    annual_expenses = flow_inputs.pop("annual_expenses", 0.0)
+    lifestyle_factor = flow_inputs.pop("lifestyle_factor", 0.8)
+    retirement_spending = merged.get("retirement_spending")
+    if retirement_spending is None and annual_expenses > 0:
+        retirement_spending = annual_expenses * lifestyle_factor
+    if retirement_spending is None:
+        retirement_spending = default_retirement_spending(
+            merged["annual_income"], merged["annual_savings"]
         )
+
+    # Szenario-Cashflows (Pflegekosten, Amortisation)
+    inflation = merged.get("inflation_rate", 0.015)
+    annual_flows = None
+    if {"care_costs_at_80", "mortgage_amortization"} & set(active_scenarios):
         annual_flows = build_annual_flows(
             years=years_to_project,
-            current_age=current_age,
+            current_age=_current_age(date_of_birth),
             retirement_age=retirement,
-            annual_savings=merged["annual_savings"],
-            pension_series=pension_series,
+            retirement_spending=retirement_spending,
             inflation_rate=inflation,
-            planned_retirement_age=planned_retirement,
             **flow_inputs,
         )
 
@@ -283,12 +287,13 @@ async def run_projection(
         years=years_to_project,
         mean_return=merged.get("mean_return", 0.07),
         volatility=merged.get("return_volatility", 0.12),
-        inflation_rate=merged.get("inflation_rate", 0.015),
+        inflation_rate=inflation,
         pension_records=pension_payload,
         date_of_birth=date_of_birth,
         retirement_age=retirement,
         runs=settings.monte_carlo_runs,
         annual_flows=annual_flows,
+        retirement_spending=retirement_spending,
     )
 
     result_dict = result_data.copy()

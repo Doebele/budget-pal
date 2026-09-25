@@ -62,6 +62,9 @@ export default function Projections() {
     include_pension: true,
   });
 
+  // Lebenskosten im Ruhestand pro Monat; null = aus Szenario bzw. geschaetzt
+  const [spendingMonthly, setSpendingMonthly] = useState<number | null>(null);
+
   const selectedHorizon = HORIZONS.find((h) => h.key === horizon)!;
 
   const profileBirthIso = user?.birthdate ?? user?.date_of_birth?.slice(0, 10) ?? undefined;
@@ -92,7 +95,7 @@ export default function Projections() {
   const totalBalance = (accounts || []).reduce((sum: number, a: { balance: number }) => sum + a.balance, 0);
 
   const { data: projection, isLoading, refetch } = useQuery({
-    queryKey: ["projection", horizon, params, profileBirthIso, totalBalance, scenarioId],
+    queryKey: ["projection", horizon, params, profileBirthIso, totalBalance, scenarioId, spendingMonthly],
     queryFn: () => {
       // Bei gewaehltem Szenario Sparrate und Einkommen NICHT mitsenden — der
       // Server fuellt nur ungesetzte Felder aus parameters_json (exclude_unset).
@@ -106,6 +109,7 @@ export default function Projections() {
             current_net_worth: totalBalance || params.current_net_worth,
             years_to_project: selectedHorizon.years,
             date_of_birth: profileBirthIso,
+            ...(spendingMonthly != null ? { retirement_spending: spendingMonthly * 12 } : {}),
           },
           scenarioId ?? undefined,
         )
@@ -123,12 +127,21 @@ export default function Projections() {
     "3b": Math.round((projection.pension_3b?.[i] || 0) / 1000),
   })) || [];
 
-  const retirementInHorizon = yearsToRetirement <= selectedHorizon.years;
-  const retIdx = retirementInHorizon ? yearsToRetirement : null;
-  const ahvAtRet = retIdx != null ? projection?.pension_ahv?.[retIdx] ?? 0 : 0;
-  const bvgAtRet = retIdx != null ? projection?.pension_bvg?.[retIdx] ?? 0 : 0;
-  const p3aAtRet = retIdx != null ? projection?.pension_3a?.[retIdx] ?? 0 : 0;
-  const p3bAtRet = retIdx != null ? projection?.pension_3b?.[retIdx] ?? 0 : 0;
+  // Das Szenario kann ein frueheres Rentenalter setzen — dann gilt das des Servers
+  const serverRetIdx = projection?.retirement_idx ?? yearsToRetirement;
+  const retirementInHorizon = serverRetIdx <= selectedHorizon.years;
+  const retIdx = retirementInHorizon ? serverRetIdx : null;
+  // Jede Saeule bei ihrem Bezugsbeginn lesen (AHV ab 63, BVG ab 58, 3a ab 60):
+  // davor steht in der Reihe das Kapital, keine Rente.
+  const pensionAt = (series: number[] | undefined, pillar: "1" | "2" | "3a" | "3b") => {
+    if (retIdx == null || !series) return 0;
+    const idx = Math.max(retIdx, projection?.payout_start_idx?.[pillar] ?? retIdx);
+    return series[Math.min(idx, series.length - 1)] ?? 0;
+  };
+  const ahvAtRet = pensionAt(projection?.pension_ahv, "1");
+  const bvgAtRet = pensionAt(projection?.pension_bvg, "2");
+  const p3aAtRet = pensionAt(projection?.pension_3a, "3a");
+  const p3bAtRet = pensionAt(projection?.pension_3b, "3b");
   const totalPensionAnnual = ahvAtRet + bvgAtRet + p3aAtRet + p3bAtRet;
 
   return (
@@ -254,6 +267,19 @@ export default function Projections() {
               onChange={(e) => setParams((p) => ({ ...p, inflation_rate: +e.target.value }))}
             />
           </div>
+          <div>
+            <label className="label">{t("pages:ui.retirementSpendingLabel")}</label>
+            <input
+              type="number"
+              min={0}
+              step={500}
+              className="input"
+              value={spendingMonthly ?? ""}
+              placeholder={projection?.retirement_spending ? String(Math.round(projection.retirement_spending / 12)) : ""}
+              onChange={(e) => setSpendingMonthly(e.target.value === "" ? null : Math.max(0, +e.target.value))}
+            />
+            <p className="text-text-tertiary text-[10px] mt-0.5">{t("pages:ui.retirementSpendingHint")}</p>
+          </div>
         </div>
       </div>
 
@@ -330,6 +356,17 @@ export default function Projections() {
         {/* ── Monthly pension KPIs at retirement ── */}
         {projection && retirementInHorizon && retIdx != null && (
           <div className="mt-4 pt-4 border-t border-border/50 space-y-3">
+            <p className="text-text-secondary text-xs">
+              {projection.depletion_age != null
+                ? t("pages:ui.wealthDepletes", { age: projection.depletion_age })
+                : t("pages:ui.wealthHolds", { age: currentAge + projection.years.length - 1 })}
+              {" · "}
+              {t("pages:ui.successRate", { pct: Math.round((projection.success_rate ?? 0) * 100) })}
+              {" · "}
+              {t("pages:ui.spendingUsed", {
+                amount: formatCHF((projection.retirement_spending ?? 0) / 12),
+              })}
+            </p>
             <p className="text-text-secondary text-xs font-semibold uppercase tracking-wide">
               {t("pages:hints.pensionAtRetirement", { year: projection.years[retIdx] })}
             </p>

@@ -669,7 +669,7 @@
     "referenzwaehrung": "Reference currency",
     "rente": "Pension",
     "rente_monat": "Pension/month",
-    "rote_linie_geschaetzte_monatliche_ausgaben_i": "Red line = estimated monthly expenses in retirement (80% of current level)",
+    "rote_linie_geschaetzte_monatliche_ausgaben_i": "Red line = spending in retirement used in the calculation. Without your own value: spending from the financial plan × lifestyle factor, otherwise 80 % of today's consumption. Before payouts start (AHV from 63, pension fund from 58, 3a from 60) your wealth covers the gap.",
     "saeule_3a": "Pillar 3a",
     "saeule_3b_lv": "Pillar 3b / life",
     "saron_referenzzins_jaehrlich_p_a": "SARON reference rate (annual, % p.a.)",
@@ -738,7 +738,18 @@
     "noScenario": "No scenario (own values)",
     "scenarioHint": "Savings rate and income come from the selected scenario.",
     "simulationParams": "Simulation parameters",
-    "bvgModelValue": "Capital × conversion rate ÷ 12"
+    "bvgModelValue": "Capital × conversion rate ÷ 12",
+    "retirementSpendingLabel": "Spending in retirement (CHF/month)",
+    "retirementSpendingHint": "Empty = estimated from your data, in today's francs incl. taxes",
+    "pensionFromAge": "from {{age}}, once all pillars pay",
+    "afterSpending": "after spending of {{amount}}/month",
+    "wealthLasts": "Wealth lasts",
+    "untilAge": "until {{age}}",
+    "untilEnd": "beyond {{age}}",
+    "successRate": "in {{pct}} % of simulations until the end",
+    "wealthDepletes": "Free wealth runs out at {{age}} (median)",
+    "wealthHolds": "Free wealth lasts beyond {{age}} (median)",
+    "spendingUsed": "assuming spending of {{amount}}/month"
   },
   "health": {
     "savingsRate": "Savings rate",
@@ -779,7 +790,7 @@
     "savingsRateVsPeer": "{{pct}}% — peer group {{peer}}%"
   },
   "hints": {
-    "pensionChartHint": "Before retirement ({{age}}): AHV = 0; BVG, 3a and 3b show projected capital. From then on nothing is paid in: the BVG pension (capital × conversion rate) stays the same in francs and loses real value, 3a/3b are paid out over 20 years with a 2 % residual return and then end. AHV starts at 63 at the earliest (−6.8 % per year drawn early, deferral up to 70 with a supplement), includes the 13th pension and stays constant in today's francs because it follows wages and prices. Contribution years are extended until the pension starts (max. 44). The AHV pension follows the official formula; your individual account statement is authoritative.",
+    "pensionChartHint": "Before retirement ({{age}}): AHV = 0; BVG, 3a and 3b show projected capital. From then on nothing is paid in: the BVG pension (capital × conversion rate) stays the same in francs and loses real value, 3a/3b are paid out over 20 years with a 2 % residual return and then end. The pension fund pays from 58 at the earliest (capital sits in a vested benefits account until then), 3a between 60 and 70. AHV starts at 63 at the earliest (−6.8 % per year drawn early, deferral up to 70 with a supplement), includes the 13th pension and stays constant in today's francs because it follows wages and prices. Contribution years are extended until the pension starts (max. 44). The AHV pension follows the official formula; your individual account statement is authoritative.",
     "saronHint": "Reference value for displaying SARON mortgages (not a live daily rate). Source and details:",
     "birthdate": "Date of birth",
     "yearsOld": "{{age}} years",

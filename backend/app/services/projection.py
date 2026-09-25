@@ -84,6 +84,105 @@ def _accumulate(balance: float, contribution: float, rate: float, years: int) ->
     return balance
 
 
+# ── Auszahlphase ──────────────────────────────────────────────
+
+#: Pensionskasse: fruehester Bezug (Vorbezug ab 58), spaetester (Aufschub bei
+#: Weiterarbeit). Wer frueher aufhoert, parkt das Guthaben bis 58 verzinst auf
+#: einem Freizuegigkeitskonto.
+BVG_EARLIEST_AGE: int = 58
+BVG_LATEST_AGE: int = 70
+#: Aenderung des Umwandlungssatzes je Jahr vor bzw. nach 65 (0.0015 = 0.15
+#: Prozentpunkte). ponytail: typischer Wert; die Tabelle der eigenen Kasse
+#: steht im Reglement.
+BVG_CONVERSION_STEP: float = 0.0015
+#: Saeule 3a: Bezug fruehestens fuenf Jahre vor dem Referenzalter, spaetestens
+#: fuenf danach (dann nur bei Erwerbstaetigkeit).
+PILLAR_3A_EARLIEST_AGE: int = 60
+PILLAR_3A_LATEST_AGE: int = 70
+#: Pflegeheimkosten ersetzen diesen Anteil der normalen Lebenskosten (Wohnen,
+#: Essen, Haushalt); Krankenkasse, Steuern und Persoenliches bleiben.
+CARE_REPLACES_SHARE: float = 0.6
+#: Ohne Angabe: Lebenskosten im Ruhestand = 80 % der heutigen Ausgaben, diese
+#: geschaetzt als Nettolohn (72 % des Bruttolohns nach Sozialabgaben, BVG und
+#: Steuern) minus Sparrate. Ueblich sind 70-80 % des bisherigen Konsums.
+NET_INCOME_SHARE: float = 0.72
+RETIREMENT_SPENDING_SHARE: float = 0.8
+
+
+def bvg_start_age(retirement_age: int) -> int:
+    return min(max(retirement_age, BVG_EARLIEST_AGE), BVG_LATEST_AGE)
+
+
+def pillar_3a_start_age(retirement_age: int) -> int:
+    return min(max(retirement_age, PILLAR_3A_EARLIEST_AGE), PILLAR_3A_LATEST_AGE)
+
+
+def payout_start_ages(retirement_age: int) -> Dict[str, int]:
+    """Ab welchem Alter jede Saeule auszahlt. 3b (freie Vorsorge) ist an kein
+    Alter gebunden."""
+    return {
+        "1": ahv_start_age(retirement_age),
+        "2": bvg_start_age(retirement_age),
+        "3a": pillar_3a_start_age(retirement_age),
+        "3b": retirement_age,
+    }
+
+
+def bvg_conversion_at(rate_at_65: float, start_age: int) -> float:
+    """Umwandlungssatz beim tatsaechlichen Bezugsalter. Der Satz auf dem
+    Vorsorgeausweis gilt fuer 65; frueher gibt es weniger, spaeter mehr."""
+    return max(0.0, rate_at_65 + BVG_CONVERSION_STEP * (start_age - AHV_REGULAR_RETIREMENT_AGE))
+
+
+def default_retirement_spending(annual_income: float, annual_savings: float) -> float:
+    """Jaehrliche Lebenskosten im Ruhestand in heutigen CHF, wenn der Nutzer
+    keine angibt."""
+    return RETIREMENT_SPENDING_SHARE * max(0.0, annual_income * NET_INCOME_SHARE - annual_savings)
+
+
+def ahv_nonemployed_contribution(basis):
+    """AHV-Beitrag fuer Nichterwerbstaetige pro Jahr (2025/2026), aus Vermoegen
+    plus 20-fachem Renteneinkommen. Pflicht bis zum Referenzalter, auch fuer
+    Fruehpensionierte. Nimmt Skalar oder NumPy-Array.
+
+    ponytail: Naeherung an die Beitragstabelle — 530 unter 350'000, je weitere
+    50'000 +106 bis 1.75 Mio., darueber +159, hoechstens 26'500; ohne
+    Verwaltungskostenbeitrag und ohne Befreiung durch einen erwerbstaetigen
+    Ehepartner.
+    """
+    basis = np.asarray(basis, dtype=np.float64)
+    low = np.clip(np.floor((np.minimum(basis, 1_750_000) - 300_000) / 50_000), 0, None)
+    high = np.clip(np.floor((basis - 1_750_000) / 50_000), 0, None)
+    return np.minimum(530 + 106 * low + 159 * high, 26_500)
+
+
+def _current_age(date_of_birth: Optional[str]) -> int:
+    """Alter als Kalenderjahr-Differenz, wie das Frontend (Tage/365.25 lag je
+    nach Geburtsmonat um ein Jahr daneben). Ohne Datum: 40."""
+    if date_of_birth:
+        try:
+            return datetime.now().year - datetime.fromisoformat(date_of_birth).year
+        except ValueError:
+            pass
+    return 40
+
+
+def pension_income(
+    series: Dict[str, Sequence[float]], current_age: int, retirement_age: int
+) -> List[float]:
+    """Summe der Saeulen, die im jeweiligen Jahr tatsaechlich auszahlen.
+
+    Vor ihrem Bezugsbeginn enthalten die BVG-/3a-/3b-Reihen das Kapital (fuers
+    Diagramm) — das ist kein Einkommen und darf nicht mitgezaehlt werden.
+    """
+    starts = payout_start_ages(retirement_age)
+    length = len(series["1"])
+    return [
+        sum(values[i] for pillar, values in series.items() if current_age + i >= starts[pillar])
+        for i in range(length)
+    ]
+
+
 def _annuity_payout(
     balance: float, years: int = PAYOUT_YEARS, rate: float = PAYOUT_RESIDUAL_RATE
 ) -> float:
@@ -116,63 +215,43 @@ def build_annual_flows(
     years: int,
     current_age: int,
     retirement_age: int,
-    annual_savings: float = 0.0,
-    annual_expenses: float = 0.0,
-    lifestyle_factor: float = 0.8,
-    pension_series: Optional[Sequence[float]] = None,
+    retirement_spending: float = 0.0,
     care_cost_annual: float = CARE_COST_ANNUAL_DEFAULT,
     mortgage_debt: float = 0.0,
     mortgage_rate_pct: float = 0.0,
     amortization_years: int = AMORTIZATION_YEARS_DEFAULT,
     inflation_rate: float = 0.015,
-    planned_retirement_age: Optional[int] = None,
 ) -> List[float]:
-    """Baut die jaehrlichen Zusatz-Cashflows der aktiven Szenarien.
+    """Zusatz-Cashflows der Szenarien Pflegekosten und Amortisation.
 
-    Rueckgabe: Liste der Laenge `years`, NOMINALE CHF-Deltas je Jahr, die in
-    `ProjectionService.run(annual_flows=...)` auf die Sparrate addiert werden.
+    Rueckgabe: Liste der Laenge `years`, NOMINALE CHF-Deltas je Jahr, die
+    `ProjectionService.run(annual_flows=...)` zum Jahresfluss addiert.
     Mehrere Szenarien addieren sich — `active_scenarios` ist eine Liste.
 
-    Zur Einheit: `annual_savings`, `annual_expenses`, `care_cost_annual` und
-    `pension_series` kommen in heutigen CHF herein und werden hier pro Jahr auf
-    nominal hochgerechnet — die Jahresschleife in `run()` rechnet nominal und
-    deflationiert erst am Ende. Hypothekenbetraege bleiben nominal: ein
-    Hypothekarvertrag lautet auf einen festen Betrag, er waechst nicht mit der
-    Teuerung.
+    Die Fruehpensionierung steht hier nicht mehr: sie ist dieselbe Rechnung mit
+    frueherem Rentenalter (Sparen endet, Renten beginnen spaeter und kleiner,
+    Entnahmen ab dann). Frueher modellierte sie nur das Fenster bis zum
+    geplanten Alter und liess die lebenslang tieferen Renten weg.
 
-    Reine Funktion, absichtlich ohne DB- oder Modellzugriff, damit sie ohne
-    Fixtures testbar bleibt.
+    `care_cost_annual` und `retirement_spending` kommen in heutigen CHF und
+    werden je Jahr auf nominal hochgerechnet. Hypothekenbetraege bleiben
+    nominal: ein Hypothekarvertrag lautet auf einen festen Betrag.
+
+    Reine Funktion, absichtlich ohne DB- oder Modellzugriff.
     """
     flows = [0.0] * max(0, years)
     if years <= 0:
         return flows
-    if planned_retirement_age is None:
-        planned_retirement_age = retirement_age
 
     active = set(active_scenarios or [])
-    # Index, ab dem das Rentenalter erreicht ist — wie retirement_idx in
-    # _project_pensions, damit Vermoegens- und Rentenpfad zusammenpassen.
-    retirement_idx = min(max(0, retirement_age - current_age), years)
-    planned_idx = min(max(0, planned_retirement_age - current_age), years)
-
-    if "early_retirement" in active:
-        # Nur das Fenster zwischen frueherem und geplantem Rentenalter. Danach
-        # sind beide Welten identisch, das Delta ist null. So braucht der
-        # Vergleich kein Ausgabenmodell im Basisfall — den gibt es hier nicht.
-        for yr in range(retirement_idx, planned_idx):
-            nominal = (1 + inflation_rate) ** yr
-            # Sparen endet. Der Abzug entspricht exakt dem, was die
-            # Jahresschleife in run() addiert — sonst bliebe ein Rest stehen.
-            flows[yr] -= annual_savings * nominal
-            flows[yr] -= annual_expenses * lifestyle_factor * nominal
-            if pension_series is not None and yr < len(pension_series):
-                # Serie kommt real herein (siehe _project_pensions).
-                flows[yr] += pension_series[yr] * nominal
 
     if "care_costs_at_80" in active:
+        # Das Pflegeheim ersetzt Wohnen, Essen und Haushalt — nur der Rest ist
+        # Mehrkosten.
+        extra = max(0.0, care_cost_annual - CARE_REPLACES_SHARE * retirement_spending)
         for yr in range(years):
             if current_age + yr >= CARE_START_AGE:
-                flows[yr] -= care_cost_annual * (1 + inflation_rate) ** yr
+                flows[yr] -= extra * (1 + inflation_rate) ** yr
 
     if "mortgage_amortization" in active and mortgage_debt > 0:
         span = max(1, min(amortization_years, years))
@@ -192,10 +271,13 @@ def build_annual_flows(
 
 
 def _bvg_capital(
-    record: Optional[Dict], annual_income: float, start_age: int, saving_years: int
+    record: Optional[Dict], annual_income: float, start_age: int, saving_years: int,
+    interest_years: int = 0,
 ) -> tuple:
-    """BVG-Guthaben nach `saving_years` Beitragsjahren ab `start_age`, dazu
-    der Umwandlungssatz (eigener laut Vorsorgeausweis oder Vorgabe)."""
+    """BVG-Guthaben nach `saving_years` Beitragsjahren ab `start_age` und
+    danach `interest_years` Jahren nur mit Zins (Freizuegigkeitskonto zwischen
+    Erwerbsende und Bezug), dazu der Umwandlungssatz fuer 65 (eigener laut
+    Vorsorgeausweis oder Vorgabe)."""
     if record:
         balance = record.get("current_balance", 0.0)
         annual_contribution = record.get("annual_contribution", 0.0)
@@ -208,29 +290,31 @@ def _bvg_capital(
     for yr in range(saving_years):
         contrib = annual_contribution or insured_salary * _bvg_rate_for_age(start_age + yr)
         balance = balance * (1 + return_rate) + contrib
+    balance *= (1 + return_rate) ** max(0, interest_years)
     return balance, conversion_rate
 
 
 def _saving_then_payout(
-    record: Dict, age_at_year: int, retirement_age: int, years_elapsed: int, default_rate: float
+    record: Dict, age_at_year: int, retirement_age: int, years_elapsed: int,
+    default_rate: float, payout_start: int,
 ) -> float:
-    """3a/3b: bis zum Rentenalter ansparen, danach PAYOUT_YEARS lang einen
-    festen Betrag auszahlen, dann 0.
+    """3a/3b: bis zum Rentenalter ansparen, bis `payout_start` nur verzinsen,
+    danach PAYOUT_YEARS lang einen festen Betrag auszahlen, dann 0.
 
-    Wer heute schon im Rentenalter ist, dem wird das verbleibende Guthaben ab
-    jetzt ausbezahlt.
+    Wer heute schon ueber dem Bezugsbeginn ist, dem wird das verbleibende
+    Guthaben ab jetzt ausbezahlt.
     """
     start_age = age_at_year - years_elapsed
     saving_years = min(years_elapsed, max(0, retirement_age - start_age))
+    interest_years = min(years_elapsed, max(0, payout_start - start_age)) - saving_years
+    rate = record.get("expected_return_rate", default_rate)
     balance = _accumulate(
-        record.get("current_balance", 0.0),
-        record.get("annual_contribution", 0.0),
-        record.get("expected_return_rate", default_rate),
-        saving_years,
+        record.get("current_balance", 0.0), record.get("annual_contribution", 0.0), rate, saving_years,
     )
-    if age_at_year < retirement_age:
+    balance *= (1 + rate) ** max(0, interest_years)
+    if age_at_year < payout_start:
         return balance
-    payout_year = age_at_year - max(retirement_age, start_age)
+    payout_year = age_at_year - max(payout_start, start_age)
     if payout_year >= PAYOUT_YEARS:
         return 0.0
     return _annuity_payout(balance)
@@ -261,18 +345,25 @@ class ProjectionService:
         retirement_age: int = 65,
         runs: int = 10_000,
         annual_flows: Optional[Sequence[float]] = None,
+        retirement_spending: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         Run Monte Carlo simulation and pension projections.
 
-        Returns dict with:
-          years, p10, p25, p50, p75, p90,
-          pension_ahv, pension_bvg, pension_3a,
-          inflation_adjusted
+        Jahresfluss aufs freie Vermoegen (`current_net_worth`, ohne die Saeulen):
+          - bis zum Rentenalter: Sparrate (waechst mit der Teuerung)
+          - ab dem Rentenalter: tatsaechlich fliessende Renten minus
+            Lebenskosten (`retirement_spending`, heutige CHF; ohne Angabe
+            `default_retirement_spending`), bis 65 zusaetzlich die AHV-Beitraege
+            als Nichterwerbstaetige
+          - dazu die Szenario-Cashflows (`annual_flows`, nominal)
+        Das Vermoegen faellt nie unter 0.
+
+        Returns dict with years, p10..p90, pension_* series, pension_income,
+        retirement_idx, payout_start_idx, retirement_spending, depletion_age,
+        success_rate, inflation_adjusted.
         """
         # ── Pension Projections ───────────────────────────────
-        # Vor der Monte-Carlo-Schleife, weil eine Entnahmephase die Rentenserie
-        # als Einkommen braucht (siehe build_annual_flows).
         pension_ahv, pension_bvg, pension_3a, pension_3b, retirement_idx = (
             self._project_pensions(
                 pension_records=pension_records or [],
@@ -283,6 +374,14 @@ class ProjectionService:
                 inflation_rate=inflation_rate,
             )
         )
+        current_age = _current_age(date_of_birth)
+        income_real = pension_income(
+            {"1": pension_ahv, "2": pension_bvg, "3a": pension_3a, "3b": pension_3b},
+            current_age,
+            retirement_age,
+        )
+        if retirement_spending is None:
+            retirement_spending = default_retirement_spending(annual_income, annual_savings)
 
         # ── Monte Carlo ────────────────────────────────────────
         np.random.seed(None)
@@ -297,25 +396,29 @@ class ProjectionService:
         )
         annual_returns = np.exp(annual_log_returns) - 1  # shape (runs, years)
 
-        # Simulate net worth year by year
         portfolio = np.full(runs, current_net_worth, dtype=np.float64)
         all_values = np.zeros((runs, years + 1), dtype=np.float64)
         all_values[:, 0] = portfolio
 
-        # Savings may grow with inflation
         for yr in range(years):
             inflation_factor = (1 + inflation_rate) ** yr
-            yr_savings = annual_savings * inflation_factor
-            if annual_flows is not None:
-                # Szenario-Cashflows sind bereits nominal fuer das jeweilige
-                # Jahr gerechnet und werden nicht nochmals inflationiert.
-                yr_savings += annual_flows[yr] if yr < len(annual_flows) else 0.0
-            portfolio = portfolio * (1 + annual_returns[:, yr]) + yr_savings
-            if annual_flows is not None:
-                # Ohne Deckel "waechst" ein negatives Portfolio im Folgejahr mit
-                # der Rendite weiter — bei Entnahmen ist das Unsinn. Nur im
-                # Szenario-Pfad, damit der Default bit-identisch bleibt.
-                portfolio = np.maximum(portfolio, 0.0)
+            age = current_age + yr
+            if age < retirement_age:
+                flow = annual_savings * inflation_factor
+            else:
+                # Renten und Lebenskosten kommen real herein, gerechnet wird nominal
+                flow = (income_real[yr] - retirement_spending) * inflation_factor
+                if age < AHV_REGULAR_RETIREMENT_AGE:
+                    # Fruehpensionierte zahlen bis 65 AHV-Beitraege — je Lauf
+                    # verschieden, weil sie am Vermoegen haengen
+                    basis = portfolio / inflation_factor + 20 * income_real[yr]
+                    flow = flow - ahv_nonemployed_contribution(basis) * inflation_factor
+            if annual_flows is not None and yr < len(annual_flows):
+                # Szenario-Cashflows sind bereits nominal
+                flow = flow + annual_flows[yr]
+            # Ohne Deckel "waechst" ein negatives Vermoegen mit der Rendite
+            # weiter — bei Entnahmen ist das Unsinn.
+            portfolio = np.maximum(portfolio * (1 + annual_returns[:, yr]) + flow, 0.0)
             all_values[:, yr + 1] = portfolio
 
         # Inflation adjust all values to today's CHF (real terms)
@@ -331,6 +434,11 @@ class ProjectionService:
         p75 = np.percentile(real_values, 75, axis=0).tolist()
         p90 = np.percentile(real_values, 90, axis=0).tolist()
 
+        # Bis wann reicht das Vermoegen? Median-Pfad nach der Pensionierung.
+        depletion_age = next(
+            (current_age + i for i in range(retirement_idx, years + 1) if p50[i] <= 0),
+            None,
+        )
         year_labels = list(range(datetime.now().year, datetime.now().year + years + 1))
 
         return {
@@ -344,36 +452,18 @@ class ProjectionService:
             "pension_bvg": pension_bvg,
             "pension_3a": pension_3a,
             "pension_3b": pension_3b,
+            "pension_income": income_real,
             "retirement_idx": retirement_idx,
+            "payout_start_idx": {
+                pillar: max(0, start - current_age)
+                for pillar, start in payout_start_ages(retirement_age).items()
+            },
+            "retirement_spending": retirement_spending,
+            "depletion_age": depletion_age,
+            # Anteil der Laeufe, in denen bis zum Ende des Horizonts Vermoegen bleibt
+            "success_rate": float(np.mean(all_values[:, -1] > 0)),
             "inflation_adjusted": True,
         }
-
-    def project_pension_series(
-        self,
-        pension_records: List[Dict],
-        years: int,
-        annual_income: float,
-        date_of_birth: Optional[str],
-        retirement_age: int,
-        inflation_rate: float,
-    ) -> List[float]:
-        """Summe der jaehrlichen Rente aus allen Saeulen, in realen CHF.
-
-        Wird vom API-Layer gebraucht, um die Entnahmephase eines Szenarios zu
-        bauen, bevor `run()` laeuft. Rein rechnerisch, kein Monte Carlo.
-        """
-        ahv, bvg, p3a, p3b, retirement_idx = self._project_pensions(
-            pension_records=pension_records,
-            years=years,
-            annual_income=annual_income,
-            date_of_birth=date_of_birth,
-            retirement_age=retirement_age,
-            inflation_rate=inflation_rate,
-        )
-        return [
-            (ahv[i] + bvg[i] + p3a[i] + p3b[i]) if i >= retirement_idx else 0.0
-            for i in range(len(ahv))
-        ]
 
     def estimate_at_retirement(
         self,
@@ -383,56 +473,48 @@ class ProjectionService:
         annual_income: float,
         inflation_rate: float,
     ) -> Dict[str, Any]:
-        """Renten und Kapital bei der Pensionierung, in heutigen CHF.
+        """Renten und Kapital bei Bezugsbeginn, in heutigen CHF.
 
-        Dieselben Funktionen wie die Prognose — Wizard und Finanzplan zeigen
-        damit dieselben Zahlen wie das Rentendiagramm. Monatsbetraege sind
-        Jahresbetraege / 12; bei der AHV steckt die 13. Rente anteilig darin.
+        Liest dieselben Reihen wie das Rentendiagramm (`_project_pensions`) —
+        Wizard und Finanzplan zeigen damit dieselben Zahlen. Jede Saeule wird
+        bei ihrem eigenen Bezugsbeginn gelesen (AHV ab 63, BVG ab 58, 3a ab 60).
+        Monatsbetraege sind Jahresbetraege / 12; bei der AHV steckt die 13.
+        Rente anteilig darin.
         """
-        years_to_retirement = max(0, retirement_age - current_age)
-        deflator = (1 + inflation_rate) ** years_to_retirement
-        ahv_record = next((r for r in pension_records if r["pillar"] == "1"), None)
-        bvg_record = next((r for r in pension_records if r["pillar"] == "2"), None)
-        p3a_records = [r for r in pension_records if r["pillar"] == "3a"]
-        p3b_records = [r for r in pension_records if r["pillar"] == "3b"]
+        starts = payout_start_ages(retirement_age)
+        horizon = max(max(starts.values()) - current_age, 0) + 1
+        dob = f"{datetime.now().year - current_age}-01-01"
+        ahv, bvg, p3a, p3b, _ = self._project_pensions(
+            pension_records, horizon, annual_income, dob, retirement_age, inflation_rate
+        )
 
-        start = ahv_start_age(retirement_age)
-        ahv_annual = self._project_ahv(
-            age_at_year=max(start, current_age), retirement_age=retirement_age,
-            record=ahv_record, annual_income=annual_income, current_age=current_age,
-        )
-        bvg_capital, conversion_rate = _bvg_capital(
-            bvg_record, annual_income, current_age, years_to_retirement
-        )
-        p3a_capital = sum(
-            _accumulate(
-                r.get("current_balance", 0.0), r.get("annual_contribution", 0.0),
-                r.get("expected_return_rate", 0.03), years_to_retirement,
-            )
-            for r in p3a_records
-        )
-        p3b_capital = sum(
-            _accumulate(
-                r.get("current_balance", 0.0), r.get("annual_contribution", 0.0),
-                r.get("expected_return_rate", 0.0), years_to_retirement,
-            )
-            for r in p3b_records
-        )
-        ahv_monthly = ahv_annual / 12
-        bvg_monthly = bvg_capital * conversion_rate / 12 / deflator
-        p3a_monthly = _annuity_payout(p3a_capital) / 12 / deflator
-        p3b_monthly = _annuity_payout(p3b_capital) / 12 / deflator
+        def at(series, pillar):
+            return series[max(0, starts[pillar] - current_age)]
+
+        # Kapital bei Bezugsbeginn aus der Auszahlung zurueckgerechnet — die
+        # ist eine feste Funktion davon (Rente bzw. Annuitaet).
+        per_chf = _annuity_payout(1.0)
+
+        bvg_record = next((r for r in pension_records if r["pillar"] == "2"), None)
+        rate_at_65 = (bvg_record or {}).get("conversion_rate") or BVG_CONVERSION_RATE_DEFAULT
+        conversion_rate = bvg_conversion_at(rate_at_65, starts["2"])
+        ahv_monthly = at(ahv, "1") / 12
+        bvg_monthly = at(bvg, "2") / 12
+        p3a_monthly = at(p3a, "3a") / 12
+        p3b_monthly = at(p3b, "3b") / 12
         return {
             "retirement_age": retirement_age,
-            "years_to_retirement": years_to_retirement,
-            "ahv_start_age": start,
+            "years_to_retirement": max(0, retirement_age - current_age),
+            "ahv_start_age": starts["1"],
+            "bvg_start_age": starts["2"],
+            "pillar_3a_start_age": starts["3a"],
             "ahv_monthly": ahv_monthly,
-            "bvg_capital": bvg_capital / deflator,
+            "bvg_capital": bvg_monthly * 12 / conversion_rate if conversion_rate else 0.0,
             "bvg_conversion_rate": conversion_rate,
             "bvg_monthly": bvg_monthly,
-            "pillar_3a_capital": p3a_capital / deflator,
+            "pillar_3a_capital": p3a_monthly * 12 / per_chf,
             "pillar_3a_monthly": p3a_monthly,
-            "pillar_3b_capital": p3b_capital / deflator,
+            "pillar_3b_capital": p3b_monthly * 12 / per_chf,
             "pillar_3b_monthly": p3b_monthly,
             "total_monthly": ahv_monthly + bvg_monthly + p3a_monthly + p3b_monthly,
         }
@@ -458,16 +540,7 @@ class ProjectionService:
         """
         current_year = datetime.now().year
 
-        # Determine current age — align with frontend (calendar-year difference).
-        # Using days/365.25 can be off by ±1 year depending on birth month vs. today,
-        # which causes retirement index mismatches between frontend and backend.
-        current_age = 40  # fallback
-        if date_of_birth:
-            try:
-                dob = datetime.fromisoformat(date_of_birth)
-                current_age = datetime.now().year - dob.year
-            except Exception:
-                pass
+        current_age = _current_age(date_of_birth)
 
         years_to_retirement = max(0, retirement_age - current_age)
         # Index in the series where age first reaches retirement_age.
@@ -611,14 +684,18 @@ class ProjectionService:
         rate. Beitraege enden mit dem Rentenalter, die Rente steht danach fest.
         """
         start_age = age_at_year - years_elapsed
-        # Nur bis zum Rentenalter wird einbezahlt — danach waechst nichts mehr
+        payout_start = bvg_start_age(retirement_age)
+        # Beitraege nur bis zum Rentenalter, danach bis zum Bezug nur Zins
         saving_years = min(years_elapsed, max(0, retirement_age - start_age))
-        balance, conversion_rate = _bvg_capital(record, annual_income, start_age, saving_years)
+        interest_years = min(years_elapsed, max(0, payout_start - start_age)) - saving_years
+        balance, conversion_rate = _bvg_capital(
+            record, annual_income, start_age, saving_years, interest_years
+        )
 
-        if age_at_year < retirement_age:
-            return balance  # return balance as proxy before retirement
+        if age_at_year < payout_start:
+            return balance  # Kapital, solange noch nichts ausbezahlt wird
 
-        return balance * conversion_rate
+        return balance * bvg_conversion_at(conversion_rate, payout_start)
 
     def _project_3a(
         self,
@@ -632,7 +709,10 @@ class ProjectionService:
         Before retirement: accumulated balance. After: fixed annual payout over
         PAYOUT_YEARS, then 0. Einzahlen geht nur bis zum Rentenalter.
         """
-        return _saving_then_payout(record, age_at_year, retirement_age, years_elapsed, 0.03)
+        return _saving_then_payout(
+            record, age_at_year, retirement_age, years_elapsed, 0.03,
+            pillar_3a_start_age(retirement_age),
+        )
 
     def _project_3b(
         self,
@@ -651,7 +731,9 @@ class ProjectionService:
         """
         if record.get("current_balance", 0.0) <= 0 and record.get("annual_contribution", 0.0) <= 0:
             return 0.0
-        return _saving_then_payout(record, age_at_year, retirement_age, years_elapsed, 0.0)
+        return _saving_then_payout(
+            record, age_at_year, retirement_age, years_elapsed, 0.0, retirement_age
+        )
 
     def compare_scenarios(
         self,

@@ -249,6 +249,12 @@ Central definition of all 11 supercategories (wohnen, essen, mobilitaet, versich
   The legal 6.8 % only applies to the mandatory part. Fixed in nominal CHF after retirement.
 - Pillar 3a/3b: contributions stop at retirement, then a fixed payout for `PAYOUT_YEARS`, then 0.
   Max `PILLAR_3A_MAX_CONTRIBUTION` CHF/year.
+- Payout starts per pillar (`payout_start_ages`): AHV 63-70, BVG 58-70 (conversion rate
+  ±`BVG_CONVERSION_STEP` per year vs. 65), 3a 60-70. Before its start a series holds *capital*,
+  not income — use `pension_income()` for cash flows, never the raw sum of the series.
+- Wealth path (`ProjectionService.run`): savings only until retirement, then pensions minus
+  `retirement_spending` (plus AHV non-employed contributions until 65); floored at 0. Early
+  retirement is just an earlier `retirement_age` — no special window logic.
 - One calculation: Wizard and Finanzplan call `/api/pension/estimate`
   (`ProjectionService.estimate_at_retirement`) — never re-implement pension math in the frontend.
 - All monetary projections are inflation-adjusted using `SWISS_INFLATION_RATE` (default 1.5%)

@@ -669,7 +669,7 @@
     "referenzwaehrung": "Referenzwährung",
     "rente": "Rente",
     "rente_monat": "Rente/Monat",
-    "rote_linie_geschaetzte_monatliche_ausgaben_i": "Rote Linie = geschätzte monatliche Ausgaben im Ruhestand (80 % des aktuellen Niveaus)",
+    "rote_linie_geschaetzte_monatliche_ausgaben_i": "Rote Linie = Ausgaben im Ruhestand, mit denen gerechnet wird. Ohne eigene Angabe: Ausgaben aus dem Finanzplan × Lebensstilfaktor, sonst 80 % des heutigen Konsums. Vor dem Bezugsbeginn (AHV ab 63, Pensionskasse ab 58, 3a ab 60) trägt das Vermögen die Lücke.",
     "saeule_3a": "Säule 3a",
     "saeule_3b_lv": "Säule 3b / LV",
     "saron_referenzzins_jaehrlich_p_a": "SARON-Referenzzins (jährlich, % p.a.)",
@@ -738,7 +738,18 @@
     "noScenario": "Ohne Szenario (eigene Werte)",
     "scenarioHint": "Sparrate und Einkommen stammen aus dem gewählten Szenario.",
     "simulationParams": "Simulationsparameter",
-    "bvgModelValue": "Kapital × Umwandlungssatz ÷ 12"
+    "bvgModelValue": "Kapital × Umwandlungssatz ÷ 12",
+    "retirementSpendingLabel": "Ausgaben im Ruhestand (CHF/Monat)",
+    "retirementSpendingHint": "Leer = aus Ihren Angaben geschätzt, in heutigen Franken inkl. Steuern",
+    "pensionFromAge": "ab {{age}}, wenn alle Säulen zahlen",
+    "afterSpending": "nach Ausgaben von {{amount}}/Monat",
+    "wealthLasts": "Vermögen reicht",
+    "untilAge": "bis {{age}}",
+    "untilEnd": "über {{age}} hinaus",
+    "successRate": "in {{pct}} % der Simulationen bis zum Ende",
+    "wealthDepletes": "Freies Vermögen im Median aufgebraucht mit {{age}}",
+    "wealthHolds": "Freies Vermögen reicht im Median über {{age}} hinaus",
+    "spendingUsed": "gerechnet mit Ausgaben von {{amount}}/Monat"
   },
   "health": {
     "savingsRate": "Sparquote",
@@ -779,7 +790,7 @@
     "savingsRateVsPeer": "{{pct}} % — Vergleichsgruppe {{peer}} %"
   },
   "hints": {
-    "pensionChartHint": "Vor dem Rentenalter ({{age}}): AHV = 0; BVG, 3a und 3b zeigen das projizierte Kapital. Ab dann wird nichts mehr einbezahlt: Die BVG-Rente (Kapital × Umwandlungssatz) bleibt in Franken gleich und verliert real an Wert, 3a/3b werden über 20 Jahre mit 2 % Restverzinsung ausbezahlt und enden dann. Die AHV fliesst frühestens mit 63 (Vorbezug −6.8 % je Jahr, Aufschub bis 70 mit Zuschlag), inklusive 13. Rente, und bleibt in heutigen Franken gleich, weil sie der Lohn- und Preisentwicklung folgt. Beitragsjahre werden bis zum Rentenbeginn fortgeschrieben (max. 44). Die AHV-Rente folgt der Rentenformel der Ausgleichskasse; massgebend ist Ihr individueller Kontoauszug.",
+    "pensionChartHint": "Vor dem Rentenalter ({{age}}): AHV = 0; BVG, 3a und 3b zeigen das projizierte Kapital. Ab dann wird nichts mehr einbezahlt: Die BVG-Rente (Kapital × Umwandlungssatz) bleibt in Franken gleich und verliert real an Wert, 3a/3b werden über 20 Jahre mit 2 % Restverzinsung ausbezahlt und enden dann. Die Pensionskasse zahlt frühestens mit 58 (Kapital bis dahin auf dem Freizügigkeitskonto), die 3a zwischen 60 und 70. Die AHV fliesst frühestens mit 63 (Vorbezug −6.8 % je Jahr, Aufschub bis 70 mit Zuschlag), inklusive 13. Rente, und bleibt in heutigen Franken gleich, weil sie der Lohn- und Preisentwicklung folgt. Beitragsjahre werden bis zum Rentenbeginn fortgeschrieben (max. 44). Die AHV-Rente folgt der Rentenformel der Ausgleichskasse; massgebend ist Ihr individueller Kontoauszug.",
     "saronHint": "Referenzwert zur Darstellung von SARON-Hypotheken (kein Live-Tageszins). Quelle und Details:",
     "birthdate": "Geburtsdatum",
     "yearsOld": "{{age}} Jahre",

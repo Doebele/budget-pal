@@ -46,11 +46,15 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
   const [retirementAge, setRetirementAge] = useState(65);
   const [annualIncome, setAnnualIncome] = useState(90_000);
   const [meanReturn, setMeanReturn] = useState(0.07);
+  // Lebenskosten im Ruhestand pro Monat; null = der Server schaetzt sie
+  const [spendingMonthly, setSpendingMonthly] = useState<number | null>(null);
 
   const annualSavings = monthlyNetMean * 12;
-  const yearsToRetirement = dateOfBirth
-    ? retirementAge - (new Date().getFullYear() - new Date(dateOfBirth).getFullYear())
-    : 25;
+  // Kalenderjahr-Differenz wie im Backend; ohne Geburtsdatum rechnet es mit 40
+  const currentAge = dateOfBirth
+    ? new Date().getFullYear() - new Date(dateOfBirth).getFullYear()
+    : 40;
+  const yearsToRetirement = retirementAge - currentAge;
 
   const projectionParams = {
     current_net_worth: currentNetWorth,
@@ -63,6 +67,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
     retirement_age: retirementAge,
     include_pension: true,
     date_of_birth: dateOfBirth ?? undefined,
+    retirement_spending: spendingMonthly != null ? spendingMonthly * 12 : undefined,
   };
 
   const { data: projection, isLoading } = useQuery({
@@ -78,17 +83,27 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
     : (yearsToRetirement > 0 ? Math.min(yearsToRetirement, (projection?.years?.length ?? 0) - 1) : 0);
   const wealthAtRetirement = projection?.p50?.[retirementIdx] ?? 0;
 
-  // Post-retirement: monthly pension income (backend returns annual CHF, real terms).
-  const ahvMonthly       = (projection?.pension_ahv?.[retirementIdx] ?? 0) / 12;
-  const bvgMonthly       = (projection?.pension_bvg?.[retirementIdx] ?? 0) / 12;
-  const pillar3aMonthly  = (projection?.pension_3a?.[retirementIdx] ?? 0) / 12;
-  const pillar3bMonthly  = (projection?.pension_3b?.[retirementIdx] ?? 0) / 12;
+  // Renten ab dem Jahr, in dem alle Saeulen zahlen (AHV frühestens mit 63,
+  // BVG ab 58, 3a ab 60). Vor dem Bezugsbeginn stehen in den Reihen Kapitalien.
+  const starts = projection?.payout_start_idx;
+  const lastIdx = (projection?.years?.length ?? 1) - 1;
+  const fullIdx = Math.min(
+    starts ? Math.max(starts["1"], starts["2"], starts["3a"], starts["3b"], retirementIdx) : retirementIdx,
+    Math.max(lastIdx, 0),
+  );
+  const paying = (pillar: "1" | "2" | "3a" | "3b", idx: number) => !starts || idx >= starts[pillar];
+  const ahvMonthly       = (projection?.pension_ahv?.[fullIdx] ?? 0) / 12;
+  const bvgMonthly       = (projection?.pension_bvg?.[fullIdx] ?? 0) / 12;
+  const pillar3aMonthly  = paying("3a", fullIdx) ? (projection?.pension_3a?.[fullIdx] ?? 0) / 12 : 0;
+  const pillar3bMonthly  = paying("3b", fullIdx) ? (projection?.pension_3b?.[fullIdx] ?? 0) / 12 : 0;
   const totalPensionMonthly = ahvMonthly + bvgMonthly + pillar3aMonthly + pillar3bMonthly;
 
-  // Estimate monthly expenses at retirement (rough: 80 % of current)
-  const estimatedExpenseMonthly = Math.abs(monthlyNetMean) * 0.8 + (annualIncome / 12) * 0.5;
-  const monthlyDeficitOrSurplus = totalPensionMonthly - estimatedExpenseMonthly;
+  // Lebenskosten: die, mit denen der Server gerechnet hat
+  const expenseMonthly = (projection?.retirement_spending ?? 0) / 12;
+  const monthlyDeficitOrSurplus = totalPensionMonthly - expenseMonthly;
   const isSurplus = monthlyDeficitOrSurplus >= 0;
+  const depletionAge = projection?.depletion_age ?? null;
+  const successPct = Math.round((projection?.success_rate ?? 0) * 100);
 
   // Chart data: net worth over time
   const netWorthData = projection?.years?.map((yr: number, i: number) => ({
@@ -102,13 +117,19 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
   // Chart data: pension income breakdown (per year, post retirement only)
   const pensionBarData = projection?.years
     ?.slice(retirementIdx, retirementIdx + 20)
-    ?.map((yr: number, i: number) => ({
-      year: yr,
-      ahv:  Math.round((projection.pension_ahv?.[retirementIdx + i] ?? 0) / 12),
-      bvg:  Math.round((projection.pension_bvg?.[retirementIdx + i] ?? 0) / 12),
-      "3a": Math.round((projection.pension_3a?.[retirementIdx + i] ?? 0) / 12),
-      "3b": Math.round((projection.pension_3b?.[retirementIdx + i] ?? 0) / 12),
-    })) ?? [];
+    ?.map((yr: number, i: number) => {
+      const idx = retirementIdx + i;
+      // Vor dem Bezugsbeginn ist es Kapital, keine Rente
+      const monthly = (pillar: "1" | "2" | "3a" | "3b", series?: number[]) =>
+        paying(pillar, idx) ? Math.round((series?.[idx] ?? 0) / 12) : 0;
+      return {
+        year: yr,
+        ahv:  monthly("1", projection.pension_ahv),
+        bvg:  monthly("2", projection.pension_bvg),
+        "3a": monthly("3a", projection.pension_3a),
+        "3b": monthly("3b", projection.pension_3b),
+      };
+    }) ?? [];
 
   return (
     <div className="space-y-6">
@@ -118,7 +139,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
           <Calendar className="w-4 h-4 text-accent" />
           Rentenparameter
         </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
             <label className="text-text-tertiary text-xs mb-1 block">Rentenalter</label>
             <div className="flex gap-1 flex-wrap">
@@ -165,6 +186,21 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
               <span>12% (aggressiv)</span>
             </div>
           </div>
+          <div>
+            <label className="text-text-tertiary text-xs mb-1 block">
+              {t("pages:ui.retirementSpendingLabel")}
+            </label>
+            <input
+              type="number"
+              min={0}
+              step={500}
+              value={spendingMonthly ?? ""}
+              placeholder={expenseMonthly ? String(Math.round(expenseMonthly)) : ""}
+              onChange={(e) => setSpendingMonthly(e.target.value === "" ? null : Math.max(0, Number(e.target.value)))}
+              className="input-field w-full"
+            />
+            <p className="text-[10px] text-text-tertiary mt-0.5">{t("pages:ui.retirementSpendingHint")}</p>
+          </div>
         </div>
       </div>
 
@@ -180,14 +216,14 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
         <KPICard
           label={t("pages:ui.rente_monat")}
           value={formatCHF(totalPensionMonthly)}
-          sub="AHV + BVG + 3a + 3b"
+          sub={t("pages:ui.pensionFromAge", { age: currentAge + fullIdx })}
           icon={<Coins className="w-4 h-4" style={{ color: PILLAR_COLORS.bvg }} />}
           valueColor={PILLAR_COLORS.bvg}
         />
         <KPICard
           label={isSurplus ? "Überschuss/Monat" : "Lücke/Monat"}
           value={formatCHF(Math.abs(monthlyDeficitOrSurplus))}
-          sub={isSurplus ? "nach Ausgaben" : "Deckungslücke"}
+          sub={t("pages:ui.afterSpending", { amount: formatCHF(expenseMonthly) })}
           icon={
             isSurplus
               ? <ShieldCheck className="w-4 h-4 text-gain" />
@@ -196,11 +232,15 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
           valueColor={isSurplus ? "#10b981" : "#f87171"}
         />
         <KPICard
-          label={t("pages:misc.r01")}
-          value={`${Math.round((ahvMonthly / (totalPensionMonthly || 1)) * 100)}% AHV`}
-          sub={`${Math.round((bvgMonthly / (totalPensionMonthly || 1)) * 100)}% BVG · ${Math.round((pillar3aMonthly / (totalPensionMonthly || 1)) * 100)}% 3a · ${Math.round((pillar3bMonthly / (totalPensionMonthly || 1)) * 100)}% 3b`}
-          icon={<ShieldCheck className="w-4 h-4" style={{ color: PILLAR_COLORS.ahv }} />}
-          valueColor={PILLAR_COLORS.ahv}
+          label={t("pages:ui.wealthLasts")}
+          value={depletionAge != null ? t("pages:ui.untilAge", { age: depletionAge }) : t("pages:ui.untilEnd", { age: currentAge + lastIdx })}
+          sub={t("pages:ui.successRate", { pct: successPct })}
+          icon={
+            depletionAge == null
+              ? <ShieldCheck className="w-4 h-4 text-gain" />
+              : <WarningTriangle className="w-4 h-4 text-loss" />
+          }
+          valueColor={depletionAge == null ? "#10b981" : "#f87171"}
         />
       </div>
 
@@ -225,7 +265,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
               <Bar dataKey="3a" name="Säule 3a" stackId="a" fill={PILLAR_COLORS["3a"]} />
               <Bar dataKey="3b" name="Säule 3b" stackId="a" fill={PILLAR_COLORS["3b"]} radius={[4, 4, 0, 0]} />
               <ReferenceLine
-                y={estimatedExpenseMonthly}
+                y={Math.round(expenseMonthly)}
                 stroke="#f87171"
                 strokeDasharray="4 3"
                 label={{ value: "Ausgaben", position: "right", fill: "#f87171", fontSize: 10 }}
