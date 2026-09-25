@@ -54,6 +54,10 @@ services:
       SMTP_FROM: ${SMTP_FROM:-}
       # Links in Mails — fest, nie aus dem Host-Header
       APP_BASE_URL: https://budgetpal.doebele12.de
+      # Passkeys sind fest an die Domain gebunden. Ohne diese Werte gilt
+      # "localhost", und der Browser lehnt jeden Passkey ab.
+      WEBAUTHN_RP_ID: budgetpal.doebele12.de
+      WEBAUTHN_ORIGINS_RAW: https://budgetpal.doebele12.de
       UPLOADS_DIR: /app/data/uploads
       RATES_CACHE_PATH: /app/data/cache/rates.json
       # Fest: "production" sperrt KI-Endpunkte auf interne Adressen

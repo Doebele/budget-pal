@@ -26,13 +26,13 @@ from app.core.security import (
     verify_password,
 )
 from app.core.config import settings
-from app.models.models import User
+from app.models.models import User, WebAuthnCredential
 from app.services import mailer
 from app.services.currency_service import REFERENCE_CURRENCIES
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import AfterValidator, BaseModel, EmailStr, Field, field_validator
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Unterstützte UI-Sprachen — bei neuen Sprachen hier und im Frontend (i18n) ergänzen
@@ -238,6 +238,14 @@ _MAILS = {
             "Warst du das nicht, setze das Passwort sofort über „Passwort vergessen?“ zurück:\n"
             "{link}"
         ),
+        "passkey_subject": "Budget-Pal: neuer Passkey hinzugefügt",
+        "passkey_text": (
+            "Hallo {name}\n\n"
+            "Deinem Budget-Pal-Konto wurde eben ein neuer Passkey hinzugefügt. "
+            "Mit ihm kann man sich ohne Passwort anmelden.\n\n"
+            "Warst du das nicht, entferne ihn unter Einstellungen → Sicherheit und "
+            "ändere dein Passwort:\n{link}"
+        ),
     },
     "en": {
         "reset_subject": "Budget-Pal: reset your password",
@@ -255,6 +263,14 @@ _MAILS = {
             "All other devices have been signed out.\n\n"
             "If this wasn't you, reset your password right away via “Forgot password?”:\n"
             "{link}"
+        ),
+        "passkey_subject": "Budget-Pal: new passkey added",
+        "passkey_text": (
+            "Hello {name}\n\n"
+            "A new passkey was just added to your Budget-Pal account. "
+            "It can be used to sign in without a password.\n\n"
+            "If this wasn't you, remove it under Settings → Security and "
+            "change your password:\n{link}"
         ),
     },
 }
@@ -353,6 +369,10 @@ async def reset_password(
         )
 
     _set_password(user, payload.new_password)
+    # "Passwort vergessen" ist der Weg zur Kontorettung: ein Passkey, den ein
+    # Eindringling angelegt hat, muss dabei mit raus. Eigene Passkeys legt der
+    # Nutzer danach neu an.
+    await db.execute(delete(WebAuthnCredential).where(WebAuthnCredential.user_id == user.id))
     await db.commit()
     background.add_task(
         mailer.send_mail, user.email, *_mail_text(user, "changed", _app_url("/forgot-password"))

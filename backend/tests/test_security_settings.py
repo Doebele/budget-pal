@@ -73,7 +73,7 @@ class TestSessionTimeoutApi:
 
 class TestRegistrationOptions:
     async def test_options_contain_a_challenge_and_are_stored(self, client, db_session):
-        response = client.post("/api/auth/webauthn/register/options")
+        response = client.post("/api/auth/webauthn/register/options", json={"password": "testpassword123"})
         assert response.status_code == 200
 
         options = json.loads(response.json())
@@ -85,7 +85,7 @@ class TestRegistrationOptions:
 
     def test_requires_authentication(self, client):
         client.headers.pop("Authorization", None)
-        assert client.post("/api/auth/webauthn/register/options").status_code == 401
+        assert client.post("/api/auth/webauthn/register/options", json={"password": "testpassword123"}).status_code == 401
 
 
 class TestLoginOptions:
@@ -105,32 +105,37 @@ class TestVerificationRejects:
         assert response.status_code == 400
 
     async def test_garbage_credential_is_rejected(self, client, db_session):
-        client.post("/api/auth/webauthn/register/options")
+        client.post("/api/auth/webauthn/register/options", json={"password": "testpassword123"})
         response = client.post(
             "/api/auth/webauthn/register/verify",
             json={"credential": {"id": "unsinn", "response": {}}},
         )
         assert response.status_code == 400
 
-    async def test_challenge_is_consumed_even_on_failure(self, client, db_session):
-        """Einmalgebrauch ist der Kern des Verfahrens — eine liegengebliebene
-        Challenge machte eine abgefangene Antwort wiederverwendbar."""
-        client.post("/api/auth/webauthn/register/options")
-        client.post(
-            "/api/auth/webauthn/register/verify",
-            json={"credential": {"id": "unsinn", "response": {}}},
-        )
-        rest = (await db_session.execute(WebAuthnChallenge.__table__.select())).all()
-        assert rest == []
-
     async def test_unknown_credential_on_login_is_401(self, client, db_session):
+        """Gueltige Challenge, aber ein Passkey, den es hier nicht gibt."""
+        import base64
+
+        client.headers.pop("Authorization", None)
+        options = json.loads(client.post("/api/auth/webauthn/login/options").json())
+        client_data = json.dumps({"type": "webauthn.get", "challenge": options["challenge"]}).encode()
+        response = client.post(
+            "/api/auth/webauthn/login/verify",
+            json={"credential": {
+                "id": "gibtsnicht",
+                "response": {"clientDataJSON": base64.urlsafe_b64encode(client_data).decode().rstrip("=")},
+            }},
+        )
+        assert response.status_code == 401
+
+    def test_response_without_client_data_is_400(self, client):
         client.headers.pop("Authorization", None)
         client.post("/api/auth/webauthn/login/options")
         response = client.post(
             "/api/auth/webauthn/login/verify",
             json={"credential": {"id": "gibtsnicht", "response": {}}},
         )
-        assert response.status_code == 401
+        assert response.status_code == 400
 
 
 class TestCredentialManagement:

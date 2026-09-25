@@ -410,7 +410,9 @@ export type SessionTimeout = (typeof SESSION_TIMEOUTS)[number];
 export const passkeysApi = {
   // Die Options-Endpunkte liefern JSON als String, so wie die WebAuthn-Spec
   // es erwartet — er geht unveraendert an den Browser weiter.
-  registerOptions: () => api.post<string>("/auth/webauthn/register/options"),
+  /** Verlangt das aktuelle Passwort — ein Passkey ist ein zweiter Schluessel zum Konto. */
+  registerOptions: (password: string) =>
+    api.post<string>("/auth/webauthn/register/options", { password }),
   registerVerify: (credential: unknown, deviceName?: string) =>
     api.post<PasskeyCredential>("/auth/webauthn/register/verify", {
       credential,

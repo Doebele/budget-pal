@@ -64,7 +64,7 @@
     "sessionDuration": "Session duration",
     "sessionDurationHint": "How long a sign-in stays valid — applies from the next sign-in; an already issued token keeps its expiry.",
     "passkeys": "Passkeys",
-    "passkeysHint": "Face ID, Touch ID, Windows Hello or a security key — sign in without a password.",
+    "passkeysHint": "Face ID, Touch ID, Windows Hello or a security key — sign in without a password. Adding one needs your current password; you will get an info email.",
     "devicePlaceholder": "Device name, e.g. MacBook Pro",
     "register": "Register",
     "registering": "Waiting for device…",
