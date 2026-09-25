@@ -13,8 +13,6 @@ from typing import Dict, Optional, FrozenSet
 import aiofiles
 import httpx
 
-from app.core.database import AsyncSessionLocal as async_session_maker
-from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
 
@@ -127,7 +125,6 @@ class CurrencyService:
             # Try to fetch from API
             rates = await self._fetch_from_api()
             await self._persist_rates(rates)
-            await self._update_database(rates, "api")
             logger.info(f"[CurrencyService] ✅ Loaded {len(rates)} rates from API")
             return rates
 
@@ -143,7 +140,6 @@ class CurrencyService:
             # Use fallback rates
             logger.info("[CurrencyService] ⚠️ Using fallback rates")
             await self._persist_rates(FALLBACK_RATES)
-            await self._update_database(FALLBACK_RATES, "fallback")
             return FALLBACK_RATES.copy()
 
     async def _fetch_from_api(self) -> Dict[str, float]:
@@ -215,61 +211,6 @@ class CurrencyService:
             k: float(v) for k, v in payload.items()
             if not str(k).startswith("_") and isinstance(v, (int, float))
         }
-
-    async def _update_database(
-        self, rates: Dict[str, float], source: str
-    ) -> None:
-        """Update exchange rates in SQLite database."""
-        try:
-            async with async_session_maker() as session:
-                # Create table if not exists
-                await session.execute(
-                    text("""
-                        CREATE TABLE IF NOT EXISTS exchange_rates (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                            currency TEXT NOT NULL,
-                            rate REAL NOT NULL,
-                            source TEXT CHECK(source IN ('api', 'fallback')) DEFAULT 'api',
-                            UNIQUE(timestamp, currency)
-                        )
-                    """)
-                )
-
-                # Create index
-                await session.execute(
-                    text("""
-                        CREATE INDEX IF NOT EXISTS idx_exchange_rates_currency_timestamp 
-                        ON exchange_rates(currency, timestamp DESC)
-                    """)
-                )
-
-                # Insert/update rates
-                timestamp = datetime.utcnow().isoformat()
-                for currency, rate in rates.items():
-                    if not currency.startswith("_") and isinstance(rate, (int, float)):
-                        await session.execute(
-                            text("""
-                                INSERT INTO exchange_rates (timestamp, currency, rate, source)
-                                VALUES (:timestamp, :currency, :rate, :source)
-                                ON CONFLICT(timestamp, currency) DO UPDATE SET
-                                    rate = excluded.rate,
-                                    source = excluded.source
-                            """),
-                            {
-                                "timestamp": timestamp,
-                                "currency": currency,
-                                "rate": rate,
-                                "source": source,
-                            },
-                        )
-
-                await session.commit()
-                logger.info(f"[CurrencyService] 📊 Database updated ({source})")
-
-        except Exception as e:
-            logger.error(f"[CurrencyService] Failed to update database: {e}")
-            # Non-fatal: JSON cache is primary storage
 
     async def get_rates(self, base_currency: str = "EUR") -> Dict[str, float]:
         """
