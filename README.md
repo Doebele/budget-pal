@@ -226,7 +226,9 @@ Sprache, Session-Dauer und aktiven KI-Anbieter ersetzt. Ungültige Werte in der 
 
 ### Authentifizierung
 - Multi-User mit JWT (python-jose, bcrypt)
-- Registrierung und Login, Passkeys (WebAuthn)
+- Registrierung und Login, Passkeys (WebAuthn). Einen Passkey hinzufügen verlangt das aktuelle
+  Passwort und löst eine Info-Mail aus; „Passwort vergessen“ entfernt alle Passkeys des Kontos.
+  Produktiv sind Domain und Adresse fest gesetzt (`WEBAUTHN_RP_ID`, `WEBAUTHN_ORIGINS_RAW`)
 - Session-Dauer pro Nutzer einstellbar
 - **Passwort ändern** unter *Einstellungen → Sicherheit*; alle anderen Geräte werden dabei
   abgemeldet, die eigene Sitzung bleibt

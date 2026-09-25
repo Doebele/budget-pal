@@ -177,6 +177,15 @@ Reset links store only the SHA-256 of the token and are built from
 `settings.app_base_url`, never from the request's Host header. Mail goes out
 through `services/mailer.py` (plain SMTP); without `SMTP_HOST` it only logs.
 
+Passkeys (`api/webauthn.py`): the challenge is looked up from the response's
+`clientDataJSON`, never "the newest open one" — otherwise concurrent logins
+collide and spamming the open options route blocks everyone. Adding a passkey
+needs the current password (a stolen session must not plant a lasting key);
+a password *reset* deletes all passkeys. User verification is required. The
+RP ID and origin are fixed per deployment (`WEBAUTHN_*` in
+`docker-compose.prod.yml`); the default `localhost` makes every browser refuse.
+`tests/test_passkey_ceremony.py` runs real ceremonies with a software authenticator.
+
 ### Test environment caveats
 Tests run against **in-memory SQLite**, which ignores `VARCHAR(n)` limits. A string
 that is too long for a column passes every test and then fails on PostgreSQL with

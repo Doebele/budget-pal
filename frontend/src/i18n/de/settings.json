@@ -64,7 +64,7 @@
     "sessionDuration": "Session-Dauer",
     "sessionDurationHint": "Wie lange die Anmeldung aktiv bleibt — wirksam ab der nächsten Anmeldung, ein bereits ausgestelltes Token behält seine Frist.",
     "passkeys": "Passkeys",
-    "passkeysHint": "Face ID, Touch ID, Windows Hello oder Sicherheitsschlüssel — Anmeldung ohne Passwort.",
+    "passkeysHint": "Face ID, Touch ID, Windows Hello oder Sicherheitsschlüssel — Anmeldung ohne Passwort. Zum Hinzufügen braucht es dein aktuelles Passwort; du bekommst dazu eine Info-Mail.",
     "devicePlaceholder": "Gerätename, z. B. MacBook Pro",
     "register": "Registrieren",
     "registering": "Warte auf Gerät …",

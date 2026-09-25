@@ -1792,6 +1792,7 @@ function SecuritySection() {
   const { t } = useTranslation("settings");
   const queryClient = useQueryClient();
   const [deviceName, setDeviceName] = useState("");
+  const [passkeyPassword, setPasskeyPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const { data: profile } = useQuery({
@@ -1812,22 +1813,32 @@ function SecuritySection() {
   const registerPasskey = useMutation({
     mutationFn: async () => {
       setError(null);
-      const options = JSON.parse((await passkeysApi.registerOptions()).data);
+      // Ein 400 hier heisst "Passwort falsch"; beim Verify hiesse es etwas anderes
+      const optionsJson = await passkeysApi.registerOptions(passkeyPassword).catch((e) => {
+        throw Object.assign(e, { step: "password" });
+      });
+      const options = JSON.parse(optionsJson.data);
       // Der Browser fuehrt die Ceremony (Face ID, Touch ID, Windows Hello)
       const credential = await startRegistration({ optionsJSON: options });
       return (await passkeysApi.registerVerify(credential, deviceName)).data;
     },
     onSuccess: () => {
       setDeviceName("");
+      setPasskeyPassword("");
       queryClient.invalidateQueries({ queryKey: ["passkeys"] });
     },
     onError: (e: unknown) => {
       // Abbruch durch den Nutzer ist kein Fehler, den man anschreien muss
       const name = (e as { name?: string })?.name;
+      const status = (e as { response?: { status?: number } })?.response?.status;
       setError(
         name === "NotAllowedError"
           ? t("security.passkeyCancelled")
-          : t("security.passkeyFailed"),
+          : status === 400 && (e as { step?: string })?.step === "password"
+            ? t("security.passwordWrong")
+            : status === 429
+              ? t("security.passwordTooMany")
+              : t("security.passkeyFailed"),
       );
     },
   });
@@ -1875,18 +1886,27 @@ function SecuritySection() {
             <p className="text-text-tertiary text-xs">{t("security.passkeyUnsupported")}</p>
           ) : (
             <>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <input
-                  className="input flex-1"
+                  className="input flex-1 min-w-[10rem]"
                   value={deviceName}
                   onChange={(e) => setDeviceName(e.target.value)}
                   placeholder={t("security.devicePlaceholder")}
                   maxLength={120}
                 />
+                <input
+                  type="password"
+                  className="input flex-1 min-w-[10rem]"
+                  value={passkeyPassword}
+                  onChange={(e) => setPasskeyPassword(e.target.value)}
+                  placeholder={t("security.passwordCurrent")}
+                  aria-label={t("security.passwordCurrent")}
+                  autoComplete="current-password"
+                />
                 <button
                   type="button"
                   className="btn btn-primary shrink-0"
-                  disabled={registerPasskey.isPending}
+                  disabled={registerPasskey.isPending || !passkeyPassword}
                   onClick={() => registerPasskey.mutate()}
                 >
                   <Plus className="w-3.5 h-3.5" />

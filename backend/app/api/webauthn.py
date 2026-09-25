@@ -4,7 +4,7 @@ oder Sicherheitsschluessel.
 
 Vier Ceremonies, jeweils zweistufig (Optionen holen, Antwort verifizieren):
 
-  POST /auth/webauthn/register/options   angemeldet  → Registrierung starten
+  POST /auth/webauthn/register/options   angemeldet + Passwort → Registrierung starten
   POST /auth/webauthn/register/verify    angemeldet  → Passkey speichern
   POST /auth/webauthn/login/options      offen       → Anmeldung starten
   POST /auth/webauthn/login/verify       offen       → Token ausstellen
@@ -17,6 +17,12 @@ Zwei Dinge, die hier anders sind als in einem Ein-Prozess-Backend:
 - Die Challenge liegt in der Datenbank, nicht im Arbeitsspeicher. Das Backend
   laeuft mit mehreren Workern; die Verifikation trifft nicht zwingend den
   Prozess, der die Challenge ausgestellt hat.
+- Die Challenge wird ueber die Antwort gefunden (clientDataJSON), nicht als
+  "juengste offene". Sonst stoeren sich gleichzeitige Anmeldungen, und wer die
+  offene Options-Route oft genug aufruft, blockiert jede Passkey-Anmeldung.
+- Einen Passkey hinzufuegen verlangt das aktuelle Passwort. Sonst legte jemand
+  mit einer gestohlenen Sitzung einen eigenen Passkey an und bliebe auch nach
+  einem Passwortwechsel drin.
 - rp_id und origin kommen aus der Konfiguration. WebAuthn bindet einen Passkey
   fest an die Domain — passt der Wert nicht zur aufgerufenen Adresse, lehnt der
   Browser die Ceremony ab, noch bevor das Backend etwas sieht.
@@ -24,12 +30,13 @@ Zwei Dinge, die hier anders sind als in einem Ein-Prozess-Backend:
 from __future__ import annotations
 
 import base64
+import json
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
+from pydantic import BaseModel, Field
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from webauthn import (
@@ -46,16 +53,29 @@ from webauthn.helpers.structs import (
     UserVerificationRequirement,
 )
 
+from app.api.auth import _app_url, _limit, _mail_text
 from app.core.config import settings
 from app.core.database import get_db
-from app.core.security import create_access_token, get_current_user, session_timeout_delta
+from app.core.rate_limit import SlidingWindowRateLimiter
+from app.core.security import (
+    create_access_token,
+    get_current_user,
+    session_timeout_delta,
+    verify_password,
+)
 from app.models.models import User, WebAuthnChallenge, WebAuthnCredential
+from app.services import mailer
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Eine Ceremony ist eine Interaktion, keine Sitzung — kurz halten.
 CHALLENGE_TTL = timedelta(minutes=5)
+
+# Die Anmeldung ist offen und legt je Aufruf eine Challenge in der DB an
+login_limiter = SlidingWindowRateLimiter(max_requests=30, window_seconds=60)
+# Passwortpruefung beim Hinzufuegen: gegen Durchprobieren mit fremder Sitzung
+register_limiter = SlidingWindowRateLimiter(max_requests=5, window_seconds=300)
 
 
 def _b64(raw: bytes) -> str:
@@ -85,43 +105,59 @@ async def _store_challenge(
     await db.commit()
 
 
-async def _take_challenge(db: AsyncSession, purpose: str, user_id: Optional[int]) -> bytes:
-    """Juengste gueltige Challenge holen UND verbrauchen.
+async def _take_challenge(
+    db: AsyncSession, purpose: str, user_id: Optional[int], credential: dict
+) -> bytes:
+    """Die Challenge dieser Antwort holen UND verbrauchen.
 
+    Welche Challenge gemeint ist, steht in der Antwort selbst (clientDataJSON).
+    Die Signatur prueft spaeter, dass sie nicht vertauscht wurde.
     Einmalgebrauch ist der Kern des Verfahrens — bliebe sie liegen, waere eine
     abgefangene Antwort wiederverwendbar.
     """
+    invalid = HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Keine gültige Challenge — bitte erneut versuchen.",
+    )
+    try:
+        client_data = json.loads(_unb64(credential["response"]["clientDataJSON"]))
+        challenge_b64 = str(client_data["challenge"])
+    except (KeyError, TypeError, ValueError):
+        raise invalid
+
     filters = [
+        WebAuthnChallenge.challenge == challenge_b64,
         WebAuthnChallenge.purpose == purpose,
         WebAuthnChallenge.expires_at >= datetime.now(timezone.utc),
     ]
     if user_id is not None:
         filters.append(WebAuthnChallenge.user_id == user_id)
 
-    result = await db.execute(
-        select(WebAuthnChallenge)
-        .where(*filters)
-        .order_by(WebAuthnChallenge.id.desc())
-        .limit(1)
-    )
-    row = result.scalar_one_or_none()
+    row = (await db.execute(select(WebAuthnChallenge).where(*filters))).scalar_one_or_none()
     if row is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Keine gültige Challenge — bitte erneut versuchen.",
-        )
+        raise invalid
     challenge = _unb64(row.challenge)
     await db.delete(row)
     await db.commit()
     return challenge
 
 
+def _client_ip(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
+
+
 # ── Schemas ───────────────────────────────────────────────────
+
+
+class RegisterOptionsRequest(BaseModel):
+    # Aktuelles Passwort: ein Passkey ist ein zweiter Schluessel zum Konto
+    password: str
 
 
 class RegisterVerifyRequest(BaseModel):
     credential: dict
-    device_name: Optional[str] = None
+    # Spalte ist VARCHAR(120); SQLite in den Tests wuerde Laengeres schlucken
+    device_name: Optional[str] = Field(default=None, max_length=120)
 
 
 class LoginVerifyRequest(BaseModel):
@@ -148,10 +184,19 @@ class PasskeyTokenResponse(BaseModel):
 
 @router.post("/register/options")
 async def register_options(
+    payload: RegisterOptionsRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Optionen für einen neuen Passkey des angemeldeten Nutzers."""
+    """Optionen für einen neuen Passkey des angemeldeten Nutzers. Verlangt das
+    aktuelle Passwort; falsches Passwort ist 400, nicht 401 — ein 401 meldet
+    das Frontend ab."""
+    _limit(register_limiter, str(current_user.id))
+    if not verify_password(payload.password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect.",
+        )
     existing = (
         await db.execute(
             select(WebAuthnCredential.credential_id).where(
@@ -173,7 +218,9 @@ async def register_options(
         ],
         authenticator_selection=AuthenticatorSelectionCriteria(
             resident_key=ResidentKeyRequirement.PREFERRED,
-            user_verification=UserVerificationRequirement.PREFERRED,
+            # Der Passkey ersetzt das Passwort: Besitz allein (Schluessel ohne
+            # PIN) darf nicht reichen. Touch ID / Face ID pruefen ohnehin.
+            user_verification=UserVerificationRequirement.REQUIRED,
         ),
     )
     await _store_challenge(db, options.challenge, "register", current_user.id)
@@ -183,11 +230,12 @@ async def register_options(
 @router.post("/register/verify", response_model=CredentialResponse, status_code=201)
 async def register_verify(
     payload: RegisterVerifyRequest,
+    background: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Antwort des Authenticators pruefen und den Passkey speichern."""
-    challenge = await _take_challenge(db, "register", current_user.id)
+    challenge = await _take_challenge(db, "register", current_user.id, payload.credential)
 
     try:
         verified = verify_registration_response(
@@ -195,6 +243,7 @@ async def register_verify(
             expected_challenge=challenge,
             expected_rp_id=settings.webauthn_rp_id,
             expected_origin=settings.webauthn_origins,
+            require_user_verification=True,
         )
     except Exception as e:
         logger.warning("Passkey-Registrierung abgelehnt: %s: %s", type(e).__name__, e)
@@ -213,6 +262,12 @@ async def register_verify(
     db.add(credential)
     await db.commit()
     await db.refresh(credential)
+    # Info an den Kontoinhaber — faellt auf, falls ein Fremder das war
+    background.add_task(
+        mailer.send_mail,
+        current_user.email,
+        *_mail_text(current_user, "passkey", _app_url("/settings")),
+    )
     return CredentialResponse(
         id=credential.id,
         device_name=credential.device_name,
@@ -225,12 +280,13 @@ async def register_verify(
 
 
 @router.post("/login/options")
-async def login_options(db: AsyncSession = Depends(get_db)):
+async def login_options(request: Request, db: AsyncSession = Depends(get_db)):
     """Optionen für die Anmeldung. Bewusst ohne Nutzerbezug — der Authenticator
     waehlt selbst, welcher hinterlegte Passkey passt."""
+    _limit(login_limiter, _client_ip(request))
     options = generate_authentication_options(
         rp_id=settings.webauthn_rp_id,
-        user_verification=UserVerificationRequirement.PREFERRED,
+        user_verification=UserVerificationRequirement.REQUIRED,
     )
     await _store_challenge(db, options.challenge, "login", None)
     return options_to_json(options)
@@ -238,10 +294,11 @@ async def login_options(db: AsyncSession = Depends(get_db)):
 
 @router.post("/login/verify", response_model=PasskeyTokenResponse)
 async def login_verify(
-    payload: LoginVerifyRequest, db: AsyncSession = Depends(get_db)
+    payload: LoginVerifyRequest, request: Request, db: AsyncSession = Depends(get_db)
 ):
     """Antwort pruefen und bei Erfolg ein Token ausstellen."""
-    challenge = await _take_challenge(db, "login", None)
+    _limit(login_limiter, _client_ip(request))
+    challenge = await _take_challenge(db, "login", None, payload.credential)
 
     raw_id = payload.credential.get("id")
     if not raw_id:
@@ -265,6 +322,7 @@ async def login_verify(
             expected_origin=settings.webauthn_origins,
             credential_public_key=_unb64(credential.public_key),
             credential_current_sign_count=credential.sign_count,
+            require_user_verification=True,
         )
     except Exception as e:
         logger.warning("Passkey-Anmeldung abgelehnt: %s: %s", type(e).__name__, e)
