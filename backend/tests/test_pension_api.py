@@ -105,3 +105,31 @@ def test_retirement_spending_comes_from_the_scenario(client):
 def test_explicit_retirement_spending_wins(client):
     data = _run(client, _scenario(client)["id"], retirement_spending=40_000)
     assert data["retirement_spending"] == 40_000
+
+
+def test_capital_tax_uses_the_wizard_canton(client):
+    from app.services.capital_tax import capital_tax
+
+    client.post("/api/pension", json={"pillar": "3a", "current_balance": 100_000, "provider": "VIAC"})
+    data = _run(client, _scenario(client, kanton="SZ", household_type="couple")["id"])
+    w = data["capital_withdrawals"][0]
+    assert w["source"] == "3a" and w["label"] == "VIAC"
+    assert w["tax"] == pytest.approx(capital_tax(w["amount"], "SZ", True))
+
+
+def test_estimate_returns_the_withdrawal_plan(client):
+    res = client.post("/api/pension/estimate", json={
+        "current_age": 50, "retirement_age": 65, "bvg_balance": 400_000,
+        "bvg_capital_share": 0.5, "canton": "BE",
+        "pillar_3a": [{"balance": 60_000, "provider": "A"}, {"balance": 60_000, "provider": "B"}],
+        "inflation_rate": 0.0,
+    })
+    assert res.status_code == 200, res.text
+    data = res.json()
+    assert [(w["source"], w["age"]) for w in data["capital_withdrawals"]] == [
+        ("3a", 63), ("3a", 64), ("bvg", 65),
+    ]
+    assert data["capital_tax"] < data["capital_tax_single_year"]
+    assert data["capital_net"] == pytest.approx(
+        sum(w["amount"] for w in data["capital_withdrawals"]) - data["capital_tax"]
+    )

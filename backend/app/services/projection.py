@@ -17,6 +17,7 @@ from typing import Any, Dict, List, Optional, Sequence
 
 import numpy as np
 from app.core.config import settings
+from app.services.capital_tax import DEFAULT_CANTON, capital_tax
 
 logger = logging.getLogger(__name__)
 
@@ -113,19 +114,45 @@ def bvg_start_age(retirement_age: int) -> int:
     return min(max(retirement_age, BVG_EARLIEST_AGE), BVG_LATEST_AGE)
 
 
-def pillar_3a_start_age(retirement_age: int) -> int:
-    return min(max(retirement_age, PILLAR_3A_EARLIEST_AGE), PILLAR_3A_LATEST_AGE)
-
-
 def payout_start_ages(retirement_age: int) -> Dict[str, int]:
-    """Ab welchem Alter jede Saeule auszahlt. 3b (freie Vorsorge) ist an kein
-    Alter gebunden."""
+    """Ab welchem Alter jede Saeule eine Rente zahlt. 3b (freie Vorsorge) ist an
+    kein Alter gebunden. Die 3a zahlt keine Rente: sie wird als Kapital bezogen
+    (siehe capital_withdrawals)."""
     return {
         "1": ahv_start_age(retirement_age),
         "2": bvg_start_age(retirement_age),
-        "3a": pillar_3a_start_age(retirement_age),
         "3b": retirement_age,
     }
+
+
+def pillar_3a_latest_age(retirement_age: int) -> int:
+    """Spaetester 3a-Bezug: das Referenzalter, bei Weiterarbeit bis 70."""
+    if retirement_age <= AHV_REGULAR_RETIREMENT_AGE:
+        return AHV_REGULAR_RETIREMENT_AGE
+    return min(retirement_age, PILLAR_3A_LATEST_AGE)
+
+
+def plan_3a_ages(
+    count: int, retirement_age: int, current_age: int, avoid: Sequence[int] = ()
+) -> List[int]:
+    """Vorschlag fuer den gestaffelten 3a-Bezug: ein Konto pro Jahr, so spaet wie
+    moeglich (das Guthaben waechst bis dahin steuerfrei), nie im Jahr eines
+    anderen Kapitalbezugs. Mehr Konten als Jahre teilen sich Jahre."""
+    earliest = max(PILLAR_3A_EARLIEST_AGE, current_age)
+    latest = max(pillar_3a_latest_age(retirement_age), earliest)
+    free = [a for a in range(latest, earliest - 1, -1) if a not in set(avoid)] or [latest]
+    return sorted(free[i % len(free)] for i in range(count))
+
+
+def resolve_3a_ages(
+    p3a_records: Sequence[Dict], retirement_age: int, current_age: int,
+    other_capital_ages: Sequence[int] = (),
+) -> List[int]:
+    """Bezugsalter je 3a-Konto: das eigene, sonst aus dem Staffelplan."""
+    fixed = [r.get("withdrawal_age") for r in p3a_records]
+    taken = {a for a in fixed if a} | set(other_capital_ages)
+    auto = iter(plan_3a_ages(sum(1 for a in fixed if not a), retirement_age, current_age, sorted(taken)))
+    return [max(a, current_age) if a else next(auto) for a in fixed]
 
 
 def bvg_conversion_at(rate_at_65: float, start_age: int) -> float:
@@ -178,7 +205,10 @@ def pension_income(
     starts = payout_start_ages(retirement_age)
     length = len(series["1"])
     return [
-        sum(values[i] for pillar, values in series.items() if current_age + i >= starts[pillar])
+        sum(
+            values[i] for pillar, values in series.items()
+            if pillar in starts and current_age + i >= starts[pillar]
+        )
         for i in range(length)
     ]
 
@@ -320,6 +350,16 @@ def _saving_then_payout(
     return _annuity_payout(balance)
 
 
+def _pillar_3a_balance(record: Dict, current_age: int, retirement_age: int, at_age: int) -> float:
+    """3a-Guthaben (nominal) im Alter `at_age`: Beitraege bis zum Rentenalter,
+    danach nur Zins."""
+    years = max(0, at_age - current_age)
+    saving = min(years, max(0, retirement_age - current_age))
+    rate = record.get("expected_return_rate", 0.03)
+    balance = _accumulate(record.get("current_balance", 0.0), record.get("annual_contribution", 0.0), rate, saving)
+    return balance * (1 + rate) ** (years - saving)
+
+
 def _bvg_rate_for_age(age: int) -> float:
     """Return the BVG employee contribution rate for a given age."""
     for (min_age, max_age), rate in BVG_CONTRIBUTION_RATES.items():
@@ -346,6 +386,8 @@ class ProjectionService:
         runs: int = 10_000,
         annual_flows: Optional[Sequence[float]] = None,
         retirement_spending: Optional[float] = None,
+        canton: str = DEFAULT_CANTON,
+        married: bool = False,
     ) -> Dict[str, Any]:
         """
         Run Monte Carlo simulation and pension projections.
@@ -356,6 +398,8 @@ class ProjectionService:
             Lebenskosten (`retirement_spending`, heutige CHF; ohne Angabe
             `default_retirement_spending`), bis 65 zusaetzlich die AHV-Beitraege
             als Nichterwerbstaetige
+          - Kapitalbezuege (Pensionskasse, 3a) nach Steuer im Bezugsjahr
+            (`canton`, `married` fuer die Steuer)
           - dazu die Szenario-Cashflows (`annual_flows`, nominal)
         Das Vermoegen faellt nie unter 0.
 
@@ -382,6 +426,17 @@ class ProjectionService:
         )
         if retirement_spending is None:
             retirement_spending = default_retirement_spending(annual_income, annual_savings)
+
+        # Kapitalbezuege: netto nach Steuer ins freie Vermoegen, real je Jahr
+        withdrawals = self.capital_withdrawals(
+            pension_records or [], current_age, retirement_age, annual_income,
+            inflation_rate, canton, married,
+        )
+        capital_inflow_real = [0.0] * (years + 1)
+        for w in withdrawals:
+            idx = w["age"] - current_age
+            if 0 <= idx < years:
+                capital_inflow_real[idx] += w["amount"] - w["tax"]
 
         # ── Monte Carlo ────────────────────────────────────────
         np.random.seed(None)
@@ -413,6 +468,7 @@ class ProjectionService:
                     # verschieden, weil sie am Vermoegen haengen
                     basis = portfolio / inflation_factor + 20 * income_real[yr]
                     flow = flow - ahv_nonemployed_contribution(basis) * inflation_factor
+            flow = flow + capital_inflow_real[yr] * inflation_factor
             if annual_flows is not None and yr < len(annual_flows):
                 # Szenario-Cashflows sind bereits nominal
                 flow = flow + annual_flows[yr]
@@ -459,6 +515,11 @@ class ProjectionService:
                 for pillar, start in payout_start_ages(retirement_age).items()
             },
             "retirement_spending": retirement_spending,
+            "capital_withdrawals": withdrawals,
+            "capital_tax_total": sum(w["tax"] for w in withdrawals),
+            # Zum Vergleich: alles im selben Jahr bezogen — was die Staffelung spart
+            "capital_tax_single_year": capital_tax(sum(w["amount"] for w in withdrawals), canton, married)
+            if withdrawals else 0.0,
             "depletion_age": depletion_age,
             # Anteil der Laeufe, in denen bis zum Ende des Horizonts Vermoegen bleibt
             "success_rate": float(np.mean(all_values[:, -1] > 0)),
@@ -472,52 +533,113 @@ class ProjectionService:
         retirement_age: int,
         annual_income: float,
         inflation_rate: float,
+        canton: str = DEFAULT_CANTON,
+        married: bool = False,
     ) -> Dict[str, Any]:
-        """Renten und Kapital bei Bezugsbeginn, in heutigen CHF.
+        """Renten bei Bezugsbeginn und Kapitalbezuege, in heutigen CHF.
 
-        Liest dieselben Reihen wie das Rentendiagramm (`_project_pensions`) —
-        Wizard und Finanzplan zeigen damit dieselben Zahlen. Jede Saeule wird
-        bei ihrem eigenen Bezugsbeginn gelesen (AHV ab 63, BVG ab 58, 3a ab 60).
-        Monatsbetraege sind Jahresbetraege / 12; bei der AHV steckt die 13.
-        Rente anteilig darin.
+        Liest dieselben Reihen wie das Rentendiagramm (`_project_pensions`) und
+        denselben Bezugsplan (`capital_withdrawals`) — Wizard und Finanzplan
+        zeigen damit dieselben Zahlen. Monatsbetraege sind Jahresbetraege / 12;
+        bei der AHV steckt die 13. Rente anteilig darin.
         """
         starts = payout_start_ages(retirement_age)
         horizon = max(max(starts.values()) - current_age, 0) + 1
         dob = f"{datetime.now().year - current_age}-01-01"
-        ahv, bvg, p3a, p3b, _ = self._project_pensions(
+        ahv, bvg, _p3a, p3b, _ = self._project_pensions(
             pension_records, horizon, annual_income, dob, retirement_age, inflation_rate
         )
 
         def at(series, pillar):
             return series[max(0, starts[pillar] - current_age)]
 
-        # Kapital bei Bezugsbeginn aus der Auszahlung zurueckgerechnet — die
-        # ist eine feste Funktion davon (Rente bzw. Annuitaet).
-        per_chf = _annuity_payout(1.0)
-
-        bvg_record = next((r for r in pension_records if r["pillar"] == "2"), None)
-        rate_at_65 = (bvg_record or {}).get("conversion_rate") or BVG_CONVERSION_RATE_DEFAULT
+        withdrawals = self.capital_withdrawals(
+            pension_records, current_age, retirement_age, annual_income,
+            inflation_rate, canton, married,
+        )
+        bvg_record = next((r for r in pension_records if r["pillar"] == "2"), None) or {}
+        share = min(max(bvg_record.get("capital_share") or 0.0, 0.0), 1.0)
+        rate_at_65 = bvg_record.get("conversion_rate") or BVG_CONVERSION_RATE_DEFAULT
         conversion_rate = bvg_conversion_at(rate_at_65, starts["2"])
         ahv_monthly = at(ahv, "1") / 12
         bvg_monthly = at(bvg, "2") / 12
-        p3a_monthly = at(p3a, "3a") / 12
         p3b_monthly = at(p3b, "3b") / 12
+        bvg_lump = sum(w["amount"] for w in withdrawals if w["source"] == "bvg")
+        bvg_pension_capital = bvg_monthly * 12 / conversion_rate if conversion_rate else 0.0
+        capital_gross = sum(w["amount"] for w in withdrawals)
+        capital_tax_total = sum(w["tax"] for w in withdrawals)
         return {
             "retirement_age": retirement_age,
             "years_to_retirement": max(0, retirement_age - current_age),
             "ahv_start_age": starts["1"],
             "bvg_start_age": starts["2"],
-            "pillar_3a_start_age": starts["3a"],
             "ahv_monthly": ahv_monthly,
-            "bvg_capital": bvg_monthly * 12 / conversion_rate if conversion_rate else 0.0,
+            "bvg_capital": bvg_pension_capital + bvg_lump,
             "bvg_conversion_rate": conversion_rate,
+            "bvg_capital_share": share,
+            "bvg_lump_sum": bvg_lump,
             "bvg_monthly": bvg_monthly,
-            "pillar_3a_capital": p3a_monthly * 12 / per_chf,
-            "pillar_3a_monthly": p3a_monthly,
-            "pillar_3b_capital": p3b_monthly * 12 / per_chf,
+            "pillar_3a_capital": sum(w["amount"] for w in withdrawals if w["source"] == "3a"),
+            "pillar_3b_capital": p3b_monthly * 12 / _annuity_payout(1.0),
             "pillar_3b_monthly": p3b_monthly,
-            "total_monthly": ahv_monthly + bvg_monthly + p3a_monthly + p3b_monthly,
+            "capital_withdrawals": withdrawals,
+            "capital_tax": capital_tax_total,
+            "capital_tax_single_year": capital_tax(capital_gross, canton, married) if withdrawals else 0.0,
+            "capital_net": capital_gross - capital_tax_total,
+            "total_monthly": ahv_monthly + bvg_monthly + p3b_monthly,
         }
+
+    def capital_withdrawals(
+        self,
+        pension_records: List[Dict],
+        current_age: int,
+        retirement_age: int,
+        annual_income: float,
+        inflation_rate: float,
+        canton: str = DEFAULT_CANTON,
+        married: bool = False,
+    ) -> List[Dict[str, Any]]:
+        """Kapitalbezuege mit Alter, Betrag und Steuer, in heutigen CHF.
+
+        - Pensionskasse: `capital_share` des Guthabens bei Bezugsbeginn
+        - Saeule 3a: jedes Konto einzeln, im eigenen oder im gestaffelten Alter
+        Alle Bezuege desselben Jahres werden fuer die Steuer zusammengezaehlt,
+        die Steuer dann anteilig verteilt.
+        """
+        events: List[Dict[str, Any]] = []
+        bvg = next((r for r in pension_records if r["pillar"] == "2"), None)
+        share = min(max((bvg or {}).get("capital_share") or 0.0, 0.0), 1.0)
+        bvg_age = bvg_start_age(retirement_age)
+        bvg_capital_ages: List[int] = []
+        if bvg and share > 0 and bvg_age >= current_age:
+            saving = max(0, retirement_age - current_age)
+            interest = max(0, bvg_age - current_age) - saving
+            balance, _ = _bvg_capital(bvg, annual_income, current_age, saving, interest)
+            events.append({
+                "source": "bvg", "label": bvg.get("provider") or "Pensionskasse", "age": bvg_age,
+                "amount": balance * share / (1 + inflation_rate) ** (bvg_age - current_age),
+            })
+            bvg_capital_ages.append(bvg_age)
+
+        p3a = [r for r in pension_records if r["pillar"] == "3a"]
+        ages = resolve_3a_ages(p3a, retirement_age, current_age, bvg_capital_ages)
+        for account, (record, age) in enumerate(zip(p3a, ages)):
+            events.append({
+                "source": "3a", "label": record.get("provider") or "Säule 3a", "age": age,
+                "account": account,  # Position unter den 3a-Konten, fuer die Oberflaeche
+                "amount": _pillar_3a_balance(record, current_age, retirement_age, age)
+                / (1 + inflation_rate) ** (age - current_age),
+            })
+
+        per_age: Dict[int, float] = {}
+        for e in events:
+            per_age[e["age"]] = per_age.get(e["age"], 0.0) + e["amount"]
+        tax_per_age = {age: capital_tax(total, canton, married) for age, total in per_age.items()}
+        this_year = datetime.now().year
+        for e in events:
+            e["tax"] = tax_per_age[e["age"]] * e["amount"] / per_age[e["age"]] if per_age[e["age"]] else 0.0
+            e["year"] = this_year + e["age"] - current_age
+        return sorted(events, key=lambda e: (e["age"], e["source"]))
 
     def _project_pensions(
         self,
@@ -535,8 +657,9 @@ class ProjectionService:
         in real CHF. Before retirement: projected balance. After: annual income.
 
         Nach dem Rentenalter wird nichts mehr einbezahlt: BVG-Rente und
-        3a/3b-Auszahlung stehen ab da nominal fest (und verlieren real an
-        Wert), die 3a/3b-Auszahlung endet nach PAYOUT_YEARS.
+        3b-Auszahlung stehen ab da nominal fest (und verlieren real an Wert),
+        die 3b-Auszahlung endet nach PAYOUT_YEARS. Die 3a-Reihe zeigt das
+        Guthaben bis zum Bezug, danach 0 — sie wird als Kapital bezogen.
         """
         current_year = datetime.now().year
 
@@ -551,6 +674,19 @@ class ProjectionService:
         bvg_record = next((r for r in pension_records if r["pillar"] == "2"), None)
         p3a_records = [r for r in pension_records if r["pillar"] == "3a"]
         p3b_records = [r for r in pension_records if r["pillar"] == "3b"]
+        # Bezugsalter je 3a-Konto festlegen (eigenes oder gestaffelt), damit
+        # Reihe und Kapitalbezug dasselbe Alter verwenden
+        bvg_capital_ages = (
+            [bvg_start_age(retirement_age)]
+            if bvg_record and (bvg_record.get("capital_share") or 0) > 0 else []
+        )
+        p3a_records = [
+            {**r, "withdrawal_age": age}
+            for r, age in zip(
+                p3a_records,
+                resolve_3a_ages(p3a_records, retirement_age, current_age, bvg_capital_ages),
+            )
+        ]
 
         pension_ahv_series = []
         pension_bvg_series = []
@@ -695,7 +831,9 @@ class ProjectionService:
         if age_at_year < payout_start:
             return balance  # Kapital, solange noch nichts ausbezahlt wird
 
-        return balance * bvg_conversion_at(conversion_rate, payout_start)
+        # Der als Kapital bezogene Teil ist keine Rente (capital_withdrawals)
+        pension_share = 1 - min(max((record or {}).get("capital_share") or 0.0, 0.0), 1.0)
+        return balance * bvg_conversion_at(conversion_rate, payout_start) * pension_share
 
     def _project_3a(
         self,
@@ -705,14 +843,14 @@ class ProjectionService:
         years_elapsed: int,
     ) -> float:
         """
-        Project Pillar 3a balance with compound growth (nominal CHF).
-        Before retirement: accumulated balance. After: fixed annual payout over
-        PAYOUT_YEARS, then 0. Einzahlen geht nur bis zum Rentenalter.
+        Saeule-3a-Guthaben (nominal) bis zum Bezug, danach 0: das Konto wird als
+        Kapital bezogen (Steuer und Zufluss ins Vermoegen: capital_withdrawals).
+        Einzahlen geht nur bis zum Rentenalter.
         """
-        return _saving_then_payout(
-            record, age_at_year, retirement_age, years_elapsed, 0.03,
-            pillar_3a_start_age(retirement_age),
-        )
+        withdrawal_age = record.get("withdrawal_age") or pillar_3a_latest_age(retirement_age)
+        if age_at_year >= withdrawal_age:
+            return 0.0
+        return _pillar_3a_balance(record, age_at_year - years_elapsed, retirement_age, age_at_year)
 
     def _project_3b(
         self,

@@ -18,6 +18,7 @@ import { formatAmountRounded } from "@/lib/theme";
 import { useTaxonomy } from "@/lib/categories";
 import { useTranslation } from "react-i18next";
 import ProgressBar from "@/components/ui/ProgressBar";
+import WithdrawalPlan from "@/components/WithdrawalPlan";
 
 // ── Types mirroring backend responses ─────────────────────────
 
@@ -555,8 +556,14 @@ export default function Finanzplan() {
                 pillar === "1" && entries.length > 0 ? Math.round(estimate?.ahv_monthly ?? 0) : null;
               const bvgMonthlyEst =
                 pillar === "2" && entries.length > 0 ? Math.round(estimate?.bvg_monthly ?? 0) : null;
-              const drawdownEst =
-                pillar === "3a" ? estimate?.pillar_3a_monthly : pillar === "3b" ? estimate?.pillar_3b_monthly : undefined;
+              // 3b: Rente ueber 20 Jahre; 3a: Kapital netto nach Steuer laut Bezugsplan
+              const drawdownEst = pillar === "3b" ? estimate?.pillar_3b_monthly : undefined;
+              const p3aNetEst =
+                pillar === "3a" && estimate
+                  ? estimate.capital_withdrawals
+                      .filter((w) => w.source === "3a")
+                      .reduce((sum, w) => sum + w.amount - w.tax, 0)
+                  : undefined;
 
               return (
                 <div key={pillar} className="px-5 py-4">
@@ -623,7 +630,15 @@ export default function Finanzplan() {
                               <span className="font-mono text-xs text-text-secondary">{fmtCHF(totalContrib)}</span>
                             </div>
                           )}
-                          {/* Bezug ab Pensionierung, ueber 20 Jahre verteilt */}
+                          {totalBalance > 0 && p3aNetEst !== undefined && (
+                            <div className="flex justify-between">
+                              <span className="text-text-tertiary text-xs">{t("pages:plan.p3aCard")}</span>
+                              <span className="font-mono text-xs" style={{ color }}>
+                                {fmtCHF(Math.round(p3aNetEst))}
+                              </span>
+                            </div>
+                          )}
+                          {/* 3b: Bezug ab Pensionierung, ueber 20 Jahre verteilt */}
                           {totalBalance > 0 && drawdownEst !== undefined && (
                             <div className="flex justify-between">
                               <span className="text-text-tertiary text-xs">Gesch. Bezug/Mo</span>
@@ -657,6 +672,14 @@ export default function Finanzplan() {
                   rate: (estimate.bvg_conversion_rate * 100).toFixed(1),
                 })}
               </p>
+              {estimate.capital_withdrawals.length > 0 && (
+                <div className="mt-3">
+                  <WithdrawalPlan
+                    withdrawals={estimate.capital_withdrawals}
+                    taxSingleYear={estimate.capital_tax_single_year}
+                  />
+                </div>
+              )}
             </div>
           )}
         </section>

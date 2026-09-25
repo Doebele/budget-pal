@@ -597,6 +597,8 @@ async def import_backup(
                 contribution_years=p_data.get("contribution_years"),
                 average_insured_salary=p_data.get("average_insured_salary"),
                 conversion_rate=p_data.get("conversion_rate"),
+                capital_share=p_data.get("capital_share"),
+                withdrawal_age=p_data.get("withdrawal_age"),
                 notes=p_data.get("notes"),
             ))
             result.pension_created += 1

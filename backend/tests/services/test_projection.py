@@ -498,26 +498,13 @@ class TestPillar3aProjection:
         for val in result["pension_3a"]:
             assert val >= 0.0
 
-    def test_3a_annuitized_after_retirement(self):
-        """Test 3a annuitization after retirement."""
-        balance = self.service._project_3a(
-            age_at_year=66,
-            retirement_age=65,
-            record={
-                "current_balance": 50000.0,
-                "annual_contribution": 7056.0,
-                "expected_return_rate": 0.03,
-            },
-            years_elapsed=0,
-        )
-
-        # Annuitized over PAYOUT_YEARS with residual return during payout:
-        # annual = balance × r / (1 − (1+r)^−years)
-        from app.services.projection import PAYOUT_RESIDUAL_RATE, PAYOUT_YEARS
-
-        r = PAYOUT_RESIDUAL_RATE
-        expected_annual = 50000.0 * r / (1 - (1 + r) ** -PAYOUT_YEARS)
-        assert balance == pytest.approx(expected_annual, rel=1e-6)
+    def test_3a_is_withdrawn_as_capital(self):
+        """Die 3a zahlt keine Rente: bis zum Bezug steht das Guthaben in der
+        Reihe, danach 0 (das Kapital fliesst ins freie Vermoegen)."""
+        record = {"current_balance": 50000.0, "annual_contribution": 0.0,
+                  "expected_return_rate": 0.0, "withdrawal_age": 64}
+        assert self.service._project_3a(63, 65, record, 0) == pytest.approx(50000.0)
+        assert self.service._project_3a(64, 65, record, 0) == 0.0
 
     def test_3a_compound_growth(self):
         """Test 3a compound growth before retirement."""
