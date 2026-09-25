@@ -299,7 +299,8 @@ class TestAHVPension:
             annual_income=95_000.0,
             current_age=66,
         )
-        assert pension == pytest.approx(2520.0 * 12)
+        # 12 Monatsrenten + 13. AHV-Rente
+        assert pension == pytest.approx(2520.0 * 13)
 
     def test_salary_moves_the_pension(self):
         """`average_insured_salary` wurde vorher zugewiesen und nie gelesen:
@@ -313,7 +314,7 @@ class TestAHVPension:
 
         assert at(40_000.0) < at(70_000.0) < at(95_000.0)
         # Minimalrente als Untergrenze bei vollen Beitragsjahren
-        assert at(0.0) == pytest.approx(1260.0 * 12)
+        assert at(0.0) == pytest.approx(1260.0 * 13)
 
     def test_missing_years_cost_one_forty_fourth_each(self):
         """Rentenskala: je fehlendem Beitragsjahr 1/44 weniger. Vorher
@@ -373,7 +374,7 @@ class TestAHVPension:
         )
 
         # Should not exceed max pension
-        assert pension_series <= 2520.0 * 12
+        assert pension_series <= 2520.0 * 13
 
 
 # ── BVG Pension Tests ─────────────────────────────────────────
@@ -995,26 +996,37 @@ class TestRunWithAnnualFlows:
 
 
 class TestAhvEarlyWithdrawal:
-    """Vorbezug kuerzt die AHV lebenslang um 6.8 % je Jahr. Ohne diesen Abzug
-    sieht das Szenario "Fruehpensionierung" wie ein Gratisgewinn aus."""
+    """Vorbezug kuerzt die AHV lebenslang um 6.8 % je Jahr — frueher als 63
+    geht nicht. Ohne diese Regeln sieht die Fruehpensionierung wie ein
+    Gratisgewinn aus."""
 
-    def _ahv_at(self, retirement_age: int) -> float:
+    def _ahv(self, retirement_age: int, age: int) -> float:
         service = ProjectionService()
         return service._project_ahv(
-            age_at_year=retirement_age,
+            age_at_year=age,
             retirement_age=retirement_age,
-            record={"contribution_years": 40, "average_insured_salary": 85_000},
+            record={"contribution_years": 44, "average_insured_salary": 85_000},
             annual_income=85_000,
-            current_age=retirement_age,
+            current_age=age,
         )
 
     def test_early_withdrawal_reduces_the_pension(self):
-        assert self._ahv_at(62) < self._ahv_at(65)
+        assert self._ahv(63, 63) < self._ahv(65, 65)
 
     def test_reduction_is_68_percent_per_year(self):
-        full, early = self._ahv_at(65), self._ahv_at(62)
-        assert early == pytest.approx(full * (1 - 0.068 * 3), rel=1e-6)
+        full, early = self._ahv(65, 65), self._ahv(63, 63)
+        assert early == pytest.approx(full * (1 - 0.068 * 2), rel=1e-6)
+
+    def test_no_ahv_before_63_even_when_retiring_earlier(self):
+        """Wer mit 62 aufhoert, bekommt die AHV erst mit 63 — mit zwei Jahren
+        Vorbezug, nicht mit drei."""
+        assert self._ahv(62, 62) == 0.0
+        assert self._ahv(62, 63) == pytest.approx(self._ahv(63, 63))
+
+    def test_deferral_adds_a_supplement(self):
+        """Aufschub um zwei Jahre: +10.8 % lebenslang."""
+        full = self._ahv(65, 65)
+        assert self._ahv(67, 67) == pytest.approx(full * 1.108, rel=1e-6)
 
     def test_regular_age_is_unreduced(self):
-        service = ProjectionService()
-        assert self._ahv_at(65) > 0
+        assert self._ahv(65, 65) > 0

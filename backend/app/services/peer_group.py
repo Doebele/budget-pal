@@ -261,7 +261,7 @@ def get_peer_group_defaults(profile: PeerGroupProfile) -> Dict[str, Any]:
     tax_rates: Dict[IncomeLevel, float] = {"low": 0.08, "medium": 0.14, "high": 0.22}
     direct_taxes = round50(income_median * 1.25 * tax_rates[profile.income_level] * cm * (hm ** 0.4))
 
-    pillar3a_annual_max = 35_280 if profile.employment_status == "self-employed" else 7_056
+    pillar3a_annual_max = 36_288 if profile.employment_status == "self-employed" else 7_258
     if profile.income_level == "high":
         pillar3a_usage_rate = 0.95
     elif profile.income_level == "medium":

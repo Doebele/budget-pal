@@ -13,7 +13,7 @@ import clsx from "clsx";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, Bank, Building, Coins, GraphUp, MagicWand, PiggyBank, Refresh, Reports, ShieldCheck, WarningCircle, WarningTriangle } from "@/lib/icons";
-import { api } from "@/lib/api";
+import { api, pensionApi } from "@/lib/api";
 import { formatAmountRounded } from "@/lib/theme";
 import { useTaxonomy } from "@/lib/categories";
 import { useTranslation } from "react-i18next";
@@ -154,6 +154,15 @@ export default function Finanzplan() {
     queryKey: ["finanzplan-pension"],
     queryFn: () => api.get("/pension").then((r) => r.data),
     staleTime: 60_000,
+  });
+
+  // Renten bei der Pensionierung — dieselbe Rechnung wie Wizard und
+  // Rentendiagramm. Die Vorsorgeliste im Schluessel: aendert sie sich, wird neu
+  // geschaetzt.
+  const { data: estimate } = useQuery({
+    queryKey: ["pension-estimate-stored", pension],
+    queryFn: async () => (await pensionApi.estimateStored()).data,
+    enabled: pension.length > 0,
   });
 
   const { data: assets = [], isLoading: assetsLoading } = useQuery<AssetItem[]>({
@@ -541,22 +550,13 @@ export default function Finanzplan() {
               const totalContrib = entries.reduce((s, p) => s + p.annual_contribution, 0);
               const color = PILLAR_COLOR[pillar];
 
-              // ── Säule 1: compute estimated monthly AHV pension ──
-              let ahvMonthlyEst: number | null = null;
-              if (pillar === "1" && entries.length > 0) {
-                const e = entries[0];
-                const years = Math.min(e.contribution_years ?? 0, 44);
-                const completeness = 44 > 0 ? years / 44 : 0;
-                // Swiss AHV 2024: min CHF 1260/Mo, max CHF 2520/Mo
-                ahvMonthlyEst = Math.round(1260 + completeness * (2520 - 1260));
-              }
-
-              // ── Säule 2: compute estimated monthly BVG pension ──
-              let bvgMonthlyEst: number | null = null;
-              if (pillar === "2" && entries.length > 0) {
-                // BVG Umwandlungssatz 6.8%: annual = capital × 6.8%, monthly = /12
-                bvgMonthlyEst = Math.round((totalBalance * 0.068) / 12);
-              }
+              // Geschaetzte Monatsrenten aus dem Backend (null = Saeule 3a/3b)
+              const ahvMonthlyEst =
+                pillar === "1" && entries.length > 0 ? Math.round(estimate?.ahv_monthly ?? 0) : null;
+              const bvgMonthlyEst =
+                pillar === "2" && entries.length > 0 ? Math.round(estimate?.bvg_monthly ?? 0) : null;
+              const drawdownEst =
+                pillar === "3a" ? estimate?.pillar_3a_monthly : pillar === "3b" ? estimate?.pillar_3b_monthly : undefined;
 
               return (
                 <div key={pillar} className="px-5 py-4">
@@ -623,12 +623,12 @@ export default function Finanzplan() {
                               <span className="font-mono text-xs text-text-secondary">{fmtCHF(totalContrib)}</span>
                             </div>
                           )}
-                          {/* Estimated monthly drawdown (÷ 20 years) */}
-                          {totalBalance > 0 && (
+                          {/* Bezug ab Pensionierung, ueber 20 Jahre verteilt */}
+                          {totalBalance > 0 && drawdownEst !== undefined && (
                             <div className="flex justify-between">
                               <span className="text-text-tertiary text-xs">Gesch. Bezug/Mo</span>
                               <span className="font-mono text-xs" style={{ color }}>
-                                {fmtCHF(Math.round(totalBalance / 240))}/Mo
+                                {fmtCHF(Math.round(drawdownEst))}/Mo
                               </span>
                             </div>
                           )}
@@ -642,28 +642,23 @@ export default function Finanzplan() {
           </div>
 
           {/* ── Total monthly pension estimate ── */}
-          {(() => {
-            const ahvE = pensionByPillar.get("1") ?? [];
-            const bvgE = pensionByPillar.get("2") ?? [];
-            const p3aE = pensionByPillar.get("3a") ?? [];
-            const p3bE = pensionByPillar.get("3b") ?? [];
-            const ahvYears = Math.min(ahvE[0]?.contribution_years ?? 0, 44);
-            const ahvMo = ahvE.length > 0 ? Math.round(1260 + (ahvYears / 44) * (2520 - 1260)) : 0;
-            const bvgCap = bvgE.reduce((s, e) => s + e.current_balance, 0);
-            const bvgMo = Math.round((bvgCap * 0.068) / 12);
-            const p3aCap = p3aE.reduce((s, e) => s + e.current_balance, 0);
-            const p3aMo = Math.round(p3aCap / 240);
-            const p3bCap = p3bE.reduce((s, e) => s + e.current_balance, 0);
-            const p3bMo = Math.round(p3bCap / 240);
-            const totalMo = ahvMo + bvgMo + p3aMo + p3bMo;
-            if (totalMo <= 0) return null;
-            return (
-              <div className="px-5 py-3 border-t border-border/40 bg-bg-elevated/40 flex items-center justify-between">
+          {estimate && estimate.total_monthly > 0 && (
+            <div className="px-5 py-3 border-t border-border/40 bg-bg-elevated/40">
+              <div className="flex items-center justify-between">
                 <span className="text-text-tertiary text-xs">{t("pages:finanzplan.estimatedTotalPension")}</span>
-                <span className="font-mono text-sm font-bold text-accent">{fmtCHF(totalMo)} / Monat</span>
+                <span className="font-mono text-sm font-bold text-accent">
+                  {fmtCHF(Math.round(estimate.total_monthly))} / Monat
+                </span>
               </div>
-            );
-          })()}
+              <p className="text-text-tertiary text-[11px] mt-1">
+                {t("pages:finanzplan.estimateNote", {
+                  age: estimate.retirement_age,
+                  ahvAge: estimate.ahv_start_age,
+                  rate: (estimate.bvg_conversion_rate * 100).toFixed(1),
+                })}
+              </p>
+            </div>
+          )}
         </section>
       )}
 

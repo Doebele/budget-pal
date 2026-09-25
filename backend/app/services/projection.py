@@ -34,14 +34,54 @@ BVG_CONTRIBUTION_RATES = {
 AHV_MAX_PENSION: float = settings.ahv_max_pension_chf
 AHV_MIN_PENSION: float = settings.ahv_min_pension_chf
 AHV_FULL_YEARS: int = settings.ahv_full_contribution_years
-AHV_CONVERSION_RATE: float = settings.ahv_conversion_rate_bvg
+BVG_CONVERSION_RATE_DEFAULT: float = settings.bvg_conversion_rate_default
 BVG_COORD_DEDUCTION: float = settings.bvg_coordination_deduction
 PAYOUT_YEARS: int = 20  # 3a/3b annuitization horizon (~age 65→85)
 PAYOUT_RESIDUAL_RATE: float = 0.02  # conservative yield during payout phase
-#: Ordentliches AHV-Rentenalter (Referenz 65).
+#: Ordentliches AHV-Rentenalter (Referenzalter 65).
 AHV_REGULAR_RETIREMENT_AGE: int = 65
-#: Lebenslange Kuerzung je vorbezogenem Jahr (Schweiz: 6.8 %).
+#: Flexibler Rentenbezug: frueheste und spaeteste Wahl (AHV 21).
+AHV_EARLIEST_AGE: int = 63
+AHV_LATEST_AGE: int = 70
+#: Lebenslange Kuerzung je vorbezogenem Jahr.
+#: ponytail: fester Satz; AHV 21 sieht neue versicherungstechnische Saetze
+#: vor — dann hier ersetzen.
 AHV_EARLY_WITHDRAWAL_REDUCTION: float = 0.068
+#: Lebenslanger Zuschlag bei Aufschub, nach Anzahl aufgeschobener Jahre.
+AHV_DEFERRAL_SUPPLEMENT: Dict[int, float] = {1: 0.052, 2: 0.108, 3: 0.171, 4: 0.240, 5: 0.315}
+#: 12 Monatsrenten plus die 13. AHV-Rente (Volksabstimmung 3.3.2024), die ab
+#: 2026 jaehrlich im Dezember ausbezahlt wird.
+AHV_PAYMENTS_PER_YEAR: int = 13
+
+
+def ahv_start_age(retirement_age: int) -> int:
+    """Alter, ab dem die AHV fliesst. Wer vor 63 aufhoert zu arbeiten, bekommt
+    sie trotzdem erst mit 63; spaeter als 70 laesst sie sich nicht aufschieben."""
+    return min(max(retirement_age, AHV_EARLIEST_AGE), AHV_LATEST_AGE)
+
+
+def ahv_full_monthly(average_income: float) -> float:
+    """Monatliche Vollrente (Rentenskala 44) aus dem massgebenden
+    durchschnittlichen Jahreseinkommen — die zweistufige Rentenformel der AHV.
+
+    Mit m = Minimalrente: bis 12·m Einkommen gilt m, bis 36·m gilt
+    0.74·m + 13/600·E, darueber 1.04·m + 8/600·E, hoechstens 2·m (Maximalrente
+    ab 72·m, also 90'720 CHF).
+    """
+    m = AHV_MIN_PENSION
+    e = max(0.0, average_income)
+    if e <= 12 * m:
+        return m
+    if e <= 36 * m:
+        return 0.74 * m + 13 / 600 * e
+    return min(1.04 * m + 8 / 600 * e, AHV_MAX_PENSION)
+
+
+def _accumulate(balance: float, contribution: float, rate: float, years: int) -> float:
+    """Guthaben nach `years` Jahren mit Zins und jaehrlichem Beitrag."""
+    for _ in range(max(0, years)):
+        balance = balance * (1 + rate) + contribution
+    return balance
 
 
 def _annuity_payout(
@@ -149,6 +189,51 @@ def build_annual_flows(
                 flows[yr] += mortgage_debt * rate
 
     return flows
+
+
+def _bvg_capital(
+    record: Optional[Dict], annual_income: float, start_age: int, saving_years: int
+) -> tuple:
+    """BVG-Guthaben nach `saving_years` Beitragsjahren ab `start_age`, dazu
+    der Umwandlungssatz (eigener laut Vorsorgeausweis oder Vorgabe)."""
+    if record:
+        balance = record.get("current_balance", 0.0)
+        annual_contribution = record.get("annual_contribution", 0.0)
+        return_rate = record.get("expected_return_rate", 0.01)
+        conversion_rate = record.get("conversion_rate") or BVG_CONVERSION_RATE_DEFAULT
+    else:
+        balance, annual_contribution, return_rate = 0.0, 0.0, 0.01  # Mindestzins
+        conversion_rate = BVG_CONVERSION_RATE_DEFAULT
+    insured_salary = max(0, annual_income - BVG_COORD_DEDUCTION)
+    for yr in range(saving_years):
+        contrib = annual_contribution or insured_salary * _bvg_rate_for_age(start_age + yr)
+        balance = balance * (1 + return_rate) + contrib
+    return balance, conversion_rate
+
+
+def _saving_then_payout(
+    record: Dict, age_at_year: int, retirement_age: int, years_elapsed: int, default_rate: float
+) -> float:
+    """3a/3b: bis zum Rentenalter ansparen, danach PAYOUT_YEARS lang einen
+    festen Betrag auszahlen, dann 0.
+
+    Wer heute schon im Rentenalter ist, dem wird das verbleibende Guthaben ab
+    jetzt ausbezahlt.
+    """
+    start_age = age_at_year - years_elapsed
+    saving_years = min(years_elapsed, max(0, retirement_age - start_age))
+    balance = _accumulate(
+        record.get("current_balance", 0.0),
+        record.get("annual_contribution", 0.0),
+        record.get("expected_return_rate", default_rate),
+        saving_years,
+    )
+    if age_at_year < retirement_age:
+        return balance
+    payout_year = age_at_year - max(retirement_age, start_age)
+    if payout_year >= PAYOUT_YEARS:
+        return 0.0
+    return _annuity_payout(balance)
 
 
 def _bvg_rate_for_age(age: int) -> float:
@@ -290,6 +375,68 @@ class ProjectionService:
             for i in range(len(ahv))
         ]
 
+    def estimate_at_retirement(
+        self,
+        pension_records: List[Dict],
+        current_age: int,
+        retirement_age: int,
+        annual_income: float,
+        inflation_rate: float,
+    ) -> Dict[str, Any]:
+        """Renten und Kapital bei der Pensionierung, in heutigen CHF.
+
+        Dieselben Funktionen wie die Prognose — Wizard und Finanzplan zeigen
+        damit dieselben Zahlen wie das Rentendiagramm. Monatsbetraege sind
+        Jahresbetraege / 12; bei der AHV steckt die 13. Rente anteilig darin.
+        """
+        years_to_retirement = max(0, retirement_age - current_age)
+        deflator = (1 + inflation_rate) ** years_to_retirement
+        ahv_record = next((r for r in pension_records if r["pillar"] == "1"), None)
+        bvg_record = next((r for r in pension_records if r["pillar"] == "2"), None)
+        p3a_records = [r for r in pension_records if r["pillar"] == "3a"]
+        p3b_records = [r for r in pension_records if r["pillar"] == "3b"]
+
+        start = ahv_start_age(retirement_age)
+        ahv_annual = self._project_ahv(
+            age_at_year=max(start, current_age), retirement_age=retirement_age,
+            record=ahv_record, annual_income=annual_income, current_age=current_age,
+        )
+        bvg_capital, conversion_rate = _bvg_capital(
+            bvg_record, annual_income, current_age, years_to_retirement
+        )
+        p3a_capital = sum(
+            _accumulate(
+                r.get("current_balance", 0.0), r.get("annual_contribution", 0.0),
+                r.get("expected_return_rate", 0.03), years_to_retirement,
+            )
+            for r in p3a_records
+        )
+        p3b_capital = sum(
+            _accumulate(
+                r.get("current_balance", 0.0), r.get("annual_contribution", 0.0),
+                r.get("expected_return_rate", 0.0), years_to_retirement,
+            )
+            for r in p3b_records
+        )
+        ahv_monthly = ahv_annual / 12
+        bvg_monthly = bvg_capital * conversion_rate / 12 / deflator
+        p3a_monthly = _annuity_payout(p3a_capital) / 12 / deflator
+        p3b_monthly = _annuity_payout(p3b_capital) / 12 / deflator
+        return {
+            "retirement_age": retirement_age,
+            "years_to_retirement": years_to_retirement,
+            "ahv_start_age": start,
+            "ahv_monthly": ahv_monthly,
+            "bvg_capital": bvg_capital / deflator,
+            "bvg_conversion_rate": conversion_rate,
+            "bvg_monthly": bvg_monthly,
+            "pillar_3a_capital": p3a_capital / deflator,
+            "pillar_3a_monthly": p3a_monthly,
+            "pillar_3b_capital": p3b_capital / deflator,
+            "pillar_3b_monthly": p3b_monthly,
+            "total_monthly": ahv_monthly + bvg_monthly + p3a_monthly + p3b_monthly,
+        }
+
     def _project_pensions(
         self,
         pension_records: List[Dict],
@@ -304,6 +451,10 @@ class ProjectionService:
 
         Returns four lists (length = years+1) of annual pension income / capital
         in real CHF. Before retirement: projected balance. After: annual income.
+
+        Nach dem Rentenalter wird nichts mehr einbezahlt: BVG-Rente und
+        3a/3b-Auszahlung stehen ab da nominal fest (und verlieren real an
+        Wert), die 3a/3b-Auszahlung endet nach PAYOUT_YEARS.
         """
         current_year = datetime.now().year
 
@@ -345,7 +496,10 @@ class ProjectionService:
                 annual_income=annual_income,
                 current_age=current_age,
             )
-            pension_ahv_series.append(ahv_annual / inflation_deflator)
+            # Nicht deflationieren: die AHV wird alle zwei Jahre an Loehne und
+            # Preise angepasst (Mischindex) und bleibt real etwa gleich. Die
+            # Formel rechnet ohnehin mit heutigen Werten.
+            pension_ahv_series.append(ahv_annual)
 
             # ── BVG ────────────────────────────────────────
             bvg_annual = self._project_bvg(
@@ -398,64 +552,49 @@ class ProjectionService:
         current_age: int,
     ) -> float:
         """
-        Calculate projected AHV monthly pension (× 12 for annual).
-        Returns annual AHV pension income in nominal CHF.
+        Jaehrliche AHV-Rente in heutigen CHF (inkl. 13. AHV-Rente), 0 vor dem
+        Rentenbeginn.
 
-        The wizard stores the user's **today's** contribution years. For the
-        projection at retirement, we extrapolate by adding the years between
-        "now" and the projected year so the AHV formula reflects the full
-        contribution history at retirement (capped at AHV_FULL_YEARS = 44).
+        Der Wizard speichert die Beitragsjahre von heute. Bis zum Rentenbeginn
+        kommen die Jahre dazwischen dazu (wer frueher aufhoert, zahlt als
+        Nichterwerbstaetiger weiter), hoechstens bis zum Referenzalter und 44.
+        Danach steht die Rente fest.
         """
-        if age_at_year < retirement_age:
+        start_age = ahv_start_age(retirement_age)
+        if age_at_year < start_age:
             return 0.0
 
-        # Extrapolate: stored years (as of today) + additional years worked
-        # between today and the projected retirement/year.
-        years_elapsed_since_now = max(0, age_at_year - current_age)
+        # Beitragsjahre werden beim Rentenbeginn festgeschrieben
+        contributing_until = min(start_age, AHV_REGULAR_RETIREMENT_AGE)
+        added_years = max(0, contributing_until - current_age)
 
         if record:
             stored_years = record.get("contribution_years")
             if stored_years is None:
                 # No explicit value → estimate from age (assume work since 18)
-                contribution_years = max(0, age_at_year - 18)
+                contribution_years = max(0, contributing_until - 18)
             else:
-                contribution_years = stored_years + years_elapsed_since_now
+                contribution_years = stored_years + added_years
             avg_salary = record.get("average_insured_salary") or annual_income
         else:
-            contribution_years = max(0, age_at_year - 18)
+            contribution_years = max(0, contributing_until - 18)
             avg_salary = annual_income
 
         contribution_years = min(contribution_years, AHV_FULL_YEARS)
 
-        # Die Rentenhoehe haengt am massgebenden durchschnittlichen
-        # Jahreseinkommen: die Vollrente wird ab dem Sechsfachen der jaehrlichen
-        # Minimalrente erreicht, darunter liegt sie zwischen Minimum und Maximum.
-        # ponytail: die Rentenskala ist in Wirklichkeit zweistufig geknickt,
-        # hier linear interpoliert — Merkblatt 3.01 fuer die exakte Segmentformel.
-        full_pension_income = AHV_MIN_PENSION * 12 * 6
-        income_factor = min(max(avg_salary / full_pension_income, 0.0), 1.0)
-        full_pension_monthly = AHV_MIN_PENSION + income_factor * (
-            AHV_MAX_PENSION - AHV_MIN_PENSION
-        )
+        # Kuerzung um 1/44 je fehlendem Beitragsjahr (Rentenskala).
+        pension_monthly = ahv_full_monthly(avg_salary) * (contribution_years / AHV_FULL_YEARS)
+        pension_monthly = min(pension_monthly, AHV_MAX_PENSION)
 
-        # Kuerzung um 1/44 je fehlendem Beitragsjahr (Rentenskala). Vorher
-        # interpolierte die Formel zwischen Minimal- und Maximalrente, womit ein
-        # fehlendes Jahr fast nichts kostete und `avg_salary` gar nicht einging.
-        pension_monthly = full_pension_monthly * (contribution_years / AHV_FULL_YEARS)
+        # Vorbezug kuerzt lebenslang, Aufschub erhoeht lebenslang. Der Zuschlag
+        # kommt auf die Rente obendrauf und darf die Maximalrente ueberschreiten.
+        if start_age < AHV_REGULAR_RETIREMENT_AGE:
+            early_years = AHV_REGULAR_RETIREMENT_AGE - start_age
+            pension_monthly *= max(0.0, 1 - AHV_EARLY_WITHDRAWAL_REDUCTION * early_years)
+        elif start_age > AHV_REGULAR_RETIREMENT_AGE:
+            pension_monthly *= 1 + AHV_DEFERRAL_SUPPLEMENT[start_age - AHV_REGULAR_RETIREMENT_AGE]
 
-        # Vorbezugskuerzung: wer die AHV vor dem ordentlichen Rentenalter
-        # bezieht, erhaelt sie lebenslang gekuerzt — 6.8 % je vorbezogenem
-        # Jahr. Ohne diesen Abzug erscheint eine Fruehpensionierung gratis.
-        early_years = max(0, AHV_REGULAR_RETIREMENT_AGE - retirement_age)
-        if early_years:
-            pension_monthly *= max(
-                0.0, 1 - AHV_EARLY_WITHDRAWAL_REDUCTION * early_years
-            )
-
-        # Enforce configured maximum
-        pension_monthly = min(pension_monthly, settings.ahv_max_pension_chf)
-
-        return pension_monthly * 12
+        return pension_monthly * AHV_PAYMENTS_PER_YEAR
 
     def _project_bvg(
         self,
@@ -466,37 +605,20 @@ class ProjectionService:
         years_elapsed: int,
     ) -> float:
         """
-        Project BVG pension balance and eventual annual pension.
+        Project BVG pension balance and eventual annual pension (nominal CHF).
         Before retirement: returns projected capital (not income).
-        After retirement: returns annual pension = capital × conversion_rate.
+        After retirement: annual pension = capital at retirement x conversion
+        rate. Beitraege enden mit dem Rentenalter, die Rente steht danach fest.
         """
-        if record:
-            current_balance = record.get("current_balance", 0.0)
-            annual_contribution = record.get("annual_contribution", 0.0)
-            return_rate = record.get("expected_return_rate", 0.01)
-        else:
-            # Estimate from salary — use configured coordination deduction
-            insured_salary = max(0, annual_income - BVG_COORD_DEDUCTION)
-            bvg_rate = _bvg_rate_for_age(age_at_year)
-            current_balance = 0.0
-            annual_contribution = insured_salary * bvg_rate
-            return_rate = 0.01  # minimum guarantee
-
-        # Project balance using compound growth + contributions
-        balance = current_balance
-        for yr in range(years_elapsed):
-            age_in_sim = (age_at_year - years_elapsed) + yr
-            insured_salary = max(0, annual_income - BVG_COORD_DEDUCTION)
-            contrib = annual_contribution or insured_salary * _bvg_rate_for_age(
-                age_in_sim
-            )
-            balance = balance * (1 + return_rate) + contrib
+        start_age = age_at_year - years_elapsed
+        # Nur bis zum Rentenalter wird einbezahlt — danach waechst nichts mehr
+        saving_years = min(years_elapsed, max(0, retirement_age - start_age))
+        balance, conversion_rate = _bvg_capital(record, annual_income, start_age, saving_years)
 
         if age_at_year < retirement_age:
             return balance  # return balance as proxy before retirement
 
-        # At/after retirement: convert capital to annual pension using configured conversion rate
-        return balance * AHV_CONVERSION_RATE
+        return balance * conversion_rate
 
     def _project_3a(
         self,
@@ -506,24 +628,11 @@ class ProjectionService:
         years_elapsed: int,
     ) -> float:
         """
-        Project Pillar 3a balance with compound growth.
-        Before retirement: accumulated balance. After: annuitized (balance / 20 years).
+        Project Pillar 3a balance with compound growth (nominal CHF).
+        Before retirement: accumulated balance. After: fixed annual payout over
+        PAYOUT_YEARS, then 0. Einzahlen geht nur bis zum Rentenalter.
         """
-        current_balance = record.get("current_balance", 0.0)
-        annual_contribution = record.get("annual_contribution", 0.0)
-        return_rate = record.get("expected_return_rate", 0.03)
-        # Use the UI-level retirement_age consistently, not the record's —
-        # the user's slider is the single source of truth for the projection.
-
-        balance = current_balance
-        for _ in range(years_elapsed):
-            balance = balance * (1 + return_rate) + annual_contribution
-
-        if age_at_year < retirement_age:
-            return balance  # return balance as proxy
-
-        # Annuitize with residual return during payout phase
-        return _annuity_payout(balance)
+        return _saving_then_payout(record, age_at_year, retirement_age, years_elapsed, 0.03)
 
     def _project_3b(
         self,
@@ -536,26 +645,13 @@ class ProjectionService:
         Project Pillar 3b (Lebensversicherung / freie Vorsorge).
 
         For Kapital-/Gemischt-Lebensversicherungen: current_balance holds the
-        guaranteed Ablaufleistung (fixed payout sum). We grow it by the
-        expected_return_rate until retirement, then annuitize over 20 years.
+        guaranteed Ablaufleistung (fixed payout sum). Grows by the
+        expected_return_rate until retirement, then paid out like 3a.
         For Risiko-LV: current_balance = 0 (no capital component), returns 0.
         """
-        current_balance = record.get("current_balance", 0.0)
-        annual_contribution = record.get("annual_contribution", 0.0)
-        return_rate = record.get("expected_return_rate", 0.0)
-
-        if current_balance <= 0 and annual_contribution <= 0:
+        if record.get("current_balance", 0.0) <= 0 and record.get("annual_contribution", 0.0) <= 0:
             return 0.0
-
-        balance = current_balance
-        for _ in range(years_elapsed):
-            balance = balance * (1 + return_rate) + annual_contribution
-
-        if age_at_year < retirement_age:
-            return balance  # proxy: projected capital
-
-        # Annuitize with residual return during payout phase
-        return _annuity_payout(balance)
+        return _saving_then_payout(record, age_at_year, retirement_age, years_elapsed, 0.0)
 
     def compare_scenarios(
         self,

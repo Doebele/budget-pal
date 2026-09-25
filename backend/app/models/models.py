@@ -375,6 +375,9 @@ class PensionData(Base):
     retirement_age: Mapped[int] = mapped_column(Integer, default=65)
     contribution_years: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     average_insured_salary: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    # Nur Saeule 2: Umwandlungssatz laut Vorsorgeausweis (Bruchteil, 0.053 = 5.3 %).
+    # NULL = settings.bvg_conversion_rate_default.
+    conversion_rate: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     as_of_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

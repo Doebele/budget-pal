@@ -241,8 +241,15 @@ Central definition of all 11 supercategories (wohnen, essen, mobilitaet, versich
 **PortableJSON**: Use `PortableJSON` (not raw `JSON`/`JSONB`) for any JSON columns so the app works on both PostgreSQL and the optional SQLite deployment (`docker-compose.sqlite.yml`).
 
 ### Swiss-specific domain logic
-- AHV (Pillar 1): contribution years × average salary → capped at `AHV_MAX_PENSION_CHF`
-- BVG (Pillar 2): accumulated capital × `AHV_CONVERSION_RATE_BVG` (6.8%)
-- Pillar 3a: compound interest, max `PILLAR_3A_MAX_CONTRIBUTION` CHF/year tax-deductible
+- AHV (Pillar 1): two-segment pension formula (`ahv_full_monthly`) × years/44, paid 13×/year
+  (13th pension from Dec 2026), in today's CHF — **not deflated** (it follows the mixed
+  wage/price index). Drawn at 63-70 (`ahv_start_age`): −6.8 %/year early, deferral supplement late.
+- BVG (Pillar 2): contributions stop at retirement; pension = capital at retirement ×
+  `pension_data.conversion_rate` (from the certificate) or `BVG_CONVERSION_RATE_DEFAULT` (5.3 %).
+  The legal 6.8 % only applies to the mandatory part. Fixed in nominal CHF after retirement.
+- Pillar 3a/3b: contributions stop at retirement, then a fixed payout for `PAYOUT_YEARS`, then 0.
+  Max `PILLAR_3A_MAX_CONTRIBUTION` CHF/year.
+- One calculation: Wizard and Finanzplan call `/api/pension/estimate`
+  (`ProjectionService.estimate_at_retirement`) — never re-implement pension math in the frontend.
 - All monetary projections are inflation-adjusted using `SWISS_INFLATION_RATE` (default 1.5%)
 - Monte Carlo: 10,000 runs, percentile bands p10/p25/p50/p75/p90

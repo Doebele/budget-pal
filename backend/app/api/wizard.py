@@ -78,7 +78,7 @@ class Pillar3aAccountPayload(BaseModel):
 
     provider: str = ""
     balance: float = 0.0
-    annual_contribution: float = 7_056.0
+    annual_contribution: float = 7_258.0
     strategy: Literal["interest", "funds"] = "funds"
 
 
@@ -229,6 +229,9 @@ class WizardCompletePayload(BaseModel):
     bvg_guthaben: float = 50_000.0
     bvg_jahresbeitrag: float = 8_000.0
     bvg_rentenalter: int = Field(default=65, ge=63, le=70)
+    # Umwandlungssatz laut Vorsorgeausweis in Prozent (5.3 = 5.3 %). Die
+    # gesetzlichen 6.8 % gelten nur fuer den obligatorischen Teil.
+    bvg_umwandlungssatz: float = Field(default=5.3, ge=2.0, le=8.0)
     # Explicit alias: auto to_camel yields pillar3AAccounts, but the app sends pillar3aAccounts.
     pillar_3a_accounts: List[Pillar3aAccountPayload] = Field(
         default_factory=list,
@@ -401,6 +404,7 @@ def _build_scenario_params(p: WizardCompletePayload) -> dict:
         "bvg_guthaben": p.bvg_guthaben,
         "bvg_jahresbeitrag": p.bvg_jahresbeitrag,
         "bvg_rentenalter": p.bvg_rentenalter,
+        "bvg_umwandlungssatz": p.bvg_umwandlungssatz,
         "pillar_3a_total": sum(a.balance for a in p.pillar_3a_accounts),
     }
 
@@ -772,6 +776,7 @@ async def wizard_complete(
         annual_contribution=payload.bvg_jahresbeitrag,
         expected_return_rate=0.015,  # BVG Mindestzins
         retirement_age=payload.bvg_rentenalter,
+        conversion_rate=payload.bvg_umwandlungssatz / 100,
         notes=f"BVG Guthaben aus empirischen Angaben | Rentenalter: {payload.bvg_rentenalter}",
         as_of_date=_now(),
     )

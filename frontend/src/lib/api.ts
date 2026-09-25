@@ -247,7 +247,43 @@ export const taxonomyApi = {
 };
 
 // Pension
+
+/** Schaetzung bei Pensionierung — dieselbe Rechnung wie die Prognose.
+ *  Alle Betraege in heutigen CHF, Monatswerte = Jahreswert / 12 (bei der AHV
+ *  steckt die 13. Rente anteilig darin). */
+export interface PensionEstimate {
+  retirement_age: number;
+  years_to_retirement: number;
+  ahv_start_age: number;
+  ahv_monthly: number;
+  bvg_capital: number;
+  bvg_conversion_rate: number;
+  bvg_monthly: number;
+  pillar_3a_capital: number;
+  pillar_3a_monthly: number;
+  pillar_3b_capital: number;
+  pillar_3b_monthly: number;
+  total_monthly: number;
+}
+
+export interface PensionEstimateInput {
+  current_age: number;
+  retirement_age: number;
+  ahv_contribution_years?: number | null;
+  ahv_average_income?: number;
+  bvg_balance?: number;
+  bvg_annual_contribution?: number;
+  bvg_conversion_rate?: number | null;
+  pillar_3a?: { balance: number; annual_contribution: number; return_rate?: number }[];
+  inflation_rate?: number;
+}
+
 export const pensionApi = {
+  /** Aus ungespeicherten Werten (Wizard). */
+  estimate: (input: PensionEstimateInput) =>
+    api.post<PensionEstimate>("/pension/estimate", input),
+  /** Aus den gespeicherten Vorsorgedaten (Finanzplan). */
+  estimateStored: () => api.get<PensionEstimate>("/pension/estimate"),
   list: () => api.get("/pension"),
   create: (data: Record<string, unknown>) => api.post("/pension", data),
   update: (id: number, data: Record<string, unknown>) => api.put(`/pension/${id}`, data),

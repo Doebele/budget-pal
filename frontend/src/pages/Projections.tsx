@@ -372,9 +372,9 @@ export default function Projections() {
         {/* Reference values */}
         <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-border/50">
           {[
-            { label: t("pages:ui.ahv_saeule_1"), value: "bis CHF 2'520/Mo", desc: t("pages:ui.max_2024_bei_44_vollbeitragsjahren"), color: PILLAR_COLORS.ahv },
-            { label: t("pages:ui.bvg_saeule_2"), value: "Kapital × 6.8% ÷ 12", desc: t("pages:ui.umwandlungssatz_2024_im_modell"), color: PILLAR_COLORS.bvg },
-            { label: t("pages:ui.saeule_3a"), value: `max. CHF 7'056/Jahr`, desc: t("pages:ui.beitragsgrenze_lohnabhaengige_2024"), color: PILLAR_COLORS["3a"] },
+            { label: t("pages:ui.ahv_saeule_1"), value: "bis CHF 2'520/Mo × 13", desc: t("pages:ui.max_2024_bei_44_vollbeitragsjahren"), color: PILLAR_COLORS.ahv },
+            { label: t("pages:ui.bvg_saeule_2"), value: t("pages:ui.bvgModelValue"), desc: t("pages:ui.umwandlungssatz_2024_im_modell"), color: PILLAR_COLORS.bvg },
+            { label: t("pages:ui.saeule_3a"), value: `max. CHF 7'258/Jahr`, desc: t("pages:ui.beitragsgrenze_lohnabhaengige_2024"), color: PILLAR_COLORS["3a"] },
           ].map(({ label, value, desc, color }) => (
             <div key={label} className="card-elevated">
               <p className="text-text-tertiary text-xs">{label}</p>
