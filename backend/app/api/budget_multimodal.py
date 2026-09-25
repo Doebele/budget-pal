@@ -698,7 +698,7 @@ def _compute_health_score(
     if pension_score < 70:
         levers.append(HealthScoreLever(
             title="Säule 3a einrichten", title_key="setupPillar3a", body_key="pillar3aLeverBody", body_params=None,
-            body="Zahle regelmässig in die Säule 3a ein. Max. CHF 7'056/Jahr (2024, unselbstständig).",
+            body="Zahle regelmässig in die Säule 3a ein. Max. CHF 7'258/Jahr (2025/2026, unselbstständig).",
             potential=588.0,
         ))
     if cashflow_score < 80 and income > 0:

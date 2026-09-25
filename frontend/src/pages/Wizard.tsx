@@ -19,10 +19,11 @@
  */
 
 import { useState, useCallback, useEffect } from "react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Airplane, ArrowRight, Bank, BitcoinCircle, Building, Car, Cash, Check, Coins, Community, Globe, GraphDown, GraphUp, Group, Heart, Home, Laptop, NavArrowLeft, NavArrowRight, OpenBook, PiggyBank, Reports, ShieldCheck, Shuffle, Sofa, StatsReport, Suitcase, Train, Trash, User, UserXmark, Wallet } from "@/lib/icons";
 import { clsx } from "clsx";
-import { api } from "@/lib/api";
+import { api, pensionApi, type PensionEstimate } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { DEFAULT_SARON_REFERENCE_ANNUAL_PCT } from "@/lib/saron";
 import {
@@ -132,6 +133,8 @@ interface WizardData {
   bvgGuthaben: number;
   bvgJahresbeitrag: number;
   bvgRentenalter: number;
+  /** Umwandlungssatz laut Vorsorgeausweis in Prozent (5.3 = 5.3 %). */
+  bvgUmwandlungssatz: number;
   pillar3aAccounts: Pillar3aAccount[];
   hasLifeInsurance: boolean;
   lifeInsuranceType: "kapital" | "risiko" | "gemischt";
@@ -220,7 +223,8 @@ const DEFAULT_WIZARD_DATA: WizardData = {
   bvgGuthaben: 50_000,
   bvgJahresbeitrag: 8_000,
   bvgRentenalter: 65,
-  pillar3aAccounts: [{ provider: "VIAC", balance: 20_000, annualContribution: 7_056, strategy: "funds" }],
+  bvgUmwandlungssatz: 5.3,
+  pillar3aAccounts: [{ provider: "VIAC", balance: 20_000, annualContribution: 7_258, strategy: "funds" }],
   hasLifeInsurance: false,
   lifeInsuranceType: "kapital",
   lifeInsuranceAblauf: "",
@@ -278,30 +282,34 @@ function healthInsuranceMonthly(data: WizardData): number {
 }
 
 /**
- * AHV-Rente, gleiche Rechnung wie `_project_ahv` im Backend — sonst zeigt der
- * Wizard eine andere Zahl als die Rentenprognose.
- *
- * Vollrente ab dem Sechsfachen der jaehrlichen Minimalrente, darunter linear
- * zwischen Minimum und Maximum; dann Kuerzung um 1/44 je fehlendem
- * Beitragsjahr.
+ * Renten bei der Pensionierung — gerechnet im Backend (`/pension/estimate`),
+ * mit derselben Funktion wie das Rentendiagramm. Vorher rechnete der Wizard
+ * eine eigene Kopie und zeigte andere Zahlen.
  */
-function computeAhvRente(beitragsjahre: number, avgLohn: number): number {
-  const fullYears = 44;
-  const minRente = 1_260; // AHV-Skala 2025
-  const maxRente = 2_520;
-  const fullPensionIncome = minRente * 12 * 6;
-  const lohnFactor = Math.min(Math.max(avgLohn / fullPensionIncome, 0), 1);
-  const base = minRente + (maxRente - minRente) * lohnFactor;
-  return Math.round(base * Math.min(beitragsjahre / fullYears, 1));
-}
-
-function computeBvgKapital(guthaben: number, jahresbeitrag: number, yearsToRetirement: number): number {
-  const rate = 0.015; // BVG Mindestzins 2023
-  let capital = guthaben;
-  for (let i = 0; i < yearsToRetirement; i++) {
-    capital = (capital + jahresbeitrag) * (1 + rate);
-  }
-  return Math.round(capital);
+function usePensionEstimate(data: WizardData, retirementAge: number): PensionEstimate | undefined {
+  const input = {
+    current_age: new Date().getFullYear() - data.geburtsjahr,
+    retirement_age: retirementAge,
+    ahv_contribution_years: data.ahvBeitragsjahre,
+    ahv_average_income: data.ahvDurchschnittsLohn,
+    bvg_balance: data.bvgGuthaben,
+    bvg_annual_contribution: data.bvgJahresbeitrag,
+    bvg_conversion_rate: (data.bvgUmwandlungssatz ?? 5.3) / 100,
+    pillar_3a: data.pillar3aAccounts.map((a) => ({
+      balance: a.balance,
+      annual_contribution: a.annualContribution,
+      return_rate: a.strategy === "funds" ? 0.04 : 0.01,
+    })),
+    inflation_rate: data.inflation / 100,
+  };
+  const { data: estimate } = useQuery({
+    queryKey: ["pension-estimate", input],
+    queryFn: async () => (await pensionApi.estimate(input)).data,
+    // Beim Tippen die letzte Zahl stehen lassen statt kurz auf 0 zu springen
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
+  });
+  return estimate;
 }
 
 // ── Section wrapper ────────────────────────────────────────────
@@ -1420,13 +1428,11 @@ function Step6({ data, update }: { data: WizardData; update: (p: Partial<WizardD
 
 function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardData>) => void }) {
   const { t } = useTranslation();
-  const currentYear = new Date().getFullYear();
-  const age = currentYear - data.geburtsjahr;
-  const yearsToRetirement = Math.max(data.bvgRentenalter - age, 0);
-
-  const ahvRente = computeAhvRente(data.ahvBeitragsjahre, data.ahvDurchschnittsLohn);
-  const bvgKapital = computeBvgKapital(data.bvgGuthaben, data.bvgJahresbeitrag, yearsToRetirement);
-  const bvgRente = Math.round((bvgKapital * 0.068) / 12); // BVG Umwandlungssatz 6.8%
+  const estimate = usePensionEstimate(data, data.bvgRentenalter);
+  const ahvRente = Math.round(estimate?.ahv_monthly ?? 0);
+  const bvgKapital = Math.round(estimate?.bvg_capital ?? 0);
+  const bvgRente = Math.round(estimate?.bvg_monthly ?? 0);
+  const umwandlungssatz = data.bvgUmwandlungssatz ?? 5.3;
 
   const pillar3aTotal = data.pillar3aAccounts.reduce((sum, a) => sum + a.balance, 0);
 
@@ -1439,7 +1445,7 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
     update({
       pillar3aAccounts: [
         ...data.pillar3aAccounts,
-        { provider: "", balance: 0, annualContribution: 7_056, strategy: "funds" },
+        { provider: "", balance: 0, annualContribution: 7_258, strategy: "funds" },
       ],
     });
   }
@@ -1491,7 +1497,9 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
             <div>
               <p className="text-text-tertiary text-xs">{t("pages:wizard.w07")}</p>
               <p className="text-text-primary font-mono font-semibold text-xl mt-0.5">{chf(ahvRente)}</p>
-              <p className="text-text-tertiary text-xs mt-0.5">{t("pages:wizard.w08")}</p>
+              <p className="text-text-tertiary text-xs mt-0.5">
+                {t("pages:wizard.ahvFromAge", { age: estimate?.ahv_start_age ?? data.bvgRentenalter })}
+              </p>
             </div>
             <div className="text-right">
               <p className="text-text-tertiary text-xs">{t("pages:wizard.w09")}</p>
@@ -1519,6 +1527,17 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
             <ChfInput value={data.bvgJahresbeitrag} onChange={(v) => update({ bvgJahresbeitrag: v })} />
           </Field>
 
+          <Field label={t("pages:wizard.bvgConversion")} hint={t("pages:wizard.bvgConversionHint")}>
+            <Slider
+              value={umwandlungssatz}
+              min={3.5}
+              max={6.8}
+              step={0.1}
+              onChange={(v) => update({ bvgUmwandlungssatz: Math.round(v * 10) / 10 })}
+              format={(v) => `${v.toFixed(1)} %`}
+            />
+          </Field>
+
           <Field label={t("pages:wizard.w128")}>
             <Slider
               value={data.bvgRentenalter}
@@ -1537,7 +1556,9 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
             <div>
               <p className="text-text-tertiary text-xs">{t("pages:wizard.w11")}</p>
               <p className="text-text-primary font-mono font-semibold text-lg mt-0.5">{chf(bvgRente)}/Mo</p>
-              <p className="text-text-tertiary text-xs">{t("pages:wizard.w165")}</p>
+              <p className="text-text-tertiary text-xs">
+                {t("pages:wizard.bvgConversionUsed", { rate: umwandlungssatz.toFixed(1) })}
+              </p>
             </div>
           </div>
         </div>
@@ -1781,11 +1802,9 @@ function Step8({ data, update }: { data: WizardData; update: (p: Partial<WizardD
 function ReviewScreen({ data, budgetOnly = false }: { data: WizardData; budgetOnly?: boolean }) {
   const { t } = useTranslation();
   const netto = computeNettoEinkommen(data);
-  const age = new Date().getFullYear() - data.geburtsjahr;
-  const yearsToRetirement = Math.max(data.zielRentenalter - age, 0);
-  const ahvRente = computeAhvRente(data.ahvBeitragsjahre, data.ahvDurchschnittsLohn);
-  const bvgKapital = computeBvgKapital(data.bvgGuthaben, data.bvgJahresbeitrag, yearsToRetirement);
-  const bvgRente = Math.round((bvgKapital * 0.068) / 12);
+  const estimate = usePensionEstimate(data, data.zielRentenalter);
+  const ahvRente = Math.round(estimate?.ahv_monthly ?? 0);
+  const bvgRente = Math.round(estimate?.bvg_monthly ?? 0);
   const pillar3aTotal = data.pillar3aAccounts.reduce((sum, a) => sum + a.balance, 0);
 
   const subscriptionTotal = COMMON_SUBSCRIPTIONS

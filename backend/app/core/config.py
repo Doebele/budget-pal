@@ -104,16 +104,21 @@ class Settings(BaseSettings):
     # ansprechen.
     ai_allow_private_endpoints: bool = False
 
-    # ── Swiss Financial Constants ─────────────────────────────
+    # ── Swiss Financial Constants (Stand 2025/2026) ───────────
+    # AHV und BVG passen diese Werte alle zwei Jahre an (zuletzt 2025).
     swiss_inflation_rate: float = 0.015
     ahv_max_pension_chf: float = 2520.0
     ahv_min_pension_chf: float = 1260.0
     ahv_full_contribution_years: int = 44
-    ahv_conversion_rate_bvg: float = 0.068
-    bvg_coordination_deduction: float = 25725.0
-    bvg_minimum_salary: float = 22050.0
-    pillar_3a_max_contribution: float = 7056.0
-    pillar_3a_max_self_employed: float = 35280.0
+    # Umhuellender Umwandlungssatz der Pensionskasse, wenn der Nutzer keinen
+    # eigenen erfasst. Die gesetzlichen 6.8 % gelten nur fuer den
+    # obligatorischen Teil; die meisten Kassen rechnen aufs ganze Guthaben
+    # mit rund 5.0-5.6 %. Den genauen Wert zeigt der Vorsorgeausweis.
+    bvg_conversion_rate_default: float = 0.053
+    bvg_coordination_deduction: float = 26460.0
+    bvg_minimum_salary: float = 22680.0
+    pillar_3a_max_contribution: float = 7258.0
+    pillar_3a_max_self_employed: float = 36288.0
 
     # ── Projection Defaults ───────────────────────────────────
     default_equity_return: float = 0.07

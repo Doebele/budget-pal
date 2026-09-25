@@ -26,7 +26,8 @@
     "assetSavings": "Savings / Bank",
     "assetBond": "Bonds",
     "assetPension": "Pension fund",
-    "assetOther": "Other"
+    "assetOther": "Other",
+    "estimateNote": "From age {{age}} (AHV from {{ahvAge}}), in today's francs, incl. 13th AHV pension; pension fund at a {{rate}} % conversion rate, 3a/3b spread over 20 years."
   },
   "dashboard": {
     "topExpenseCategories": "Top expense categories",
@@ -332,7 +333,11 @@
     "ownership": "Home ownership",
     "years": "{{count}} years",
     "budgetSubmit": "Apply budget",
-    "budgetReviewIntro": "Check your estimate. Pension and assets can be added later — your progress is saved at every step."
+    "budgetReviewIntro": "Check your estimate. Pension and assets can be added later — your progress is saved at every step.",
+    "ahvFromAge": "per month from age {{age}}, incl. 13th AHV pension, in today's francs",
+    "bvgConversion": "Conversion rate",
+    "bvgConversionHint": "Shown on your pension fund certificate. The legal 6.8 % only applies to the mandatory part; most funds apply 5.0–5.6 % to the whole balance.",
+    "bvgConversionUsed": "Conversion rate {{rate}} %, in today's francs"
   },
   "step5": {
     "s00": "Everyday & subscriptions",
@@ -624,8 +629,8 @@
     "loeschen_ohne_archivierung_hard_delete": "Delete without archiving (hard delete)",
     "lohn_gehalt_brutto": "Salary / wages (gross)",
     "marktwert": "Market value",
-    "max_2024_bei_44_vollbeitragsjahren": "Max. 2024 with 44 full contribution years",
-    "max_chf_7_056_jahr": "max. CHF 7,056/year",
+    "max_2024_bei_44_vollbeitragsjahren": "Max. 2025/2026 with 44 contribution years, plus 13th pension; drawn 63–70 with reduction or supplement",
+    "max_chf_7_056_jahr": "max. CHF 7,258/year",
     "miete": "Rent",
     "mobilitaet_oev_abos": "Mobility (public transport passes)",
     "moechtest_du_das_konto": "Do you want to delete the account",
@@ -690,7 +695,7 @@
     "ueberschuss_nicht_kategorisiert": "Surplus (uncategorised)",
     "uebersicht": "Overview",
     "ueberspringen": "Skip",
-    "umwandlungssatz_2024_im_modell": "Conversion rate 2024 in the model",
+    "umwandlungssatz_2024_im_modell": "Rate from your pension certificate, otherwise 5.3 %; the legal 6.8 % applies to the mandatory part only",
     "unbekannter_fehler": "Unknown error",
     "ungueltige_konto_id_bitte_konto_erneut_auswa": "Invalid account ID. Please select the account again.",
     "verbesserungspotenzial": "Room for improvement",
@@ -732,7 +737,8 @@
     "scenario": "Scenario",
     "noScenario": "No scenario (own values)",
     "scenarioHint": "Savings rate and income come from the selected scenario.",
-    "simulationParams": "Simulation parameters"
+    "simulationParams": "Simulation parameters",
+    "bvgModelValue": "Capital × conversion rate ÷ 12"
   },
   "health": {
     "savingsRate": "Savings rate",
@@ -754,7 +760,7 @@
     "improveAdherence": "Improve budget adherence",
     "adherenceLeverBody": "Expenses exceed the budget by ~{{ref}} {{amount}}/month.",
     "setupPillar3a": "Set up pillar 3a",
-    "pillar3aLeverBody": "Pay into pillar 3a regularly. Max. CHF 7,056/year (2024, employed).",
+    "pillar3aLeverBody": "Pay into pillar 3a regularly. Max. CHF 7,258/year (2025/2026, employed).",
     "reduceExpenses": "Reduce expenses",
     "reduceLeverBody": "Expenses exceed income by ~{{ref}} {{amount}}/month.",
     "currently": "Currently",
@@ -773,7 +779,7 @@
     "savingsRateVsPeer": "{{pct}}% — peer group {{peer}}%"
   },
   "hints": {
-    "pensionChartHint": "Before retirement age ({{age}}): OASI = 0; BVG, 3a and 3b show the projected capital. From then on: OASI and BVG pension, and for 3a/3b a pension formula with 2% residual interest over a 20-year payout period. OASI contribution years are projected up to retirement age (max. 44 years). The OASI pension is an estimate: full pension from six times the annual minimum pension, linearly interpolated below that, minus 1/44 for each missing contribution year. The compensation office's pension scale is authoritative.",
+    "pensionChartHint": "Before retirement ({{age}}): AHV = 0; BVG, 3a and 3b show projected capital. From then on nothing is paid in: the BVG pension (capital × conversion rate) stays the same in francs and loses real value, 3a/3b are paid out over 20 years with a 2 % residual return and then end. AHV starts at 63 at the earliest (−6.8 % per year drawn early, deferral up to 70 with a supplement), includes the 13th pension and stays constant in today's francs because it follows wages and prices. Contribution years are extended until the pension starts (max. 44). The AHV pension follows the official formula; your individual account statement is authoritative.",
     "saronHint": "Reference value for displaying SARON mortgages (not a live daily rate). Source and details:",
     "birthdate": "Date of birth",
     "yearsOld": "{{age}} years",

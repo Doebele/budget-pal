@@ -26,7 +26,8 @@
     "assetSavings": "Sparkonto / Bank",
     "assetBond": "Obligationen",
     "assetPension": "Pensionskasse",
-    "assetOther": "Sonstiges"
+    "assetOther": "Sonstiges",
+    "estimateNote": "Ab {{age}} (AHV ab {{ahvAge}}), in heutigen Franken, inkl. 13. AHV-Rente; Pensionskasse mit Umwandlungssatz {{rate}} %, 3a/3b über 20 Jahre verteilt."
   },
   "dashboard": {
     "topExpenseCategories": "Top Ausgaben-Kategorien",
@@ -332,7 +333,11 @@
     "ownership": "Wohneigentum",
     "years": "{{count}} Jahre",
     "budgetSubmit": "Budget übernehmen",
-    "budgetReviewIntro": "Überprüfe deine Einschätzung. Vorsorge und Vermögen kannst du später ergänzen — dein Fortschritt bleibt bei jedem Schritt gespeichert."
+    "budgetReviewIntro": "Überprüfe deine Einschätzung. Vorsorge und Vermögen kannst du später ergänzen — dein Fortschritt bleibt bei jedem Schritt gespeichert.",
+    "ahvFromAge": "pro Monat ab {{age}}, inkl. 13. AHV-Rente, in heutigen Franken",
+    "bvgConversion": "Umwandlungssatz",
+    "bvgConversionHint": "Steht auf dem Vorsorgeausweis. Die gesetzlichen 6.8 % gelten nur für den obligatorischen Teil; die meisten Kassen rechnen aufs ganze Guthaben mit 5.0–5.6 %.",
+    "bvgConversionUsed": "Umwandlungssatz {{rate}} %, in heutigen Franken"
   },
   "step5": {
     "s00": "Alltag & Abonnements",
@@ -624,8 +629,8 @@
     "loeschen_ohne_archivierung_hard_delete": "Löschen ohne Archivierung (Hard-Delete)",
     "lohn_gehalt_brutto": "Lohn / Gehalt (brutto)",
     "marktwert": "Marktwert",
-    "max_2024_bei_44_vollbeitragsjahren": "Max. 2024 bei 44 Vollbeitragsjahren",
-    "max_chf_7_056_jahr": "max. CHF 7'056/Jahr",
+    "max_2024_bei_44_vollbeitragsjahren": "Max. 2025/2026 bei 44 Beitragsjahren, plus 13. Rente; Bezug 63–70 mit Kürzung bzw. Zuschlag",
+    "max_chf_7_056_jahr": "max. CHF 7'258/Jahr",
     "miete": "Miete",
     "mobilitaet_oev_abos": "Mobilität (ÖV-Abos)",
     "moechtest_du_das_konto": "Möchtest du das Konto",
@@ -690,7 +695,7 @@
     "ueberschuss_nicht_kategorisiert": "Überschuss (nicht kategorisiert)",
     "uebersicht": "Übersicht",
     "ueberspringen": "Überspringen",
-    "umwandlungssatz_2024_im_modell": "Umwandlungssatz 2024 im Modell",
+    "umwandlungssatz_2024_im_modell": "Satz laut Vorsorgeausweis, sonst 5.3 %; die gesetzlichen 6.8 % gelten nur fürs Obligatorium",
     "unbekannter_fehler": "Unbekannter Fehler",
     "ungueltige_konto_id_bitte_konto_erneut_auswa": "Ungültige Konto-ID. Bitte Konto erneut auswählen.",
     "verbesserungspotenzial": "Verbesserungspotenzial",
@@ -732,7 +737,8 @@
     "scenario": "Szenario",
     "noScenario": "Ohne Szenario (eigene Werte)",
     "scenarioHint": "Sparrate und Einkommen stammen aus dem gewählten Szenario.",
-    "simulationParams": "Simulationsparameter"
+    "simulationParams": "Simulationsparameter",
+    "bvgModelValue": "Kapital × Umwandlungssatz ÷ 12"
   },
   "health": {
     "savingsRate": "Sparquote",
@@ -754,7 +760,7 @@
     "improveAdherence": "Budgeteinhaltung verbessern",
     "adherenceLeverBody": "Ausgaben übersteigen das Budget um ~{{ref}} {{amount}}/Monat.",
     "setupPillar3a": "Säule 3a einrichten",
-    "pillar3aLeverBody": "Zahle regelmässig in die Säule 3a ein. Max. CHF 7'056/Jahr (2024, unselbstständig).",
+    "pillar3aLeverBody": "Zahle regelmässig in die Säule 3a ein. Max. CHF 7'258/Jahr (2025/2026, unselbstständig).",
     "reduceExpenses": "Ausgaben senken",
     "reduceLeverBody": "Ausgaben übersteigen die Einnahmen um ~{{ref}} {{amount}}/Monat.",
     "currently": "Aktuell",
@@ -773,7 +779,7 @@
     "savingsRateVsPeer": "{{pct}} % — Vergleichsgruppe {{peer}} %"
   },
   "hints": {
-    "pensionChartHint": "Vor dem Rentenalter ({{age}}): AHV = 0; BVG, 3a und 3b zeigen das projizierte Kapital. Ab dann: AHV- und BVG-Rente bzw. bei 3a/3b eine Rentenformel mit 2 % Restverzinsung über 20 Jahre Auszahlungsdauer. AHV-Beitragsjahre werden bis zum Rentenalter fortgeschrieben (max. 44 Jahre). Die AHV-Rente ist eine Schätzung: Vollrente ab dem Sechsfachen der jährlichen Minimalrente, darunter linear interpoliert, abzüglich 1/44 je fehlendem Beitragsjahr. Massgebend ist die Rentenskala der Ausgleichskasse.",
+    "pensionChartHint": "Vor dem Rentenalter ({{age}}): AHV = 0; BVG, 3a und 3b zeigen das projizierte Kapital. Ab dann wird nichts mehr einbezahlt: Die BVG-Rente (Kapital × Umwandlungssatz) bleibt in Franken gleich und verliert real an Wert, 3a/3b werden über 20 Jahre mit 2 % Restverzinsung ausbezahlt und enden dann. Die AHV fliesst frühestens mit 63 (Vorbezug −6.8 % je Jahr, Aufschub bis 70 mit Zuschlag), inklusive 13. Rente, und bleibt in heutigen Franken gleich, weil sie der Lohn- und Preisentwicklung folgt. Beitragsjahre werden bis zum Rentenbeginn fortgeschrieben (max. 44). Die AHV-Rente folgt der Rentenformel der Ausgleichskasse; massgebend ist Ihr individueller Kontoauszug.",
     "saronHint": "Referenzwert zur Darstellung von SARON-Hypotheken (kein Live-Tageszins). Quelle und Details:",
     "birthdate": "Geburtsdatum",
     "yearsOld": "{{age}} Jahre",

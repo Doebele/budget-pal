@@ -226,9 +226,21 @@ async def run_projection(
             "retirement_age": r.retirement_age,
             "contribution_years": r.contribution_years,
             "average_insured_salary": r.average_insured_salary,
+            "conversion_rate": r.conversion_rate,
         }
         for r in pension_records
     ]
+
+    # Frueher in Rente heisst: weniger Beitragsjahre, also auch weniger Rente.
+    # Dieses Alter gilt fuer die Entnahmephase UND fuer die angezeigten Renten —
+    # sonst zeigte das Diagramm im Szenario die Renten mit dem geplanten Alter.
+    planned_retirement = merged.get("retirement_age", 65)
+    early_years = flow_inputs.pop("early_retirement_years", 3)
+    retirement = (
+        planned_retirement - early_years
+        if "early_retirement" in flow_inputs.get("active_scenarios", [])
+        else planned_retirement
+    )
 
     # Szenario-Cashflows (Fruehpensionierung, Pflegekosten, Amortisation).
     # Ohne aktive Szenarien bleibt annual_flows None und der Simulationspfad
@@ -242,15 +254,6 @@ async def run_projection(
             except ValueError:
                 pass
         inflation = merged.get("inflation_rate", 0.015)
-        planned_retirement = merged.get("retirement_age", 65)
-        early_years = flow_inputs.pop("early_retirement_years", 3)
-        # Frueher in Rente heisst: weniger Beitragsjahre, also auch weniger
-        # Rente. Deshalb geht das vorgezogene Alter in BEIDE Rechnungen.
-        retirement = (
-            planned_retirement - early_years
-            if "early_retirement" in flow_inputs["active_scenarios"]
-            else planned_retirement
-        )
         # Rentenserie vorab, damit die Entnahmephase die Rente als Einkommen
         # gegenrechnen kann. Rein rechnerisch, kein Monte Carlo.
         pension_series = projection_service.project_pension_series(
@@ -283,7 +286,7 @@ async def run_projection(
         inflation_rate=merged.get("inflation_rate", 0.015),
         pension_records=pension_payload,
         date_of_birth=date_of_birth,
-        retirement_age=merged.get("retirement_age", 65),
+        retirement_age=retirement,
         runs=settings.monte_carlo_runs,
         annual_flows=annual_flows,
     )

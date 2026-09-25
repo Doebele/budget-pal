@@ -237,8 +237,8 @@ export function getPeerGroupDefaults(profile: PeerGroupProfile): PeerGroupDefaul
   const subscriptionsBase = profile.householdType === "single" ? 100 : 130;
   const subscriptions = round10(subscriptionsBase);
 
-  // Pillar 3a: max annual contribution 2023 = CHF 7,056 for employed
-  const pillar3aAnnualMax = profile.employmentStatus === "self-employed" ? 35_280 : 7_056;
+  // Pillar 3a: max annual contribution 2025/2026 = CHF 7,258 for employed
+  const pillar3aAnnualMax = profile.employmentStatus === "self-employed" ? 36_288 : 7_258;
   const pillar3aUsageRate = profile.incomeLevel === "high" ? 0.95 : profile.incomeLevel === "medium" ? 0.70 : 0.35;
   const pillar_3a_monthly = Math.round((pillar3aAnnualMax * pillar3aUsageRate) / 12);
 

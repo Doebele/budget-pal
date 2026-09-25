@@ -601,12 +601,25 @@ budget-pal/
 
 ## Schweizer Rentenrechner
 
-| Säule | Typ | Max. 2024 | Beitrag |
-|-------|-----|-----------|---------|
-| AHV (1) | Staatlich | CHF 2'520/Monat | Pflicht, Lohnprozente |
-| BVG (2) | Berufsvorsorge | Kapital × 6.8% | Pflicht ab CHF 22'050 |
-| 3a | Privat gebunden | CHF 7'056/Jahr | Freiwillig, steuerfrei |
+| Säule | Typ | Werte 2025/2026 | Beitrag |
+|-------|-----|-----------------|---------|
+| AHV (1) | Staatlich | max. CHF 2'520/Monat × 13 (13. AHV-Rente ab Dez. 2026) | Pflicht, Lohnprozente |
+| BVG (2) | Berufsvorsorge | Kapital × Umwandlungssatz (Vorsorgeausweis, sonst 5.3 %) | Pflicht ab CHF 22'680 |
+| 3a | Privat gebunden | CHF 7'258/Jahr (ohne PK: 20 % bis CHF 36'288) | Freiwillig, steuerbegünstigt |
 | 3b | Privat frei | Unbegrenzt | Freiwillig |
+
+So rechnet die Prognose (`services/projection.py`, eine Rechnung für Wizard, Finanzplan und
+Rentendiagramm über `/api/pension/estimate`):
+
+- **AHV:** zweistufige Rentenformel (Rentenskala 44), −1/44 je fehlendem Beitragsjahr. Bezug
+  frühestens mit 63 (−6.8 % je Jahr Vorbezug), Aufschub bis 70 (+5.2 % bis +31.5 %). Die Rente
+  folgt Löhnen und Preisen und bleibt deshalb in heutigen Franken gleich.
+- **Pensionskasse:** Beiträge bis zum Rentenalter, danach feste Rente = Kapital × Umwandlungssatz.
+  Die gesetzlichen 6.8 % gelten nur für den obligatorischen Teil; die meisten Kassen rechnen aufs
+  ganze Guthaben mit 5.0–5.6 %. Die Rente wird in der Regel nicht der Teuerung angepasst.
+- **3a/3b:** Ansparen bis zum Rentenalter, danach 20 Jahre Auszahlung mit 2 % Restverzinsung.
+- Noch nicht abgebildet: Kapitalbezug und dessen Steuer, gestaffelter 3a-Bezug, AHV-Beiträge als
+  Nichterwerbstätige bei Frühpensionierung, Plafonierung für Ehepaare.
 
 ---
 

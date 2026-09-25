@@ -565,17 +565,27 @@ async def import_backup(
 
     # ── Pension data ───────────────────────────────────────────
     if payload.import_pension_assets:
+        def pension_key(pillar: str, provider, balance) -> tuple:
+            # AHV und BVG gibt es je einmal. 3a/3b sind oft mehrere Konten,
+            # auch beim selben Anbieter — Anbieter + Guthaben unterscheidet
+            # sie, und ein zweiter Import desselben Backups legt nichts doppelt an.
+            if pillar in ("1", "2"):
+                return (pillar,)
+            return (pillar, provider, round(float(balance or 0.0), 2))
+
+        existing_rows = (await db.execute(
+            select(PensionData).where(PensionData.user_id == uid)
+        )).scalars().all()
+        seen = {pension_key(r.pillar.value, r.provider, r.current_balance) for r in existing_rows}
+
         for p_data in backup.get("pension_data", []):
             pillar = p_data.get("pillar")
             if not pillar:
                 continue
-            existing_p = (await db.execute(
-                select(PensionData).where(
-                    and_(PensionData.user_id == uid, PensionData.pillar == pillar)
-                )
-            )).scalar_one_or_none()
-            if existing_p is not None:
+            key = pension_key(pillar, p_data.get("provider"), p_data.get("current_balance"))
+            if key in seen:
                 continue  # keep existing
+            seen.add(key)
             db.add(PensionData(
                 user_id=uid,
                 pillar=pillar,
@@ -586,6 +596,7 @@ async def import_backup(
                 retirement_age=p_data.get("retirement_age", 65),
                 contribution_years=p_data.get("contribution_years"),
                 average_insured_salary=p_data.get("average_insured_salary"),
+                conversion_rate=p_data.get("conversion_rate"),
                 notes=p_data.get("notes"),
             ))
             result.pension_created += 1
