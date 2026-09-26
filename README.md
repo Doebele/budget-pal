@@ -617,7 +617,18 @@ Rentendiagramm über `/api/pension/estimate`):
 - **Pensionskasse:** Beiträge bis zum Rentenalter, danach feste Rente = Kapital × Umwandlungssatz.
   Die gesetzlichen 6.8 % gelten nur für den obligatorischen Teil; die meisten Kassen rechnen aufs
   ganze Guthaben mit 5.0–5.6 %. Die Rente wird in der Regel nicht der Teuerung angepasst.
-- **3a/3b:** Ansparen bis zum Rentenalter, danach 20 Jahre Auszahlung mit 2 % Restverzinsung.
+- **3a:** Ansparen bis zum Rentenalter, dann **Kapitalbezug pro Konto** (ein Konto lässt sich nur
+  als Ganzes beziehen). Ohne eigenes Bezugsalter staffelt der Planer: ein Konto pro Jahr, so spät
+  wie möglich, frühestens mit 60, spätestens mit 65 (bei Weiterarbeit bis 70), nie im Jahr des
+  Pensionskassen-Kapitals.
+- **3b:** Ansparen bis zum Rentenalter, danach 20 Jahre Auszahlung mit 2 % Restverzinsung.
+- **Pensionskasse als Kapital:** frei wählbarer Anteil (0–100 %). Der Kapitalteil fliesst im
+  Bezugsjahr nach Steuer ins freie Vermögen, der Rest wird Rente.
+- **Steuer auf Kapitalbezüge** (`services/capital_tax.py`): Bund exakt (ein Fünftel des Tarifs
+  2026, ESTV Form. 58c; die geplante Verschärfung hat das Parlament im März 2026 gestrichen),
+  Kanton und Gemeinde für den Kantonshauptort aus dem ESTV-Steuerrechner
+  (`services/data/capital_tax_2026.json`, 26 Kantone, alleinstehend/verheiratet, 50'000–2 Mio.).
+  Alle Bezüge eines Jahres werden zusammen besteuert. Kanton und Tarif kommen aus dem Wizard.
 - **Bezugsbeginn je Säule:** AHV 63–70, Pensionskasse ab 58 (davor verzinst auf dem
   Freizügigkeitskonto; Umwandlungssatz −0.15 Prozentpunkte je Jahr vor 65, + je Jahr danach),
   3a 60–70, 3b ab Rentenalter.
@@ -630,8 +641,9 @@ Rentendiagramm über `/api/pension/estimate`):
   (0.8), sonst 80 % von (72 % des Bruttolohns − Sparrate).
 - **Szenarien:** Frühpensionierung = dieselbe Rechnung mit früherem Rentenalter (lebenslang). Pflege
   ab 80 ersetzt 60 % der normalen Lebenskosten.
-- Noch nicht abgebildet: Kapitalbezug und dessen Steuer, gestaffelter 3a-Bezug, Plafonierung für
-  Ehepaare, Befreiung von AHV-Beiträgen durch einen erwerbstätigen Ehepartner.
+- Noch nicht abgebildet: Plafonierung für Ehepaare, Kapitalbezüge des Ehepartners im selben Jahr,
+  Befreiung von AHV-Beiträgen durch einen erwerbstätigen Ehepartner, Gemeinden ausserhalb des
+  Kantonshauptorts, Kirchensteuer.
 
 ---
 

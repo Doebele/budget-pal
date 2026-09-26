@@ -34,6 +34,7 @@ import {
 } from "@/services/peerGroupAnalyzer";
 import type { PeerGroupDefaults, PeerGroupProfile } from "@/services/peerGroupAnalyzer";
 import StepIndicator from "@/components/wizard/StepIndicator";
+import WithdrawalPlan from "@/components/WithdrawalPlan";
 import PeerGroupCard from "@/components/wizard/PeerGroupCard";
 import Step5AccordionExpenses from "@/components/wizard/Step5AccordionExpenses";
 import type { SelectedExpenseEntry, CustomExpenseEntry } from "@/components/wizard/Step5AccordionExpenses";
@@ -46,6 +47,8 @@ interface Pillar3aAccount {
   balance: number;
   annualContribution: number;
   strategy: "interest" | "funds";
+  /** Alter beim Bezug (60-70); null/fehlend = der Planer staffelt. */
+  withdrawalAge?: number | null;
 }
 
 interface MortgageEntry {
@@ -135,6 +138,8 @@ interface WizardData {
   bvgRentenalter: number;
   /** Umwandlungssatz laut Vorsorgeausweis in Prozent (5.3 = 5.3 %). */
   bvgUmwandlungssatz: number;
+  /** Anteil der Pensionskasse, der als Kapital bezogen wird, in Prozent. */
+  bvgKapitalanteil: number;
   pillar3aAccounts: Pillar3aAccount[];
   hasLifeInsurance: boolean;
   lifeInsuranceType: "kapital" | "risiko" | "gemischt";
@@ -224,6 +229,7 @@ const DEFAULT_WIZARD_DATA: WizardData = {
   bvgJahresbeitrag: 8_000,
   bvgRentenalter: 65,
   bvgUmwandlungssatz: 5.3,
+  bvgKapitalanteil: 0,
   pillar3aAccounts: [{ provider: "VIAC", balance: 20_000, annualContribution: 7_258, strategy: "funds" }],
   hasLifeInsurance: false,
   lifeInsuranceType: "kapital",
@@ -295,12 +301,18 @@ function usePensionEstimate(data: WizardData, retirementAge: number): PensionEst
     bvg_balance: data.bvgGuthaben,
     bvg_annual_contribution: data.bvgJahresbeitrag,
     bvg_conversion_rate: (data.bvgUmwandlungssatz ?? 5.3) / 100,
-    pillar_3a: data.pillar3aAccounts.map((a) => ({
+    bvg_capital_share: (data.bvgKapitalanteil ?? 0) / 100,
+    pillar_3a: data.pillar3aAccounts.map((a, i) => ({
       balance: a.balance,
       annual_contribution: a.annualContribution,
       return_rate: a.strategy === "funds" ? 0.04 : 0.01,
+      provider: a.provider || `3a ${i + 1}`,
+      withdrawal_age: a.withdrawalAge ?? null,
     })),
     inflation_rate: data.inflation / 100,
+    // Steuer auf Kapitalbezuege: Kanton und Tarif aus Schritt 1
+    canton: data.kanton,
+    married: data.haushalt !== "single",
   };
   const { data: estimate } = useQuery({
     queryKey: ["pension-estimate", input],
@@ -1538,6 +1550,17 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
             />
           </Field>
 
+          <Field label={t("pages:wizard.bvgCapitalShare")} hint={t("pages:wizard.bvgCapitalShareHint")}>
+            <Slider
+              value={data.bvgKapitalanteil ?? 0}
+              min={0}
+              max={100}
+              step={5}
+              onChange={(v) => update({ bvgKapitalanteil: v })}
+              format={(v) => (v === 0 ? t("pages:wizard.pensionOnly") : `${v} %`)}
+            />
+          </Field>
+
           <Field label={t("pages:wizard.w128")}>
             <Slider
               value={data.bvgRentenalter}
@@ -1618,6 +1641,24 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
                     <option value="funds">{t("pages:wizard.w123")}</option>
                   </select>
                 </Field>
+                <Field label={t("pages:wizard.withdrawalAge")}>
+                  <select
+                    className="input"
+                    value={acc.withdrawalAge ?? ""}
+                    onChange={(e) =>
+                      updateAccount(idx, { withdrawalAge: e.target.value ? Number(e.target.value) : null })
+                    }
+                  >
+                    <option value="">
+                      {t("pages:wizard.withdrawalAuto", {
+                        age: estimate?.capital_withdrawals.find((w) => w.source === "3a" && w.account === idx)?.age ?? "–",
+                      })}
+                    </option>
+                    {Array.from({ length: 11 }, (_, i) => 60 + i).map((age) => (
+                      <option key={age} value={age}>{age}</option>
+                    ))}
+                  </select>
+                </Field>
               </div>
             </div>
           ))}
@@ -1645,6 +1686,13 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
               <span className="text-text-secondary">{t("pages:wizard.w161")}</span>
               <span className="font-mono font-semibold text-text-primary">{chf(pillar3aTotal)}</span>
             </div>
+          )}
+
+          {estimate && estimate.capital_withdrawals.length > 0 && (
+            <WithdrawalPlan
+              withdrawals={estimate.capital_withdrawals}
+              taxSingleYear={estimate.capital_tax_single_year}
+            />
           )}
         </div>
       </div>

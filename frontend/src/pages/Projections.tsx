@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth";
 import { formatCHF } from "@/lib/theme";
 import { useThemeColors } from "@/hooks/useThemeColors";
 import MonteCarloChart from "@/components/charts/MonteCarloChart";
+import WithdrawalPlan from "@/components/WithdrawalPlan";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
@@ -131,18 +132,21 @@ export default function Projections() {
   const serverRetIdx = projection?.retirement_idx ?? yearsToRetirement;
   const retirementInHorizon = serverRetIdx <= selectedHorizon.years;
   const retIdx = retirementInHorizon ? serverRetIdx : null;
-  // Jede Saeule bei ihrem Bezugsbeginn lesen (AHV ab 63, BVG ab 58, 3a ab 60):
-  // davor steht in der Reihe das Kapital, keine Rente.
-  const pensionAt = (series: number[] | undefined, pillar: "1" | "2" | "3a" | "3b") => {
+  // Jede Saeule bei ihrem Bezugsbeginn lesen (AHV ab 63, BVG ab 58): davor
+  // steht in der Reihe das Kapital, keine Rente. Die 3a zahlt keine Rente —
+  // sie wird als Kapital bezogen (Bezugsplan).
+  const pensionAt = (series: number[] | undefined, pillar: "1" | "2" | "3b") => {
     if (retIdx == null || !series) return 0;
     const idx = Math.max(retIdx, projection?.payout_start_idx?.[pillar] ?? retIdx);
     return series[Math.min(idx, series.length - 1)] ?? 0;
   };
   const ahvAtRet = pensionAt(projection?.pension_ahv, "1");
   const bvgAtRet = pensionAt(projection?.pension_bvg, "2");
-  const p3aAtRet = pensionAt(projection?.pension_3a, "3a");
   const p3bAtRet = pensionAt(projection?.pension_3b, "3b");
-  const totalPensionAnnual = ahvAtRet + bvgAtRet + p3aAtRet + p3bAtRet;
+  const totalPensionAnnual = ahvAtRet + bvgAtRet + p3bAtRet;
+  const p3aNet = (projection?.capital_withdrawals ?? [])
+    .filter((w) => w.source === "3a")
+    .reduce((sum, w) => sum + w.amount - w.tax, 0);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -374,7 +378,6 @@ export default function Projections() {
               {[
                 { label: t("pages:ui.ahv_saeule_1"), annual: ahvAtRet, color: PILLAR_COLORS.ahv },
                 { label: t("pages:ui.bvg_saeule_2"), annual: bvgAtRet, color: PILLAR_COLORS.bvg },
-                { label: t("pages:ui.saeule_3a"), annual: p3aAtRet, color: PILLAR_COLORS["3a"] },
                 { label: t("pages:ui.saeule_3b_lv"), annual: p3bAtRet, color: PILLAR_COLORS["3b"] },
               ].map(({ label, annual, color }) => (
                 <div key={label} className="bg-bg-elevated rounded-lg px-4 py-3 border border-border/30">
@@ -386,6 +389,14 @@ export default function Projections() {
                   <p className="text-text-tertiary text-[10px]">{formatCHF(annual)} / Jahr</p>
                 </div>
               ))}
+              {/* 3a: keine Rente, sondern Kapital (netto nach Steuer) */}
+              <div className="bg-bg-elevated rounded-lg px-4 py-3 border border-border/30">
+                <p className="text-text-tertiary text-[11px] mb-1">{t("pages:ui.saeule_3a")}</p>
+                <p className="font-mono font-bold text-lg" style={{ color: PILLAR_COLORS["3a"] }}>
+                  {formatCHF(p3aNet)}
+                </p>
+                <p className="text-text-tertiary text-[10px] mt-0.5">{t("pages:plan.p3aCard")}</p>
+              </div>
             </div>
             {/* Total */}
             <div className="flex items-center justify-between bg-accent/8 border border-accent/20 rounded-lg px-4 py-3">
@@ -398,6 +409,10 @@ export default function Projections() {
                 <p className="text-text-tertiary text-[10px]">pro Monat · {formatCHF(totalPensionAnnual)} / Jahr</p>
               </div>
             </div>
+            <WithdrawalPlan
+              withdrawals={projection.capital_withdrawals}
+              taxSingleYear={projection.capital_tax_single_year}
+            />
           </div>
         )}
         {projection && !retirementInHorizon && (

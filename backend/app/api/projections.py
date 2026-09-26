@@ -19,6 +19,8 @@ from app.core.database import get_db
 from app.core.security import get_current_user
 from app.core.config import settings
 from app.models.models import Scenario, PensionData, User
+from app.api.budget_multimodal import _get_wizard_scenario
+from app.services.capital_tax import tax_profile
 from app.services.projection import (
     AMORTIZATION_YEARS_DEFAULT,
     CARE_COST_ANNUAL_DEFAULT,
@@ -51,6 +53,10 @@ class ProjectionParameters(BaseModel):
     # Jaehrliche Lebenskosten im Ruhestand in heutigen CHF. Ohne Angabe: aus
     # dem Szenario (Ausgaben x Lebensstilfaktor), sonst geschaetzt.
     retirement_spending: Optional[float] = Field(default=None, ge=0)
+    # Steuer auf Kapitalbezuege: ohne Angabe aus dem Wizard-Szenario (Kanton,
+    # Haushalt), sonst Zuerich / alleinstehend
+    canton: Optional[str] = Field(default=None, min_length=2, max_length=2)
+    married: Optional[bool] = None
 
 
 class ProjectionResult(BaseModel):
@@ -73,6 +79,11 @@ class ProjectionResult(BaseModel):
     depletion_age: Optional[int] = None
     # Anteil der Simulationen mit Vermoegen am Ende des Horizonts
     success_rate: Optional[float] = None
+    # Kapitalbezuege (Pensionskasse, 3a): Alter, Jahr, Betrag, Steuer — real
+    capital_withdrawals: List[Dict[str, Any]] = []
+    capital_tax_total: float = 0.0
+    # Steuer, wenn alles im selben Jahr bezogen wuerde (Vergleich zur Staffelung)
+    capital_tax_single_year: float = 0.0
     # run() liefert das seit jeher, das Schema hat es verschluckt — das
     # Frontend (RetirementPlanner.tsx:75) las darum immer undefined.
     retirement_idx: Optional[int] = None
@@ -183,6 +194,7 @@ async def run_projection(
     # — Pydantic-Defaults duerfen es nicht ueberschreiben.
     merged: Dict[str, Any] = {}
     flow_inputs: Dict[str, Any] = {}
+    scenario_params: Optional[Dict[str, Any]] = None
     if scenario_id:
         scenario_row = await db.execute(
             select(Scenario).where(
@@ -195,6 +207,7 @@ async def run_projection(
             raise HTTPException(status_code=404, detail="Scenario not found.")
         merged.update(_params_from_scenario(scenario.parameters_json))
         flow_inputs = _flow_inputs(scenario.parameters_json)
+        scenario_params = scenario.parameters_json
     merged.update(params.model_dump(exclude_unset=True))
 
     # Pflichtwerte pruefen — die Validierung an der Vertrauensgrenze bleibt,
@@ -238,6 +251,9 @@ async def run_projection(
             "contribution_years": r.contribution_years,
             "average_insured_salary": r.average_insured_salary,
             "conversion_rate": r.conversion_rate,
+            "capital_share": r.capital_share,
+            "withdrawal_age": r.withdrawal_age,
+            "provider": r.provider,
         }
         for r in pension_records
     ]
@@ -279,6 +295,15 @@ async def run_projection(
             **flow_inputs,
         )
 
+    # Steuer auf Kapitalbezuege: Anfrage > gewaehltes Szenario > letzter
+    # Wizard > Vorgabe (Zuerich, alleinstehend)
+    if not (scenario_params or {}).get("kanton"):
+        scenario_params = await _get_wizard_scenario(current_user.id, db)
+    canton, married = tax_profile(scenario_params)
+    canton = (merged.get("canton") or canton).upper()
+    if merged.get("married") is not None:
+        married = bool(merged["married"])
+
     # Run simulation
     result_data = projection_service.run(
         current_net_worth=merged["current_net_worth"],
@@ -294,6 +319,8 @@ async def run_projection(
         runs=settings.monte_carlo_runs,
         annual_flows=annual_flows,
         retirement_spending=retirement_spending,
+        canton=canton,
+        married=married,
     )
 
     result_dict = result_data.copy()

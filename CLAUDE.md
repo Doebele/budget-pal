@@ -247,8 +247,14 @@ Central definition of all 11 supercategories (wohnen, essen, mobilitaet, versich
 - BVG (Pillar 2): contributions stop at retirement; pension = capital at retirement ×
   `pension_data.conversion_rate` (from the certificate) or `BVG_CONVERSION_RATE_DEFAULT` (5.3 %).
   The legal 6.8 % only applies to the mandatory part. Fixed in nominal CHF after retirement.
-- Pillar 3a/3b: contributions stop at retirement, then a fixed payout for `PAYOUT_YEARS`, then 0.
+- Pillar 3a: contributions stop at retirement; each account is withdrawn **as capital** at its
+  `withdrawal_age` or at the staggered age from `plan_3a_ages` (one account per year, latest
+  first, never in the BVG capital year). The series holds the balance until then, 0 after.
   Max `PILLAR_3A_MAX_CONTRIBUTION` CHF/year.
+- Pillar 3b: contributions stop at retirement, then a fixed payout for `PAYOUT_YEARS`, then 0.
+- Capital withdrawals (`ProjectionService.capital_withdrawals`: BVG `capital_share` + 3a) are
+  taxed per calendar year by `services/capital_tax.py` (federal tariff 2026 exact, cantonal from
+  ESTV data for the cantonal capital) and flow into free wealth net of tax.
 - Payout starts per pillar (`payout_start_ages`): AHV 63-70, BVG 58-70 (conversion rate
   ±`BVG_CONVERSION_STEP` per year vs. 65), 3a 60-70. Before its start a series holds *capital*,
   not income — use `pension_income()` for cash flows, never the raw sum of the series.

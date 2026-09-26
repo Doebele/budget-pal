@@ -207,14 +207,18 @@ export interface ProjectionResult {
   /** Jaehrliches Renteneinkommen — nur Saeulen, die schon auszahlen. */
   pension_income: number[];
   retirement_idx: number | null;
-  /** Index, ab dem jede Saeule auszahlt: "1" AHV, "2" BVG, "3a", "3b". */
-  payout_start_idx: Record<"1" | "2" | "3a" | "3b", number>;
+  /** Index, ab dem jede Saeule eine Rente zahlt: "1" AHV, "2" BVG, "3b".
+   *  Die 3a zahlt keine Rente, sie wird als Kapital bezogen. */
+  payout_start_idx: Record<"1" | "2" | "3b", number>;
   /** Jaehrliche Lebenskosten im Ruhestand, die die Rechnung verwendet hat. */
   retirement_spending: number | null;
   /** Alter, ab dem das Vermoegen im Median aufgebraucht ist; null = reicht. */
   depletion_age: number | null;
   /** Anteil der Simulationen mit Vermoegen am Ende des Horizonts (0-1). */
   success_rate: number | null;
+  capital_withdrawals: CapitalWithdrawal[];
+  capital_tax_total: number;
+  capital_tax_single_year: number;
   inflation_adjusted: boolean;
   computed_at: string;
   runs: number;
@@ -283,18 +287,40 @@ export const taxonomyApi = {
 /** Schaetzung bei Pensionierung — dieselbe Rechnung wie die Prognose.
  *  Alle Betraege in heutigen CHF, Monatswerte = Jahreswert / 12 (bei der AHV
  *  steckt die 13. Rente anteilig darin). */
+/** Ein Kapitalbezug (Pensionskasse oder ein 3a-Konto), heutige CHF. Die
+ *  Steuer ist der Anteil an der Steuer des Bezugsjahres — alle Bezuege eines
+ *  Jahres werden zusammen besteuert. */
+export interface CapitalWithdrawal {
+  source: "bvg" | "3a";
+  label: string;
+  age: number;
+  year: number;
+  amount: number;
+  tax: number;
+  /** Nur 3a: Position des Kontos in der Eingabe. */
+  account?: number;
+}
+
 export interface PensionEstimate {
   retirement_age: number;
   years_to_retirement: number;
   ahv_start_age: number;
+  bvg_start_age: number;
   ahv_monthly: number;
   bvg_capital: number;
   bvg_conversion_rate: number;
+  bvg_capital_share: number;
+  bvg_lump_sum: number;
   bvg_monthly: number;
   pillar_3a_capital: number;
-  pillar_3a_monthly: number;
   pillar_3b_capital: number;
   pillar_3b_monthly: number;
+  capital_withdrawals: CapitalWithdrawal[];
+  capital_tax: number;
+  /** Steuer, wenn alles im selben Jahr bezogen wuerde. */
+  capital_tax_single_year: number;
+  capital_net: number;
+  /** Renten (AHV + BVG + 3b) pro Monat; Kapitalbezuege sind nicht darin. */
   total_monthly: number;
 }
 
@@ -306,8 +332,19 @@ export interface PensionEstimateInput {
   bvg_balance?: number;
   bvg_annual_contribution?: number;
   bvg_conversion_rate?: number | null;
-  pillar_3a?: { balance: number; annual_contribution: number; return_rate?: number }[];
+  /** Anteil der Pensionskasse als Kapital, 0-1. */
+  bvg_capital_share?: number;
+  pillar_3a?: {
+    balance: number;
+    annual_contribution: number;
+    return_rate?: number;
+    provider?: string;
+    /** null = der Planer staffelt */
+    withdrawal_age?: number | null;
+  }[];
   inflation_rate?: number;
+  canton?: string;
+  married?: boolean;
 }
 
 export const pensionApi = {

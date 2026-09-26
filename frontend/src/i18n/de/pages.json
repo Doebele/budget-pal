@@ -337,7 +337,12 @@
     "ahvFromAge": "pro Monat ab {{age}}, inkl. 13. AHV-Rente, in heutigen Franken",
     "bvgConversion": "Umwandlungssatz",
     "bvgConversionHint": "Steht auf dem Vorsorgeausweis. Die gesetzlichen 6.8 % gelten nur für den obligatorischen Teil; die meisten Kassen rechnen aufs ganze Guthaben mit 5.0–5.6 %.",
-    "bvgConversionUsed": "Umwandlungssatz {{rate}} %, in heutigen Franken"
+    "bvgConversionUsed": "Umwandlungssatz {{rate}} %, in heutigen Franken",
+    "bvgCapitalShare": "Bezug als Kapital",
+    "pensionOnly": "nur Rente",
+    "bvgCapitalShareHint": "Anteil des Pensionskassenguthabens, den Sie als Kapital beziehen – mindestens 25 % des obligatorischen Teils sind gesetzlich möglich, viele Kassen erlauben 100 %. Die Kasse verlangt meist eine Anmeldung Monate bis Jahre im Voraus; nach einem Einkauf gilt eine Sperrfrist von 3 Jahren.",
+    "withdrawalAge": "Bezug mit",
+    "withdrawalAuto": "automatisch ({{age}})"
   },
   "step5": {
     "s00": "Alltag & Abonnements",
@@ -850,5 +855,20 @@
     "reviewDone": "Danke — die Zuordnungen sind gespeichert und gelten ab jetzt auch für neue Buchungen.",
     "estimateTitle": "Budget selbst einschätzen",
     "estimateBody": "Vier Schritte: Profil, Einkommen, Wohnen und Alltag mit Abos. Deine eigene Einschätzung — sie darf auch Dinge enthalten, die es in keinem Kontoauszug gibt."
+  },
+  "plan": {
+    "title": "Bezugsplan Kapital (Pensionskasse, 3a)",
+    "when": "Alter (Jahr)",
+    "what": "Bezug",
+    "amount": "Betrag",
+    "tax": "Steuer",
+    "net": "Netto",
+    "total": "Total",
+    "age": "{{age}} ({{year}})",
+    "bvg": "Pensionskasse – Kapital ({{label}})",
+    "p3a": "Säule 3a – {{label}}",
+    "saving": "Die Staffelung spart rund {{amount}} Steuern gegenüber einem Bezug aller Kapitalien im selben Jahr.",
+    "rules": "Ein 3a-Konto lässt sich nur als Ganzes beziehen – darum ein Konto pro Jahr, frühestens mit 60, spätestens mit 65 (bei Weiterarbeit bis 70), nie im Jahr des Pensionskassen-Kapitals. Bei Ehepaaren werden die Bezüge beider Partner im selben Jahr zusammengezählt. Steuer: Bund exakt (ein Fünftel des Tarifs 2026), Kanton und Gemeinde für den Kantonshauptort laut ESTV-Steuerrechner, ohne Kirchensteuer; in heutigen Franken. Keine Steuerberatung.",
+    "p3aCard": "Kapital netto nach Steuer, gestaffelt bezogen"
   }
 }

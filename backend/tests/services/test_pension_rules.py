@@ -82,11 +82,11 @@ class TestAfterRetirement:
         _, bvg, _, _ = _series(65, inflation=0.015)
         assert at(bvg, 80) < at(bvg, 65)
 
-    def test_3a_payout_is_fixed_and_ends(self):
+    def test_3a_stays_capital_until_withdrawn(self):
+        """Zwei Konten, gestaffelt mit 64 und 65 bezogen: danach 0."""
         _, _, p3a, _ = _series(65)
-        assert at(p3a, 75) == pytest.approx(at(p3a, 65))
-        assert at(p3a, 65 + PAYOUT_YEARS - 1) > 0
-        assert at(p3a, 65 + PAYOUT_YEARS) == 0.0
+        assert at(p3a, 63) > at(p3a, 64) > 0   # das erste Konto ist mit 64 weg
+        assert at(p3a, 65) == 0.0
 
     def test_early_retirement_means_less_bvg(self):
         """Wer mit 62 aufhoert, zahlt drei Jahre weniger ein. Frueher hatte er
@@ -128,10 +128,10 @@ class TestEstimate:
         )
         assert est["ahv_monthly"] * 12 == pytest.approx(at(ahv, 65))
         assert est["bvg_monthly"] * 12 == pytest.approx(at(bvg, 65))
-        assert est["pillar_3a_monthly"] * 12 == pytest.approx(at(p3a, 65))
+        # 3a ist Kapital, keine Rente — zwei Konten, gestaffelt bezogen
+        assert [w["source"] for w in est["capital_withdrawals"]] == ["3a", "3a"]
         assert est["total_monthly"] == pytest.approx(
-            est["ahv_monthly"] + est["bvg_monthly"] + est["pillar_3a_monthly"]
-            + est["pillar_3b_monthly"]
+            est["ahv_monthly"] + est["bvg_monthly"] + est["pillar_3b_monthly"]
         )
 
     def test_reports_when_ahv_starts(self):
@@ -224,17 +224,18 @@ class TestEarlyRetirementCosts:
         rate = BVG_CONVERSION_RATE_DEFAULT - 7 * BVG_CONVERSION_STEP
         assert SERVICE._project_bvg(58, 55, record, 0, 3) == pytest.approx(400_000 * rate)
 
-    def test_3a_is_paid_from_60_at_the_earliest(self):
+    def test_3a_withdrawal_needs_age_60(self):
+        """Wer mit 55 aufhoert, bezieht die 3a trotzdem erst ab 60; bis dahin
+        verzinst sie sich ohne Beitraege."""
         record = {"current_balance": 100_000, "annual_contribution": 7_258, "expected_return_rate": 0.0}
-        # Rente mit 55: Einzahlen endet, bis 60 wird nur verwahrt
         assert SERVICE._project_3a(59, 55, record, 9) == pytest.approx(100_000 + 5 * 7_258)
-        assert SERVICE._project_3a(60, 55, record, 10) > 0
-        assert SERVICE._project_3a(60, 55, record, 10) < 100_000
+        ages = SERVICE.capital_withdrawals([{"pillar": "3a", **record}], 50, 55, 0, 0.0)
+        assert ages[0]["age"] >= 60
 
     def test_capital_before_payout_is_not_income(self):
         """Mit 55 in Rente: BVG und 3a sind bis 58/60 Kapital, kein Einkommen."""
         r = _run(pension_records=RECORDS, annual_income=100_000, retirement_age=55)
-        assert r["payout_start_idx"] == {"1": 13, "2": 8, "3a": 10, "3b": 5}
+        assert r["payout_start_idx"] == {"1": 13, "2": 8, "3b": 5}
         assert at(r["pension_income"], 56) == 0.0
         assert at(r["pension_income"], 58) == pytest.approx(at(r["pension_bvg"], 58))
 

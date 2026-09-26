@@ -80,6 +80,8 @@ class Pillar3aAccountPayload(BaseModel):
     balance: float = 0.0
     annual_contribution: float = 7_258.0
     strategy: Literal["interest", "funds"] = "funds"
+    # Alter beim Bezug (60-70); None = der Planer staffelt die Konten
+    withdrawal_age: Optional[int] = Field(default=None, ge=60, le=70)
 
 
 class SelectedExpenseEntryPayload(BaseModel):
@@ -232,6 +234,8 @@ class WizardCompletePayload(BaseModel):
     # Umwandlungssatz laut Vorsorgeausweis in Prozent (5.3 = 5.3 %). Die
     # gesetzlichen 6.8 % gelten nur fuer den obligatorischen Teil.
     bvg_umwandlungssatz: float = Field(default=5.3, ge=2.0, le=8.0)
+    # Anteil des Pensionskassenguthabens, der als Kapital bezogen wird, in Prozent
+    bvg_kapitalanteil: float = Field(default=0.0, ge=0.0, le=100.0)
     # Explicit alias: auto to_camel yields pillar3AAccounts, but the app sends pillar3aAccounts.
     pillar_3a_accounts: List[Pillar3aAccountPayload] = Field(
         default_factory=list,
@@ -405,6 +409,7 @@ def _build_scenario_params(p: WizardCompletePayload) -> dict:
         "bvg_jahresbeitrag": p.bvg_jahresbeitrag,
         "bvg_rentenalter": p.bvg_rentenalter,
         "bvg_umwandlungssatz": p.bvg_umwandlungssatz,
+        "bvg_kapitalanteil": p.bvg_kapitalanteil,
         "pillar_3a_total": sum(a.balance for a in p.pillar_3a_accounts),
     }
 
@@ -777,6 +782,7 @@ async def wizard_complete(
         expected_return_rate=0.015,  # BVG Mindestzins
         retirement_age=payload.bvg_rentenalter,
         conversion_rate=payload.bvg_umwandlungssatz / 100,
+        capital_share=payload.bvg_kapitalanteil / 100,
         notes=f"BVG Guthaben aus empirischen Angaben | Rentenalter: {payload.bvg_rentenalter}",
         as_of_date=_now(),
     )
@@ -817,6 +823,7 @@ async def wizard_complete(
             annual_contribution=acc_3a.annual_contribution,
             expected_return_rate=expected_return,
             retirement_age=payload.ziel_rentenalter,
+            withdrawal_age=acc_3a.withdrawal_age,
             notes=f"Strategie: {acc_3a.strategy} | Import aus empirischen Angaben",
             as_of_date=_now(),
         )

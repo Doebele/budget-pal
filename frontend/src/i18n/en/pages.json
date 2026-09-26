@@ -337,7 +337,12 @@
     "ahvFromAge": "per month from age {{age}}, incl. 13th AHV pension, in today's francs",
     "bvgConversion": "Conversion rate",
     "bvgConversionHint": "Shown on your pension fund certificate. The legal 6.8 % only applies to the mandatory part; most funds apply 5.0–5.6 % to the whole balance.",
-    "bvgConversionUsed": "Conversion rate {{rate}} %, in today's francs"
+    "bvgConversionUsed": "Conversion rate {{rate}} %, in today's francs",
+    "bvgCapitalShare": "Withdraw as capital",
+    "pensionOnly": "pension only",
+    "bvgCapitalShareHint": "Share of your pension fund balance you withdraw as capital – at least 25 % of the mandatory part is allowed by law, many funds allow 100 %. Funds usually require notice months to years in advance; after a buy-in a 3-year lock applies.",
+    "withdrawalAge": "Withdraw at",
+    "withdrawalAuto": "automatic ({{age}})"
   },
   "step5": {
     "s00": "Everyday & subscriptions",
@@ -850,5 +855,20 @@
     "reviewDone": "Thanks — the assignments are saved and now apply to new transactions too.",
     "estimateTitle": "Estimate your budget",
     "estimateBody": "Four steps: profile, income, housing and daily life with subscriptions. Your own estimate — it may include things no bank statement knows about."
+  },
+  "plan": {
+    "title": "Capital withdrawal plan (pension fund, 3a)",
+    "when": "Age (year)",
+    "what": "Withdrawal",
+    "amount": "Amount",
+    "tax": "Tax",
+    "net": "Net",
+    "total": "Total",
+    "age": "{{age}} ({{year}})",
+    "bvg": "Pension fund – capital ({{label}})",
+    "p3a": "Pillar 3a – {{label}}",
+    "saving": "Staggering saves about {{amount}} in taxes compared with withdrawing all capital in the same year.",
+    "rules": "A 3a account can only be withdrawn in full – hence one account per year, from 60 at the earliest, by 65 at the latest (up to 70 if still working), never in the year of the pension fund capital. For married couples, both partners' withdrawals in the same year are added together. Tax: federal exact (one fifth of the 2026 tariff), cantonal and communal for the cantonal capital per the ESTV tax calculator, without church tax; in today's francs. Not tax advice.",
+    "p3aCard": "Capital net of tax, withdrawn in stages"
   }
 }

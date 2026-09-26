@@ -20,6 +20,7 @@ import {
 import { ArrowRight, Calendar, Coins, GraphUp, ShieldCheck, WarningTriangle } from "@/lib/icons";
 import { projectionsApi, api } from "@/lib/api";
 import { formatCHF } from "@/lib/theme";
+import WithdrawalPlan from "@/components/WithdrawalPlan";
 import { useTranslation } from "react-i18next";
 
 interface Props {
@@ -84,19 +85,19 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
   const wealthAtRetirement = projection?.p50?.[retirementIdx] ?? 0;
 
   // Renten ab dem Jahr, in dem alle Saeulen zahlen (AHV frühestens mit 63,
-  // BVG ab 58, 3a ab 60). Vor dem Bezugsbeginn stehen in den Reihen Kapitalien.
+  // BVG ab 58). Vor dem Bezugsbeginn stehen in den Reihen Kapitalien. Die 3a
+  // zahlt keine Rente — sie wird als Kapital bezogen (Bezugsplan unten).
   const starts = projection?.payout_start_idx;
   const lastIdx = (projection?.years?.length ?? 1) - 1;
   const fullIdx = Math.min(
-    starts ? Math.max(starts["1"], starts["2"], starts["3a"], starts["3b"], retirementIdx) : retirementIdx,
+    starts ? Math.max(starts["1"], starts["2"], starts["3b"], retirementIdx) : retirementIdx,
     Math.max(lastIdx, 0),
   );
-  const paying = (pillar: "1" | "2" | "3a" | "3b", idx: number) => !starts || idx >= starts[pillar];
+  const paying = (pillar: "1" | "2" | "3b", idx: number) => !starts || idx >= starts[pillar];
   const ahvMonthly       = (projection?.pension_ahv?.[fullIdx] ?? 0) / 12;
   const bvgMonthly       = (projection?.pension_bvg?.[fullIdx] ?? 0) / 12;
-  const pillar3aMonthly  = paying("3a", fullIdx) ? (projection?.pension_3a?.[fullIdx] ?? 0) / 12 : 0;
   const pillar3bMonthly  = paying("3b", fullIdx) ? (projection?.pension_3b?.[fullIdx] ?? 0) / 12 : 0;
-  const totalPensionMonthly = ahvMonthly + bvgMonthly + pillar3aMonthly + pillar3bMonthly;
+  const totalPensionMonthly = ahvMonthly + bvgMonthly + pillar3bMonthly;
 
   // Lebenskosten: die, mit denen der Server gerechnet hat
   const expenseMonthly = (projection?.retirement_spending ?? 0) / 12;
@@ -120,13 +121,12 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
     ?.map((yr: number, i: number) => {
       const idx = retirementIdx + i;
       // Vor dem Bezugsbeginn ist es Kapital, keine Rente
-      const monthly = (pillar: "1" | "2" | "3a" | "3b", series?: number[]) =>
+      const monthly = (pillar: "1" | "2" | "3b", series?: number[]) =>
         paying(pillar, idx) ? Math.round((series?.[idx] ?? 0) / 12) : 0;
       return {
         year: yr,
         ahv:  monthly("1", projection.pension_ahv),
         bvg:  monthly("2", projection.pension_bvg),
-        "3a": monthly("3a", projection.pension_3a),
         "3b": monthly("3b", projection.pension_3b),
       };
     }) ?? [];
@@ -244,6 +244,16 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
         />
       </div>
 
+      {/* Kapitalbezuege: Pensionskasse und 3a, mit Steuer */}
+      {projection && projection.capital_withdrawals.length > 0 && (
+        <div className="card">
+          <WithdrawalPlan
+            withdrawals={projection.capital_withdrawals}
+            taxSingleYear={projection.capital_tax_single_year}
+          />
+        </div>
+      )}
+
       {/* Pension income breakdown (post retirement) */}
       {pensionBarData.length > 0 && (
         <div className="card">
@@ -262,7 +272,6 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
               />
               <Bar dataKey="ahv" name="AHV (Säule 1)" stackId="a" fill={PILLAR_COLORS.ahv} radius={[0, 0, 0, 0]} />
               <Bar dataKey="bvg" name="BVG (Säule 2)" stackId="a" fill={PILLAR_COLORS.bvg} />
-              <Bar dataKey="3a" name="Säule 3a" stackId="a" fill={PILLAR_COLORS["3a"]} />
               <Bar dataKey="3b" name="Säule 3b" stackId="a" fill={PILLAR_COLORS["3b"]} radius={[4, 4, 0, 0]} />
               <ReferenceLine
                 y={Math.round(expenseMonthly)}

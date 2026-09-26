@@ -7,6 +7,8 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.models import PensionData, PensionPillar, User
+from app.api.budget_multimodal import _get_wizard_scenario
+from app.services.capital_tax import tax_profile
 from app.services.projection import ProjectionService
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -27,6 +29,9 @@ class PensionCreate(BaseModel):
     average_insured_salary: Optional[float] = None
     # Saeule 2: Umwandlungssatz laut Vorsorgeausweis, Bruchteil (0.053 = 5.3 %)
     conversion_rate: Optional[float] = Field(default=None, ge=0.02, le=0.08)
+    # Saeule 2: Anteil als Kapital (0-1); Saeule 3a: Bezugsalter (60-70)
+    capital_share: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    withdrawal_age: Optional[int] = Field(default=None, ge=60, le=70)
     notes: Optional[str] = None
     as_of_date: Optional[datetime] = None
 
@@ -42,6 +47,8 @@ class PensionResponse(BaseModel):
     contribution_years: Optional[int]
     average_insured_salary: Optional[float]
     conversion_rate: Optional[float]
+    capital_share: Optional[float]
+    withdrawal_age: Optional[int]
     notes: Optional[str]
     as_of_date: Optional[datetime]
 
@@ -58,6 +65,8 @@ def _to_response(r: PensionData) -> PensionResponse:
         contribution_years=r.contribution_years,
         average_insured_salary=r.average_insured_salary,
         conversion_rate=r.conversion_rate,
+        capital_share=r.capital_share,
+        withdrawal_age=r.withdrawal_age,
         notes=r.notes,
         as_of_date=r.as_of_date,
     )
@@ -70,6 +79,9 @@ class Pillar3aInput(BaseModel):
     balance: float = 0.0
     annual_contribution: float = 0.0
     return_rate: float = 0.03
+    provider: Optional[str] = Field(default=None, max_length=120)
+    # None = der Planer staffelt
+    withdrawal_age: Optional[int] = Field(default=None, ge=60, le=70)
 
 
 class PensionEstimateRequest(BaseModel):
@@ -82,8 +94,21 @@ class PensionEstimateRequest(BaseModel):
     bvg_annual_contribution: float = 0.0
     bvg_return_rate: float = 0.015
     bvg_conversion_rate: Optional[float] = Field(default=None, ge=0.02, le=0.08)
+    bvg_capital_share: float = Field(default=0.0, ge=0.0, le=1.0)
     pillar_3a: List[Pillar3aInput] = []
     inflation_rate: Optional[float] = Field(default=None, ge=0, le=0.1)
+    canton: str = Field(default="ZH", min_length=2, max_length=2)
+    married: bool = False
+
+
+class CapitalWithdrawal(BaseModel):
+    source: str      # "bvg" | "3a"
+    label: str
+    age: int
+    year: int
+    amount: float    # heutige CHF, brutto
+    tax: float       # Anteil an der Steuer des Bezugsjahres
+    account: Optional[int] = None  # nur 3a: Position des Kontos in der Eingabe
 
 
 class PensionEstimate(BaseModel):
@@ -91,14 +116,23 @@ class PensionEstimate(BaseModel):
     retirement_age: int
     years_to_retirement: int
     ahv_start_age: int
+    bvg_start_age: int
     ahv_monthly: float
     bvg_capital: float
     bvg_conversion_rate: float
+    bvg_capital_share: float
+    bvg_lump_sum: float
     bvg_monthly: float
     pillar_3a_capital: float
-    pillar_3a_monthly: float
     pillar_3b_capital: float
     pillar_3b_monthly: float
+    # Bezugsplan: jedes Kapital mit Alter und Steuer; Summe und Vergleich mit
+    # einem einzigen Bezugsjahr
+    capital_withdrawals: List[CapitalWithdrawal]
+    capital_tax: float
+    capital_tax_single_year: float
+    capital_net: float
+    # Monatliche Renten (AHV + BVG + 3b); Kapitalbezuege sind nicht darin
     total_monthly: float
 
 
@@ -122,10 +156,12 @@ async def estimate_from_inputs(
         {"pillar": "2", "current_balance": payload.bvg_balance,
          "annual_contribution": payload.bvg_annual_contribution,
          "expected_return_rate": payload.bvg_return_rate,
-         "conversion_rate": payload.bvg_conversion_rate},
+         "conversion_rate": payload.bvg_conversion_rate,
+         "capital_share": payload.bvg_capital_share},
     ] + [
         {"pillar": "3a", "current_balance": a.balance,
-         "annual_contribution": a.annual_contribution, "expected_return_rate": a.return_rate}
+         "annual_contribution": a.annual_contribution, "expected_return_rate": a.return_rate,
+         "provider": a.provider, "withdrawal_age": a.withdrawal_age}
         for a in payload.pillar_3a
     ]
     return _service.estimate_at_retirement(
@@ -135,6 +171,8 @@ async def estimate_from_inputs(
         annual_income=payload.ahv_average_income,
         inflation_rate=payload.inflation_rate if payload.inflation_rate is not None
         else settings.swiss_inflation_rate,
+        canton=payload.canton.upper(),
+        married=payload.married,
     )
 
 
@@ -154,9 +192,13 @@ async def estimate_from_records(
          "expected_return_rate": r.expected_return_rate,
          "contribution_years": r.contribution_years,
          "average_insured_salary": r.average_insured_salary,
-         "conversion_rate": r.conversion_rate}
+         "conversion_rate": r.conversion_rate,
+         "capital_share": r.capital_share,
+         "withdrawal_age": r.withdrawal_age,
+         "provider": r.provider}
         for r in records
     ]
+    canton, married = tax_profile(await _get_wizard_scenario(current_user.id, db))
     ahv = next((r for r in records if r.pillar == PensionPillar.pillar_1), None)
     age = retirement_age or (ahv.retirement_age if ahv else None) or current_user.retirement_age or 65
     return _service.estimate_at_retirement(
@@ -165,6 +207,8 @@ async def estimate_from_records(
         retirement_age=age,
         annual_income=(ahv.average_insured_salary if ahv else None) or 0.0,
         inflation_rate=settings.swiss_inflation_rate,
+        canton=canton,
+        married=married,
     )
 
 
