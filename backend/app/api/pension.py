@@ -1,7 +1,7 @@
 """Pension data API — manage Pillar 1/2/3a records."""
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Annotated, List, Optional
 
 from app.core.config import settings
 from app.core.database import get_db
@@ -9,13 +9,39 @@ from app.core.security import get_current_user
 from app.models.models import PensionData, PensionPillar, User
 from app.api.budget_multimodal import _get_wizard_scenario
 from app.services.capital_tax import tax_profile
-from app.services.projection import ProjectionService
+from app.services.projection import BVG_MAX_PARTIAL_STEPS, BVG_MIN_FIRST_STEP, ProjectionService
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import AfterValidator, BaseModel, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
+
+
+class PartialStep(BaseModel):
+    """Teilpensionierung: ab `age` arbeitet man noch `pensum` (Bruchteil);
+    vom frei werdenden Guthaben geht `capital_share` als Kapital weg."""
+    age: int = Field(ge=58, le=69)
+    pensum: float = Field(gt=0.0, lt=1.0)
+    capital_share: float = Field(default=0.0, ge=0.0, le=1.0)
+
+
+def _check_partial_steps(steps: List[PartialStep]) -> List[PartialStep]:
+    """Art. 13a BVG: hoechstens drei Kapitalbezuege (zwei Teilschritte plus
+    Endbezug), mindestens ein Jahr Abstand, der erste Schritt mindestens 20 %."""
+    if len(steps) > BVG_MAX_PARTIAL_STEPS:
+        raise ValueError(f"at most {BVG_MAX_PARTIAL_STEPS} partial retirement steps")
+    last_age, last_pensum = 0, 1.0
+    for step in steps:
+        if step.age <= last_age or step.pensum >= last_pensum:
+            raise ValueError("partial retirement steps need rising ages and a falling pensum")
+        last_age, last_pensum = step.age, step.pensum
+    if steps and 1.0 - steps[0].pensum < BVG_MIN_FIRST_STEP - 1e-9:
+        raise ValueError("the first partial retirement step must be at least 20 %")
+    return steps
+
+
+PartialSteps = Annotated[List[PartialStep], AfterValidator(_check_partial_steps)]
 
 
 class PensionCreate(BaseModel):
@@ -29,11 +55,20 @@ class PensionCreate(BaseModel):
     average_insured_salary: Optional[float] = None
     # Saeule 2: Umwandlungssatz laut Vorsorgeausweis, Bruchteil (0.053 = 5.3 %)
     conversion_rate: Optional[float] = Field(default=None, ge=0.02, le=0.08)
-    # Saeule 2: Anteil als Kapital (0-1); Saeule 3a: Bezugsalter (60-70)
+    # Saeule 2: Anteil als Kapital beim Endbezug (0-1) und Teilpensionierung
     capital_share: Optional[float] = Field(default=None, ge=0.0, le=1.0)
-    withdrawal_age: Optional[int] = Field(default=None, ge=60, le=70)
+    partial_steps: Optional[PartialSteps] = None
+    # Saeule 3a: Bezugsalter (60-70); Saeule 3b: Alter bei Ablauf der Police
+    withdrawal_age: Optional[int] = Field(default=None, ge=18, le=100)
     notes: Optional[str] = None
     as_of_date: Optional[datetime] = None
+
+    @model_validator(mode="after")
+    def _3a_age(self):
+        if self.pillar == PensionPillar.pillar_3a and self.withdrawal_age is not None \
+                and not 60 <= self.withdrawal_age <= 70:
+            raise ValueError("Pillar 3a can be withdrawn between 60 and 70")
+        return self
 
 
 class PensionResponse(BaseModel):
@@ -48,6 +83,7 @@ class PensionResponse(BaseModel):
     average_insured_salary: Optional[float]
     conversion_rate: Optional[float]
     capital_share: Optional[float]
+    partial_steps: Optional[List[PartialStep]]
     withdrawal_age: Optional[int]
     notes: Optional[str]
     as_of_date: Optional[datetime]
@@ -66,10 +102,29 @@ def _to_response(r: PensionData) -> PensionResponse:
         average_insured_salary=r.average_insured_salary,
         conversion_rate=r.conversion_rate,
         capital_share=r.capital_share,
+        partial_steps=r.partial_steps,
         withdrawal_age=r.withdrawal_age,
         notes=r.notes,
         as_of_date=r.as_of_date,
     )
+
+
+def record_dict(r: PensionData) -> dict:
+    """Ein gespeicherter Vorsorge-Eintrag, wie ihn ProjectionService liest."""
+    return {
+        "pillar": r.pillar.value,
+        "current_balance": r.current_balance,
+        "annual_contribution": r.annual_contribution,
+        "expected_return_rate": r.expected_return_rate,
+        "retirement_age": r.retirement_age,
+        "contribution_years": r.contribution_years,
+        "average_insured_salary": r.average_insured_salary,
+        "conversion_rate": r.conversion_rate,
+        "capital_share": r.capital_share,
+        "partial_steps": r.partial_steps,
+        "withdrawal_age": r.withdrawal_age,
+        "provider": r.provider,
+    }
 
 
 # ── Schaetzung bei Pensionierung ──────────────────────────────
@@ -84,6 +139,14 @@ class Pillar3aInput(BaseModel):
     withdrawal_age: Optional[int] = Field(default=None, ge=60, le=70)
 
 
+class Pillar3bInput(BaseModel):
+    """Lebensversicherung: Ablaufleistung, am Ablauf ausbezahlt."""
+    balance: float = Field(default=0.0, ge=0)
+    provider: Optional[str] = Field(default=None, max_length=120)
+    # None = beim Erwerbsende
+    withdrawal_age: Optional[int] = Field(default=None, ge=18, le=100)
+
+
 class PensionEstimateRequest(BaseModel):
     """Werte, die noch nicht gespeichert sind — der Wizard rechnet live."""
     current_age: int = Field(ge=15, le=100)
@@ -95,20 +158,32 @@ class PensionEstimateRequest(BaseModel):
     bvg_return_rate: float = 0.015
     bvg_conversion_rate: Optional[float] = Field(default=None, ge=0.02, le=0.08)
     bvg_capital_share: float = Field(default=0.0, ge=0.0, le=1.0)
+    bvg_partial_steps: PartialSteps = []
     pillar_3a: List[Pillar3aInput] = []
+    pillar_3b: List[Pillar3bInput] = []
     inflation_rate: Optional[float] = Field(default=None, ge=0, le=0.1)
     canton: str = Field(default="ZH", min_length=2, max_length=2)
     married: bool = False
 
 
 class CapitalWithdrawal(BaseModel):
-    source: str      # "bvg" | "3a"
+    source: str      # "bvg" | "3a" | "3b"
     label: str
     age: int
     year: int
     amount: float    # heutige CHF, brutto
-    tax: float       # Anteil an der Steuer des Bezugsjahres
+    tax: float       # Anteil an der Steuer des Bezugsjahres (3b: steuerfrei)
     account: Optional[int] = None  # nur 3a: Position des Kontos in der Eingabe
+    pensum: Optional[float] = None  # nur BVG: Pensum danach, > 0 = Teilpensionierung
+
+
+class BvgStep(BaseModel):
+    """Teilpensionierung oder Endbezug der Pensionskasse, heutige CHF."""
+    age: int
+    pensum: float
+    released: float
+    capital: float
+    pension_monthly: float
 
 
 class PensionEstimate(BaseModel):
@@ -123,16 +198,16 @@ class PensionEstimate(BaseModel):
     bvg_capital_share: float
     bvg_lump_sum: float
     bvg_monthly: float
+    bvg_steps: List[BvgStep]
     pillar_3a_capital: float
     pillar_3b_capital: float
-    pillar_3b_monthly: float
     # Bezugsplan: jedes Kapital mit Alter und Steuer; Summe und Vergleich mit
     # einem einzigen Bezugsjahr
     capital_withdrawals: List[CapitalWithdrawal]
     capital_tax: float
     capital_tax_single_year: float
     capital_net: float
-    # Monatliche Renten (AHV + BVG + 3b); Kapitalbezuege sind nicht darin
+    # Monatliche Renten (AHV + BVG); Kapitalbezuege sind nicht darin
     total_monthly: float
 
 
@@ -157,12 +232,17 @@ async def estimate_from_inputs(
          "annual_contribution": payload.bvg_annual_contribution,
          "expected_return_rate": payload.bvg_return_rate,
          "conversion_rate": payload.bvg_conversion_rate,
-         "capital_share": payload.bvg_capital_share},
+         "capital_share": payload.bvg_capital_share,
+         "partial_steps": [s.model_dump() for s in payload.bvg_partial_steps]},
     ] + [
         {"pillar": "3a", "current_balance": a.balance,
          "annual_contribution": a.annual_contribution, "expected_return_rate": a.return_rate,
          "provider": a.provider, "withdrawal_age": a.withdrawal_age}
         for a in payload.pillar_3a
+    ] + [
+        {"pillar": "3b", "current_balance": b.balance, "annual_contribution": 0.0,
+         "expected_return_rate": 0.0, "provider": b.provider, "withdrawal_age": b.withdrawal_age}
+        for b in payload.pillar_3b
     ]
     return _service.estimate_at_retirement(
         pension_records=records,
@@ -186,18 +266,7 @@ async def estimate_from_records(
     records = (
         await db.execute(select(PensionData).where(PensionData.user_id == current_user.id))
     ).scalars().all()
-    payload = [
-        {"pillar": r.pillar.value, "current_balance": r.current_balance,
-         "annual_contribution": r.annual_contribution,
-         "expected_return_rate": r.expected_return_rate,
-         "contribution_years": r.contribution_years,
-         "average_insured_salary": r.average_insured_salary,
-         "conversion_rate": r.conversion_rate,
-         "capital_share": r.capital_share,
-         "withdrawal_age": r.withdrawal_age,
-         "provider": r.provider}
-        for r in records
-    ]
+    payload = [record_dict(r) for r in records]
     canton, married = tax_profile(await _get_wizard_scenario(current_user.id, db))
     ahv = next((r for r in records if r.pillar == PensionPillar.pillar_1), None)
     age = retirement_age or (ahv.retirement_age if ahv else None) or current_user.retirement_age or 65

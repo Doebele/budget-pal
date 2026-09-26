@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from app.services import capital_tax as ct
-from app.services.projection import ProjectionService, plan_3a_ages
+from app.services.projection import ProjectionService, bvg_steps, plan_3a_ages
 
 SERVICE = ProjectionService()
 
@@ -113,9 +113,9 @@ class TestCapitalWithdrawals:
         assert staggered < single
 
     def test_bvg_capital_share_splits_pension_and_lump_sum(self):
-        full = SERVICE._project_bvg(66, 65, {**RECORDS[1], "capital_share": 0.0}, 0, 16)
-        half = SERVICE._project_bvg(66, 65, RECORDS[1], 0, 16)
-        assert half == pytest.approx(full / 2)
+        full, _ = bvg_steps({**RECORDS[1], "capital_share": 0.0}, 0, 50, 65)
+        half, _ = bvg_steps(RECORDS[1], 0, 50, 65)
+        assert half[-1]["pension"] == pytest.approx(full[-1]["pension"] / 2)
         lump = next(e for e in SERVICE.capital_withdrawals(RECORDS, 50, 65, 0, 0.0) if e["source"] == "bvg")
         assert lump["amount"] == pytest.approx(200_000)
 

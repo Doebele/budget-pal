@@ -616,12 +616,20 @@ Rentendiagramm über `/api/pension/estimate`):
   folgt Löhnen und Preisen und bleibt deshalb in heutigen Franken gleich.
 - **Pensionskasse:** Beiträge bis zum Rentenalter, danach feste Rente = Kapital × Umwandlungssatz.
   Die gesetzlichen 6.8 % gelten nur für den obligatorischen Teil; die meisten Kassen rechnen aufs
-  ganze Guthaben mit 5.0–5.6 %. Die Rente wird in der Regel nicht der Teuerung angepasst.
+  ganze Guthaben mit 5.0–5.6 %. Die Rente wird in der Regel nicht der Teuerung angepasst. Sie
+  beginnt mit dem Erwerbsende (frühestens 58).
+- **Teilpensionierung** (Art. 13a BVG): bis zu zwei Schritte vor dem Erwerbsende, je mit Alter,
+  Pensum danach und Kapitalanteil. Jeder Schritt gibt den Teil des Guthabens frei, um den das
+  Pensum sinkt; der Rest spart mit dem tieferen Pensum weiter. Höchstens drei Kapitalbezüge
+  inklusive Endbezug, der erste Schritt mindestens 20 %. Im Vermögen fehlt der Lohnausfall
+  (netto), die Teilrente kommt dazu.
 - **3a:** Ansparen bis zum Rentenalter, dann **Kapitalbezug pro Konto** (ein Konto lässt sich nur
   als Ganzes beziehen). Ohne eigenes Bezugsalter staffelt der Planer: ein Konto pro Jahr, so spät
   wie möglich, frühestens mit 60, spätestens mit 65 (bei Weiterarbeit bis 70), nie im Jahr des
   Pensionskassen-Kapitals.
-- **3b:** Ansparen bis zum Rentenalter, danach 20 Jahre Auszahlung mit 2 % Restverzinsung.
+- **3b / Lebensversicherung:** Die Ablaufleistung kommt am Ablauf der Police auf einmal ins freie
+  Vermögen (ohne Datum beim Erwerbsende), steuerfrei (rückkaufsfähige Versicherung mit laufender
+  Prämie). Als fester Betrag verliert sie bis dahin an realem Wert.
 - **Pensionskasse als Kapital:** frei wählbarer Anteil (0–100 %). Der Kapitalteil fliesst im
   Bezugsjahr nach Steuer ins freie Vermögen, der Rest wird Rente.
 - **Steuer auf Kapitalbezüge** (`services/capital_tax.py`): Bund exakt (ein Fünftel des Tarifs
@@ -631,7 +639,7 @@ Rentendiagramm über `/api/pension/estimate`):
   Alle Bezüge eines Jahres werden zusammen besteuert. Kanton und Tarif kommen aus dem Wizard.
 - **Bezugsbeginn je Säule:** AHV 63–70, Pensionskasse ab 58 (davor verzinst auf dem
   Freizügigkeitskonto; Umwandlungssatz −0.15 Prozentpunkte je Jahr vor 65, + je Jahr danach),
-  3a 60–70, 3b ab Rentenalter.
+  3a 60–70, 3b am Ablauf der Police.
 - **Vermögen nach der Pensionierung:** Die Sparrate endet mit dem Rentenalter. Danach werden die
   Lebenskosten entnommen, abzüglich der Renten, die schon fliessen. Frühpensionierte zahlen bis 65
   AHV-Beiträge als Nichterwerbstätige (aus Vermögen + 20 × Renteneinkommen, 530–26'500 CHF/Jahr).

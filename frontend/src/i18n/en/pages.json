@@ -342,7 +342,20 @@
     "pensionOnly": "pension only",
     "bvgCapitalShareHint": "Share of your pension fund balance you withdraw as capital – at least 25 % of the mandatory part is allowed by law, many funds allow 100 %. Funds usually require notice months to years in advance; after a buy-in a 3-year lock applies.",
     "withdrawalAge": "Withdraw at",
-    "withdrawalAuto": "automatic ({{age}})"
+    "withdrawalAuto": "automatic ({{age}})",
+    "bvgStart": "The pension fund pays from the end of employment (at {{age}}), at 58 at the earliest. If you reduce your workload before, plan a partial retirement.",
+    "bvgFinalShare": "Capital at final withdrawal",
+    "partialTitle": "Partial retirement (optional)",
+    "partialHint": "If you reduce your workload in steps before retiring, each step releases the matching part of your pension fund – as a pension, as capital or mixed. By law (Art. 13a BVG): at most three capital withdrawals including the final one, the first step at least 20 %, at least one year apart. Every fund must offer this from 63, earlier only if its rules allow. Staggering saves tax when the steps don't fall into a 3a withdrawal year.",
+    "partialAdd": "Add step",
+    "partialAge": "From age",
+    "partialPensum": "Workload after",
+    "partialCapital": "Thereof as capital",
+    "partialRemove": "Remove",
+    "partialInvalid": "Invalid: ages rising, between 58 and the end of employment ({{age}}), workload falling, first step at least 20 %.",
+    "partialStep": "At {{age}}: {{released}} released, {{capital}} as capital, pension {{pension}}/mo (workload after {{pensum}} %)",
+    "partialFinal": "At {{age}} (end of employment): {{released}} released, {{capital}} as capital, pension {{pension}}/mo",
+    "lvPayout": "Paid out at {{age}} ({{year}}) in one sum, tax-free: {{amount}} in today's francs"
   },
   "step5": {
     "s00": "Everyday & subscriptions",
@@ -857,7 +870,7 @@
     "estimateBody": "Four steps: profile, income, housing and daily life with subscriptions. Your own estimate — it may include things no bank statement knows about."
   },
   "plan": {
-    "title": "Capital withdrawal plan (pension fund, 3a)",
+    "title": "Capital withdrawal plan (pension fund, 3a, life insurance)",
     "when": "Age (year)",
     "what": "Withdrawal",
     "amount": "Amount",
@@ -869,6 +882,11 @@
     "p3a": "Pillar 3a – {{label}}",
     "saving": "Staggering saves about {{amount}} in taxes compared with withdrawing all capital in the same year.",
     "rules": "A 3a account can only be withdrawn in full – hence one account per year, from 60 at the earliest, by 65 at the latest (up to 70 if still working), never in the year of the pension fund capital. For married couples, both partners' withdrawals in the same year are added together. Tax: federal exact (one fifth of the 2026 tariff), cantonal and communal for the cantonal capital per the ESTV tax calculator, without church tax; in today's francs. Not tax advice.",
-    "p3aCard": "Capital net of tax, withdrawn in stages"
+    "p3aCard": "Capital net of tax, withdrawn in stages",
+    "bvgPartial": "Pension fund – partial retirement, workload after {{pensum}} % ({{label}})",
+    "p3b": "Pillar 3b – {{label}}",
+    "taxFree": "tax-free",
+    "p3bCard": "at policy expiry, tax-free",
+    "rulesExtra": "Pension fund: with partial retirement at most three capital withdrawals (Art. 13a BVG). Life insurance (3b, ongoing premium): income-tax-free at expiry."
   }
 }

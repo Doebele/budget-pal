@@ -342,7 +342,20 @@
     "pensionOnly": "nur Rente",
     "bvgCapitalShareHint": "Anteil des Pensionskassenguthabens, den Sie als Kapital beziehen – mindestens 25 % des obligatorischen Teils sind gesetzlich möglich, viele Kassen erlauben 100 %. Die Kasse verlangt meist eine Anmeldung Monate bis Jahre im Voraus; nach einem Einkauf gilt eine Sperrfrist von 3 Jahren.",
     "withdrawalAge": "Bezug mit",
-    "withdrawalAuto": "automatisch ({{age}})"
+    "withdrawalAuto": "automatisch ({{age}})",
+    "bvgStart": "Die Pensionskasse zahlt ab dem Erwerbsende (mit {{age}}), frühestens mit 58. Wer vorher das Pensum reduziert, plant eine Teilpensionierung.",
+    "bvgFinalShare": "Kapital beim Endbezug",
+    "partialTitle": "Teilpensionierung (optional)",
+    "partialHint": "Wer das Pensum vor dem Erwerbsende schrittweise reduziert, bezieht bei jedem Schritt den entsprechenden Teil der Pensionskasse – als Rente, als Kapital oder gemischt. Gesetzlich (Art. 13a BVG): höchstens drei Kapitalbezüge inklusive Endbezug, der erste Schritt mindestens 20 %, mindestens ein Jahr Abstand. Ab 63 muss jede Kasse das anbieten, früher nur, wenn ihr Reglement es erlaubt. Staffeln lohnt sich steuerlich, wenn die Schritte nicht ins Jahr eines 3a-Bezugs fallen.",
+    "partialAdd": "Schritt hinzufügen",
+    "partialAge": "Ab Alter",
+    "partialPensum": "Pensum danach",
+    "partialCapital": "Davon als Kapital",
+    "partialRemove": "Entfernen",
+    "partialInvalid": "Ungültig: Alter aufsteigend, zwischen 58 und dem Erwerbsende ({{age}}), Pensum sinkend, der erste Schritt mindestens 20 %.",
+    "partialStep": "Mit {{age}}: {{released}} frei, davon {{capital}} Kapital, Rente {{pension}}/Mo (Pensum danach {{pensum}} %)",
+    "partialFinal": "Mit {{age}} (Erwerbsende): {{released}} frei, davon {{capital}} Kapital, Rente {{pension}}/Mo",
+    "lvPayout": "Auszahlung mit {{age}} ({{year}}) auf einmal, steuerfrei: {{amount}} in heutigen Franken"
   },
   "step5": {
     "s00": "Alltag & Abonnements",
@@ -857,7 +870,7 @@
     "estimateBody": "Vier Schritte: Profil, Einkommen, Wohnen und Alltag mit Abos. Deine eigene Einschätzung — sie darf auch Dinge enthalten, die es in keinem Kontoauszug gibt."
   },
   "plan": {
-    "title": "Bezugsplan Kapital (Pensionskasse, 3a)",
+    "title": "Bezugsplan Kapital (Pensionskasse, 3a, Lebensversicherung)",
     "when": "Alter (Jahr)",
     "what": "Bezug",
     "amount": "Betrag",
@@ -869,6 +882,11 @@
     "p3a": "Säule 3a – {{label}}",
     "saving": "Die Staffelung spart rund {{amount}} Steuern gegenüber einem Bezug aller Kapitalien im selben Jahr.",
     "rules": "Ein 3a-Konto lässt sich nur als Ganzes beziehen – darum ein Konto pro Jahr, frühestens mit 60, spätestens mit 65 (bei Weiterarbeit bis 70), nie im Jahr des Pensionskassen-Kapitals. Bei Ehepaaren werden die Bezüge beider Partner im selben Jahr zusammengezählt. Steuer: Bund exakt (ein Fünftel des Tarifs 2026), Kanton und Gemeinde für den Kantonshauptort laut ESTV-Steuerrechner, ohne Kirchensteuer; in heutigen Franken. Keine Steuerberatung.",
-    "p3aCard": "Kapital netto nach Steuer, gestaffelt bezogen"
+    "p3aCard": "Kapital netto nach Steuer, gestaffelt bezogen",
+    "bvgPartial": "Pensionskasse – Teilpensionierung, Pensum danach {{pensum}} % ({{label}})",
+    "p3b": "Säule 3b – {{label}}",
+    "taxFree": "steuerfrei",
+    "p3bCard": "am Ablauf der Police, steuerfrei",
+    "rulesExtra": "Pensionskasse: bei einer Teilpensionierung höchstens drei Kapitalbezüge (Art. 13a BVG). Lebensversicherung (3b, laufende Prämie): am Ablauf einkommenssteuerfrei."
   }
 }

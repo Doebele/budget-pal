@@ -37,8 +37,6 @@ AHV_MIN_PENSION: float = settings.ahv_min_pension_chf
 AHV_FULL_YEARS: int = settings.ahv_full_contribution_years
 BVG_CONVERSION_RATE_DEFAULT: float = settings.bvg_conversion_rate_default
 BVG_COORD_DEDUCTION: float = settings.bvg_coordination_deduction
-PAYOUT_YEARS: int = 20  # 3a/3b annuitization horizon (~age 65→85)
-PAYOUT_RESIDUAL_RATE: float = 0.02  # conservative yield during payout phase
 #: Ordentliches AHV-Rentenalter (Referenzalter 65).
 AHV_REGULAR_RETIREMENT_AGE: int = 65
 #: Flexibler Rentenbezug: frueheste und spaeteste Wahl (AHV 21).
@@ -96,6 +94,11 @@ BVG_LATEST_AGE: int = 70
 #: Prozentpunkte). ponytail: typischer Wert; die Tabelle der eigenen Kasse
 #: steht im Reglement.
 BVG_CONVERSION_STEP: float = 0.0015
+#: Teilpensionierung (Art. 13a BVG, seit 2024): hoechstens drei Bezuege in
+#: Kapitalform, auch ueber mehrere Kassen, der erste mindestens 20 % der
+#: Altersleistung. Mit dem Endbezug beim Erwerbsende bleiben zwei Teilschritte.
+BVG_MAX_PARTIAL_STEPS: int = 2
+BVG_MIN_FIRST_STEP: float = 0.2
 #: Saeule 3a: Bezug fruehestens fuenf Jahre vor dem Referenzalter, spaetestens
 #: fuenf danach (dann nur bei Erwerbstaetigkeit).
 PILLAR_3A_EARLIEST_AGE: int = 60
@@ -115,14 +118,10 @@ def bvg_start_age(retirement_age: int) -> int:
 
 
 def payout_start_ages(retirement_age: int) -> Dict[str, int]:
-    """Ab welchem Alter jede Saeule eine Rente zahlt. 3b (freie Vorsorge) ist an
-    kein Alter gebunden. Die 3a zahlt keine Rente: sie wird als Kapital bezogen
-    (siehe capital_withdrawals)."""
-    return {
-        "1": ahv_start_age(retirement_age),
-        "2": bvg_start_age(retirement_age),
-        "3b": retirement_age,
-    }
+    """Ab welchem Alter AHV und Pensionskasse (Endbezug) eine Rente zahlen.
+    3a und 3b werden als Kapital bezogen (capital_withdrawals), eine
+    Teilpensionierung zahlt ihre Teilrente schon vorher (bvg_steps)."""
+    return {"1": ahv_start_age(retirement_age), "2": bvg_start_age(retirement_age)}
 
 
 def pillar_3a_latest_age(retirement_age: int) -> int:
@@ -194,42 +193,64 @@ def _current_age(date_of_birth: Optional[str]) -> int:
     return 40
 
 
-def pension_income(
-    series: Dict[str, Sequence[float]], current_age: int, retirement_age: int
-) -> List[float]:
-    """Summe der Saeulen, die im jeweiligen Jahr tatsaechlich auszahlen.
-
-    Vor ihrem Bezugsbeginn enthalten die BVG-/3a-/3b-Reihen das Kapital (fuers
-    Diagramm) — das ist kein Einkommen und darf nicht mitgezaehlt werden.
-    """
-    starts = payout_start_ages(retirement_age)
-    length = len(series["1"])
-    return [
-        sum(
-            values[i] for pillar, values in series.items()
-            if pillar in starts and current_age + i >= starts[pillar]
-        )
-        for i in range(length)
-    ]
+def _share(value: Optional[float]) -> float:
+    return min(max(value or 0.0, 0.0), 1.0)
 
 
-def _annuity_payout(
-    balance: float, years: int = PAYOUT_YEARS, rate: float = PAYOUT_RESIDUAL_RATE
-) -> float:
+def partial_retirement_plan(
+    record: Optional[Dict], current_age: int, retirement_age: int
+) -> tuple:
+    """Teilpensionierungen der Pensionskasse, bereinigt.
+
+    Returns (Pensum heute, kommende Schritte als (Alter, Pensum danach,
+    Kapitalanteil)). Ein Schritt gilt ab 58 und vor dem Erwerbsende, mit
+    sinkendem Pensum, hoechstens BVG_MAX_PARTIAL_STEPS. Vergangene Schritte
+    bestimmen nur das heutige Pensum, ihr Guthaben ist schon bezogen. Liegt ein
+    Schritt nach dem Erwerbsende (Fruehpensionierung), nimmt ihn der Endbezug mit.
     """
-    Convert a capital balance into an annual pension using a level annuity
-    formula with residual return during payout:
-        annual = balance × r / (1 − (1+r)^−years)
-    At r=0 this reduces to balance/years (simple division). The residual
-    return accounts for capital that keeps earning while being drawn down,
-    which is how Swiss 3a/3b payouts behave in practice (Wertschriftenlösung
-    or mixed life insurance).
-    """
-    if balance <= 0 or years <= 0:
+    pensum = last = 1.0
+    upcoming = []
+    steps = sorted((record or {}).get("partial_steps") or [], key=lambda s: s.get("age") or 0)
+    for step in steps[:BVG_MAX_PARTIAL_STEPS]:
+        age, after = int(step.get("age") or 0), float(step.get("pensum") or 0)
+        if not (BVG_EARLIEST_AGE <= age < retirement_age and 0.0 < after < last):
+            continue
+        last = after
+        if age < current_age:
+            pensum = after
+        else:
+            upcoming.append((age, after, _share(step.get("capital_share"))))
+    return pensum, upcoming
+
+
+def pensum_at(record: Optional[Dict], current_age: int, retirement_age: int, age: int) -> float:
+    """Arbeitspensum (0-1) im Alter `age`: voll bis zur ersten
+    Teilpensionierung, 0 ab dem Erwerbsende."""
+    if age >= retirement_age:
         return 0.0
-    if rate <= 0:
-        return balance / years
-    return balance * rate / (1 - (1 + rate) ** -years)
+    pensum, upcoming = partial_retirement_plan(record, current_age, retirement_age)
+    for step_age, after, _ in upcoming:
+        if age >= step_age:
+            pensum = after
+    return pensum
+
+
+def pillar_3b_age(record: Dict, current_age: int, retirement_age: int) -> int:
+    """Auszahlung der freien Vorsorge (3b): am Ablauf der Police
+    (`withdrawal_age`), sonst beim Erwerbsende."""
+    return max(record.get("withdrawal_age") or retirement_age, current_age)
+
+
+#: Kapitalbezuege, die besteuert werden. Die 3b (Lebensversicherung mit
+#: laufender Praemie) ist bei Auszahlung einkommenssteuerfrei.
+TAXED_SOURCES = ("bvg", "3a")
+
+
+def single_year_tax(withdrawals: Sequence[Dict], canton: str, married: bool) -> float:
+    """Zum Vergleich: alle steuerbaren Bezuege im selben Jahr — was die
+    Staffelung spart."""
+    taxed = sum(w["amount"] for w in withdrawals if w["source"] in TAXED_SOURCES)
+    return capital_tax(taxed, canton, married) if taxed > 0 else 0.0
 
 
 #: Selbstbehalt Pflegeheim CH — Groessenordnung fuer das Szenario "Pflegekosten
@@ -300,54 +321,51 @@ def build_annual_flows(
     return flows
 
 
-def _bvg_capital(
-    record: Optional[Dict], annual_income: float, start_age: int, saving_years: int,
-    interest_years: int = 0,
+def bvg_steps(
+    record: Optional[Dict], annual_income: float, current_age: int, retirement_age: int,
 ) -> tuple:
-    """BVG-Guthaben nach `saving_years` Beitragsjahren ab `start_age` und
-    danach `interest_years` Jahren nur mit Zins (Freizuegigkeitskonto zwischen
-    Erwerbsende und Bezug), dazu der Umwandlungssatz fuer 65 (eigener laut
-    Vorsorgeausweis oder Vorgabe)."""
-    if record:
-        balance = record.get("current_balance", 0.0)
-        annual_contribution = record.get("annual_contribution", 0.0)
-        return_rate = record.get("expected_return_rate", 0.01)
-        conversion_rate = record.get("conversion_rate") or BVG_CONVERSION_RATE_DEFAULT
-    else:
-        balance, annual_contribution, return_rate = 0.0, 0.0, 0.01  # Mindestzins
-        conversion_rate = BVG_CONVERSION_RATE_DEFAULT
-    insured_salary = max(0, annual_income - BVG_COORD_DEDUCTION)
-    for yr in range(saving_years):
-        contrib = annual_contribution or insured_salary * _bvg_rate_for_age(start_age + yr)
-        balance = balance * (1 + return_rate) + contrib
-    balance *= (1 + return_rate) ** max(0, interest_years)
-    return balance, conversion_rate
+    """Pensionskasse Jahr fuer Jahr bis zum Endbezug, nominal.
 
+    Eine Teilpensionierung gibt den Teil des Guthabens frei, um den das Pensum
+    sinkt (100 % auf 60 %: 40 %); der Rest spart mit dem tieferen Pensum
+    weiter. Beim Erwerbsende (fruehestens 58, bis dahin verzinst auf
+    Freizuegigkeit) wird der Rest frei. Vom frei gewordenen Guthaben geht der
+    Kapitalanteil als Kapital weg, der Rest wird Rente mit dem Umwandlungssatz
+    des Bezugsalters (Satz auf dem Vorsorgeausweis gilt fuer 65).
 
-def _saving_then_payout(
-    record: Dict, age_at_year: int, retirement_age: int, years_elapsed: int,
-    default_rate: float, payout_start: int,
-) -> float:
-    """3a/3b: bis zum Rentenalter ansparen, bis `payout_start` nur verzinsen,
-    danach PAYOUT_YEARS lang einen festen Betrag auszahlen, dann 0.
-
-    Wer heute schon ueber dem Bezugsbeginn ist, dem wird das verbleibende
-    Guthaben ab jetzt ausbezahlt.
+    Returns (Schritte, Guthaben): Schritte als Dicts mit age, pensum (danach),
+    released, capital, pension (Jahresrente ab age); Guthaben[i] = Stand im
+    Alter current_age + i vor einem Schritt, bis vor den Endbezug.
     """
-    start_age = age_at_year - years_elapsed
-    saving_years = min(years_elapsed, max(0, retirement_age - start_age))
-    interest_years = min(years_elapsed, max(0, payout_start - start_age)) - saving_years
-    rate = record.get("expected_return_rate", default_rate)
-    balance = _accumulate(
-        record.get("current_balance", 0.0), record.get("annual_contribution", 0.0), rate, saving_years,
-    )
-    balance *= (1 + rate) ** max(0, interest_years)
-    if age_at_year < payout_start:
-        return balance
-    payout_year = age_at_year - max(payout_start, start_age)
-    if payout_year >= PAYOUT_YEARS:
-        return 0.0
-    return _annuity_payout(balance)
+    record = record or {}
+    balance = record.get("current_balance", 0.0)
+    contribution = record.get("annual_contribution", 0.0)
+    rate = record.get("expected_return_rate", 0.01)
+    rate_65 = record.get("conversion_rate") or BVG_CONVERSION_RATE_DEFAULT
+    insured_salary = max(0, annual_income - BVG_COORD_DEDUCTION)
+    pensum, upcoming = partial_retirement_plan(record, current_age, retirement_age)
+    # ponytail: wer heute schon ueber dem Bezugsalter ist, bezieht jetzt
+    final_age = max(bvg_start_age(retirement_age), current_age)
+    plan = upcoming + [(final_age, 0.0, _share(record.get("capital_share")))]
+    steps: List[Dict[str, float]] = []
+    balances: List[float] = []
+    age = current_age
+    for step_age, after, share in plan:
+        while age < step_age:
+            balances.append(balance)
+            # Beitraege nur bei Erwerbstaetigkeit, im Verhaeltnis zum Pensum
+            base = contribution or insured_salary * _bvg_rate_for_age(age)
+            balance = balance * (1 + rate) + (base * pensum if age < retirement_age else 0.0)
+            age += 1
+        released = balance * (pensum - after) / pensum if pensum > 0 else balance
+        balance -= released
+        pensum = after
+        steps.append({
+            "age": step_age, "pensum": after, "released": released,
+            "capital": released * share,
+            "pension": released * (1 - share) * bvg_conversion_at(rate_65, step_age),
+        })
+    return steps, balances
 
 
 def _pillar_3a_balance(record: Dict, current_age: int, retirement_age: int, at_age: int) -> float:
@@ -393,13 +411,15 @@ class ProjectionService:
         Run Monte Carlo simulation and pension projections.
 
         Jahresfluss aufs freie Vermoegen (`current_net_worth`, ohne die Saeulen):
-          - bis zum Rentenalter: Sparrate (waechst mit der Teuerung)
+          - bis zum Rentenalter: Sparrate (waechst mit der Teuerung); nach
+            einer Teilpensionierung abzueglich des Lohnausfalls, zuzueglich der
+            Teilrente
           - ab dem Rentenalter: tatsaechlich fliessende Renten minus
             Lebenskosten (`retirement_spending`, heutige CHF; ohne Angabe
             `default_retirement_spending`), bis 65 zusaetzlich die AHV-Beitraege
             als Nichterwerbstaetige
-          - Kapitalbezuege (Pensionskasse, 3a) nach Steuer im Bezugsjahr
-            (`canton`, `married` fuer die Steuer)
+          - Kapitalbezuege (Pensionskasse, 3a nach Steuer, 3b steuerfrei) im
+            Bezugsjahr (`canton`, `married` fuer die Steuer)
           - dazu die Szenario-Cashflows (`annual_flows`, nominal)
         Das Vermoegen faellt nie unter 0.
 
@@ -408,7 +428,7 @@ class ProjectionService:
         success_rate, inflation_adjusted.
         """
         # ── Pension Projections ───────────────────────────────
-        pension_ahv, pension_bvg, pension_3a, pension_3b, retirement_idx = (
+        pension_ahv, pension_bvg, pension_3a, pension_3b, retirement_idx, bvg_income = (
             self._project_pensions(
                 pension_records=pension_records or [],
                 years=years,
@@ -419,11 +439,10 @@ class ProjectionService:
             )
         )
         current_age = _current_age(date_of_birth)
-        income_real = pension_income(
-            {"1": pension_ahv, "2": pension_bvg, "3a": pension_3a, "3b": pension_3b},
-            current_age,
-            retirement_age,
-        )
+        # Was tatsaechlich fliesst: AHV ab Bezug, Pensionskasse ab jedem Schritt
+        income_real = [a + b for a, b in zip(pension_ahv, bvg_income)]
+        bvg_record = next((r for r in pension_records or [] if r["pillar"] == "2"), None)
+        pensum = [pensum_at(bvg_record, current_age, retirement_age, current_age + yr) for yr in range(years)]
         if retirement_spending is None:
             retirement_spending = default_retirement_spending(annual_income, annual_savings)
 
@@ -459,7 +478,10 @@ class ProjectionService:
             inflation_factor = (1 + inflation_rate) ** yr
             age = current_age + yr
             if age < retirement_age:
-                flow = annual_savings * inflation_factor
+                # Nach einer Teilpensionierung fehlt der Lohnausfall beim
+                # Sparen, die Teilrente kommt dazu (ohne Teilpensionierung 0)
+                lost = (1 - pensum[yr]) * annual_income * NET_INCOME_SHARE
+                flow = (annual_savings - lost + income_real[yr]) * inflation_factor
             else:
                 # Renten und Lebenskosten kommen real herein, gerechnet wird nominal
                 flow = (income_real[yr] - retirement_spending) * inflation_factor
@@ -517,9 +539,7 @@ class ProjectionService:
             "retirement_spending": retirement_spending,
             "capital_withdrawals": withdrawals,
             "capital_tax_total": sum(w["tax"] for w in withdrawals),
-            # Zum Vergleich: alles im selben Jahr bezogen — was die Staffelung spart
-            "capital_tax_single_year": capital_tax(sum(w["amount"] for w in withdrawals), canton, married)
-            if withdrawals else 0.0,
+            "capital_tax_single_year": single_year_tax(withdrawals, canton, married),
             "depletion_age": depletion_age,
             # Anteil der Laeufe, in denen bis zum Ende des Horizonts Vermoegen bleibt
             "success_rate": float(np.mean(all_values[:, -1] > 0)),
@@ -546,47 +566,56 @@ class ProjectionService:
         starts = payout_start_ages(retirement_age)
         horizon = max(max(starts.values()) - current_age, 0) + 1
         dob = f"{datetime.now().year - current_age}-01-01"
-        ahv, bvg, _p3a, p3b, _ = self._project_pensions(
+        ahv, bvg, *_ = self._project_pensions(
             pension_records, horizon, annual_income, dob, retirement_age, inflation_rate
         )
 
         def at(series, pillar):
             return series[max(0, starts[pillar] - current_age)]
 
+        def real(amount, age):
+            return amount / (1 + inflation_rate) ** (age - current_age)
+
         withdrawals = self.capital_withdrawals(
             pension_records, current_age, retirement_age, annual_income,
             inflation_rate, canton, married,
         )
-        bvg_record = next((r for r in pension_records if r["pillar"] == "2"), None) or {}
-        share = min(max(bvg_record.get("capital_share") or 0.0, 0.0), 1.0)
-        rate_at_65 = bvg_record.get("conversion_rate") or BVG_CONVERSION_RATE_DEFAULT
-        conversion_rate = bvg_conversion_at(rate_at_65, starts["2"])
+        bvg_record = next((r for r in pension_records if r["pillar"] == "2"), None)
+        steps, _ = bvg_steps(bvg_record, annual_income, current_age, retirement_age)
+        rate_at_65 = (bvg_record or {}).get("conversion_rate") or BVG_CONVERSION_RATE_DEFAULT
         ahv_monthly = at(ahv, "1") / 12
         bvg_monthly = at(bvg, "2") / 12
-        p3b_monthly = at(p3b, "3b") / 12
-        bvg_lump = sum(w["amount"] for w in withdrawals if w["source"] == "bvg")
-        bvg_pension_capital = bvg_monthly * 12 / conversion_rate if conversion_rate else 0.0
         capital_gross = sum(w["amount"] for w in withdrawals)
         capital_tax_total = sum(w["tax"] for w in withdrawals)
+
+        def gross(source):
+            return sum(w["amount"] for w in withdrawals if w["source"] == source)
+
         return {
             "retirement_age": retirement_age,
             "years_to_retirement": max(0, retirement_age - current_age),
             "ahv_start_age": starts["1"],
             "bvg_start_age": starts["2"],
             "ahv_monthly": ahv_monthly,
-            "bvg_capital": bvg_pension_capital + bvg_lump,
-            "bvg_conversion_rate": conversion_rate,
-            "bvg_capital_share": share,
-            "bvg_lump_sum": bvg_lump,
+            "bvg_capital": sum(real(s["released"], s["age"]) for s in steps),
+            "bvg_conversion_rate": bvg_conversion_at(rate_at_65, starts["2"]),
+            "bvg_capital_share": _share((bvg_record or {}).get("capital_share")),
+            "bvg_lump_sum": gross("bvg"),
             "bvg_monthly": bvg_monthly,
-            "pillar_3a_capital": sum(w["amount"] for w in withdrawals if w["source"] == "3a"),
-            "pillar_3b_capital": p3b_monthly * 12 / _annuity_payout(1.0),
-            "pillar_3b_monthly": p3b_monthly,
+            # Teilpensionierung und Endbezug: was frei wird, davon Kapital, und die Rente
+            "bvg_steps": [
+                {"age": s["age"], "pensum": s["pensum"], "released": real(s["released"], s["age"]),
+                 "capital": real(s["capital"], s["age"]),
+                 "pension_monthly": real(s["pension"], s["age"]) / 12}
+                for s in steps
+            ],
+            "pillar_3a_capital": gross("3a"),
+            "pillar_3b_capital": gross("3b"),
             "capital_withdrawals": withdrawals,
             "capital_tax": capital_tax_total,
-            "capital_tax_single_year": capital_tax(capital_gross, canton, married) if withdrawals else 0.0,
+            "capital_tax_single_year": single_year_tax(withdrawals, canton, married),
             "capital_net": capital_gross - capital_tax_total,
-            "total_monthly": ahv_monthly + bvg_monthly + p3b_monthly,
+            "total_monthly": ahv_monthly + bvg_monthly,
         }
 
     def capital_withdrawals(
@@ -601,25 +630,27 @@ class ProjectionService:
     ) -> List[Dict[str, Any]]:
         """Kapitalbezuege mit Alter, Betrag und Steuer, in heutigen CHF.
 
-        - Pensionskasse: `capital_share` des Guthabens bei Bezugsbeginn
+        - Pensionskasse: Kapitalanteil jeder Teilpensionierung und des Endbezugs
         - Saeule 3a: jedes Konto einzeln, im eigenen oder im gestaffelten Alter
-        Alle Bezuege desselben Jahres werden fuer die Steuer zusammengezaehlt,
-        die Steuer dann anteilig verteilt.
+        - Saeule 3b / Lebensversicherung: am Ablauf der Police, steuerfrei
+          (rueckkaufsfaehige Versicherung mit laufender Praemie)
+        Alle steuerbaren Bezuege desselben Jahres werden fuer die Steuer
+        zusammengezaehlt, die Steuer dann anteilig verteilt.
         """
+        def real(amount, age):
+            return amount / (1 + inflation_rate) ** (age - current_age)
+
         events: List[Dict[str, Any]] = []
         bvg = next((r for r in pension_records if r["pillar"] == "2"), None)
-        share = min(max((bvg or {}).get("capital_share") or 0.0, 0.0), 1.0)
-        bvg_age = bvg_start_age(retirement_age)
-        bvg_capital_ages: List[int] = []
-        if bvg and share > 0 and bvg_age >= current_age:
-            saving = max(0, retirement_age - current_age)
-            interest = max(0, bvg_age - current_age) - saving
-            balance, _ = _bvg_capital(bvg, annual_income, current_age, saving, interest)
-            events.append({
-                "source": "bvg", "label": bvg.get("provider") or "Pensionskasse", "age": bvg_age,
-                "amount": balance * share / (1 + inflation_rate) ** (bvg_age - current_age),
-            })
-            bvg_capital_ages.append(bvg_age)
+        steps, _ = bvg_steps(bvg, annual_income, current_age, retirement_age)
+        for s in steps:
+            if s["capital"] > 0:
+                events.append({
+                    "source": "bvg", "label": (bvg or {}).get("provider") or "Pensionskasse",
+                    "age": s["age"], "pensum": s["pensum"],  # > 0: Teilpensionierung
+                    "amount": real(s["capital"], s["age"]),
+                })
+        bvg_capital_ages = [e["age"] for e in events]
 
         p3a = [r for r in pension_records if r["pillar"] == "3a"]
         ages = resolve_3a_ages(p3a, retirement_age, current_age, bvg_capital_ages)
@@ -627,17 +658,27 @@ class ProjectionService:
             events.append({
                 "source": "3a", "label": record.get("provider") or "Säule 3a", "age": age,
                 "account": account,  # Position unter den 3a-Konten, fuer die Oberflaeche
-                "amount": _pillar_3a_balance(record, current_age, retirement_age, age)
-                / (1 + inflation_rate) ** (age - current_age),
+                "amount": real(_pillar_3a_balance(record, current_age, retirement_age, age), age),
             })
+
+        for record in (r for r in pension_records if r["pillar"] == "3b"):
+            age = pillar_3b_age(record, current_age, retirement_age)
+            amount = _pillar_3a_balance(record, current_age, retirement_age, age)
+            if amount > 0:
+                events.append({
+                    "source": "3b", "label": record.get("provider") or "Säule 3b", "age": age,
+                    "amount": real(amount, age), "tax": 0.0,
+                })
 
         per_age: Dict[int, float] = {}
         for e in events:
-            per_age[e["age"]] = per_age.get(e["age"], 0.0) + e["amount"]
+            if e["source"] in TAXED_SOURCES:
+                per_age[e["age"]] = per_age.get(e["age"], 0.0) + e["amount"]
         tax_per_age = {age: capital_tax(total, canton, married) for age, total in per_age.items()}
         this_year = datetime.now().year
         for e in events:
-            e["tax"] = tax_per_age[e["age"]] * e["amount"] / per_age[e["age"]] if per_age[e["age"]] else 0.0
+            if e["source"] in TAXED_SOURCES:
+                e["tax"] = tax_per_age[e["age"]] * e["amount"] / per_age[e["age"]] if per_age[e["age"]] else 0.0
             e["year"] = this_year + e["age"] - current_age
         return sorted(events, key=lambda e: (e["age"], e["source"]))
 
@@ -653,16 +694,16 @@ class ProjectionService:
         """
         Project AHV, BVG, Pillar 3a and Pillar 3b pension values per year.
 
-        Returns four lists (length = years+1) of annual pension income / capital
-        in real CHF. Before retirement: projected balance. After: annual income.
+        Returns (ahv, bvg, 3a, 3b, retirement_idx, bvg_income), Listen der
+        Laenge years+1 in heutigen CHF:
+          - ahv: Jahresrente, 0 vor dem Bezug
+          - bvg: Guthaben bis zum Endbezug, danach die ganze Jahresrente (fuers
+            Diagramm); bvg_income: was tatsaechlich fliesst, auch Teilrenten
+          - 3a, 3b: Guthaben bis zum Bezug als Kapital, danach 0
 
-        Nach dem Rentenalter wird nichts mehr einbezahlt: BVG-Rente und
-        3b-Auszahlung stehen ab da nominal fest (und verlieren real an Wert),
-        die 3b-Auszahlung endet nach PAYOUT_YEARS. Die 3a-Reihe zeigt das
-        Guthaben bis zum Bezug, danach 0 — sie wird als Kapital bezogen.
+        Nach dem Rentenalter wird nichts mehr einbezahlt: die BVG-Rente steht
+        ab da nominal fest (und verliert real an Wert).
         """
-        current_year = datetime.now().year
-
         current_age = _current_age(date_of_birth)
 
         years_to_retirement = max(0, retirement_age - current_age)
@@ -672,14 +713,12 @@ class ProjectionService:
         # Extract pension records by pillar
         ahv_record = next((r for r in pension_records if r["pillar"] == "1"), None)
         bvg_record = next((r for r in pension_records if r["pillar"] == "2"), None)
+        steps, bvg_balances = bvg_steps(bvg_record, annual_income, current_age, retirement_age)
+        final_age = steps[-1]["age"]
+        # Bezugsalter je 3a-Konto festlegen (eigenes oder gestaffelt) und je
+        # 3b-Police, damit Reihe und Kapitalbezug dasselbe Alter verwenden
+        bvg_capital_ages = [s["age"] for s in steps if s["capital"] > 0]
         p3a_records = [r for r in pension_records if r["pillar"] == "3a"]
-        p3b_records = [r for r in pension_records if r["pillar"] == "3b"]
-        # Bezugsalter je 3a-Konto festlegen (eigenes oder gestaffelt), damit
-        # Reihe und Kapitalbezug dasselbe Alter verwenden
-        bvg_capital_ages = (
-            [bvg_start_age(retirement_age)]
-            if bvg_record and (bvg_record.get("capital_share") or 0) > 0 else []
-        )
         p3a_records = [
             {**r, "withdrawal_age": age}
             for r, age in zip(
@@ -687,11 +726,16 @@ class ProjectionService:
                 resolve_3a_ages(p3a_records, retirement_age, current_age, bvg_capital_ages),
             )
         ]
+        p3b_records = [
+            {**r, "withdrawal_age": pillar_3b_age(r, current_age, retirement_age)}
+            for r in pension_records if r["pillar"] == "3b"
+        ]
 
         pension_ahv_series = []
         pension_bvg_series = []
         pension_3a_series = []
         pension_3b_series = []
+        bvg_income = []
 
         for yr in range(years + 1):
             age_at_year = current_age + yr
@@ -711,14 +755,11 @@ class ProjectionService:
             pension_ahv_series.append(ahv_annual)
 
             # ── BVG ────────────────────────────────────────
-            bvg_annual = self._project_bvg(
-                age_at_year=age_at_year,
-                retirement_age=retirement_age,
-                record=bvg_record,
-                annual_income=annual_income,
-                years_elapsed=yr,
-            )
-            pension_bvg_series.append(bvg_annual / inflation_deflator)
+            # Renten stehen nominal fest, ab ihrem Schritt
+            pension = sum(s["pension"] for s in steps if s["age"] <= age_at_year)
+            bvg_income.append(pension / inflation_deflator)
+            bvg_value = bvg_balances[yr] if age_at_year < final_age else pension
+            pension_bvg_series.append(bvg_value / inflation_deflator)
 
             # ── Pillar 3a ──────────────────────────────────
             p3a_total = sum(
@@ -733,8 +774,9 @@ class ProjectionService:
             pension_3a_series.append(p3a_total / inflation_deflator)
 
             # ── Pillar 3b (Lebensversicherung / freie Vorsorge) ────
+            # Wie 3a: Kapital bis zur Auszahlung, dann ins freie Vermoegen
             p3b_total = sum(
-                self._project_3b(
+                self._project_3a(
                     age_at_year=age_at_year,
                     retirement_age=retirement_age,
                     record=r,
@@ -750,6 +792,7 @@ class ProjectionService:
             pension_3a_series,
             pension_3b_series,
             retirement_idx,
+            bvg_income,
         )
 
     def _project_ahv(
@@ -805,36 +848,6 @@ class ProjectionService:
 
         return pension_monthly * AHV_PAYMENTS_PER_YEAR
 
-    def _project_bvg(
-        self,
-        age_at_year: int,
-        retirement_age: int,
-        record: Optional[Dict],
-        annual_income: float,
-        years_elapsed: int,
-    ) -> float:
-        """
-        Project BVG pension balance and eventual annual pension (nominal CHF).
-        Before retirement: returns projected capital (not income).
-        After retirement: annual pension = capital at retirement x conversion
-        rate. Beitraege enden mit dem Rentenalter, die Rente steht danach fest.
-        """
-        start_age = age_at_year - years_elapsed
-        payout_start = bvg_start_age(retirement_age)
-        # Beitraege nur bis zum Rentenalter, danach bis zum Bezug nur Zins
-        saving_years = min(years_elapsed, max(0, retirement_age - start_age))
-        interest_years = min(years_elapsed, max(0, payout_start - start_age)) - saving_years
-        balance, conversion_rate = _bvg_capital(
-            record, annual_income, start_age, saving_years, interest_years
-        )
-
-        if age_at_year < payout_start:
-            return balance  # Kapital, solange noch nichts ausbezahlt wird
-
-        # Der als Kapital bezogene Teil ist keine Rente (capital_withdrawals)
-        pension_share = 1 - min(max((record or {}).get("capital_share") or 0.0, 0.0), 1.0)
-        return balance * bvg_conversion_at(conversion_rate, payout_start) * pension_share
-
     def _project_3a(
         self,
         age_at_year: int,
@@ -843,35 +856,14 @@ class ProjectionService:
         years_elapsed: int,
     ) -> float:
         """
-        Saeule-3a-Guthaben (nominal) bis zum Bezug, danach 0: das Konto wird als
-        Kapital bezogen (Steuer und Zufluss ins Vermoegen: capital_withdrawals).
-        Einzahlen geht nur bis zum Rentenalter.
+        Guthaben eines 3a-Kontos oder einer 3b-Police (nominal) bis zum Bezug,
+        danach 0: es wird als Kapital bezogen (Steuer und Zufluss ins
+        Vermoegen: capital_withdrawals). Einzahlen geht nur bis zum Rentenalter.
         """
         withdrawal_age = record.get("withdrawal_age") or pillar_3a_latest_age(retirement_age)
         if age_at_year >= withdrawal_age:
             return 0.0
         return _pillar_3a_balance(record, age_at_year - years_elapsed, retirement_age, age_at_year)
-
-    def _project_3b(
-        self,
-        age_at_year: int,
-        retirement_age: int,
-        record: Dict,
-        years_elapsed: int,
-    ) -> float:
-        """
-        Project Pillar 3b (Lebensversicherung / freie Vorsorge).
-
-        For Kapital-/Gemischt-Lebensversicherungen: current_balance holds the
-        guaranteed Ablaufleistung (fixed payout sum). Grows by the
-        expected_return_rate until retirement, then paid out like 3a.
-        For Risiko-LV: current_balance = 0 (no capital component), returns 0.
-        """
-        if record.get("current_balance", 0.0) <= 0 and record.get("annual_contribution", 0.0) <= 0:
-            return 0.0
-        return _saving_then_payout(
-            record, age_at_year, retirement_age, years_elapsed, 0.0, retirement_age
-        )
 
     def compare_scenarios(
         self,

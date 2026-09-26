@@ -49,6 +49,7 @@ from app.models.models import (
     User,
     UserWizardConfig,
 )
+from app.api.pension import PartialStep, _check_partial_steps
 
 router = APIRouter()
 
@@ -82,6 +83,20 @@ class Pillar3aAccountPayload(BaseModel):
     strategy: Literal["interest", "funds"] = "funds"
     # Alter beim Bezug (60-70); None = der Planer staffelt die Konten
     withdrawal_age: Optional[int] = Field(default=None, ge=60, le=70)
+
+
+class PartialRetirementPayload(BaseModel):
+    """Teilpensionierung im Wizard, in Prozent (wie die Regler)."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    alter: int = Field(ge=58, le=69)
+    pensum: float = Field(gt=0.0, lt=100.0)         # Pensum danach
+    kapitalanteil: float = Field(default=0.0, ge=0.0, le=100.0)
+
+
+def _partial_step(s: PartialRetirementPayload) -> PartialStep:
+    return PartialStep(age=s.alter, pensum=s.pensum / 100, capital_share=s.kapitalanteil / 100)
 
 
 class SelectedExpenseEntryPayload(BaseModel):
@@ -236,6 +251,8 @@ class WizardCompletePayload(BaseModel):
     bvg_umwandlungssatz: float = Field(default=5.3, ge=2.0, le=8.0)
     # Anteil des Pensionskassenguthabens, der als Kapital bezogen wird, in Prozent
     bvg_kapitalanteil: float = Field(default=0.0, ge=0.0, le=100.0)
+    # Teilpensionierung vor dem Erwerbsende (hoechstens zwei Schritte)
+    bvg_teilpensionierung: List[PartialRetirementPayload] = Field(default_factory=list)
     # Explicit alias: auto to_camel yields pillar3AAccounts, but the app sends pillar3aAccounts.
     pillar_3a_accounts: List[Pillar3aAccountPayload] = Field(
         default_factory=list,
@@ -255,6 +272,12 @@ class WizardCompletePayload(BaseModel):
     scenario_early_retirement: bool = False
     scenario_care: bool = True
     inflation: float = Field(default=1.5, ge=0.0, le=10.0)
+
+    @field_validator("bvg_teilpensionierung")
+    @classmethod
+    def _partial_steps_valid(cls, steps: List[PartialRetirementPayload]):
+        _check_partial_steps([_partial_step(s) for s in steps])
+        return steps
 
     @field_validator("kanton")
     @classmethod
@@ -304,6 +327,15 @@ class MortgageTrancheResponse(BaseModel):
 
 def _now() -> datetime:
     return datetime.now(tz=timezone.utc)
+
+
+def _age_at(iso_date: Optional[str], birth_year: int) -> Optional[int]:
+    """Alter im Jahr eines Datums ("2034-12-13"), wie das Alter ueberall in
+    der Prognose: Kalenderjahr minus Geburtsjahr."""
+    try:
+        return date.fromisoformat(iso_date).year - birth_year if iso_date else None
+    except ValueError:
+        return None
 
 
 def _mortgage_interest(p: WizardCompletePayload) -> float:
@@ -783,6 +815,7 @@ async def wizard_complete(
         retirement_age=payload.bvg_rentenalter,
         conversion_rate=payload.bvg_umwandlungssatz / 100,
         capital_share=payload.bvg_kapitalanteil / 100,
+        partial_steps=[_partial_step(s).model_dump() for s in payload.bvg_teilpensionierung] or None,
         notes=f"BVG Guthaben aus empirischen Angaben | Rentenalter: {payload.bvg_rentenalter}",
         as_of_date=_now(),
     )
@@ -797,11 +830,13 @@ async def wizard_complete(
                 user_id=current_user.id,
                 pillar=PensionPillar.pillar_3b,
                 provider="Lebensversicherung",
-                # Store the guaranteed Ablaufleistung as the capital value
+                # Die Ablaufleistung ist ein fester Betrag, am Ablauf ausbezahlt
+                # (steuerfrei); ohne Datum beim Erwerbsende
                 current_balance=payload.life_insurance_leistung,
                 annual_contribution=0.0,   # Premium is tracked as budget expense
-                expected_return_rate=0.01, # Conservative: LV credit interest ~1%
+                expected_return_rate=0.0,
                 retirement_age=payload.ziel_rentenalter,
+                withdrawal_age=_age_at(payload.life_insurance_ablauf, payload.geburtsjahr),
                 notes=(
                     f"Typ: {payload.life_insurance_type} | "
                     f"Ablauf: {payload.life_insurance_ablauf or 'offen'} | "

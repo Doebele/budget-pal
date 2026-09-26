@@ -598,6 +598,8 @@ async def import_backup(
                 average_insured_salary=p_data.get("average_insured_salary"),
                 conversion_rate=p_data.get("conversion_rate"),
                 capital_share=p_data.get("capital_share"),
+                # die Rechnung uebergeht ungueltige Schritte (partial_retirement_plan)
+                partial_steps=p_data.get("partial_steps"),
                 withdrawal_age=p_data.get("withdrawal_age"),
                 notes=p_data.get("notes"),
             ))
