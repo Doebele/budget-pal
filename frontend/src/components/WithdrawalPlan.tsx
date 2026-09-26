@@ -1,13 +1,22 @@
 import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import type { CapitalWithdrawal } from "@/lib/api";
 import { formatCHF } from "@/lib/theme";
 
 /**
- * Bezugsplan fuer Kapitalbezuege (Pensionskasse, 3a-Konten): wann welches
- * Kapital, wie viel Steuer, was bleibt — und was die Staffelung gegenueber
- * einem Bezug in einem einzigen Jahr spart. Die Zahlen rechnet das Backend
- * (capital_withdrawals), in heutigen Franken.
+ * Bezugsplan fuer Kapitalbezuege (Pensionskasse, 3a-Konten, Lebensversicherung):
+ * wann welches Kapital, wie viel Steuer, was bleibt — und was die Staffelung
+ * gegenueber einem Bezug in einem einzigen Jahr spart. Die Zahlen rechnet das
+ * Backend (capital_withdrawals), in heutigen Franken.
  */
+function label(t: TFunction, w: CapitalWithdrawal) {
+  if (w.source === "3a") return t("pages:plan.p3a", { label: w.label });
+  if (w.source === "3b") return t("pages:plan.p3b", { label: w.label });
+  return w.pensum
+    ? t("pages:plan.bvgPartial", { label: w.label, pensum: Math.round(w.pensum * 100) })
+    : t("pages:plan.bvg", { label: w.label });
+}
+
 export default function WithdrawalPlan({
   withdrawals,
   taxSingleYear,
@@ -45,10 +54,12 @@ export default function WithdrawalPlan({
                   {t("pages:plan.age", { age: w.age, year: w.year })}
                 </td>
                 <td className="py-1 pr-3 font-sans text-text-primary">
-                  {w.source === "bvg" ? t("pages:plan.bvg", { label: w.label }) : t("pages:plan.p3a", { label: w.label })}
+                  {label(t, w)}
                 </td>
                 <td className="py-1 pr-3 text-right text-text-primary">{formatCHF(w.amount)}</td>
-                <td className="py-1 pr-3 text-right text-loss">−{formatCHF(w.tax)}</td>
+                <td className="py-1 pr-3 text-right text-loss">
+                  {w.source === "3b" ? <span className="font-sans text-text-tertiary">{t("pages:plan.taxFree")}</span> : `−${formatCHF(w.tax)}`}
+                </td>
                 <td className="py-1 text-right text-text-primary">{formatCHF(w.amount - w.tax)}</td>
               </tr>
             ))}
@@ -64,7 +75,9 @@ export default function WithdrawalPlan({
       {saving >= 1 && (
         <p className="text-gain text-xs">{t("pages:plan.saving", { amount: formatCHF(saving) })}</p>
       )}
-      <p className="text-text-tertiary text-[11px] leading-relaxed">{t("pages:plan.rules")}</p>
+      <p className="text-text-tertiary text-[11px] leading-relaxed">
+        {t("pages:plan.rules")} {t("pages:plan.rulesExtra")}
+      </p>
     </div>
   );
 }

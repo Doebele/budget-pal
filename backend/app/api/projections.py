@@ -20,6 +20,7 @@ from app.core.security import get_current_user
 from app.core.config import settings
 from app.models.models import Scenario, PensionData, User
 from app.api.budget_multimodal import _get_wizard_scenario
+from app.api.pension import record_dict
 from app.services.capital_tax import tax_profile
 from app.services.projection import (
     AMORTIZATION_YEARS_DEFAULT,
@@ -69,17 +70,18 @@ class ProjectionResult(BaseModel):
     pension_ahv: List[float]
     pension_bvg: List[float]
     pension_3a: List[float]
-    pension_3b: List[float] = []   # Säule 3b / Lebensversicherung (optional — zero for old cached results)
-    # Jaehrliches Renteneinkommen (nur Saeulen, die schon auszahlen), real
+    # Säule 3b / Lebensversicherung: Kapital bis zum Ablauf, danach 0
+    pension_3b: List[float] = []
+    # Jaehrliches Renteneinkommen (AHV, BVG-Renten inkl. Teilrenten), real
     pension_income: List[float] = []
-    # Index, ab dem jede Saeule auszahlt: {"1": AHV, "2": BVG, "3a", "3b"}
+    # Index, ab dem AHV ("1") und Pensionskasse ("2", Endbezug) eine Rente zahlen
     payout_start_idx: Dict[str, int] = {}
     retirement_spending: Optional[float] = None
     # Alter, ab dem das Vermoegen im Median aufgebraucht ist (None = reicht)
     depletion_age: Optional[int] = None
     # Anteil der Simulationen mit Vermoegen am Ende des Horizonts
     success_rate: Optional[float] = None
-    # Kapitalbezuege (Pensionskasse, 3a): Alter, Jahr, Betrag, Steuer — real
+    # Kapitalbezuege (Pensionskasse, 3a, 3b): Alter, Jahr, Betrag, Steuer — real
     capital_withdrawals: List[Dict[str, Any]] = []
     capital_tax_total: float = 0.0
     # Steuer, wenn alles im selben Jahr bezogen wuerde (Vergleich zur Staffelung)
@@ -241,22 +243,7 @@ async def run_projection(
         years_to_project = max(1, int(merged["life_expectancy"] - current_age))
     years_to_project = years_to_project or 30
 
-    pension_payload = [
-        {
-            "pillar": r.pillar.value,
-            "current_balance": r.current_balance,
-            "annual_contribution": r.annual_contribution,
-            "expected_return_rate": r.expected_return_rate,
-            "retirement_age": r.retirement_age,
-            "contribution_years": r.contribution_years,
-            "average_insured_salary": r.average_insured_salary,
-            "conversion_rate": r.conversion_rate,
-            "capital_share": r.capital_share,
-            "withdrawal_age": r.withdrawal_age,
-            "provider": r.provider,
-        }
-        for r in pension_records
-    ]
+    pension_payload = [record_dict(r) for r in pension_records]
 
     # Fruehpensionierung = dieselbe Rechnung mit frueherem Rentenalter: Sparen
     # endet frueher, Renten fallen kleiner aus und beginnen teils spaeter, die

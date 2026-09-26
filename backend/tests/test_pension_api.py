@@ -133,3 +133,50 @@ def test_estimate_returns_the_withdrawal_plan(client):
     assert data["capital_net"] == pytest.approx(
         sum(w["amount"] for w in data["capital_withdrawals"]) - data["capital_tax"]
     )
+
+
+def test_estimate_with_partial_retirement_and_life_insurance(client):
+    res = client.post("/api/pension/estimate", json={
+        "current_age": 58, "retirement_age": 63, "ahv_average_income": 90_000,
+        "bvg_balance": 500_000, "bvg_capital_share": 0.5,
+        "bvg_partial_steps": [{"age": 61, "pensum": 0.5, "capital_share": 1.0}],
+        "pillar_3b": [{"balance": 200_000, "withdrawal_age": 66, "provider": "LV"}],
+        "inflation_rate": 0.0,
+    })
+    assert res.status_code == 200, res.text
+    data = res.json()
+    assert [s["age"] for s in data["bvg_steps"]] == [61, 63]
+    lv = next(w for w in data["capital_withdrawals"] if w["source"] == "3b")
+    assert (lv["age"], lv["amount"], lv["tax"]) == (66, 200_000, 0)
+
+
+def test_estimate_rejects_an_illegal_partial_retirement(client):
+    res = client.post("/api/pension/estimate", json={
+        "current_age": 58, "bvg_partial_steps": [{"age": 61, "pensum": 0.95}],
+    })
+    assert res.status_code == 422
+
+
+async def test_wizard_stores_partial_retirement_and_expiry(client, db_session, test_user):
+    uid = test_user.id  # vor den Requests lesen (MissingGreenlet)
+    res = client.post("/api/wizard/complete", json={
+        "geburtsjahr": 1968, "zielRentenalter": 63,
+        "bvgTeilpensionierung": [{"alter": 61, "pensum": 50, "kapitalanteil": 100}],
+        "hasLifeInsurance": True, "lifeInsuranceType": "kapital",
+        "lifeInsuranceAblauf": "2034-12-13", "lifeInsuranceLeistung": 286_484,
+    })
+    assert res.status_code == 201, res.text
+    rows = (await db_session.execute(
+        select(PensionData).where(PensionData.user_id == uid)
+    )).scalars().all()
+    bvg = next(r for r in rows if r.pillar == PensionPillar.pillar_2)
+    lv = next(r for r in rows if r.pillar == PensionPillar.pillar_3b)
+    assert bvg.partial_steps == [{"age": 61, "pensum": 0.5, "capital_share": 1.0}]
+    assert (lv.withdrawal_age, lv.expected_return_rate) == (66, 0.0)
+
+
+def test_wizard_rejects_a_step_that_is_too_small(client):
+    res = client.post("/api/wizard/complete", json={
+        "bvgTeilpensionierung": [{"alter": 61, "pensum": 90}],
+    })
+    assert res.status_code == 422

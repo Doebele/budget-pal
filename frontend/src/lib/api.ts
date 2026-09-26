@@ -199,17 +199,18 @@ export interface ProjectionResult {
   p50: number[];
   p75: number[];
   p90: number[];
-  /** Vor dem Bezugsbeginn: Kapital (BVG, 3a, 3b) bzw. 0 (AHV); danach Jahresrente. */
+  /** AHV: Jahresrente ab Bezug. BVG: Guthaben bis zum Endbezug, danach Jahresrente.
+   *  3a/3b: Kapital bis zum Bezug, danach 0. */
   pension_ahv: number[];
   pension_bvg: number[];
   pension_3a: number[];
   pension_3b: number[];
-  /** Jaehrliches Renteneinkommen — nur Saeulen, die schon auszahlen. */
+  /** Jaehrliches Renteneinkommen: AHV und BVG-Renten, auch Teilrenten. */
   pension_income: number[];
   retirement_idx: number | null;
-  /** Index, ab dem jede Saeule eine Rente zahlt: "1" AHV, "2" BVG, "3b".
-   *  Die 3a zahlt keine Rente, sie wird als Kapital bezogen. */
-  payout_start_idx: Record<"1" | "2" | "3b", number>;
+  /** Index, ab dem AHV ("1") und Pensionskasse ("2", Endbezug) eine Rente
+   *  zahlen. 3a und 3b werden als Kapital bezogen. */
+  payout_start_idx: Record<"1" | "2", number>;
   /** Jaehrliche Lebenskosten im Ruhestand, die die Rechnung verwendet hat. */
   retirement_spending: number | null;
   /** Alter, ab dem das Vermoegen im Median aufgebraucht ist; null = reicht. */
@@ -287,11 +288,11 @@ export const taxonomyApi = {
 /** Schaetzung bei Pensionierung — dieselbe Rechnung wie die Prognose.
  *  Alle Betraege in heutigen CHF, Monatswerte = Jahreswert / 12 (bei der AHV
  *  steckt die 13. Rente anteilig darin). */
-/** Ein Kapitalbezug (Pensionskasse oder ein 3a-Konto), heutige CHF. Die
- *  Steuer ist der Anteil an der Steuer des Bezugsjahres — alle Bezuege eines
- *  Jahres werden zusammen besteuert. */
+/** Ein Kapitalbezug (Pensionskasse, 3a-Konto, Lebensversicherung), heutige
+ *  CHF. Die Steuer ist der Anteil an der Steuer des Bezugsjahres — alle
+ *  Bezuege eines Jahres werden zusammen besteuert; die 3b ist steuerfrei. */
 export interface CapitalWithdrawal {
-  source: "bvg" | "3a";
+  source: "bvg" | "3a" | "3b";
   label: string;
   age: number;
   year: number;
@@ -299,6 +300,25 @@ export interface CapitalWithdrawal {
   tax: number;
   /** Nur 3a: Position des Kontos in der Eingabe. */
   account?: number;
+  /** Nur BVG: Pensum danach (0-1); > 0 = Teilpensionierung. */
+  pensum?: number | null;
+}
+
+/** Teilpensionierung oder Endbezug der Pensionskasse, heutige CHF. */
+export interface BvgStep {
+  age: number;
+  pensum: number;
+  released: number;
+  capital: number;
+  pension_monthly: number;
+}
+
+/** Teilpensionierung: ab `age` noch `pensum` (0-1), `capital_share` des
+ *  frei werdenden Guthabens als Kapital. */
+export interface PartialStepInput {
+  age: number;
+  pensum: number;
+  capital_share: number;
 }
 
 export interface PensionEstimate {
@@ -312,15 +332,16 @@ export interface PensionEstimate {
   bvg_capital_share: number;
   bvg_lump_sum: number;
   bvg_monthly: number;
+  bvg_steps: BvgStep[];
   pillar_3a_capital: number;
+  /** Lebensversicherung am Ablauf, steuerfrei. */
   pillar_3b_capital: number;
-  pillar_3b_monthly: number;
   capital_withdrawals: CapitalWithdrawal[];
   capital_tax: number;
   /** Steuer, wenn alles im selben Jahr bezogen wuerde. */
   capital_tax_single_year: number;
   capital_net: number;
-  /** Renten (AHV + BVG + 3b) pro Monat; Kapitalbezuege sind nicht darin. */
+  /** Renten (AHV + BVG) pro Monat; Kapitalbezuege sind nicht darin. */
   total_monthly: number;
 }
 
@@ -334,6 +355,7 @@ export interface PensionEstimateInput {
   bvg_conversion_rate?: number | null;
   /** Anteil der Pensionskasse als Kapital, 0-1. */
   bvg_capital_share?: number;
+  bvg_partial_steps?: PartialStepInput[];
   pillar_3a?: {
     balance: number;
     annual_contribution: number;
@@ -342,6 +364,8 @@ export interface PensionEstimateInput {
     /** null = der Planer staffelt */
     withdrawal_age?: number | null;
   }[];
+  /** Lebensversicherung: Ablaufleistung und Alter bei Ablauf (null = Erwerbsende). */
+  pillar_3b?: { balance: number; provider?: string; withdrawal_age?: number | null }[];
   inflation_rate?: number;
   canton?: string;
   married?: boolean;

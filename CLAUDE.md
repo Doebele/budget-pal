@@ -247,17 +247,25 @@ Central definition of all 11 supercategories (wohnen, essen, mobilitaet, versich
 - BVG (Pillar 2): contributions stop at retirement; pension = capital at retirement ×
   `pension_data.conversion_rate` (from the certificate) or `BVG_CONVERSION_RATE_DEFAULT` (5.3 %).
   The legal 6.8 % only applies to the mandatory part. Fixed in nominal CHF after retirement.
+  Partial retirement (`pension_data.partial_steps`, Art. 13a BVG: at most two steps before the
+  final one, first ≥ 20 %): each step releases the share the workload drops by, as capital
+  and/or pension; the rest keeps saving at the lower workload. `bvg_steps()` is the one place
+  that walks the BVG year by year; the wealth path loses the missing salary
+  (`NET_INCOME_SHARE`) and gains the partial pension.
 - Pillar 3a: contributions stop at retirement; each account is withdrawn **as capital** at its
   `withdrawal_age` or at the staggered age from `plan_3a_ages` (one account per year, latest
   first, never in the BVG capital year). The series holds the balance until then, 0 after.
   Max `PILLAR_3A_MAX_CONTRIBUTION` CHF/year.
-- Pillar 3b: contributions stop at retirement, then a fixed payout for `PAYOUT_YEARS`, then 0.
-- Capital withdrawals (`ProjectionService.capital_withdrawals`: BVG `capital_share` + 3a) are
+- Pillar 3b / life insurance: paid out **as capital** at `withdrawal_age` (policy expiry; the
+  wizard derives it from the expiry date), else at retirement — tax-free. `current_balance` is
+  the fixed maturity sum (return 0), so it loses real value until then.
+- Capital withdrawals (`ProjectionService.capital_withdrawals`: BVG steps + 3a + 3b) are
   taxed per calendar year by `services/capital_tax.py` (federal tariff 2026 exact, cantonal from
-  ESTV data for the cantonal capital) and flow into free wealth net of tax.
-- Payout starts per pillar (`payout_start_ages`): AHV 63-70, BVG 58-70 (conversion rate
+  ESTV data for the cantonal capital; `TAXED_SOURCES` excludes 3b) and flow into free wealth.
+- Payout starts (`payout_start_ages`): AHV 63-70, BVG final step 58-70 (conversion rate
   ±`BVG_CONVERSION_STEP` per year vs. 65), 3a 60-70. Before its start a series holds *capital*,
-  not income — use `pension_income()` for cash flows, never the raw sum of the series.
+  not income — use `pension_income` from `run()` for cash flows (AHV + BVG pensions incl.
+  partial ones), never the raw sum of the series.
 - Wealth path (`ProjectionService.run`): savings only until retirement, then pensions minus
   `retirement_spending` (plus AHV non-employed contributions until 65); floored at 0. Early
   retirement is just an earlier `retirement_age` — no special window logic.

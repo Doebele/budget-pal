@@ -9,9 +9,9 @@ import pytest
 
 from app.services.projection import (
     AHV_MIN_PENSION,
-    PAYOUT_YEARS,
     ProjectionService,
     ahv_full_monthly,
+    bvg_steps,
 )
 
 SERVICE = ProjectionService()
@@ -26,7 +26,7 @@ RECORDS = [
 
 
 def _series(retirement_age: int, inflation: float = 0.0, records=RECORDS):
-    ahv, bvg, p3a, _p3b, idx = SERVICE._project_pensions(
+    ahv, bvg, p3a, _p3b, idx, _income = SERVICE._project_pensions(
         records, 40, 100_000, DOB_50, retirement_age, inflation
     )
     return ahv, bvg, p3a, idx
@@ -108,7 +108,8 @@ class TestConversionRate:
                   "expected_return_rate": 0.0}
         if conversion_rate is not None:
             record["conversion_rate"] = conversion_rate
-        return SERVICE._project_bvg(66, 65, record, 0, 0)
+        steps, _ = bvg_steps(record, 0, 65, 65)
+        return steps[-1]["pension"]
 
     def test_default_is_53_percent(self):
         """6.8 % gilt nur fuer den obligatorischen Teil — Vorgabe ist der
@@ -123,16 +124,14 @@ class TestEstimate:
     def test_matches_the_projection(self):
         """Wizard und Finanzplan zeigen dieselben Zahlen wie das Diagramm."""
         est = SERVICE.estimate_at_retirement(RECORDS, 50, 65, 100_000, 0.015)
-        ahv, bvg, p3a, _p3b, _ = SERVICE._project_pensions(
+        ahv, bvg, *_ = SERVICE._project_pensions(
             RECORDS, 40, 100_000, DOB_50, 65, 0.015
         )
         assert est["ahv_monthly"] * 12 == pytest.approx(at(ahv, 65))
         assert est["bvg_monthly"] * 12 == pytest.approx(at(bvg, 65))
         # 3a ist Kapital, keine Rente — zwei Konten, gestaffelt bezogen
         assert [w["source"] for w in est["capital_withdrawals"]] == ["3a", "3a"]
-        assert est["total_monthly"] == pytest.approx(
-            est["ahv_monthly"] + est["bvg_monthly"] + est["pillar_3b_monthly"]
-        )
+        assert est["total_monthly"] == pytest.approx(est["ahv_monthly"] + est["bvg_monthly"])
 
     def test_reports_when_ahv_starts(self):
         est = SERVICE.estimate_at_retirement(RECORDS, 50, 60, 100_000, 0.0)
@@ -220,9 +219,11 @@ class TestEarlyRetirementCosts:
 
     def test_bvg_starts_at_58_with_a_lower_conversion_rate(self):
         record = {"current_balance": 400_000, "annual_contribution": 0, "expected_return_rate": 0.0}
-        assert SERVICE._project_bvg(57, 55, record, 0, 2) == pytest.approx(400_000)  # noch Kapital
+        steps, balances = bvg_steps(record, 0, 55, 55)
+        assert balances[2] == pytest.approx(400_000)  # mit 57 noch Kapital
         rate = BVG_CONVERSION_RATE_DEFAULT - 7 * BVG_CONVERSION_STEP
-        assert SERVICE._project_bvg(58, 55, record, 0, 3) == pytest.approx(400_000 * rate)
+        assert steps == [pytest.approx({"age": 58, "pensum": 0.0, "released": 400_000,
+                                        "capital": 0.0, "pension": 400_000 * rate})]
 
     def test_3a_withdrawal_needs_age_60(self):
         """Wer mit 55 aufhoert, bezieht die 3a trotzdem erst ab 60; bis dahin
@@ -235,7 +236,7 @@ class TestEarlyRetirementCosts:
     def test_capital_before_payout_is_not_income(self):
         """Mit 55 in Rente: BVG und 3a sind bis 58/60 Kapital, kein Einkommen."""
         r = _run(pension_records=RECORDS, annual_income=100_000, retirement_age=55)
-        assert r["payout_start_idx"] == {"1": 13, "2": 8, "3b": 5}
+        assert r["payout_start_idx"] == {"1": 13, "2": 8}
         assert at(r["pension_income"], 56) == 0.0
         assert at(r["pension_income"], 58) == pytest.approx(at(r["pension_bvg"], 58))
 

@@ -133,20 +133,21 @@ export default function Projections() {
   const retirementInHorizon = serverRetIdx <= selectedHorizon.years;
   const retIdx = retirementInHorizon ? serverRetIdx : null;
   // Jede Saeule bei ihrem Bezugsbeginn lesen (AHV ab 63, BVG ab 58): davor
-  // steht in der Reihe das Kapital, keine Rente. Die 3a zahlt keine Rente —
-  // sie wird als Kapital bezogen (Bezugsplan).
-  const pensionAt = (series: number[] | undefined, pillar: "1" | "2" | "3b") => {
+  // steht in der Reihe das Kapital, keine Rente. 3a und 3b zahlen keine
+  // Rente — sie werden als Kapital bezogen (Bezugsplan).
+  const pensionAt = (series: number[] | undefined, pillar: "1" | "2") => {
     if (retIdx == null || !series) return 0;
     const idx = Math.max(retIdx, projection?.payout_start_idx?.[pillar] ?? retIdx);
     return series[Math.min(idx, series.length - 1)] ?? 0;
   };
   const ahvAtRet = pensionAt(projection?.pension_ahv, "1");
   const bvgAtRet = pensionAt(projection?.pension_bvg, "2");
-  const p3bAtRet = pensionAt(projection?.pension_3b, "3b");
-  const totalPensionAnnual = ahvAtRet + bvgAtRet + p3bAtRet;
-  const p3aNet = (projection?.capital_withdrawals ?? [])
-    .filter((w) => w.source === "3a")
+  const totalPensionAnnual = ahvAtRet + bvgAtRet;
+  const capitalNet = (source: "3a" | "3b") => (projection?.capital_withdrawals ?? [])
+    .filter((w) => w.source === source)
     .reduce((sum, w) => sum + w.amount - w.tax, 0);
+  const p3aNet = capitalNet("3a");
+  const p3bNet = capitalNet("3b");
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -374,11 +375,10 @@ export default function Projections() {
             <p className="text-text-secondary text-xs font-semibold uppercase tracking-wide">
               {t("pages:hints.pensionAtRetirement", { year: projection.years[retIdx] })}
             </p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
               {[
                 { label: t("pages:ui.ahv_saeule_1"), annual: ahvAtRet, color: PILLAR_COLORS.ahv },
                 { label: t("pages:ui.bvg_saeule_2"), annual: bvgAtRet, color: PILLAR_COLORS.bvg },
-                { label: t("pages:ui.saeule_3b_lv"), annual: p3bAtRet, color: PILLAR_COLORS["3b"] },
               ].map(({ label, annual, color }) => (
                 <div key={label} className="bg-bg-elevated rounded-lg px-4 py-3 border border-border/30">
                   <p className="text-text-tertiary text-[11px] mb-1">{label}</p>
@@ -397,6 +397,16 @@ export default function Projections() {
                 </p>
                 <p className="text-text-tertiary text-[10px] mt-0.5">{t("pages:plan.p3aCard")}</p>
               </div>
+              {/* Lebensversicherung: am Ablauf, steuerfrei */}
+              {p3bNet > 0 && (
+                <div className="bg-bg-elevated rounded-lg px-4 py-3 border border-border/30">
+                  <p className="text-text-tertiary text-[11px] mb-1">{t("pages:ui.saeule_3b_lv")}</p>
+                  <p className="font-mono font-bold text-lg" style={{ color: PILLAR_COLORS["3b"] }}>
+                    {formatCHF(p3bNet)}
+                  </p>
+                  <p className="text-text-tertiary text-[10px] mt-0.5">{t("pages:plan.p3bCard")}</p>
+                </div>
+              )}
             </div>
             {/* Total */}
             <div className="flex items-center justify-between bg-accent/8 border border-accent/20 rounded-lg px-4 py-3">
