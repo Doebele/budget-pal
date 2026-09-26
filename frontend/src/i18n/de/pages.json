@@ -27,7 +27,7 @@
     "assetBond": "Obligationen",
     "assetPension": "Pensionskasse",
     "assetOther": "Sonstiges",
-    "estimateNote": "Ab {{age}} (AHV ab {{ahvAge}}), in heutigen Franken, inkl. 13. AHV-Rente; Pensionskasse mit Umwandlungssatz {{rate}} %, 3a/3b über 20 Jahre verteilt."
+    "estimateNote": "Ab {{age}} (AHV ab {{ahvAge}}), in heutigen Franken, inkl. 13. AHV-Rente; Pensionskasse mit Umwandlungssatz {{rate}} %. 3a und Lebensversicherung werden als Kapital bezogen (Bezugsplan)."
   },
   "dashboard": {
     "topExpenseCategories": "Top Ausgaben-Kategorien",
@@ -808,7 +808,7 @@
     "savingsRateVsPeer": "{{pct}} % — Vergleichsgruppe {{peer}} %"
   },
   "hints": {
-    "pensionChartHint": "Vor dem Rentenalter ({{age}}): AHV = 0; BVG, 3a und 3b zeigen das projizierte Kapital. Ab dann wird nichts mehr einbezahlt: Die BVG-Rente (Kapital × Umwandlungssatz) bleibt in Franken gleich und verliert real an Wert, 3a/3b werden über 20 Jahre mit 2 % Restverzinsung ausbezahlt und enden dann. Die Pensionskasse zahlt frühestens mit 58 (Kapital bis dahin auf dem Freizügigkeitskonto), die 3a zwischen 60 und 70. Die AHV fliesst frühestens mit 63 (Vorbezug −6.8 % je Jahr, Aufschub bis 70 mit Zuschlag), inklusive 13. Rente, und bleibt in heutigen Franken gleich, weil sie der Lohn- und Preisentwicklung folgt. Beitragsjahre werden bis zum Rentenbeginn fortgeschrieben (max. 44). Die AHV-Rente folgt der Rentenformel der Ausgleichskasse; massgebend ist Ihr individueller Kontoauszug.",
+    "pensionChartHint": "Vor dem Rentenalter ({{age}}): AHV = 0; BVG, 3a und 3b zeigen das projizierte Kapital. Ab dann wird nichts mehr einbezahlt: Die BVG-Rente (Kapital × Umwandlungssatz) bleibt in Franken gleich und verliert real an Wert. 3a und Lebensversicherung werden als Kapital bezogen und fallen im Bezugsjahr auf 0 – das Geld fliesst ins freie Vermögen (Bezugsplan unten). Die Pensionskasse zahlt frühestens mit 58 (Kapital bis dahin auf dem Freizügigkeitskonto), bei einer Teilpensionierung schon ab dem ersten Schritt, die 3a zwischen 60 und 70. Die AHV fliesst frühestens mit 63 (Vorbezug −6.8 % je Jahr, Aufschub bis 70 mit Zuschlag), inklusive 13. Rente, und bleibt in heutigen Franken gleich, weil sie der Lohn- und Preisentwicklung folgt. Beitragsjahre werden bis zum Rentenbeginn fortgeschrieben (max. 44). Die AHV-Rente folgt der Rentenformel der Ausgleichskasse; massgebend ist Ihr individueller Kontoauszug.",
     "saronHint": "Referenzwert zur Darstellung von SARON-Hypotheken (kein Live-Tageszins). Quelle und Details:",
     "birthdate": "Geburtsdatum",
     "yearsOld": "{{age}} Jahre",

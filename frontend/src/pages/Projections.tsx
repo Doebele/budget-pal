@@ -375,7 +375,7 @@ export default function Projections() {
             <p className="text-text-secondary text-xs font-semibold uppercase tracking-wide">
               {t("pages:hints.pensionAtRetirement", { year: projection.years[retIdx] })}
             </p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
               {[
                 { label: t("pages:ui.ahv_saeule_1"), annual: ahvAtRet, color: PILLAR_COLORS.ahv },
                 { label: t("pages:ui.bvg_saeule_2"), annual: bvgAtRet, color: PILLAR_COLORS.bvg },

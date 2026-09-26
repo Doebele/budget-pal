@@ -27,7 +27,7 @@
     "assetBond": "Bonds",
     "assetPension": "Pension fund",
     "assetOther": "Other",
-    "estimateNote": "From age {{age}} (AHV from {{ahvAge}}), in today's francs, incl. 13th AHV pension; pension fund at a {{rate}} % conversion rate, 3a/3b spread over 20 years."
+    "estimateNote": "From age {{age}} (AHV from {{ahvAge}}), in today's francs, incl. 13th AHV pension; pension fund at a {{rate}} % conversion rate. 3a and life insurance are withdrawn as capital (withdrawal plan)."
   },
   "dashboard": {
     "topExpenseCategories": "Top expense categories",
@@ -808,7 +808,7 @@
     "savingsRateVsPeer": "{{pct}}% — peer group {{peer}}%"
   },
   "hints": {
-    "pensionChartHint": "Before retirement ({{age}}): AHV = 0; BVG, 3a and 3b show projected capital. From then on nothing is paid in: the BVG pension (capital × conversion rate) stays the same in francs and loses real value, 3a/3b are paid out over 20 years with a 2 % residual return and then end. The pension fund pays from 58 at the earliest (capital sits in a vested benefits account until then), 3a between 60 and 70. AHV starts at 63 at the earliest (−6.8 % per year drawn early, deferral up to 70 with a supplement), includes the 13th pension and stays constant in today's francs because it follows wages and prices. Contribution years are extended until the pension starts (max. 44). The AHV pension follows the official formula; your individual account statement is authoritative.",
+    "pensionChartHint": "Before retirement ({{age}}): AHV = 0; BVG, 3a and 3b show projected capital. From then on nothing is paid in: the BVG pension (capital × conversion rate) stays the same in francs and loses real value. 3a and life insurance are withdrawn as capital and drop to 0 in the withdrawal year – the money moves into free wealth (withdrawal plan below). The pension fund pays from 58 at the earliest (capital sits in a vested benefits account until then), with partial retirement from the first step, 3a between 60 and 70. AHV starts at 63 at the earliest (−6.8 % per year drawn early, deferral up to 70 with a supplement), includes the 13th pension and stays constant in today's francs because it follows wages and prices. Contribution years are extended until the pension starts (max. 44). The AHV pension follows the official formula; your individual account statement is authoritative.",
     "saronHint": "Reference value for displaying SARON mortgages (not a live daily rate). Source and details:",
     "birthdate": "Date of birth",
     "yearsOld": "{{age}} years",
