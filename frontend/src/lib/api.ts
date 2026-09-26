@@ -207,6 +207,13 @@ export interface ProjectionResult {
   pension_3b: number[];
   /** Jaehrliches Renteneinkommen: AHV und BVG-Renten, auch Teilrenten. */
   pension_income: number[];
+  /** Pensionskasse getrennt: Guthaben bis zum Endbezug (danach 0) und Rente. */
+  capital_bvg: number[];
+  income_bvg: number[];
+  /** Gleichmaessiger Kapitalverzehr pro Jahr (real), der das freie Vermoegen
+   *  bis `drawdown_until_age` aufbraucht; 0 vor der Pensionierung. */
+  capital_drawdown: number[];
+  drawdown_until_age: number | null;
   retirement_idx: number | null;
   /** Index, ab dem AHV ("1") und Pensionskasse ("2", Endbezug) eine Rente
    *  zahlen. 3a und 3b werden als Kapital bezogen. */

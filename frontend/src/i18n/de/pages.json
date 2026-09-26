@@ -808,7 +808,6 @@
     "savingsRateVsPeer": "{{pct}} % — Vergleichsgruppe {{peer}} %"
   },
   "hints": {
-    "pensionChartHint": "Vor dem Rentenalter ({{age}}): AHV = 0; BVG, 3a und 3b zeigen das projizierte Kapital. Ab dann wird nichts mehr einbezahlt: Die BVG-Rente (Kapital × Umwandlungssatz) bleibt in Franken gleich und verliert real an Wert. 3a und Lebensversicherung werden als Kapital bezogen und fallen im Bezugsjahr auf 0 – das Geld fliesst ins freie Vermögen (Bezugsplan unten). Die Pensionskasse zahlt frühestens mit 58 (Kapital bis dahin auf dem Freizügigkeitskonto), bei einer Teilpensionierung schon ab dem ersten Schritt, die 3a zwischen 60 und 70. Die AHV fliesst frühestens mit 63 (Vorbezug −6.8 % je Jahr, Aufschub bis 70 mit Zuschlag), inklusive 13. Rente, und bleibt in heutigen Franken gleich, weil sie der Lohn- und Preisentwicklung folgt. Beitragsjahre werden bis zum Rentenbeginn fortgeschrieben (max. 44). Die AHV-Rente folgt der Rentenformel der Ausgleichskasse; massgebend ist Ihr individueller Kontoauszug.",
     "saronHint": "Referenzwert zur Darstellung von SARON-Hypotheken (kein Live-Tageszins). Quelle und Details:",
     "birthdate": "Geburtsdatum",
     "yearsOld": "{{age}} Jahre",
@@ -888,5 +887,24 @@
     "taxFree": "steuerfrei",
     "p3bCard": "am Ablauf der Police, steuerfrei",
     "rulesExtra": "Pensionskasse: bei einer Teilpensionierung höchstens drei Kapitalbezüge (Art. 13a BVG). Lebensversicherung (3b, laufende Prämie): am Ablauf einkommenssteuerfrei."
+  },
+  "overview": {
+    "viewCapital": "Kapital und Vermögen",
+    "viewIncome": "Einkommen im Ruhestand",
+    "showWealth": "Privat-/Anlagevermögen einblenden",
+    "bvgCapital": "Pensionskasse (Guthaben)",
+    "p3a": "Säule 3a",
+    "p3b": "Säule 3b / Lebensversicherung",
+    "wealth": "Privat-/Anlagevermögen (Median)",
+    "retirement": "Pensionierung",
+    "ahv": "AHV",
+    "bvgPension": "Pensionskassen-Rente",
+    "fromWealth": "aus dem Vermögen",
+    "gap": "ungedeckt",
+    "spending": "Ausgaben",
+    "capitalHint": "Die Flächen zeigen das Vorsorgekapital: die Pensionskasse bis zum Endbezug (Teilbezüge verkleinern sie früher), 3a und Lebensversicherung bis zu ihrem Bezug. Was als Rente weiterläuft, steht in der Ansicht Einkommen. Kapitalbezüge fliessen nach Steuer ins Privat-/Anlagevermögen und werden dort mit der gewählten Rendite weiter angelegt – die Linie ist der Median aller Simulationen, nach Ausgaben und Renten. Alles in heutigen Franken.",
+    "incomeHint": "Pro Monat ab der Pensionierung, in heutigen Franken: AHV (frühestens mit 63, inkl. 13. Rente) und Pensionskassen-Rente (fester Frankenbetrag, verliert real an Wert). Den Rest der Ausgaben trägt das Vermögen, solange es im Median reicht; danach bleibt eine Lücke. Die grüne Linie zeigt, was monatlich verfügbar wäre: Renten plus ein gleichbleibender Verzehr des Privat-/Anlagevermögens bis zur Lebenserwartung – inklusive späterer Kapitalbezüge (3a, Lebensversicherung), bei realer Median-Rendite. Liegt sie über den Ausgaben, bleibt Spielraum. Einkommenssteuer auf Renten ist noch nicht abgezogen.",
+    "available": "verfügbar: Renten + Kapitalverzehr bis {{age}}",
+    "drawdownTotal": "Mit Kapitalverzehr bis {{age}}: {{amount}} pro Monat verfügbar"
   }
 }

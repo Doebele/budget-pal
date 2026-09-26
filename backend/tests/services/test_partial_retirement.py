@@ -147,3 +147,44 @@ class TestLegalLimits:
     def test_rejected(self, steps):
         with pytest.raises(ValueError):
             self._check(*steps)
+
+
+def test_bvg_capital_and_income_are_separate_series():
+    """Fuers Diagramm: Kapital bis zum Endbezug, danach 0; die Rente separat."""
+    dob = f"{datetime.now().year - 55}-06-01"
+    r = SERVICE.run(
+        current_net_worth=0, annual_savings=0, annual_income=0, years=12,
+        mean_return=0.0, volatility=0.0, inflation_rate=0.0,
+        pension_records=[{**BVG, "partial_steps": HALF_AT_60}], date_of_birth=dob,
+        retirement_age=63, runs=10, retirement_spending=0.0,
+    )
+    assert r["capital_bvg"][7] > 0 and r["capital_bvg"][8] == 0.0      # 62 / 63
+    assert r["income_bvg"][4] == 0.0 and r["income_bvg"][5] == 0.0      # Teilschritt ganz als Kapital
+    assert r["income_bvg"][8] == pytest.approx(r["pension_bvg"][8])      # ab 63 die Rente
+
+
+def test_capital_drawdown_uses_up_wealth_by_90():
+    """Ohne Rendite: Vermoegen / Jahre von 65 bis und mit 90, erst ab der Pensionierung."""
+    dob = f"{datetime.now().year - 60}-06-01"
+    r = SERVICE.run(
+        current_net_worth=300_000, annual_savings=0, annual_income=0, years=10,
+        mean_return=0.0, volatility=0.0, inflation_rate=0.0, pension_records=[],
+        date_of_birth=dob, retirement_age=65, runs=10, retirement_spending=0.0,
+    )
+    assert r["capital_drawdown"][4] == 0.0
+    assert r["capital_drawdown"][5] == pytest.approx(r["p50"][5] / 26)
+    assert r["capital_drawdown"][10] == r["capital_drawdown"][5]  # gleichbleibend
+
+
+def test_capital_drawdown_counts_later_capital():
+    """Ein 3a-Bezug nach der Pensionierung zaehlt schon im Verzehr mit."""
+    dob = f"{datetime.now().year - 60}-06-01"
+    common = dict(current_net_worth=300_000, annual_savings=0, annual_income=0, years=10,
+                  mean_return=0.0, volatility=0.0, inflation_rate=0.0, date_of_birth=dob,
+                  retirement_age=62, runs=10, retirement_spending=0.0)
+    without = SERVICE.run(pension_records=[], **common)
+    with_3a = SERVICE.run(pension_records=[
+        {"pillar": "3a", "current_balance": 100_000, "withdrawal_age": 64}], **common)
+    extra = with_3a["capital_withdrawals"][0]
+    assert with_3a["capital_drawdown"][2] - without["capital_drawdown"][2] == pytest.approx(
+        (extra["amount"] - extra["tax"]) / 29)

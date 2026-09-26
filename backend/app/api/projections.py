@@ -74,6 +74,12 @@ class ProjectionResult(BaseModel):
     pension_3b: List[float] = []
     # Jaehrliches Renteneinkommen (AHV, BVG-Renten inkl. Teilrenten), real
     pension_income: List[float] = []
+    # Pensionskasse getrennt: Guthaben bis zum Endbezug (danach 0) und Rente
+    capital_bvg: List[float] = []
+    income_bvg: List[float] = []
+    # Gleichmaessiger Kapitalverzehr pro Jahr bis drawdown_until_age (real)
+    capital_drawdown: List[float] = []
+    drawdown_until_age: Optional[int] = None
     # Index, ab dem AHV ("1") und Pensionskasse ("2", Endbezug) eine Rente zahlen
     payout_start_idx: Dict[str, int] = {}
     retirement_spending: Optional[float] = None
@@ -308,6 +314,7 @@ async def run_projection(
         retirement_spending=retirement_spending,
         canton=canton,
         married=married,
+        drawdown_until_age=int(merged.get("life_expectancy") or 90),
     )
 
     result_dict = result_data.copy()

@@ -808,7 +808,6 @@
     "savingsRateVsPeer": "{{pct}}% — peer group {{peer}}%"
   },
   "hints": {
-    "pensionChartHint": "Before retirement ({{age}}): AHV = 0; BVG, 3a and 3b show projected capital. From then on nothing is paid in: the BVG pension (capital × conversion rate) stays the same in francs and loses real value. 3a and life insurance are withdrawn as capital and drop to 0 in the withdrawal year – the money moves into free wealth (withdrawal plan below). The pension fund pays from 58 at the earliest (capital sits in a vested benefits account until then), with partial retirement from the first step, 3a between 60 and 70. AHV starts at 63 at the earliest (−6.8 % per year drawn early, deferral up to 70 with a supplement), includes the 13th pension and stays constant in today's francs because it follows wages and prices. Contribution years are extended until the pension starts (max. 44). The AHV pension follows the official formula; your individual account statement is authoritative.",
     "saronHint": "Reference value for displaying SARON mortgages (not a live daily rate). Source and details:",
     "birthdate": "Date of birth",
     "yearsOld": "{{age}} years",
@@ -888,5 +887,24 @@
     "taxFree": "tax-free",
     "p3bCard": "at policy expiry, tax-free",
     "rulesExtra": "Pension fund: with partial retirement at most three capital withdrawals (Art. 13a BVG). Life insurance (3b, ongoing premium): income-tax-free at expiry."
+  },
+  "overview": {
+    "viewCapital": "Capital and wealth",
+    "viewIncome": "Income in retirement",
+    "showWealth": "Show private/investment wealth",
+    "bvgCapital": "Pension fund (balance)",
+    "p3a": "Pillar 3a",
+    "p3b": "Pillar 3b / life insurance",
+    "wealth": "Private/investment wealth (median)",
+    "retirement": "Retirement",
+    "ahv": "AHV",
+    "bvgPension": "Pension fund pension",
+    "fromWealth": "from wealth",
+    "gap": "uncovered",
+    "spending": "Spending",
+    "capitalHint": "The areas show retirement capital: the pension fund until the final withdrawal (partial withdrawals shrink it earlier), 3a and life insurance until they are withdrawn. What continues as a pension is shown in the income view. Capital withdrawals flow net of tax into private/investment wealth and stay invested at the chosen return – the line is the median of all simulations, after spending and pensions. All in today's francs.",
+    "incomeHint": "Per month from retirement, in today's francs: AHV (from 63 at the earliest, incl. 13th pension) and the pension fund pension (fixed in francs, loses real value). Wealth covers the rest of the spending as long as the median lasts; after that a gap remains. The green line shows what would be available per month: pensions plus a constant drawdown of private/investment wealth until life expectancy – including later capital withdrawals (3a, life insurance), at the real median return. Above spending means headroom. Income tax on pensions is not deducted yet.",
+    "available": "available: pensions + drawdown until {{age}}",
+    "drawdownTotal": "With drawdown until {{age}}: {{amount}} per month available"
   }
 }
