@@ -183,10 +183,13 @@ brauchbare Zahl, bevor jemand 50 Felder ausfüllt:
 
 ### Prognosen
 - **Monte Carlo Simulation** (10.000 Durchläufe), Perzentilbänder (p10, p25, p50, p75, p90)
-- **Schweizer Rentenberechnung**:
-  - AHV (Säule 1): Beitragsjahre, Durchschnittseinkommen, max. CHF 2'520/Monat
-  - BVG/Pensionskasse (Säule 2): Umwandlungssatz 6.8%, Altersklassen
-  - Säule 3a: Zinseszins, max. CHF 7'056/Jahr steuerlich abzugsfähig
+- **Schweizer Rentenberechnung** (Details: [Schweizer Rentenrechner](#schweizer-rentenrechner)):
+  - AHV (Säule 1): Rentenformel mit 13. Rente, Bezug 63–70 (Vorbezug −6.8 %/Jahr, Aufschub mit Zuschlag)
+  - BVG/Pensionskasse (Säule 2): Umwandlungssatz aus dem Vorsorgeausweis (sonst 5.3 %),
+    Bezug 58–70, Anteil als Kapital frei wählbar
+  - Säule 3a: Kapitalbezug pro Konto, automatischer Stufenplan (ein Konto pro Jahr)
+  - Steuer auf Kapitalbezüge: Bund exakt, Kanton/Gemeinde aus dem ESTV-Steuerrechner (26 Kantone)
+  - Auszahlphase: Vermögen nach der Pensionierung mit Ausgaben, Renten und Kapitalbezügen
 - Inflationsbereinigung (Standard: 1.5% CHF)
 - Szenario-Vergleich (Was-wäre-wenn-Analysen)
 - **Wirksame Szenarien**: Sparplan erhöhen, Frühpensionierung (inkl. AHV-Vorbezugskürzung
@@ -198,7 +201,7 @@ brauchbare Zahl, bevor jemand 50 Felder ausfüllt:
 ### Visualisierungen
 - **Sankey-Diagramm**: Cashflow — Einnahmen → Superkategorien → Sparen, wahlweise aus realen (importierten) oder empirischen (Wizard-)Daten
 - **Monte Carlo Fan-Chart**: Recharts AreaChart mit Perzentilbändern
-- **Finanzplan**: Gestapeltes Flächendiagramm (Rentenentwicklung 3 Säulen)
+- **Finanzplan**: Gestapeltes Flächendiagramm (Rentenentwicklung 3 Säulen) mit Bezugsplan für Kapitalbezüge
 - Budget-Statusbalken pro Kategorie
 - Monatsübersicht Einnahmen vs. Ausgaben
 
@@ -525,14 +528,18 @@ budget-pal/
 │   │   │   └── settings.py     # User-Einstellungen
 │   │   └── services/
 │   │       ├── categorization.py     # 5-stufige KI-Pipeline
-│   │       ├── projection.py         # Monte Carlo + AHV/BVG
+│   │       ├── projection.py         # Monte Carlo + AHV/BVG/3a
+│   │       ├── capital_tax.py        # Steuer auf Kapitalbezüge (Bund + Kanton, data/)
 │   │       ├── wizard_derive.py      # Wizard-Ableitungen (Hypothekarzins, Jahresbeträge, Krankenkasse)
 │   │       ├── peer_group_seed.py    # System-Kategorie Seeding + Migrationen
 │   │       └── import_parsers/       # UBS, N26, Revolut, comdirect
 │   ├── alembic/
 │   │   └── versions/
 │   │       ├── 0001_migrate_float_to_numeric_for_monetary_columns.py
-│   │       └── 0002_add_user_ui_language.py   # DE/EN-Präferenz pro Nutzer
+│   │       ├── 0002_add_user_ui_language.py   # DE/EN-Präferenz pro Nutzer
+│   │       ├── …                               # 0003 KI-Konfiguration, 0004 Passkeys, 0005 Passwort-Reset
+│   │       ├── 0006_pension_conversion_rate.py # Umwandlungssatz pro Pensionskasse
+│   │       └── 0007_pension_withdrawal_plan.py # Kapitalanteil BVG, Bezugsalter 3a
 │   ├── tests/                  # pytest Test-Suite
 │   │   ├── conftest.py         # Async DB-Fixtures, Test-Client
 │   │   ├── test_auth.py        # Auth-Flows (Register, Login, JWT)
