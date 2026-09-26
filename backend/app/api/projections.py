@@ -74,6 +74,9 @@ class ProjectionResult(BaseModel):
     pension_3b: List[float] = []
     # Jaehrliches Renteneinkommen (AHV, BVG-Renten inkl. Teilrenten), real
     pension_income: List[float] = []
+    # Pensionskasse getrennt: Guthaben bis zum Endbezug (danach 0) und Rente
+    capital_bvg: List[float] = []
+    income_bvg: List[float] = []
     # Index, ab dem AHV ("1") und Pensionskasse ("2", Endbezug) eine Rente zahlen
     payout_start_idx: Dict[str, int] = {}
     retirement_spending: Optional[float] = None

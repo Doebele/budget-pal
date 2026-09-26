@@ -147,3 +147,17 @@ class TestLegalLimits:
     def test_rejected(self, steps):
         with pytest.raises(ValueError):
             self._check(*steps)
+
+
+def test_bvg_capital_and_income_are_separate_series():
+    """Fuers Diagramm: Kapital bis zum Endbezug, danach 0; die Rente separat."""
+    dob = f"{datetime.now().year - 55}-06-01"
+    r = SERVICE.run(
+        current_net_worth=0, annual_savings=0, annual_income=0, years=12,
+        mean_return=0.0, volatility=0.0, inflation_rate=0.0,
+        pension_records=[{**BVG, "partial_steps": HALF_AT_60}], date_of_birth=dob,
+        retirement_age=63, runs=10, retirement_spending=0.0,
+    )
+    assert r["capital_bvg"][7] > 0 and r["capital_bvg"][8] == 0.0      # 62 / 63
+    assert r["income_bvg"][4] == 0.0 and r["income_bvg"][5] == 0.0      # Teilschritt ganz als Kapital
+    assert r["income_bvg"][8] == pytest.approx(r["pension_bvg"][8])      # ab 63 die Rente

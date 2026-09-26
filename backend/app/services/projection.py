@@ -442,6 +442,7 @@ class ProjectionService:
         # Was tatsaechlich fliesst: AHV ab Bezug, Pensionskasse ab jedem Schritt
         income_real = [a + b for a, b in zip(pension_ahv, bvg_income)]
         bvg_record = next((r for r in pension_records or [] if r["pillar"] == "2"), None)
+        final_bvg_age = max(bvg_start_age(retirement_age), current_age)
         pensum = [pensum_at(bvg_record, current_age, retirement_age, current_age + yr) for yr in range(years)]
         if retirement_spending is None:
             retirement_spending = default_retirement_spending(annual_income, annual_savings)
@@ -531,6 +532,13 @@ class ProjectionService:
             "pension_3a": pension_3a,
             "pension_3b": pension_3b,
             "pension_income": income_real,
+            # Fuers Diagramm getrennt: Kapital in der Kasse bis zum Endbezug,
+            # und was sie als Rente zahlt (auch Teilrenten)
+            "capital_bvg": [
+                value if current_age + i < final_bvg_age else 0.0
+                for i, value in enumerate(pension_bvg)
+            ],
+            "income_bvg": bvg_income,
             "retirement_idx": retirement_idx,
             "payout_start_idx": {
                 pillar: max(0, start - current_age)

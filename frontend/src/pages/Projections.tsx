@@ -4,12 +4,9 @@ import { useQuery } from "@tanstack/react-query";
 import { projectionsApi, accountsApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { formatCHF } from "@/lib/theme";
-import { useThemeColors } from "@/hooks/useThemeColors";
 import MonteCarloChart from "@/components/charts/MonteCarloChart";
 import WithdrawalPlan from "@/components/WithdrawalPlan";
-import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-} from "recharts";
+import PensionOverviewChart, { PILLAR_COLORS } from "@/components/charts/PensionOverviewChart";
 import { Refresh } from "@/lib/icons";
 import { useTranslation } from "react-i18next";
 
@@ -39,17 +36,8 @@ const HORIZONS: Array<{ key: HorizonKey; label: string; years: number }> = [
   { key: "age90", label: "pages:ui.bis_90", years: 50 },
 ];
 
-// Consistent pillar palette (matches Finanzplan / RetirementPlanner)
-const PILLAR_COLORS = {
-  ahv: "#38bdf8",  // Säule 1 — sky
-  bvg: "#a78bfa",  // Säule 2 — violet
-  "3a": "#10b981", // Säule 3a — emerald
-  "3b": "#f59e0b", // Säule 3b — amber
-} as const;
-
 export default function Projections() {
   const { t } = useTranslation();
-  const { colors } = useThemeColors();
   const { user } = useAuth();
   const [horizon, setHorizon] = useState<HorizonKey>("10yr");
   const [params, setParams] = useState({
@@ -66,12 +54,21 @@ export default function Projections() {
   // Lebenskosten im Ruhestand pro Monat; null = aus Szenario bzw. geschaetzt
   const [spendingMonthly, setSpendingMonthly] = useState<number | null>(null);
 
-  const selectedHorizon = HORIZONS.find((h) => h.key === horizon)!;
 
   const profileBirthIso = user?.birthdate ?? user?.date_of_birth?.slice(0, 10) ?? undefined;
   const currentAge = useMemo(() => currentAgeFromProfileBirth(profileBirthIso), [profileBirthIso]);
   const yearsToRetirement = Math.max(0, params.retirement_age - currentAge);
   const retirementYear = new Date().getFullYear() + yearsToRetirement;
+  // "Bis Rente" und "Bis 90" haengen vom Alter ab — fest 25/50 Jahre liefen
+  // sonst bis 108
+  const baseHorizon = HORIZONS.find((h) => h.key === horizon)!;
+  const selectedHorizon = {
+    ...baseHorizon,
+    years:
+      horizon === "retirement" ? Math.max(1, yearsToRetirement)
+      : horizon === "age90" ? Math.max(1, 90 - currentAge)
+      : baseHorizon.years,
+  };
 
   const { data: accounts } = useQuery({
     queryKey: ["accounts"],
@@ -96,7 +93,7 @@ export default function Projections() {
   const totalBalance = (accounts || []).reduce((sum: number, a: { balance: number }) => sum + a.balance, 0);
 
   const { data: projection, isLoading, refetch } = useQuery({
-    queryKey: ["projection", horizon, params, profileBirthIso, totalBalance, scenarioId, spendingMonthly],
+    queryKey: ["projection", horizon, selectedHorizon.years, params, profileBirthIso, totalBalance, scenarioId, spendingMonthly],
     queryFn: () => {
       // Bei gewaehltem Szenario Sparrate und Einkommen NICHT mitsenden — der
       // Server fuellt nur ungesetzte Felder aus parameters_json (exclude_unset).
@@ -118,15 +115,6 @@ export default function Projections() {
     },
     enabled: true,
   });
-
-  // Pension chart data
-  const pensionChartData = projection?.years?.map((year: number, i: number) => ({
-    year,
-    ahv:  Math.round((projection.pension_ahv?.[i] || 0) / 1000),
-    bvg:  Math.round((projection.pension_bvg?.[i] || 0) / 1000),
-    "3a": Math.round((projection.pension_3a?.[i] || 0) / 1000),
-    "3b": Math.round((projection.pension_3b?.[i] || 0) / 1000),
-  })) || [];
 
   // Das Szenario kann ein frueheres Rentenalter setzen — dann gilt das des Servers
   const serverRetIdx = projection?.retirement_idx ?? yearsToRetirement;
@@ -296,66 +284,10 @@ export default function Projections() {
             <p className="text-text-tertiary text-xs mt-0.5">
               {t("pages:ui.ahv_saeule_1_bvg_pensionskasse_saeule_2_saeu")}
             </p>
-            <p className="text-text-tertiary text-[11px] mt-1 max-w-3xl leading-relaxed">
-              {t("pages:hints.pensionChartHint", { age: params.retirement_age })}
-            </p>
           </div>
         </div>
-        {pensionChartData.length > 0 && (
-          <ResponsiveContainer width="100%" height={280}>
-            <AreaChart data={pensionChartData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="ahv-grad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={PILLAR_COLORS.ahv} stopOpacity={0.3} />
-                  <stop offset="95%" stopColor={PILLAR_COLORS.ahv} stopOpacity={0.0} />
-                </linearGradient>
-                <linearGradient id="bvg-grad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={PILLAR_COLORS.bvg} stopOpacity={0.3} />
-                  <stop offset="95%" stopColor={PILLAR_COLORS.bvg} stopOpacity={0.0} />
-                </linearGradient>
-                <linearGradient id="p3a-grad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={PILLAR_COLORS["3a"]} stopOpacity={0.3} />
-                  <stop offset="95%" stopColor={PILLAR_COLORS["3a"]} stopOpacity={0.0} />
-                </linearGradient>
-                <linearGradient id="p3b-grad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={PILLAR_COLORS["3b"]} stopOpacity={0.3} />
-                  <stop offset="95%" stopColor={PILLAR_COLORS["3b"]} stopOpacity={0.0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke={colors.borderSubtle} vertical={false} />
-              <XAxis
-                dataKey="year"
-                tick={{ fill: colors.textTertiary, fontSize: 11 }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                tick={{ fill: colors.textTertiary, fontSize: 11 }}
-                axisLine={false}
-                tickLine={false}
-                tickFormatter={(v) => `${v}k`}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: colors.bgElevated,
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: "6px",
-                  color: colors.textPrimary,
-                  fontSize: 12,
-                }}
-                formatter={(v: number) => [`${formatCHF(v * 1000)}`, undefined]}
-              />
-              <Legend
-                iconType="line"
-                wrapperStyle={{ fontSize: 11, color: colors.textSecondary }}
-              />
-              {/* Retirement line */}
-              <Area type="monotone" dataKey="ahv" name="AHV (Säule 1)"              stroke={PILLAR_COLORS.ahv}   fill="url(#ahv-grad)"  strokeWidth={2} dot={false} />
-              <Area type="monotone" dataKey="bvg" name="BVG (Säule 2)"              stroke={PILLAR_COLORS.bvg}   fill="url(#bvg-grad)"  strokeWidth={2} dot={false} />
-              <Area type="monotone" dataKey="3a"  name="Säule 3a (gebunden)"        stroke={PILLAR_COLORS["3a"]} fill="url(#p3a-grad)"  strokeWidth={2} dot={false} />
-              <Area type="monotone" dataKey="3b"  name="Säule 3b / Lebensversich."  stroke={PILLAR_COLORS["3b"]} fill="url(#p3b-grad)"  strokeWidth={2} dot={false} />
-            </AreaChart>
-          </ResponsiveContainer>
+        {projection && projection.years.length > 1 && (
+          <PensionOverviewChart projection={projection} retirementIdx={retIdx} />
         )}
 
         {/* ── Monthly pension KPIs at retirement ── */}
