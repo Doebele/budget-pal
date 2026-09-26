@@ -58,7 +58,9 @@ export default function PensionOverviewChart({
     const i = start + j;
     const ahv = (projection.pension_ahv[i] ?? 0) / 12;
     const bvg = (projection.income_bvg?.[i] ?? 0) / 12;
-    const rest = Math.max(0, spending - ahv - bvg);
+    // Bedarf = Ausgaben plus Steuern im Ruhestand (Median-Pfad)
+    const need = spending + (projection.retirement_tax?.[i] ?? 0) / 12;
+    const rest = Math.max(0, need - ahv - bvg);
     const drawdown = (projection.capital_drawdown?.[i] ?? 0) / 12;
     // Ist das Vermoegen im Median aufgebraucht, bleibt der Rest eine Luecke
     const funded = (projection.p50[i] ?? 0) > 0;
@@ -69,6 +71,7 @@ export default function PensionOverviewChart({
       wealth: funded ? Math.round(rest) : 0,
       gap: funded ? 0 : Math.round(rest),
       available: Math.round(ahv + bvg + drawdown),
+      need: Math.round(need),
     };
   });
 
@@ -147,8 +150,8 @@ export default function PensionOverviewChart({
             <Bar dataKey="gap" stackId="inc" name={t("pages:overview.gap")} fill={colors.loss} fillOpacity={0.6} />
             <Line type="monotone" dataKey="available" stroke={colors.gain} strokeWidth={2.5} dot={false}
               name={t("pages:overview.available", { age: projection.drawdown_until_age ?? 90 })} />
-            <ReferenceLine y={Math.round(spending)} stroke={colors.loss} strokeDasharray="4 3"
-              label={{ value: t("pages:overview.spending"), position: "insideTopRight", fill: colors.loss, fontSize: 10 }} />
+            <Line type="stepAfter" dataKey="need" stroke={colors.loss} strokeDasharray="4 3" strokeWidth={1.5}
+              dot={false} name={t("pages:overview.spendingTax")} />
           </ComposedChart>
         )}
       </ResponsiveContainer>
