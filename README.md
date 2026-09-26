@@ -649,8 +649,17 @@ Rentendiagramm über `/api/pension/estimate`):
   AHV-Beiträge als Nichterwerbstätige (aus Vermögen + 20 × Renteneinkommen, 530–26'500 CHF/Jahr).
   Die Anzeige zeigt, bis zu welchem Alter das Vermögen im Median reicht und in wie vielen
   Simulationen es bis zum Ende hält.
-- **Lebenskosten im Ruhestand:** eigene Angabe, sonst Ausgaben aus dem Wizard × Lebensstilfaktor
-  (0.8), sonst 80 % von (72 % des Bruttolohns − Sparrate).
+- **Lebenskosten im Ruhestand** (ohne Steuern): eigene Angabe, sonst Ausgaben aus dem Wizard ohne
+  den Posten „Direkte Steuern“ × Lebensstilfaktor (0.8), sonst 80 % von (72 % des Bruttolohns −
+  Sparrate).
+- **Steuern im Ruhestand** (`services/retirement_tax.py`): Einkommenssteuer auf Renten plus 2 %
+  Vermögensertrag, dazu die Vermögenssteuer – Bund, Kanton und Gemeinde für den Kantonshauptort
+  aus dem ESTV-Steuerrechner 2026 (`services/data/income_tax_2026.json`), je Simulation vom
+  Vermögen abgezogen.
+- **Rente oder Kapital:** Vergleich der Pensionskasse ganz als Rente, ganz als Kapital (nach Steuer
+  im Anlagevermögen weiter angelegt) und des eigenen Plans – dieselben Märkte, bis 95: freies
+  Vermögen im Median und bei schlechten Märkten, Vermögen mit 85/90, Steuern, und ab welchem
+  Alter die Rente vorne liegt.
 - **Szenarien:** Frühpensionierung = dieselbe Rechnung mit früherem Rentenalter (lebenslang). Pflege
   ab 80 ersetzt 60 % der normalen Lebenskosten.
 - Noch nicht abgebildet: Plafonierung für Ehepaare, Kapitalbezüge des Ehepartners im selben Jahr,

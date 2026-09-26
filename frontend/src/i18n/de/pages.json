@@ -758,7 +758,7 @@
     "simulationParams": "Simulationsparameter",
     "bvgModelValue": "Kapital × Umwandlungssatz ÷ 12",
     "retirementSpendingLabel": "Ausgaben im Ruhestand (CHF/Monat)",
-    "retirementSpendingHint": "Leer = aus Ihren Angaben geschätzt, in heutigen Franken inkl. Steuern",
+    "retirementSpendingHint": "Leer = aus Ihren Angaben geschätzt, in heutigen Franken ohne Steuern – die Steuern im Ruhestand rechnet die App.",
     "pensionFromAge": "ab {{age}}, wenn alle Säulen zahlen",
     "afterSpending": "nach Ausgaben von {{amount}}/Monat",
     "wealthLasts": "Vermögen reicht",
@@ -767,7 +767,8 @@
     "successRate": "in {{pct}} % der Simulationen bis zum Ende",
     "wealthDepletes": "Freies Vermögen im Median aufgebraucht mit {{age}}",
     "wealthHolds": "Freies Vermögen reicht im Median über {{age}} hinaus",
-    "spendingUsed": "gerechnet mit Ausgaben von {{amount}}/Monat"
+    "spendingUsed": "gerechnet mit Ausgaben von {{amount}}/Monat",
+    "afterSpendingTax": "nach Ausgaben von {{amount}} und Steuern von {{tax}} pro Monat"
   },
   "health": {
     "savingsRate": "Sparquote",
@@ -903,8 +904,30 @@
     "gap": "ungedeckt",
     "spending": "Ausgaben",
     "capitalHint": "Die Flächen zeigen das Vorsorgekapital: die Pensionskasse bis zum Endbezug (Teilbezüge verkleinern sie früher), 3a und Lebensversicherung bis zu ihrem Bezug. Was als Rente weiterläuft, steht in der Ansicht Einkommen. Kapitalbezüge fliessen nach Steuer ins Privat-/Anlagevermögen und werden dort mit der gewählten Rendite weiter angelegt – die Linie ist der Median aller Simulationen, nach Ausgaben und Renten. Alles in heutigen Franken.",
-    "incomeHint": "Pro Monat ab der Pensionierung, in heutigen Franken: AHV (frühestens mit 63, inkl. 13. Rente) und Pensionskassen-Rente (fester Frankenbetrag, verliert real an Wert). Den Rest der Ausgaben trägt das Vermögen, solange es im Median reicht; danach bleibt eine Lücke. Die grüne Linie zeigt, was monatlich verfügbar wäre: Renten plus ein gleichbleibender Verzehr des Privat-/Anlagevermögens bis zur Lebenserwartung – inklusive späterer Kapitalbezüge (3a, Lebensversicherung), bei realer Median-Rendite. Liegt sie über den Ausgaben, bleibt Spielraum. Einkommenssteuer auf Renten ist noch nicht abgezogen.",
+    "incomeHint": "Pro Monat ab der Pensionierung, in heutigen Franken: AHV (frühestens mit 63, inkl. 13. Rente) und Pensionskassen-Rente (fester Frankenbetrag, verliert real an Wert). Die rote Linie ist der Bedarf: Ausgaben plus Einkommens- und Vermögenssteuer im Ruhestand. Den Rest trägt das Vermögen, solange es im Median reicht; danach bleibt eine Lücke. Die grüne Linie zeigt, was monatlich verfügbar wäre: Renten plus ein gleichbleibender Verzehr des Privat-/Anlagevermögens bis zur Lebenserwartung – inklusive späterer Kapitalbezüge (3a, Lebensversicherung), bei realer Median-Rendite. Liegt sie über dem Bedarf, bleibt Spielraum.",
     "available": "verfügbar: Renten + Kapitalverzehr bis {{age}}",
-    "drawdownTotal": "Mit Kapitalverzehr bis {{age}}: {{amount}} pro Monat verfügbar"
+    "drawdownTotal": "Mit Kapitalverzehr bis {{age}}: {{amount}} pro Monat verfügbar",
+    "spendingTax": "Ausgaben + Steuern"
+  },
+  "bvgCompare": {
+    "title": "Pensionskasse: Rente oder Kapital?",
+    "subtitle": "Dieselbe Prognose dreimal, mit denselben Märkten: ganz als Rente, ganz als Kapital (nach Steuer im Anlagevermögen weiter angelegt) und Ihr eigener Plan. Freies Vermögen in heutigen Franken, bis 95.",
+    "pension": "100 % Rente",
+    "capital": "100 % Kapital",
+    "own": "Ihr Plan",
+    "showBad": "Schlechte Märkte einblenden (10 % der Simulationen)",
+    "atAge": "Alter {{age}}",
+    "breakeven": "Ab {{age}} hinterlässt die Rente im Median mehr freies Vermögen als das Kapital – wer älter wird, fährt mit der Rente besser.",
+    "noBreakeven": "Bis {{age}} bleibt das Kapital im Median vorne – die Rente holt es in diesem Zeitraum nicht ein.",
+    "rowPension": "Pensionskassen-Rente pro Monat",
+    "rowCapital": "Kapital nach Steuer",
+    "rowWealth85": "Freies Vermögen mit 85 (Median)",
+    "rowWealth85Bad": "mit 85 bei schlechten Märkten",
+    "rowWealth90": "Freies Vermögen mit 90 (Median)",
+    "rowLasts": "Vermögen reicht",
+    "lastsAll": "bis 95",
+    "rowSuccess": "Simulationen mit Vermögen bis 95",
+    "rowTaxes": "Steuern gesamt (Kapital + Ruhestand)",
+    "explain": "Rente: lebenslang und garantiert, auch wenn Sie sehr alt werden; Ehepartner erhalten meist 60 % als Hinterlassenenrente; sie ist voll als Einkommen steuerbar und wird nicht der Teuerung angepasst. Kapital: einmal zum reduzierten Satz besteuert, frei verfügbar und vererbbar, trägt aber das Anlagerisiko und das Risiko eines langen Lebens. Viele wählen einen Mix. Beachten Sie die Anmeldefrist Ihrer Kasse für den Kapitalbezug und die Sperrfrist von 3 Jahren nach einem Einkauf. Steuern: Einkommens- und Vermögenssteuer laut ESTV-Steuerrechner für den Kantonshauptort, 2 % Vermögensertrag als Einkommen, ohne Kirchensteuer. Keine Finanz- oder Steuerberatung."
   }
 }

@@ -432,6 +432,8 @@ def _build_scenario_params(p: WizardCompletePayload) -> dict:
         # Die Tranchen liegen zwar in mortgage_tranches, erreichen die
         # Projektion aber nur ueber diese Kopie im Szenario.
         "monthly_expenses_base": _compute_monthly_expenses(p),
+        # darin enthalten; im Ruhestand rechnet die Prognose die Steuern selbst
+        "monthly_taxes": p.direkte_steuern,
         "mortgage_debt": sum(m.debt_value for m in p.mortgage_entries) or p.outstanding_debt,
         "mortgage_rate_pct": _weighted_mortgage_rate(p),
         "early_retirement_years": EARLY_RETIREMENT_YEARS,

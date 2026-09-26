@@ -7,6 +7,7 @@ import { formatCHF } from "@/lib/theme";
 import MonteCarloChart from "@/components/charts/MonteCarloChart";
 import WithdrawalPlan from "@/components/WithdrawalPlan";
 import PensionOverviewChart, { PILLAR_COLORS } from "@/components/charts/PensionOverviewChart";
+import BvgComparisonCard from "@/components/BvgComparisonCard";
 import { Refresh } from "@/lib/icons";
 import { useTranslation } from "react-i18next";
 
@@ -89,30 +90,47 @@ export default function Projections() {
     setScenarioId((wizard ?? scenarios[0]).id);
   }, [scenarios, scenarioId, scenarioTouched]);
 
+  // Rentenalter und Teuerung des Szenarios uebernehmen — sonst ueberschrieben
+  // die Vorgaben der Seite (65, 1.5 %) die Angaben aus dem Wizard, weil der
+  // Body jedes Feld ausdruecklich mitschickt
+  useEffect(() => {
+    const p = scenarios.find((sc) => sc.id === scenarioId)?.parameters;
+    if (!p) return;
+    setParams((prev) => ({
+      ...prev,
+      ...(typeof p.retirement_age === "number" ? { retirement_age: p.retirement_age } : {}),
+      ...(typeof p.inflation_rate === "number" ? { inflation_rate: p.inflation_rate } : {}),
+    }));
+  }, [scenarioId, scenarios]);
+
   // Auto-compute net worth from accounts
   const totalBalance = (accounts || []).reduce((sum: number, a: { balance: number }) => sum + a.balance, 0);
 
+  // Bei gewaehltem Szenario Sparrate und Einkommen NICHT mitsenden — der
+  // Server fuellt nur ungesetzte Felder aus parameters_json (exclude_unset).
+  // Das Nettovermoegen kommt weiterhin aus den Konten.
+  const runBody = useMemo(() => {
+    const { annual_savings, annual_income, ...rest } = params;
+    return {
+      ...(scenarioId ? rest : { ...rest, annual_savings, annual_income }),
+      current_net_worth: totalBalance || params.current_net_worth,
+      date_of_birth: profileBirthIso,
+      ...(spendingMonthly != null ? { retirement_spending: spendingMonthly * 12 } : {}),
+    };
+  }, [params, scenarioId, totalBalance, profileBirthIso, spendingMonthly]);
+
+  // Pensionskasse: Rente oder Kapital — dieselben Eingaben, bis 95 gerechnet
+  const { data: bvgComparison } = useQuery({
+    queryKey: ["bvg-comparison", runBody, scenarioId],
+    queryFn: () => projectionsApi.compareBvg(runBody, scenarioId ?? undefined).then((r) => r.data),
+  });
+
   const { data: projection, isLoading, refetch } = useQuery({
-    queryKey: ["projection", horizon, selectedHorizon.years, params, profileBirthIso, totalBalance, scenarioId, spendingMonthly],
-    queryFn: () => {
-      // Bei gewaehltem Szenario Sparrate und Einkommen NICHT mitsenden — der
-      // Server fuellt nur ungesetzte Felder aus parameters_json (exclude_unset).
-      // Das Nettovermoegen kommt weiterhin aus den Konten.
-      const { annual_savings, annual_income, ...rest } = params;
-      const body = scenarioId ? rest : { ...rest, annual_savings, annual_income };
-      return projectionsApi
-        .run(
-          {
-            ...body,
-            current_net_worth: totalBalance || params.current_net_worth,
-            years_to_project: selectedHorizon.years,
-            date_of_birth: profileBirthIso,
-            ...(spendingMonthly != null ? { retirement_spending: spendingMonthly * 12 } : {}),
-          },
-          scenarioId ?? undefined,
-        )
-        .then((r) => r.data);
-    },
+    queryKey: ["projection", horizon, selectedHorizon.years, runBody, scenarioId],
+    queryFn: () =>
+      projectionsApi
+        .run({ ...runBody, years_to_project: selectedHorizon.years }, scenarioId ?? undefined)
+        .then((r) => r.data),
     enabled: true,
   });
 
@@ -393,6 +411,8 @@ export default function Projections() {
           ))}
         </div>
       </div>
+
+      {bvgComparison && bvgComparison.variants.length > 0 && <BvgComparisonCard data={bvgComparison} />}
 
       {/* Monte Carlo fan chart */}
       <div className="card">

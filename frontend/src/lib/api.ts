@@ -218,8 +218,10 @@ export interface ProjectionResult {
   /** Index, ab dem AHV ("1") und Pensionskasse ("2", Endbezug) eine Rente
    *  zahlen. 3a und 3b werden als Kapital bezogen. */
   payout_start_idx: Record<"1" | "2", number>;
-  /** Jaehrliche Lebenskosten im Ruhestand, die die Rechnung verwendet hat. */
+  /** Jaehrliche Lebenskosten im Ruhestand (ohne Steuern), die die Rechnung verwendet hat. */
   retirement_spending: number | null;
+  /** Einkommens- und Vermoegenssteuer im Ruhestand entlang des Medians, real. */
+  retirement_tax: number[];
   /** Alter, ab dem das Vermoegen im Median aufgebraucht ist; null = reicht. */
   depletion_age: number | null;
   /** Anteil der Simulationen mit Vermoegen am Ende des Horizonts (0-1). */
@@ -232,9 +234,37 @@ export interface ProjectionResult {
   runs: number;
 }
 
+/** Pensionskasse als Rente, als Kapital oder wie geplant — heutige CHF. */
+export interface BvgVariant {
+  key: "pension" | "capital" | "own";
+  bvg_monthly: number;
+  capital_net: number;
+  p50: number[];
+  p10: number[];
+  depletion_age: number | null;
+  success_rate: number;
+  wealth_85: number | null;
+  wealth_90: number | null;
+  wealth_85_p10: number | null;
+  taxes_total: number;
+}
+
+export interface BvgComparison {
+  years: number[];
+  current_age: number | null;
+  retirement_age: number | null;
+  variants: BvgVariant[];
+  /** Ab diesem Alter hinterlaesst die Rente im Median mehr freies Vermoegen. */
+  breakeven_age: number | null;
+}
+
 export const projectionsApi = {
   run: (params: Record<string, unknown>, scenarioId?: number) =>
     api.post<ProjectionResult>("/projections/run", params, {
+      params: scenarioId ? { scenario_id: scenarioId } : {},
+    }),
+  compareBvg: (params: Record<string, unknown>, scenarioId?: number) =>
+    api.post<BvgComparison>("/projections/compare-bvg", params, {
       params: scenarioId ? { scenario_id: scenarioId } : {},
     }),
   listScenarios: () => api.get("/projections/scenarios"),

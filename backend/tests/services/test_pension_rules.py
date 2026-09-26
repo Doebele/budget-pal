@@ -151,11 +151,13 @@ from app.services.projection import (  # noqa: E402
 
 
 def _run(**kw):
-    """Deterministisch: keine Streuung, keine Rendite, keine Teuerung."""
+    """Deterministisch: keine Streuung, keine Rendite, keine Teuerung und —
+    fuer die Fluesse hier — ohne Steuern im Ruhestand (test_retirement_tax)."""
     params = dict(
         current_net_worth=500_000, annual_savings=20_000, annual_income=0,
         years=40, mean_return=0.0, volatility=0.0, inflation_rate=0.0,
         date_of_birth=DOB_50, retirement_age=65, runs=20, retirement_spending=0.0,
+        tax_in_retirement=False,
     )
     params.update(kw)
     return SERVICE.run(**params)

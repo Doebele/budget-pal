@@ -109,6 +109,7 @@ class TestLifeInsurance:
             current_net_worth=0, annual_savings=0, annual_income=0, years=12,
             mean_return=0.0, volatility=0.0, inflation_rate=0.0, pension_records=[self.LV],
             date_of_birth=dob, retirement_age=61, runs=10, retirement_spending=0.0,
+            tax_in_retirement=False,
         )
         assert r["p50"][9] - r["p50"][8] == pytest.approx(286_484 + r["pension_income"][8])
 

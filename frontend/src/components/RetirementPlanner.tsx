@@ -102,7 +102,9 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
 
   // Lebenskosten: die, mit denen der Server gerechnet hat
   const expenseMonthly = (projection?.retirement_spending ?? 0) / 12;
-  const monthlyDeficitOrSurplus = totalPensionMonthly - expenseMonthly;
+  // Bedarf = Ausgaben plus Steuern im Ruhestand (Median-Pfad)
+  const taxMonthly = (projection?.retirement_tax?.[fullIdx] ?? 0) / 12;
+  const monthlyDeficitOrSurplus = totalPensionMonthly - expenseMonthly - taxMonthly;
   const isSurplus = monthlyDeficitOrSurplus >= 0;
   const depletionAge = projection?.depletion_age ?? null;
   const successPct = Math.round((projection?.success_rate ?? 0) * 100);
@@ -220,7 +222,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
         <KPICard
           label={isSurplus ? "Überschuss/Monat" : "Lücke/Monat"}
           value={formatCHF(Math.abs(monthlyDeficitOrSurplus))}
-          sub={t("pages:ui.afterSpending", { amount: formatCHF(expenseMonthly) })}
+          sub={t("pages:ui.afterSpendingTax", { amount: formatCHF(expenseMonthly), tax: formatCHF(taxMonthly) })}
           icon={
             isSurplus
               ? <ShieldCheck className="w-4 h-4 text-gain" />
@@ -270,10 +272,10 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
               <Bar dataKey="ahv" name="AHV (Säule 1)" stackId="a" fill={PILLAR_COLORS.ahv} radius={[0, 0, 0, 0]} />
               <Bar dataKey="bvg" name="BVG (Säule 2)" stackId="a" fill={PILLAR_COLORS.bvg} radius={[4, 4, 0, 0]} />
               <ReferenceLine
-                y={Math.round(expenseMonthly)}
+                y={Math.round(expenseMonthly + taxMonthly)}
                 stroke="#f87171"
                 strokeDasharray="4 3"
-                label={{ value: "Ausgaben", position: "right", fill: "#f87171", fontSize: 10 }}
+                label={{ value: t("pages:overview.spendingTax"), position: "right", fill: "#f87171", fontSize: 10 }}
               />
               <Legend wrapperStyle={{ fontSize: 11 }} formatter={(v) => <span style={{ color: "#94a3b8" }}>{v}</span>} />
             </BarChart>
