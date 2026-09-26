@@ -266,7 +266,9 @@ Central definition of all 11 supercategories (wohnen, essen, mobilitaet, versich
   ±`BVG_CONVERSION_STEP` per year vs. 65), 3a 60-70. Before its start a series holds *capital*,
   not income — use `pension_income` from `run()` for cash flows (AHV + BVG pensions incl.
   partial ones), never the raw sum of the series. For charts `run()` also returns the BVG
-  split: `capital_bvg` (balance until the final step, then 0) and `income_bvg`.
+  split: `capital_bvg` (balance until the final step, then 0) and `income_bvg`, plus
+  `capital_drawdown`: one constant real amount from retirement that uses up the median wealth
+  at retirement plus later capital withdrawals by `drawdown_until_age` (life expectancy).
 - Wealth path (`ProjectionService.run`): savings only until retirement, then pensions minus
   `retirement_spending` (plus AHV non-employed contributions until 65); floored at 0. Early
   retirement is just an earlier `retirement_age` — no special window logic.

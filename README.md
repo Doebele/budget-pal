@@ -200,7 +200,8 @@ brauchbare Zahl, bevor jemand 50 Felder ausfüllt:
 - **Monte Carlo Fan-Chart**: Recharts AreaChart mit Perzentilbändern
 - **Rentenübersicht** (Prognose): Ansicht *Kapital und Vermögen* – Vorsorgekapital gestapelt bis
   zum Bezug, Privat-/Anlagevermögen (Median) als einblendbare Linie – und Ansicht *Einkommen im
-  Ruhestand* – AHV, Pensionskassen-Rente und Entnahme aus dem Vermögen gegen die Ausgaben
+  Ruhestand* – AHV, Pensionskassen-Rente und Entnahme aus dem Vermögen gegen die Ausgaben, dazu
+  die Linie *verfügbar*: Renten plus gleichbleibender Kapitalverzehr bis zur Lebenserwartung
 - **Finanzplan**: Gestapeltes Flächendiagramm (Rentenentwicklung 3 Säulen)
 - Budget-Statusbalken pro Kategorie
 - Monatsübersicht Einnahmen vs. Ausgaben

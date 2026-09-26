@@ -26,7 +26,9 @@ type View = "capital" | "income";
  *    optional das freie Vermoegen (Median der Simulation) — dorthin fliessen
  *    die Kapitalbezuege und werden weiter angelegt.
  *  - Einkommen: ab der Pensionierung AHV und Pensionskassen-Rente pro Monat,
- *    der Rest der Lebenskosten aus dem Vermoegen, solange es reicht.
+ *    der Rest der Lebenskosten aus dem Vermoegen, solange es reicht. Die Linie
+ *    "verfuegbar" = Renten + gleichmaessiger Kapitalverzehr bis 90: was man
+ *    ausgeben koennte, im Vergleich zu dem, was man ausgibt.
  * Alles in heutigen Franken; die Reihen rechnet das Backend.
  */
 export default function PensionOverviewChart({
@@ -57,6 +59,7 @@ export default function PensionOverviewChart({
     const ahv = (projection.pension_ahv[i] ?? 0) / 12;
     const bvg = (projection.income_bvg?.[i] ?? 0) / 12;
     const rest = Math.max(0, spending - ahv - bvg);
+    const drawdown = (projection.capital_drawdown?.[i] ?? 0) / 12;
     // Ist das Vermoegen im Median aufgebraucht, bleibt der Rest eine Luecke
     const funded = (projection.p50[i] ?? 0) > 0;
     return {
@@ -65,6 +68,7 @@ export default function PensionOverviewChart({
       bvg: Math.round(bvg),
       wealth: funded ? Math.round(rest) : 0,
       gap: funded ? 0 : Math.round(rest),
+      available: Math.round(ahv + bvg + drawdown),
     };
   });
 
@@ -141,6 +145,8 @@ export default function PensionOverviewChart({
             <Bar dataKey="bvg" stackId="inc" name={t("pages:overview.bvgPension")} fill={PILLAR_COLORS.bvg} />
             <Bar dataKey="wealth" stackId="inc" name={t("pages:overview.fromWealth")} fill={colors.accent} fillOpacity={0.5} />
             <Bar dataKey="gap" stackId="inc" name={t("pages:overview.gap")} fill={colors.loss} fillOpacity={0.6} />
+            <Line type="monotone" dataKey="available" stroke={colors.gain} strokeWidth={2.5} dot={false}
+              name={t("pages:overview.available", { age: projection.drawdown_until_age ?? 90 })} />
             <ReferenceLine y={Math.round(spending)} stroke={colors.loss} strokeDasharray="4 3"
               label={{ value: t("pages:overview.spending"), position: "insideTopRight", fill: colors.loss, fontSize: 10 }} />
           </ComposedChart>

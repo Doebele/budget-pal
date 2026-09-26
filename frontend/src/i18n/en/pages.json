@@ -903,6 +903,8 @@
     "gap": "uncovered",
     "spending": "Spending",
     "capitalHint": "The areas show retirement capital: the pension fund until the final withdrawal (partial withdrawals shrink it earlier), 3a and life insurance until they are withdrawn. What continues as a pension is shown in the income view. Capital withdrawals flow net of tax into private/investment wealth and stay invested at the chosen return – the line is the median of all simulations, after spending and pensions. All in today's francs.",
-    "incomeHint": "Per month from retirement, in today's francs: AHV (from 63 at the earliest, incl. 13th pension) and the pension fund pension (fixed in francs, loses real value). Wealth covers the rest of the spending as long as the median lasts; after that a gap remains. Income tax on pensions is not deducted yet."
+    "incomeHint": "Per month from retirement, in today's francs: AHV (from 63 at the earliest, incl. 13th pension) and the pension fund pension (fixed in francs, loses real value). Wealth covers the rest of the spending as long as the median lasts; after that a gap remains. The green line shows what would be available per month: pensions plus a constant drawdown of private/investment wealth until life expectancy – including later capital withdrawals (3a, life insurance), at the real median return. Above spending means headroom. Income tax on pensions is not deducted yet.",
+    "available": "available: pensions + drawdown until {{age}}",
+    "drawdownTotal": "With drawdown until {{age}}: {{amount}} per month available"
   }
 }

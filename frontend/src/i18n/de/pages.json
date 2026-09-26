@@ -903,6 +903,8 @@
     "gap": "ungedeckt",
     "spending": "Ausgaben",
     "capitalHint": "Die Flächen zeigen das Vorsorgekapital: die Pensionskasse bis zum Endbezug (Teilbezüge verkleinern sie früher), 3a und Lebensversicherung bis zu ihrem Bezug. Was als Rente weiterläuft, steht in der Ansicht Einkommen. Kapitalbezüge fliessen nach Steuer ins Privat-/Anlagevermögen und werden dort mit der gewählten Rendite weiter angelegt – die Linie ist der Median aller Simulationen, nach Ausgaben und Renten. Alles in heutigen Franken.",
-    "incomeHint": "Pro Monat ab der Pensionierung, in heutigen Franken: AHV (frühestens mit 63, inkl. 13. Rente) und Pensionskassen-Rente (fester Frankenbetrag, verliert real an Wert). Den Rest der Ausgaben trägt das Vermögen, solange es im Median reicht; danach bleibt eine Lücke. Einkommenssteuer auf Renten ist noch nicht abgezogen."
+    "incomeHint": "Pro Monat ab der Pensionierung, in heutigen Franken: AHV (frühestens mit 63, inkl. 13. Rente) und Pensionskassen-Rente (fester Frankenbetrag, verliert real an Wert). Den Rest der Ausgaben trägt das Vermögen, solange es im Median reicht; danach bleibt eine Lücke. Die grüne Linie zeigt, was monatlich verfügbar wäre: Renten plus ein gleichbleibender Verzehr des Privat-/Anlagevermögens bis zur Lebenserwartung – inklusive späterer Kapitalbezüge (3a, Lebensversicherung), bei realer Median-Rendite. Liegt sie über den Ausgaben, bleibt Spielraum. Einkommenssteuer auf Renten ist noch nicht abgezogen.",
+    "available": "verfügbar: Renten + Kapitalverzehr bis {{age}}",
+    "drawdownTotal": "Mit Kapitalverzehr bis {{age}}: {{amount}} pro Monat verfügbar"
   }
 }

@@ -131,6 +131,13 @@ export default function Projections() {
   const ahvAtRet = pensionAt(projection?.pension_ahv, "1");
   const bvgAtRet = pensionAt(projection?.pension_bvg, "2");
   const totalPensionAnnual = ahvAtRet + bvgAtRet;
+  // Dazu der gleichmaessige Kapitalverzehr im selben Jahr (wenn alle Renten fliessen)
+  const drawdownAtRet = (() => {
+    if (retIdx == null || !projection) return 0;
+    const starts = projection.payout_start_idx ?? { "1": retIdx, "2": retIdx };
+    const idx = Math.min(Math.max(retIdx, starts["1"], starts["2"]), projection.years.length - 1);
+    return projection.capital_drawdown?.[idx] ?? 0;
+  })();
   const capitalNet = (source: "3a" | "3b") => (projection?.capital_withdrawals ?? [])
     .filter((w) => w.source === source)
     .reduce((sum, w) => sum + w.amount - w.tax, 0);
@@ -351,6 +358,14 @@ export default function Projections() {
                 <p className="text-text-tertiary text-[10px]">pro Monat · {formatCHF(totalPensionAnnual)} / Jahr</p>
               </div>
             </div>
+            {drawdownAtRet > 0 && (
+              <p className="text-gain text-xs">
+                {t("pages:overview.drawdownTotal", {
+                  age: projection.drawdown_until_age ?? 90,
+                  amount: formatCHF((totalPensionAnnual + drawdownAtRet) / 12),
+                })}
+              </p>
+            )}
             <WithdrawalPlan
               withdrawals={projection.capital_withdrawals}
               taxSingleYear={projection.capital_tax_single_year}

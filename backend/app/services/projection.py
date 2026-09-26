@@ -246,6 +246,15 @@ def pillar_3b_age(record: Dict, current_age: int, retirement_age: int) -> int:
 TAXED_SOURCES = ("bvg", "3a")
 
 
+def level_withdrawal(balance: float, rate: float, years: int) -> float:
+    """Gleicher Betrag pro Jahr, der `balance` in `years` Jahren aufbraucht,
+    wenn der Rest mit `rate` weiter rentiert."""
+    years = max(1, years)
+    if abs(rate) < 1e-9:
+        return balance / years
+    return balance * rate / (1 - (1 + rate) ** -years)
+
+
 def single_year_tax(withdrawals: Sequence[Dict], canton: str, married: bool) -> float:
     """Zum Vergleich: alle steuerbaren Bezuege im selben Jahr — was die
     Staffelung spart."""
@@ -406,6 +415,7 @@ class ProjectionService:
         retirement_spending: Optional[float] = None,
         canton: str = DEFAULT_CANTON,
         married: bool = False,
+        drawdown_until_age: int = 90,
     ) -> Dict[str, Any]:
         """
         Run Monte Carlo simulation and pension projections.
@@ -513,6 +523,25 @@ class ProjectionService:
         p75 = np.percentile(real_values, 75, axis=0).tolist()
         p90 = np.percentile(real_values, 90, axis=0).tolist()
 
+        # Verfuegbar aus dem Vermoegen: ein gleichbleibender realer Betrag ab
+        # der Pensionierung, der das freie Vermoegen (Median bei Pensionierung)
+        # samt spaeteren Kapitalbezuegen bis `drawdown_until_age` aufbraucht,
+        # bei realer Median-Rendite. Zum Vergleich mit Renten und Ausgaben —
+        # die Simulation selbst entnimmt nur, was fehlt.
+        growth = float(np.exp(log_mean)) / (1 + inflation_rate) - 1
+        later_capital = sum(
+            capital_inflow_real[i] / (1 + growth) ** (i - retirement_idx + 1)
+            for i in range(retirement_idx, years)
+        )
+        # bis und mit dem Jahr, in dem man drawdown_until_age wird
+        drawdown = level_withdrawal(
+            p50[retirement_idx] + later_capital, growth, drawdown_until_age - retirement_age + 1
+        )
+        capital_drawdown = [
+            drawdown if i >= retirement_idx and current_age + i <= drawdown_until_age else 0.0
+            for i in range(years + 1)
+        ]
+
         # Bis wann reicht das Vermoegen? Median-Pfad nach der Pensionierung.
         depletion_age = next(
             (current_age + i for i in range(retirement_idx, years + 1) if p50[i] <= 0),
@@ -539,6 +568,8 @@ class ProjectionService:
                 for i, value in enumerate(pension_bvg)
             ],
             "income_bvg": bvg_income,
+            "capital_drawdown": capital_drawdown,
+            "drawdown_until_age": drawdown_until_age,
             "retirement_idx": retirement_idx,
             "payout_start_idx": {
                 pillar: max(0, start - current_age)
