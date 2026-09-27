@@ -223,3 +223,13 @@ def test_retirement_scenarios_endpoint(client):
     data = res.json()
     assert data["planned_age"] == 64 and 64 in data["ages"]
     assert len(data["cells"]) == len(data["ages"]) * 3
+
+
+async def test_wizard_keeps_one_scenario(client, db_session, test_user):
+    """Frueher legte jedes Speichern ein neues Szenario an."""
+    from app.models.models import Scenario
+    uid = test_user.id
+    for age in (63, 64):
+        assert client.post("/api/wizard/complete", json={"zielRentenalter": age}).status_code == 201
+    rows = (await db_session.execute(select(Scenario).where(Scenario.user_id == uid))).scalars().all()
+    assert len(rows) == 1 and rows[0].parameters_json["retirement_age"] == 64

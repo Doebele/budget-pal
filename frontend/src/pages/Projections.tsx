@@ -80,10 +80,16 @@ export default function Projections() {
 
   // Gespeicherte Szenarien. Vorausgewaehlt wird der Finanzplan aus dem Wizard,
   // damit die Seite die echten Zahlen des Nutzers zeigt statt der Defaults oben.
-  const { data: scenarios = [] } = useQuery<ScenarioSummary[]>({
+  const { data: allScenarios = [] } = useQuery<ScenarioSummary[]>({
     queryKey: ["projection-scenarios"],
     queryFn: () => projectionsApi.listScenarios().then((r) => r.data),
   });
+  // Nur das neueste Wizard-Szenario: aeltere Stände legte der Wizard frueher
+  // bei jedem Speichern zusaetzlich an (die Liste kommt neueste zuerst)
+  const scenarios = allScenarios.filter(
+    (sc, i) => !sc.parameters?.wizard_onboarding
+      || allScenarios.findIndex((o) => o.parameters?.wizard_onboarding) === i,
+  );
   const [scenarioId, setScenarioId] = useState<number | null>(null);
   const [scenarioTouched, setScenarioTouched] = useState(false);
   useEffect(() => {
