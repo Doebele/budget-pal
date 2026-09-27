@@ -929,5 +929,11 @@
     "rowSuccess": "Simulations with wealth until 95",
     "rowTaxes": "Total taxes (capital + retirement)",
     "explain": "Pension: lifelong and guaranteed, even if you live very long; spouses usually receive 60 % as a survivor's pension; fully taxable as income and not adjusted for inflation. Capital: taxed once at a reduced rate, freely available and inheritable, but carries investment risk and the risk of a long life. Many choose a mix. Mind your fund's notice period for a lump sum and the 3-year lock after a buy-in. Taxes: income and wealth tax per the ESTV tax calculator for the cantonal capital, 2 % investment yield as income, without church tax. Not financial or tax advice."
+  },
+  "peer": {
+    "toggle": "Show Swiss median (same age)",
+    "line": "Swiss median (free wealth)",
+    "hint": "Median free wealth of households of the same age, excluding pension fund and 3a. Source: tax data canton of Lucerne 2020 (LUSTAT) as an approximation – there is no Swiss-wide statistic by age, the federal tax administration receives no age data. Couples × 1.5 (equivalence scale), values up to 74.",
+    "pensions": "For comparison, median of new pensions 2024 (FSO): pension fund pension {{menMonthly}} (men) or {{womenMonthly}} (women) per month, lump sum {{menCapital}} or {{womenCapital}}."
   }
 }

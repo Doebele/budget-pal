@@ -376,6 +376,16 @@ export default function Projections() {
                 <p className="text-text-tertiary text-[10px]">pro Monat · {formatCHF(totalPensionAnnual)} / Jahr</p>
               </div>
             </div>
+            {projection.peer_pensions?.bvg_monthly && (
+              <p className="text-text-tertiary text-[11px]">
+                {t("pages:peer.pensions", {
+                  menMonthly: formatCHF(projection.peer_pensions.bvg_monthly.men),
+                  womenMonthly: formatCHF(projection.peer_pensions.bvg_monthly.women),
+                  menCapital: formatCHF(projection.peer_pensions.bvg_capital.men),
+                  womenCapital: formatCHF(projection.peer_pensions.bvg_capital.women),
+                })}
+              </p>
+            )}
             {drawdownAtRet > 0 && (
               <p className="text-gain text-xs">
                 {t("pages:overview.drawdownTotal", {

@@ -656,6 +656,10 @@ Rentendiagramm über `/api/pension/estimate`):
   Vermögensertrag, dazu die Vermögenssteuer – Bund, Kanton und Gemeinde für den Kantonshauptort
   aus dem ESTV-Steuerrechner 2026 (`services/data/income_tax_2026.json`), je Simulation vom
   Vermögen abgezogen.
+- **Vergleich mit dem Median:** einblendbare Linie in Vermögensprognose, Rentenübersicht und
+  Ruhestandsplaner – Median des freien Vermögens im selben Alter (Steuerdaten Kanton Luzern 2020,
+  LUSTAT, als Näherung; eine schweizweite Statistik nach Alter gibt es nicht), dazu der Median der
+  Neurenten 2024 (BFS) bei der Rentenübersicht.
 - **Rente oder Kapital:** Vergleich der Pensionskasse ganz als Rente, ganz als Kapital (nach Steuer
   im Anlagevermögen weiter angelegt) und des eigenen Plans – dieselben Märkte, bis 95: freies
   Vermögen im Median und bei schlechten Märkten, Vermögen mit 85/90, Steuern, und ab welchem

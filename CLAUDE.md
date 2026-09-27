@@ -279,6 +279,10 @@ Central definition of all 11 supercategories (wohnen, essen, mobilitaet, versich
   wizard's "Direkte Steuern" budget is subtracted (`monthly_taxes` in the scenario, else
   `wizard_data_json.direkteSteuern`). `tax_in_retirement=False` switches it off (tests of
   other flows).
+- Comparison with the Swiss median (`services/swiss_medians.py`): `run()` returns
+  `peer_wealth` (median free wealth at the same age, LUSTAT tax data canton of Lucerne 2020 as a
+  proxy — no Swiss-wide statistic by age exists; couples × 1.5; None outside 18–74) and
+  `peer_pensions` (BFS new pensions 2024). The charts show it via `PeerCheckbox` (off by default).
 - Pension or lump sum (`compare_bvg_options`, `POST /projections/compare-bvg`): the same
   projection with BVG 0 % / 100 % capital (and the own plan), same `seed`, until 95.
 - One calculation: Wizard and Finanzplan call `/api/pension/estimate`

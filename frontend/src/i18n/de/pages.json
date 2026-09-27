@@ -929,5 +929,11 @@
     "rowSuccess": "Simulationen mit Vermögen bis 95",
     "rowTaxes": "Steuern gesamt (Kapital + Ruhestand)",
     "explain": "Rente: lebenslang und garantiert, auch wenn Sie sehr alt werden; Ehepartner erhalten meist 60 % als Hinterlassenenrente; sie ist voll als Einkommen steuerbar und wird nicht der Teuerung angepasst. Kapital: einmal zum reduzierten Satz besteuert, frei verfügbar und vererbbar, trägt aber das Anlagerisiko und das Risiko eines langen Lebens. Viele wählen einen Mix. Beachten Sie die Anmeldefrist Ihrer Kasse für den Kapitalbezug und die Sperrfrist von 3 Jahren nach einem Einkauf. Steuern: Einkommens- und Vermögenssteuer laut ESTV-Steuerrechner für den Kantonshauptort, 2 % Vermögensertrag als Einkommen, ohne Kirchensteuer. Keine Finanz- oder Steuerberatung."
+  },
+  "peer": {
+    "toggle": "Median Schweiz einblenden (gleiches Alter)",
+    "line": "Median Schweiz (freies Vermögen)",
+    "hint": "Median des freien Vermögens von Haushalten im selben Alter, ohne Pensionskasse und 3a. Quelle: Steuerdaten Kanton Luzern 2020 (LUSTAT) als Näherung – eine schweizweite Statistik nach Alter gibt es nicht, die ESTV erhält keine Altersangaben. Paare × 1.5 (Äquivalenzskala), Werte bis 74.",
+    "pensions": "Zum Vergleich, Median der Neurenten 2024 (BFS): Pensionskassen-Rente {{menMonthly}} (Männer) bzw. {{womenMonthly}} (Frauen) pro Monat, Kapitalbezug {{menCapital}} bzw. {{womenCapital}}."
   }
 }
