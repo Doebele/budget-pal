@@ -668,6 +668,10 @@ Rentendiagramm über `/api/pension/estimate`):
   Vermögensertrag, dazu die Vermögenssteuer – Bund, Kanton und Gemeinde für den Kantonshauptort
   aus dem ESTV-Steuerrechner 2026 (`services/data/income_tax_2026.json`), je Simulation vom
   Vermögen abgezogen.
+- **Einkommensplan:** Pensionierungsalter 58–70 frei wählbar; pro Monat AHV, Pensionskassen-Rente
+  und Auszahlung aus einem Fonds, in den die Kapitalbezüge (und auf Wunsch das freie Vermögen)
+  fliessen – Rendite, Auszahldauer (bis 85/90/95 oder nur Ertrag) und Teuerungsausgleich wählbar,
+  netto nach Steuern, dazu der Abbau des Fondsvermögens.
 - **Vergleich mit dem Median:** einblendbare Linie in Vermögensprognose, Rentenübersicht und
   Ruhestandsplaner – Median des freien Vermögens im selben Alter (Steuerdaten Kanton Luzern 2020,
   LUSTAT, als Näherung; eine schweizweite Statistik nach Alter gibt es nicht), dazu der Median der

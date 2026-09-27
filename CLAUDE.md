@@ -279,6 +279,10 @@ Central definition of all 11 supercategories (wohnen, essen, mobilitaet, versich
   wizard's "Direkte Steuern" budget is subtracted (`monthly_taxes` in the scenario, else
   `wizard_data_json.direkteSteuern`). `tax_in_retirement=False` switches it off (tests of
   other flows).
+- Income plan (`income_plan`, `POST /projections/income-plan`): monthly AHV + BVG pension +
+  payout from a fund fed by all capital withdrawals (and optionally free wealth), from a freely
+  chosen retirement age (`exact_retirement`: the early-retirement scenario is not applied again),
+  deterministic at the expected fund return, net of `retirement_tax`, until 95.
 - Comparison with the Swiss median (`services/swiss_medians.py`): `run()` returns
   `peer_wealth` (median free wealth at the same age, LUSTAT tax data canton of Lucerne 2020 as a
   proxy — no Swiss-wide statistic by age exists; couples × 1.5; None outside 18–74) and

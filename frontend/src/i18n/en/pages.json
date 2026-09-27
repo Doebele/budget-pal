@@ -935,5 +935,25 @@
     "line": "Swiss median (free wealth)",
     "hint": "Median free wealth of households of the same age, excluding pension fund and 3a. Source: tax data canton of Lucerne 2020 (LUSTAT) as an approximation – there is no Swiss-wide statistic by age, the federal tax administration receives no age data. Couples × 1.5 (equivalence scale), values up to 74.",
     "pensions": "For comparison, median of new pensions 2024 (FSO): pension fund pension {{menMonthly}} (men) or {{womenMonthly}} (women) per month, lump sum {{menCapital}} or {{womenCapital}}."
+  },
+  "incomePlan": {
+    "title": "Income plan from retirement",
+    "subtitle": "Per month in today's francs: AHV, pension fund pension and payouts from an investment fund that receives your capital withdrawals (pension fund, 3a, life insurance) – net of tax.",
+    "age": "Retire at {{age}}",
+    "return": "Expected fund return {{pct}} % p.a.",
+    "until": "Pay out the fund",
+    "untilAge": "until {{age}}",
+    "yieldOnly": "yield only",
+    "indexed": "Payout rises with inflation",
+    "includeWealth": "Include free wealth",
+    "netAt": "Net at {{age}}",
+    "perMonth": "per month, after tax",
+    "fundCapital": "Capital for the fund",
+    "fundCapitalHint": "Capital withdrawals net + wealth if chosen",
+    "fund": "Fund payout",
+    "net": "Net after tax",
+    "balanceTitle": "Fund balance (drawn down by the payouts)",
+    "balance": "Fund balance",
+    "hint": "The fund pays a fixed amount until the chosen age and is then empty; \"yield only\" keeps the capital. Calculated with the expected return without fluctuations – the wealth projection shows how much market years shift this. The withdrawal is capital consumption and tax-free; pensions, fund yield (2 %) and wealth are taxed. Changing the retirement age changes AHV (−6.8 % per early year), pension fund (conversion rate, contribution years) and 3a withdrawals. Model calculation, not investment or financial advice."
   }
 }

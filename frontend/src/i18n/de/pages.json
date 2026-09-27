@@ -935,5 +935,25 @@
     "line": "Median Schweiz (freies Vermögen)",
     "hint": "Median des freien Vermögens von Haushalten im selben Alter, ohne Pensionskasse und 3a. Quelle: Steuerdaten Kanton Luzern 2020 (LUSTAT) als Näherung – eine schweizweite Statistik nach Alter gibt es nicht, die ESTV erhält keine Altersangaben. Paare × 1.5 (Äquivalenzskala), Werte bis 74.",
     "pensions": "Zum Vergleich, Median der Neurenten 2024 (BFS): Pensionskassen-Rente {{menMonthly}} (Männer) bzw. {{womenMonthly}} (Frauen) pro Monat, Kapitalbezug {{menCapital}} bzw. {{womenCapital}}."
+  },
+  "incomePlan": {
+    "title": "Einkommensplan ab Pensionierung",
+    "subtitle": "Pro Monat in heutigen Franken: AHV, Pensionskassen-Rente und Auszahlung aus einem Anlagefonds, in den Ihre Kapitalbezüge (Pensionskasse, 3a, Lebensversicherung) fliessen – netto nach Steuern.",
+    "age": "Pensionierung mit {{age}}",
+    "return": "Erwartete Fondsrendite {{pct}} % p.a.",
+    "until": "Fonds auszahlen",
+    "untilAge": "bis {{age}}",
+    "yieldOnly": "nur Ertrag",
+    "indexed": "Auszahlung steigt mit der Teuerung",
+    "includeWealth": "Freies Vermögen einbeziehen",
+    "netAt": "Netto mit {{age}}",
+    "perMonth": "pro Monat, nach Steuern",
+    "fundCapital": "Kapital für den Fonds",
+    "fundCapitalHint": "Kapitalbezüge netto + ggf. Vermögen",
+    "fund": "Fonds-Auszahlung",
+    "net": "Netto nach Steuern",
+    "balanceTitle": "Fondsvermögen (Abbau durch die Auszahlung)",
+    "balance": "Fondsvermögen",
+    "hint": "Der Fonds zahlt einen festen Betrag bis zum gewählten Alter und ist dann leer; „nur Ertrag“ lässt das Kapital stehen. Gerechnet mit der erwarteten Rendite ohne Schwankungen – wie stark Börsenjahre das verschieben, zeigt die Vermögensprognose. Die Entnahme ist Kapitalverzehr und steuerfrei; besteuert werden Renten, der Fondsertrag (2 %) und das Vermögen. Ein Wechsel des Rentenalters ändert AHV (Vorbezug −6.8 % pro Jahr), Pensionskasse (Umwandlungssatz, Beitragsjahre) und 3a-Bezüge. Modellrechnung, keine Anlage- oder Finanzberatung."
   }
 }
