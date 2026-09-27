@@ -282,7 +282,35 @@ export interface IncomePlan {
   rows: IncomePlanRow[];
 }
 
+export interface ScenarioCell {
+  age: number;
+  capital_share: number;
+  net_start: number;
+  net_75: number | null;
+  net_85: number | null;
+  success_rate: number;
+  depletion_age: number | null;
+  wealth_85: number | null;
+  capital_tax: number;
+}
+
+/** Hinweis aus den eigenen Zahlen: `key` = pages:scenarios.hint_<key>, der Rest sind Werte. */
+export type ScenarioHint = { key: string } & Record<string, string | number | null>;
+
+export interface RetirementScenarios {
+  ages: number[];
+  shares: number[];
+  planned_age: number;
+  own_share: number;
+  cells: ScenarioCell[];
+  hints: ScenarioHint[];
+}
+
 export const projectionsApi = {
+  retirementScenarios: (params: Record<string, unknown>, scenarioId?: number) =>
+    api.post<RetirementScenarios>("/projections/retirement-scenarios", params, {
+      params: scenarioId ? { scenario_id: scenarioId } : {},
+    }),
   incomePlan: (params: Record<string, unknown>, scenarioId?: number) =>
     api.post<IncomePlan>("/projections/income-plan", params, {
       params: scenarioId ? { scenario_id: scenarioId } : {},

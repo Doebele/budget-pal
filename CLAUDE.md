@@ -283,6 +283,9 @@ Central definition of all 11 supercategories (wohnen, essen, mobilitaet, versich
   payout from a fund fed by all capital withdrawals (and optionally free wealth), from a freely
   chosen retirement age (`exact_retirement`: the early-retirement scenario is not applied again),
   deterministic at the expected fund return, net of `retirement_tax`, until 95.
+- Scenario matrix (`retirement_scenarios`, `POST /projections/retirement-scenarios`): retirement
+  ages × BVG capital share (0/50/100 %), same seed; net income via `income_plan` (fund 4 % until
+  life expectancy) plus success rate; rule-based `hints` as i18n keys (`pages:scenarios.hint_*`).
 - Comparison with the Swiss median (`services/swiss_medians.py`): `run()` returns
   `peer_wealth` (median free wealth at the same age, LUSTAT tax data canton of Lucerne 2020 as a
   proxy — no Swiss-wide statistic by age exists; couples × 1.5; None outside 18–74) and

@@ -955,5 +955,28 @@
     "balanceTitle": "Fondsvermögen (Abbau durch die Auszahlung)",
     "balance": "Fondsvermögen",
     "hint": "Der Fonds zahlt einen festen Betrag bis zum gewählten Alter und ist dann leer; „nur Ertrag“ lässt das Kapital stehen. Gerechnet mit der erwarteten Rendite ohne Schwankungen – wie stark Börsenjahre das verschieben, zeigt die Vermögensprognose. Die Entnahme ist Kapitalverzehr und steuerfrei; besteuert werden Renten, der Fondsertrag (2 %) und das Vermögen. Ein Wechsel des Rentenalters ändert AHV (Vorbezug −6.8 % pro Jahr), Pensionskasse (Umwandlungssatz, Beitragsjahre) und 3a-Bezüge. Modellrechnung, keine Anlage- oder Finanzberatung."
+  },
+  "scenarios": {
+    "title": "Szenarien: wann in Rente, Pensionskasse wie beziehen?",
+    "subtitle": "Nettoeinkommen pro Monat bei Pensionierung (heutige Franken, nach Steuern) – Kapital im Fonds mit 4 % bis zur Lebenserwartung ausbezahlt – und wie oft das Vermögen bis 95 reicht. Gleiche Märkte für alle Felder.",
+    "age": "Rente mit",
+    "share0": "PK als Rente",
+    "share50": "PK halb/halb",
+    "share100": "PK als Kapital",
+    "at75": "mit 75: {{amount}}",
+    "success": "reicht in {{pct}} %",
+    "yours": "Ihr Plan",
+    "hintsTitle": "Hinweise aus Ihren Zahlen",
+    "hint_earlyCost": "Jedes Jahr früher in Rente (zwischen {{age}} und {{planned}}) kostet Sie rund {{amount}} netto pro Monat – lebenslang, weil AHV (−6.8 % pro Vorbezugsjahr) und Pensionskasse kleiner ausfallen.",
+    "hint_ahvBridge": "Mit {{age}} fehlen {{years}} Jahre bis zur frühesten AHV mit 63: diese Brücke trägt Ihr Vermögen, und bis 65 zahlen Sie AHV-Beiträge als Nichterwerbstätige.",
+    "hint_pensionWins": "Bei Ihrer Lebenserwartung ({{life}}) lohnt sich die Rente: ab {{age}} lässt sie im Median mehr übrig als das Kapital. Die Rente sichert zudem ein langes Leben ab.",
+    "hint_capitalWins": "Bis {{life}} bleibt das Kapital im Median vorne – angelegt bringt es mehr, trägt aber das Börsen- und Langlebigkeitsrisiko. Ein Mix (z. B. halb/halb) verbindet Sicherheit und Flexibilität.",
+    "hint_lowSuccess": "Nur in {{pct}} % der Simulationen reicht das Vermögen bis 95. Später pensionieren (mit {{age}} über 80 %) oder die Ausgaben senken.",
+    "hint_lowSuccessNoAge": "Nur in {{pct}} % der Simulationen reicht das Vermögen bis 95 – die Ausgaben im Ruhestand senken oder mehr sparen.",
+    "hint_sameYear": "Zwei steuerbare Kapitalbezüge fallen ins selbe Jahr – verteilen Sie sie (Bezugsalter der 3a-Konten im Wizard), das senkt die Progression.",
+    "hint_staggerSaving": "Die Staffelung Ihrer Kapitalbezüge spart rund {{amount}} Steuern gegenüber einem Bezug in einem Jahr.",
+    "hint_lifeInsurance": "Die Lebensversicherung zahlt mit {{age}} rund {{amount}} steuerfrei aus. Im Fonds angelegt fliesst sie in den Einkommensplan; wer keine Rendite braucht, hält sie als Reserve für grössere Ausgaben.",
+    "hint_buyInLock": "Einkäufe in die Pensionskasse sparen Steuern, sind aber 3 Jahre vor einem Kapitalbezug gesperrt – sonst werden die Abzüge rückgängig gemacht. Den Kapitalbezug früh bei der Kasse anmelden.",
+    "disclaimer": "Modellrechnung mit Ihren Angaben und allgemeinen Regeln – keine Anlage-, Finanz- oder Steuerberatung. Für Entscheide Ihre Pensionskasse und eine Fachperson beiziehen."
   }
 }

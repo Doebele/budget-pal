@@ -949,7 +949,7 @@ class ProjectionService:
         Fondsertrag und Vermoegen; die Entnahme selbst ist Kapitalverzehr und
         steuerfrei.
         """
-        r = self.run(**run_kwargs)
+        r = run_kwargs.pop("_run_result", None) or self.run(**run_kwargs)
         inflation = run_kwargs.get("inflation_rate", 0.015)
         canton = run_kwargs.get("canton", DEFAULT_CANTON)
         married = run_kwargs.get("married", False)
@@ -1003,6 +1003,107 @@ class ProjectionService:
             "spending_monthly": (r["retirement_spending"] or 0.0) / 12,
             "rows": rows,
         }
+
+    def retirement_scenarios(
+        self,
+        pension_records: List[Dict],
+        ages: Sequence[int] = (60, 62, 63, 65),
+        shares: Sequence[float] = (0.0, 0.5, 1.0),
+        life_expectancy: int = 90,
+        **run_kwargs,
+    ) -> Dict[str, Any]:
+        """Szenarienmatrix: Rentenalter x Anteil der Pensionskasse als Kapital.
+
+        Je Zelle das Nettoeinkommen pro Monat (Einkommensplan mit Fonds bis zur
+        Lebenserwartung, 4 %) bei Pensionierung, mit 75 und 85, dazu aus der
+        Simulation Erfolgsquote, Vermoegen mit 85 und wie lange es reicht.
+        Gleiche Maerkte fuer alle Zellen. Dazu regelbasierte Hinweise aus den
+        eigenen Zahlen (`hints`: Schluessel + Werte fuer die Uebersetzung).
+        """
+        run_kwargs["seed"] = run_kwargs.get("seed") or int(np.random.default_rng().integers(2**31))
+        planned = run_kwargs.pop("retirement_age", 65)
+        bvg = next((r for r in pension_records if r["pillar"] == "2"), None)
+        current_age = _current_age(run_kwargs.get("date_of_birth"))
+        ages = sorted({a for a in ages if a > current_age} | ({planned} if planned > current_age else set()))
+
+        def records_with(share: float) -> List[Dict]:
+            if bvg is None:
+                return pension_records
+            steps = [{**s, "capital_share": share} for s in bvg.get("partial_steps") or []]
+            return [{**r, "capital_share": share, "partial_steps": steps} if r is bvg else r
+                    for r in pension_records]
+
+        def at_age(series, age):
+            i = age - current_age
+            return series[i] if 0 <= i < len(series) else None
+
+        cells, runs = [], {}
+        for age in ages:
+            for share in (shares if bvg else (0.0,)):
+                records = records_with(share)
+                r = self.run(pension_records=records, retirement_age=age, **run_kwargs)
+                plan = self.income_plan(
+                    fund_return=0.04, payout_until_age=life_expectancy, _run_result=r,
+                    pension_records=records, retirement_age=age, **run_kwargs,
+                )
+                net = {row["age"]: row["net"] for row in plan["rows"]}
+                runs[(age, share)] = r
+                cells.append({
+                    "age": age, "capital_share": share,
+                    "net_start": net.get(age, 0.0), "net_75": net.get(max(age, 75)),
+                    "net_85": net.get(max(age, 85)),
+                    "success_rate": r["success_rate"], "depletion_age": r["depletion_age"],
+                    "wealth_85": at_age(r["p50"], 85),
+                    "capital_tax": r["capital_tax_total"],
+                })
+
+        # ── Hinweise ─────────────────────────────────────────
+        hints: List[Dict[str, Any]] = []
+        own_share = _share((bvg or {}).get("capital_share"))
+        own = min(shares, key=lambda s: abs(s - own_share)) if bvg else 0.0
+        cell = {(c["age"], c["capital_share"]): c for c in cells}
+        base = cell.get((planned, own))
+        if base:
+            # Was ein Jahr frueher kostet (netto, mit 75, wenn alle Renten fliessen)
+            earlier = [a for a in ages if a < planned]
+            if earlier and base["net_75"] is not None:
+                a = max(earlier)
+                other = cell[(a, own)]
+                diff = (base["net_75"] - (other["net_75"] or 0)) / (planned - a)
+                hints.append({"key": "earlyCost", "age": a, "planned": planned, "amount": round(diff)})
+            # AHV-Luecke bis 63
+            if planned < AHV_EARLIEST_AGE:
+                hints.append({"key": "ahvBridge", "age": planned, "years": AHV_EARLIEST_AGE - planned})
+            # Rente oder Kapital: wann holt die Rente das Kapital ein?
+            if bvg and (planned, 0.0) in runs and (planned, 1.0) in runs:
+                pension, capital = runs[(planned, 0.0)]["p50"], runs[(planned, 1.0)]["p50"]
+                first = runs[(planned, 0.0)]["payout_start_idx"]["2"] + 1
+                breakeven = next((current_age + i for i in range(first, len(pension))
+                                  if pension[i] >= capital[i] and pension[i] > 0), None)
+                hints.append({
+                    "key": "pensionWins" if breakeven and breakeven <= life_expectancy else "capitalWins",
+                    "age": breakeven, "life": life_expectancy,
+                })
+            # Erfolgsquote: lohnt sich spaeter?
+            if base["success_rate"] < 0.8:
+                better = next((a for a in ages if a > planned and cell[(a, own)]["success_rate"] >= 0.8), None)
+                hints.append({"key": "lowSuccess", "pct": round(base["success_rate"] * 100), "age": better})
+        r = runs.get((planned, own))
+        if r:
+            ws = r["capital_withdrawals"]
+            years = [w["age"] for w in ws if w["source"] in TAXED_SOURCES]
+            if len(years) != len(set(years)):
+                hints.append({"key": "sameYear"})
+            saving = r["capital_tax_single_year"] - r["capital_tax_total"]
+            if saving > 500:
+                hints.append({"key": "staggerSaving", "amount": round(saving)})
+            lv = [w for w in ws if w["source"] == "3b"]
+            if lv:
+                hints.append({"key": "lifeInsurance", "age": lv[0]["age"], "amount": round(lv[0]["amount"])})
+            if own_share > 0:
+                hints.append({"key": "buyInLock"})
+        return {"ages": ages, "shares": list(shares) if bvg else [0.0], "planned_age": planned,
+                "own_share": own, "cells": cells, "hints": hints}
 
     def compare_bvg_options(self, pension_records: List[Dict], **run_kwargs) -> Dict[str, Any]:
         """Pensionskasse ganz als Rente, ganz als Kapital (nach Steuer ins freie

@@ -211,3 +211,15 @@ def test_income_plan_endpoint(client):
     data = res.json()
     assert data["retirement_age"] == 62 and data["rows"][-1]["age"] == 95
     assert data["rows"][0]["fund"] > 0
+
+
+def test_retirement_scenarios_endpoint(client):
+    client.post("/api/pension", json={"pillar": "2", "current_balance": 400_000})
+    res = client.post("/api/projections/retirement-scenarios", json={
+        "current_net_worth": 100_000, "annual_savings": 10_000, "annual_income": 90_000,
+        "date_of_birth": f"{datetime.now().year - 55}-06-01", "retirement_age": 64,
+    })
+    assert res.status_code == 200, res.text
+    data = res.json()
+    assert data["planned_age"] == 64 and 64 in data["ages"]
+    assert len(data["cells"]) == len(data["ages"]) * 3

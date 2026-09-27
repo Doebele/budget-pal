@@ -955,5 +955,28 @@
     "balanceTitle": "Fund balance (drawn down by the payouts)",
     "balance": "Fund balance",
     "hint": "The fund pays a fixed amount until the chosen age and is then empty; \"yield only\" keeps the capital. Calculated with the expected return without fluctuations – the wealth projection shows how much market years shift this. The withdrawal is capital consumption and tax-free; pensions, fund yield (2 %) and wealth are taxed. Changing the retirement age changes AHV (−6.8 % per early year), pension fund (conversion rate, contribution years) and 3a withdrawals. Model calculation, not investment or financial advice."
+  },
+  "scenarios": {
+    "title": "Scenarios: when to retire, how to draw the pension fund?",
+    "subtitle": "Net income per month at retirement (today's francs, after tax) – capital in a fund at 4 % paid out until life expectancy – and how often wealth lasts until 95. Same markets for every cell.",
+    "age": "Retire at",
+    "share0": "Fund as pension",
+    "share50": "Fund half/half",
+    "share100": "Fund as capital",
+    "at75": "at 75: {{amount}}",
+    "success": "lasts in {{pct}} %",
+    "yours": "Your plan",
+    "hintsTitle": "Hints from your numbers",
+    "hint_earlyCost": "Each year of earlier retirement (between {{age}} and {{planned}}) costs you about {{amount}} net per month – for life, because AHV (−6.8 % per early year) and the pension fund are smaller.",
+    "hint_ahvBridge": "At {{age}} you are {{years}} years short of the earliest AHV at 63: your wealth bridges this, and until 65 you pay AHV contributions as a non-employed person.",
+    "hint_pensionWins": "With your life expectancy ({{life}}) the pension pays off: from {{age}} it leaves more in the median than the lump sum. It also insures a long life.",
+    "hint_capitalWins": "Until {{life}} the lump sum stays ahead in the median – invested it yields more but carries market and longevity risk. A mix (e.g. half/half) combines safety and flexibility.",
+    "hint_lowSuccess": "Wealth lasts until 95 in only {{pct}} % of simulations. Retire later (at {{age}} above 80 %) or spend less.",
+    "hint_lowSuccessNoAge": "Wealth lasts until 95 in only {{pct}} % of simulations – reduce spending in retirement or save more.",
+    "hint_sameYear": "Two taxable capital withdrawals fall into the same year – spread them (3a withdrawal ages in the wizard) to reduce progression.",
+    "hint_staggerSaving": "Staggering your capital withdrawals saves about {{amount}} in tax compared to one year.",
+    "hint_lifeInsurance": "The life insurance pays about {{amount}} tax-free at {{age}}. Invested in the fund it feeds the income plan; if you don't need the return, keep it as a reserve for larger expenses.",
+    "hint_buyInLock": "Buy-ins into the pension fund save tax but are locked for 3 years before a lump-sum withdrawal – otherwise the deductions are reversed. Announce the lump sum early to your fund.",
+    "disclaimer": "Model calculation with your details and general rules – not investment, financial or tax advice. Consult your pension fund and a professional for decisions."
   }
 }
