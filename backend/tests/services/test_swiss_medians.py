@@ -22,3 +22,9 @@ def test_series_in_the_projection():
     assert r["peer_wealth"][0] == pytest.approx(median_wealth(60))
     assert r["peer_wealth"][15] is None   # 75
     assert r["peer_pensions"]["bvg_monthly"]["men"] == 2_042
+
+
+def test_retiree_income_median():
+    from app.services.swiss_medians import retiree_income_monthly
+    assert retiree_income_monthly() == pytest.approx(44_899 / 12)
+    assert retiree_income_monthly(married=True) == pytest.approx(44_899 / 12 * 1.5)

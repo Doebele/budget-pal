@@ -954,7 +954,13 @@
     "net": "Netto nach Steuern",
     "balanceTitle": "Fondsvermögen (Abbau durch die Auszahlung)",
     "balance": "Fondsvermögen",
-    "hint": "Der Fonds zahlt einen festen Betrag bis zum gewählten Alter und ist dann leer; „nur Ertrag“ lässt das Kapital stehen. Gerechnet mit der erwarteten Rendite ohne Schwankungen – wie stark Börsenjahre das verschieben, zeigt die Vermögensprognose. Die Entnahme ist Kapitalverzehr und steuerfrei; besteuert werden Renten, der Fondsertrag (2 %) und das Vermögen. Ein Wechsel des Rentenalters ändert AHV (Vorbezug −6.8 % pro Jahr), Pensionskasse (Umwandlungssatz, Beitragsjahre) und 3a-Bezüge. Modellrechnung, keine Anlage- oder Finanzberatung."
+    "hint": "Der Fonds zahlt einen festen Betrag bis zum gewählten Alter und ist dann leer; „nur Ertrag“ lässt das Kapital stehen. Gerechnet mit der erwarteten Rendite ohne Schwankungen – wie stark Börsenjahre das verschieben, zeigt die Vermögensprognose. Die Entnahme ist Kapitalverzehr und steuerfrei; besteuert werden Renten, der Fondsertrag (2 %) und das Vermögen. Ein Wechsel des Rentenalters ändert AHV (Vorbezug −6.8 % pro Jahr), Pensionskasse (Umwandlungssatz, Beitragsjahre) und 3a-Bezüge. Modellrechnung, keine Anlage- oder Finanzberatung.",
+    "peerLine": "Median Pensionierte",
+    "peerAbove": "Mit {{age}} haben Sie {{net}} netto pro Monat – {{pct}} % über dem Median der Pensionierten ({{peer}}).",
+    "peerBelow": "Mit {{age}} haben Sie {{net}} netto pro Monat – {{pct}} % unter dem Median der Pensionierten ({{peer}}).",
+    "peerWithoutFund": "Ohne Kapitalverzehr (nur Renten nach Steuern): {{withoutFund}}, {{pctWithout}} %.",
+    "peerHint": "Median des verfügbaren Einkommens der Personen ab 65 (BFS, SILC 2018: 44'899 Franken pro Jahr, Paare × 1.5 – die aktuellste Zahl nach Alter). Verfügbar heisst nach Steuern, Sozialbeiträgen und Krankenkasse; der Verzehr von Kapital zählt dort nicht als Einkommen. Ihr Wert hier ist ohne Krankenkassenprämien, liegt also etwas zu hoch.",
+    "peerToggle": "Median der Pensionierten einblenden"
   },
   "scenarios": {
     "title": "Szenarien: wann in Rente, Pensionskasse wie beziehen?",

@@ -679,7 +679,8 @@ Rentendiagramm über `/api/pension/estimate`):
 - **Vergleich mit dem Median:** einblendbare Linie in Vermögensprognose, Rentenübersicht und
   Ruhestandsplaner – Median des freien Vermögens im selben Alter (Steuerdaten Kanton Luzern 2020,
   LUSTAT, als Näherung; eine schweizweite Statistik nach Alter gibt es nicht), dazu der Median der
-  Neurenten 2024 (BFS) bei der Rentenübersicht.
+  Neurenten 2024 (BFS) bei der Rentenübersicht und das Median-Einkommen der Pensionierten (BFS,
+  SILC 2018: 44'899 Franken pro Jahr, Paare × 1.5) im Einkommensplan – mit und ohne Kapitalverzehr.
 - **Rente oder Kapital:** Vergleich der Pensionskasse ganz als Rente, ganz als Kapital (nach Steuer
   im Anlagevermögen weiter angelegt) und des eigenen Plans – dieselben Märkte, bis 95: freies
   Vermögen im Median und bei schlechten Märkten, Vermögen mit 85/90, Steuern, und ab welchem

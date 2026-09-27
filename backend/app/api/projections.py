@@ -417,6 +417,8 @@ class IncomePlan(BaseModel):
     fund_start: float
     fund_inflows: List[Dict[str, float]]
     spending_monthly: float
+    # Median der Pensionierten, verfuegbares Einkommen pro Monat (SILC 2018)
+    peer_income_monthly: Optional[float] = None
     rows: List[IncomePlanRow]
 
 
