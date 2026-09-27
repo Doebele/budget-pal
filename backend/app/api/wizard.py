@@ -1001,19 +1001,36 @@ async def wizard_complete(
     scenario_params["monthly_expenses"] = monthly_expenses
     scenario_params["wizard_onboarding"] = True
 
-    scenario = Scenario(
-        user_id=current_user.id,
-        name="Finanzplan (empirische Angaben)",
-        description=(
-            f"Automatisch erstelltes Basisszenario basierend auf empirischen Angaben "
-            f"vom {_now().strftime('%d.%m.%Y')}. "
-            f"Kanton: {payload.kanton} | Haushalt: {payload.haushalt} | "
-            f"Rentenalter: {payload.ziel_rentenalter}"
-        ),
-        parameters_json=scenario_params,
+    description = (
+        f"Automatisch erstelltes Basisszenario basierend auf empirischen Angaben "
+        f"vom {_now().strftime('%d.%m.%Y')}. "
+        f"Kanton: {payload.kanton} | Haushalt: {payload.haushalt} | "
+        f"Rentenalter: {payload.ziel_rentenalter}"
     )
-    db.add(scenario)
-    scenarios_created += 1
+    # Ein Wizard-Szenario pro Nutzer: das neueste aktualisieren, aeltere Kopien
+    # (frueher legte jedes Speichern ein neues an) entfernen — wie Budgets und
+    # Vorsorge oben ersetzt der Wizard seine eigenen Daten.
+    existing = [
+        s for s in (await db.execute(
+            select(Scenario).where(Scenario.user_id == current_user.id)
+            .order_by(Scenario.created_at.desc(), Scenario.id.desc())
+        )).scalars().all()
+        if (s.parameters_json or {}).get("wizard_onboarding")
+    ]
+    if existing:
+        scenario, *older = existing
+        scenario.parameters_json = scenario_params
+        scenario.description = description
+        for old in older:
+            await db.delete(old)
+    else:
+        db.add(Scenario(
+            user_id=current_user.id,
+            name="Finanzplan (empirische Angaben)",
+            description=description,
+            parameters_json=scenario_params,
+        ))
+        scenarios_created += 1
 
     # ── 5b. Persist peer-group defaults snapshot ──────────────────
     # If the frontend sent user-adjusted values, use those.
