@@ -15,7 +15,9 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
+import { useState } from "react";
 import { formatCHF } from "@/lib/theme";
+import PeerCheckbox, { PEER_COLOR, peerK } from "@/components/charts/PeerCheckbox";
 import { useThemeColors } from "@/hooks/useThemeColors";
 import { useTranslation } from "react-i18next";
 
@@ -26,6 +28,8 @@ interface ProjectionData {
   p50: number[];
   p75: number[];
   p90: number[];
+  /** Vergleich: Median des freien Vermoegens im selben Alter */
+  peer_wealth?: (number | null)[];
 }
 
 interface MonteCarloChartProps {
@@ -47,6 +51,7 @@ interface ChartRow {
   band_25_50: number;  // p50 - p25
   band_50_75: number;  // p75 - p50
   band_75_90: number;  // p90 - p75
+  peer: number | null;
 }
 
 function buildChartData(data: ProjectionData): ChartRow[] {
@@ -61,6 +66,7 @@ function buildChartData(data: ProjectionData): ChartRow[] {
     band_25_50: Math.round((data.p50[i] - data.p25[i]) / 1000),
     band_50_75: Math.round((data.p75[i] - data.p50[i]) / 1000),
     band_75_90: Math.round((data.p90[i] - data.p75[i]) / 1000),
+    peer: peerK(data.peer_wealth, i),
   }));
 }
 
@@ -90,6 +96,9 @@ function CustomTooltip({ active, payload, label }: {
         <p style={{ color: colors.accent }}>p50: <strong>{formatCHF(row.p50 * 1000, true)}</strong></p>
         <p style={{ color: colors.textSecondary }}>p25: {formatCHF(row.p25 * 1000, true)}</p>
         <p style={{ color: colors.textSecondary }}>p10: {formatCHF(row.p10 * 1000, true)}</p>
+        {row.peer != null && payload.some((p) => p.name === "peer") && (
+          <p style={{ color: PEER_COLOR }}>Median CH: {formatCHF(row.peer * 1000, true)}</p>
+        )}
       </div>
     </div>
   );
@@ -103,6 +112,7 @@ export default function MonteCarloChart({
 }: MonteCarloChartProps) {
   const { t } = useTranslation();
   const { colors } = useThemeColors();
+  const [showPeer, setShowPeer] = useState(false);
   if (!data?.years?.length) {
     return (
       <div style={{ height }} className="flex items-center justify-center text-text-tertiary text-sm">
@@ -113,7 +123,15 @@ export default function MonteCarloChart({
 
   const chartData = buildChartData(data);
 
+  const hasPeer = data.peer_wealth?.some((v) => v != null);
+
   return (
+    <>
+    {hasPeer && (
+      <div className="mb-2">
+        <PeerCheckbox checked={showPeer} onChange={setShowPeer} />
+      </div>
+    )}
     <ResponsiveContainer width="100%" height={height}>
       <AreaChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
         <defs>
@@ -235,7 +253,12 @@ export default function MonteCarloChart({
           isAnimationActive={true}
           animationDuration={600}
         />
+        {showPeer && (
+          <Area type="monotone" dataKey="peer" name="peer" stroke={PEER_COLOR} strokeWidth={2}
+            strokeDasharray="6 4" fill="transparent" dot={false} isAnimationActive={false} />
+        )}
       </AreaChart>
     </ResponsiveContainer>
+    </>
   );
 }

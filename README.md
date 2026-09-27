@@ -186,10 +186,13 @@ brauchbare Zahl, bevor jemand 50 Felder ausfüllt:
 - **Schweizer Rentenberechnung** (Details: [Schweizer Rentenrechner](#schweizer-rentenrechner)):
   - AHV (Säule 1): Rentenformel mit 13. Rente, Bezug 63–70 (Vorbezug −6.8 %/Jahr, Aufschub mit Zuschlag)
   - BVG/Pensionskasse (Säule 2): Umwandlungssatz aus dem Vorsorgeausweis (sonst 5.3 %),
-    Bezug 58–70, Anteil als Kapital frei wählbar
-  - Säule 3a: Kapitalbezug pro Konto, automatischer Stufenplan (ein Konto pro Jahr)
+    Bezug 58–70, Anteil als Kapital frei wählbar, Teilpensionierung in bis zu drei Schritten
+  - Säule 3a: Kapitalbezug pro Konto, Bezugsjahr frei wählbar oder automatischer Stufenplan
+  - Säule 3b / Lebensversicherung: steuerfreie Auszahlung am Ablauf der Police
   - Steuer auf Kapitalbezüge: Bund exakt, Kanton/Gemeinde aus dem ESTV-Steuerrechner (26 Kantone)
+  - Steuern im Ruhestand: Einkommenssteuer auf Renten und Vermögensertrag, Vermögenssteuer
   - Auszahlphase: Vermögen nach der Pensionierung mit Ausgaben, Renten und Kapitalbezügen
+  - Vergleich Pensionskasse als Rente oder als Kapital (gleiche Märkte, bis 95)
 - Inflationsbereinigung (Standard: 1.5% CHF)
 - Szenario-Vergleich (Was-wäre-wenn-Analysen)
 - **Wirksame Szenarien**: Sparplan erhöhen, Frühpensionierung (inkl. AHV-Vorbezugskürzung
@@ -201,6 +204,12 @@ brauchbare Zahl, bevor jemand 50 Felder ausfüllt:
 ### Visualisierungen
 - **Sankey-Diagramm**: Cashflow — Einnahmen → Superkategorien → Sparen, wahlweise aus realen (importierten) oder empirischen (Wizard-)Daten
 - **Monte Carlo Fan-Chart**: Recharts AreaChart mit Perzentilbändern
+- **Rentenübersicht** (Prognose): Ansicht *Kapital und Vermögen* – Vorsorgekapital gestapelt bis
+  zum Bezug, Privat-/Anlagevermögen (Median) als einblendbare Linie – und Ansicht *Einkommen im
+  Ruhestand* – AHV, Pensionskassen-Rente und Entnahme aus dem Vermögen gegen die Ausgaben, dazu
+  die Linie *verfügbar*: Renten plus gleichbleibender Kapitalverzehr bis zur Lebenserwartung
+- **Vergleich Median Schweiz** als einblendbare Linie in Vermögensprognose, Rentenübersicht und
+  Ruhestandsplaner
 - **Finanzplan**: Gestapeltes Flächendiagramm (Rentenentwicklung 3 Säulen) mit Bezugsplan für Kapitalbezüge
 - Budget-Statusbalken pro Kategorie
 - Monatsübersicht Einnahmen vs. Ausgaben
@@ -623,12 +632,20 @@ Rentendiagramm über `/api/pension/estimate`):
   folgt Löhnen und Preisen und bleibt deshalb in heutigen Franken gleich.
 - **Pensionskasse:** Beiträge bis zum Rentenalter, danach feste Rente = Kapital × Umwandlungssatz.
   Die gesetzlichen 6.8 % gelten nur für den obligatorischen Teil; die meisten Kassen rechnen aufs
-  ganze Guthaben mit 5.0–5.6 %. Die Rente wird in der Regel nicht der Teuerung angepasst.
+  ganze Guthaben mit 5.0–5.6 %. Die Rente wird in der Regel nicht der Teuerung angepasst. Sie
+  beginnt mit dem Erwerbsende (frühestens 58).
+- **Teilpensionierung** (Art. 13a BVG): bis zu zwei Schritte vor dem Erwerbsende, je mit Alter,
+  Pensum danach und Kapitalanteil. Jeder Schritt gibt den Teil des Guthabens frei, um den das
+  Pensum sinkt; der Rest spart mit dem tieferen Pensum weiter. Höchstens drei Kapitalbezüge
+  inklusive Endbezug, der erste Schritt mindestens 20 %. Im Vermögen fehlt der Lohnausfall
+  (netto), die Teilrente kommt dazu.
 - **3a:** Ansparen bis zum Rentenalter, dann **Kapitalbezug pro Konto** (ein Konto lässt sich nur
   als Ganzes beziehen). Ohne eigenes Bezugsalter staffelt der Planer: ein Konto pro Jahr, so spät
   wie möglich, frühestens mit 60, spätestens mit 65 (bei Weiterarbeit bis 70), nie im Jahr des
   Pensionskassen-Kapitals.
-- **3b:** Ansparen bis zum Rentenalter, danach 20 Jahre Auszahlung mit 2 % Restverzinsung.
+- **3b / Lebensversicherung:** Die Ablaufleistung kommt am Ablauf der Police auf einmal ins freie
+  Vermögen (ohne Datum beim Erwerbsende), steuerfrei (rückkaufsfähige Versicherung mit laufender
+  Prämie). Als fester Betrag verliert sie bis dahin an realem Wert.
 - **Pensionskasse als Kapital:** frei wählbarer Anteil (0–100 %). Der Kapitalteil fliesst im
   Bezugsjahr nach Steuer ins freie Vermögen, der Rest wird Rente.
 - **Steuer auf Kapitalbezüge** (`services/capital_tax.py`): Bund exakt (ein Fünftel des Tarifs
@@ -638,14 +655,27 @@ Rentendiagramm über `/api/pension/estimate`):
   Alle Bezüge eines Jahres werden zusammen besteuert. Kanton und Tarif kommen aus dem Wizard.
 - **Bezugsbeginn je Säule:** AHV 63–70, Pensionskasse ab 58 (davor verzinst auf dem
   Freizügigkeitskonto; Umwandlungssatz −0.15 Prozentpunkte je Jahr vor 65, + je Jahr danach),
-  3a 60–70, 3b ab Rentenalter.
+  3a 60–70, 3b am Ablauf der Police.
 - **Vermögen nach der Pensionierung:** Die Sparrate endet mit dem Rentenalter. Danach werden die
   Lebenskosten entnommen, abzüglich der Renten, die schon fliessen. Frühpensionierte zahlen bis 65
   AHV-Beiträge als Nichterwerbstätige (aus Vermögen + 20 × Renteneinkommen, 530–26'500 CHF/Jahr).
   Die Anzeige zeigt, bis zu welchem Alter das Vermögen im Median reicht und in wie vielen
   Simulationen es bis zum Ende hält.
-- **Lebenskosten im Ruhestand:** eigene Angabe, sonst Ausgaben aus dem Wizard × Lebensstilfaktor
-  (0.8), sonst 80 % von (72 % des Bruttolohns − Sparrate).
+- **Lebenskosten im Ruhestand** (ohne Steuern): eigene Angabe, sonst Ausgaben aus dem Wizard ohne
+  den Posten „Direkte Steuern“ × Lebensstilfaktor (0.8), sonst 80 % von (72 % des Bruttolohns −
+  Sparrate).
+- **Steuern im Ruhestand** (`services/retirement_tax.py`): Einkommenssteuer auf Renten plus 2 %
+  Vermögensertrag, dazu die Vermögenssteuer – Bund, Kanton und Gemeinde für den Kantonshauptort
+  aus dem ESTV-Steuerrechner 2026 (`services/data/income_tax_2026.json`), je Simulation vom
+  Vermögen abgezogen.
+- **Vergleich mit dem Median:** einblendbare Linie in Vermögensprognose, Rentenübersicht und
+  Ruhestandsplaner – Median des freien Vermögens im selben Alter (Steuerdaten Kanton Luzern 2020,
+  LUSTAT, als Näherung; eine schweizweite Statistik nach Alter gibt es nicht), dazu der Median der
+  Neurenten 2024 (BFS) bei der Rentenübersicht.
+- **Rente oder Kapital:** Vergleich der Pensionskasse ganz als Rente, ganz als Kapital (nach Steuer
+  im Anlagevermögen weiter angelegt) und des eigenen Plans – dieselben Märkte, bis 95: freies
+  Vermögen im Median und bei schlechten Märkten, Vermögen mit 85/90, Steuern, und ab welchem
+  Alter die Rente vorne liegt.
 - **Szenarien:** Frühpensionierung = dieselbe Rechnung mit früherem Rentenalter (lebenslang). Pflege
   ab 80 ersetzt 60 % der normalen Lebenskosten.
 - Noch nicht abgebildet: Plafonierung für Ehepaare, Kapitalbezüge des Ehepartners im selben Jahr,

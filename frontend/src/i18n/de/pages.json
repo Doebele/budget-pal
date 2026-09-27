@@ -27,7 +27,7 @@
     "assetBond": "Obligationen",
     "assetPension": "Pensionskasse",
     "assetOther": "Sonstiges",
-    "estimateNote": "Ab {{age}} (AHV ab {{ahvAge}}), in heutigen Franken, inkl. 13. AHV-Rente; Pensionskasse mit Umwandlungssatz {{rate}} %, 3a/3b über 20 Jahre verteilt."
+    "estimateNote": "Ab {{age}} (AHV ab {{ahvAge}}), in heutigen Franken, inkl. 13. AHV-Rente; Pensionskasse mit Umwandlungssatz {{rate}} %. 3a und Lebensversicherung werden als Kapital bezogen (Bezugsplan)."
   },
   "dashboard": {
     "topExpenseCategories": "Top Ausgaben-Kategorien",
@@ -342,7 +342,20 @@
     "pensionOnly": "nur Rente",
     "bvgCapitalShareHint": "Anteil des Pensionskassenguthabens, den Sie als Kapital beziehen – mindestens 25 % des obligatorischen Teils sind gesetzlich möglich, viele Kassen erlauben 100 %. Die Kasse verlangt meist eine Anmeldung Monate bis Jahre im Voraus; nach einem Einkauf gilt eine Sperrfrist von 3 Jahren.",
     "withdrawalAge": "Bezug mit",
-    "withdrawalAuto": "automatisch ({{age}})"
+    "withdrawalAuto": "automatisch ({{age}})",
+    "bvgStart": "Die Pensionskasse zahlt ab dem Erwerbsende (mit {{age}}), frühestens mit 58. Wer vorher das Pensum reduziert, plant eine Teilpensionierung.",
+    "bvgFinalShare": "Kapital beim Endbezug",
+    "partialTitle": "Teilpensionierung (optional)",
+    "partialHint": "Wer das Pensum vor dem Erwerbsende schrittweise reduziert, bezieht bei jedem Schritt den entsprechenden Teil der Pensionskasse – als Rente, als Kapital oder gemischt. Gesetzlich (Art. 13a BVG): höchstens drei Kapitalbezüge inklusive Endbezug, der erste Schritt mindestens 20 %, mindestens ein Jahr Abstand. Ab 63 muss jede Kasse das anbieten, früher nur, wenn ihr Reglement es erlaubt. Staffeln lohnt sich steuerlich, wenn die Schritte nicht ins Jahr eines 3a-Bezugs fallen.",
+    "partialAdd": "Schritt hinzufügen",
+    "partialAge": "Ab Alter",
+    "partialPensum": "Pensum danach",
+    "partialCapital": "Davon als Kapital",
+    "partialRemove": "Entfernen",
+    "partialInvalid": "Ungültig: Alter aufsteigend, zwischen 58 und dem Erwerbsende ({{age}}), Pensum sinkend, der erste Schritt mindestens 20 %.",
+    "partialStep": "Mit {{age}}: {{released}} frei, davon {{capital}} Kapital, Rente {{pension}}/Mo (Pensum danach {{pensum}} %)",
+    "partialFinal": "Mit {{age}} (Erwerbsende): {{released}} frei, davon {{capital}} Kapital, Rente {{pension}}/Mo",
+    "lvPayout": "Auszahlung mit {{age}} ({{year}}) auf einmal, steuerfrei: {{amount}} in heutigen Franken"
   },
   "step5": {
     "s00": "Alltag & Abonnements",
@@ -745,7 +758,7 @@
     "simulationParams": "Simulationsparameter",
     "bvgModelValue": "Kapital × Umwandlungssatz ÷ 12",
     "retirementSpendingLabel": "Ausgaben im Ruhestand (CHF/Monat)",
-    "retirementSpendingHint": "Leer = aus Ihren Angaben geschätzt, in heutigen Franken inkl. Steuern",
+    "retirementSpendingHint": "Leer = aus Ihren Angaben geschätzt, in heutigen Franken ohne Steuern – die Steuern im Ruhestand rechnet die App.",
     "pensionFromAge": "ab {{age}}, wenn alle Säulen zahlen",
     "afterSpending": "nach Ausgaben von {{amount}}/Monat",
     "wealthLasts": "Vermögen reicht",
@@ -754,7 +767,8 @@
     "successRate": "in {{pct}} % der Simulationen bis zum Ende",
     "wealthDepletes": "Freies Vermögen im Median aufgebraucht mit {{age}}",
     "wealthHolds": "Freies Vermögen reicht im Median über {{age}} hinaus",
-    "spendingUsed": "gerechnet mit Ausgaben von {{amount}}/Monat"
+    "spendingUsed": "gerechnet mit Ausgaben von {{amount}}/Monat",
+    "afterSpendingTax": "nach Ausgaben von {{amount}} und Steuern von {{tax}} pro Monat"
   },
   "health": {
     "savingsRate": "Sparquote",
@@ -795,7 +809,6 @@
     "savingsRateVsPeer": "{{pct}} % — Vergleichsgruppe {{peer}} %"
   },
   "hints": {
-    "pensionChartHint": "Vor dem Rentenalter ({{age}}): AHV = 0; BVG, 3a und 3b zeigen das projizierte Kapital. Ab dann wird nichts mehr einbezahlt: Die BVG-Rente (Kapital × Umwandlungssatz) bleibt in Franken gleich und verliert real an Wert, 3a/3b werden über 20 Jahre mit 2 % Restverzinsung ausbezahlt und enden dann. Die Pensionskasse zahlt frühestens mit 58 (Kapital bis dahin auf dem Freizügigkeitskonto), die 3a zwischen 60 und 70. Die AHV fliesst frühestens mit 63 (Vorbezug −6.8 % je Jahr, Aufschub bis 70 mit Zuschlag), inklusive 13. Rente, und bleibt in heutigen Franken gleich, weil sie der Lohn- und Preisentwicklung folgt. Beitragsjahre werden bis zum Rentenbeginn fortgeschrieben (max. 44). Die AHV-Rente folgt der Rentenformel der Ausgleichskasse; massgebend ist Ihr individueller Kontoauszug.",
     "saronHint": "Referenzwert zur Darstellung von SARON-Hypotheken (kein Live-Tageszins). Quelle und Details:",
     "birthdate": "Geburtsdatum",
     "yearsOld": "{{age}} Jahre",
@@ -857,7 +870,7 @@
     "estimateBody": "Vier Schritte: Profil, Einkommen, Wohnen und Alltag mit Abos. Deine eigene Einschätzung — sie darf auch Dinge enthalten, die es in keinem Kontoauszug gibt."
   },
   "plan": {
-    "title": "Bezugsplan Kapital (Pensionskasse, 3a)",
+    "title": "Bezugsplan Kapital (Pensionskasse, 3a, Lebensversicherung)",
     "when": "Alter (Jahr)",
     "what": "Bezug",
     "amount": "Betrag",
@@ -869,6 +882,58 @@
     "p3a": "Säule 3a – {{label}}",
     "saving": "Die Staffelung spart rund {{amount}} Steuern gegenüber einem Bezug aller Kapitalien im selben Jahr.",
     "rules": "Ein 3a-Konto lässt sich nur als Ganzes beziehen – darum ein Konto pro Jahr, frühestens mit 60, spätestens mit 65 (bei Weiterarbeit bis 70), nie im Jahr des Pensionskassen-Kapitals. Bei Ehepaaren werden die Bezüge beider Partner im selben Jahr zusammengezählt. Steuer: Bund exakt (ein Fünftel des Tarifs 2026), Kanton und Gemeinde für den Kantonshauptort laut ESTV-Steuerrechner, ohne Kirchensteuer; in heutigen Franken. Keine Steuerberatung.",
-    "p3aCard": "Kapital netto nach Steuer, gestaffelt bezogen"
+    "p3aCard": "Kapital netto nach Steuer, gestaffelt bezogen",
+    "bvgPartial": "Pensionskasse – Teilpensionierung, Pensum danach {{pensum}} % ({{label}})",
+    "p3b": "Säule 3b – {{label}}",
+    "taxFree": "steuerfrei",
+    "p3bCard": "am Ablauf der Police, steuerfrei",
+    "rulesExtra": "Pensionskasse: bei einer Teilpensionierung höchstens drei Kapitalbezüge (Art. 13a BVG). Lebensversicherung (3b, laufende Prämie): am Ablauf einkommenssteuerfrei."
+  },
+  "overview": {
+    "viewCapital": "Kapital und Vermögen",
+    "viewIncome": "Einkommen im Ruhestand",
+    "showWealth": "Privat-/Anlagevermögen einblenden",
+    "bvgCapital": "Pensionskasse (Guthaben)",
+    "p3a": "Säule 3a",
+    "p3b": "Säule 3b / Lebensversicherung",
+    "wealth": "Privat-/Anlagevermögen (Median)",
+    "retirement": "Pensionierung",
+    "ahv": "AHV",
+    "bvgPension": "Pensionskassen-Rente",
+    "fromWealth": "aus dem Vermögen",
+    "gap": "ungedeckt",
+    "spending": "Ausgaben",
+    "capitalHint": "Die Flächen zeigen das Vorsorgekapital: die Pensionskasse bis zum Endbezug (Teilbezüge verkleinern sie früher), 3a und Lebensversicherung bis zu ihrem Bezug. Was als Rente weiterläuft, steht in der Ansicht Einkommen. Kapitalbezüge fliessen nach Steuer ins Privat-/Anlagevermögen und werden dort mit der gewählten Rendite weiter angelegt – die Linie ist der Median aller Simulationen, nach Ausgaben und Renten. Alles in heutigen Franken.",
+    "incomeHint": "Pro Monat ab der Pensionierung, in heutigen Franken: AHV (frühestens mit 63, inkl. 13. Rente) und Pensionskassen-Rente (fester Frankenbetrag, verliert real an Wert). Die rote Linie ist der Bedarf: Ausgaben plus Einkommens- und Vermögenssteuer im Ruhestand. Den Rest trägt das Vermögen, solange es im Median reicht; danach bleibt eine Lücke. Die grüne Linie zeigt, was monatlich verfügbar wäre: Renten plus ein gleichbleibender Verzehr des Privat-/Anlagevermögens bis zur Lebenserwartung – inklusive späterer Kapitalbezüge (3a, Lebensversicherung), bei realer Median-Rendite. Liegt sie über dem Bedarf, bleibt Spielraum.",
+    "available": "verfügbar: Renten + Kapitalverzehr bis {{age}}",
+    "drawdownTotal": "Mit Kapitalverzehr bis {{age}}: {{amount}} pro Monat verfügbar",
+    "spendingTax": "Ausgaben + Steuern"
+  },
+  "bvgCompare": {
+    "title": "Pensionskasse: Rente oder Kapital?",
+    "subtitle": "Dieselbe Prognose dreimal, mit denselben Märkten: ganz als Rente, ganz als Kapital (nach Steuer im Anlagevermögen weiter angelegt) und Ihr eigener Plan. Freies Vermögen in heutigen Franken, bis 95.",
+    "pension": "100 % Rente",
+    "capital": "100 % Kapital",
+    "own": "Ihr Plan",
+    "showBad": "Schlechte Märkte einblenden (10 % der Simulationen)",
+    "atAge": "Alter {{age}}",
+    "breakeven": "Ab {{age}} hinterlässt die Rente im Median mehr freies Vermögen als das Kapital – wer älter wird, fährt mit der Rente besser.",
+    "noBreakeven": "Bis {{age}} bleibt das Kapital im Median vorne – die Rente holt es in diesem Zeitraum nicht ein.",
+    "rowPension": "Pensionskassen-Rente pro Monat",
+    "rowCapital": "Kapital nach Steuer",
+    "rowWealth85": "Freies Vermögen mit 85 (Median)",
+    "rowWealth85Bad": "mit 85 bei schlechten Märkten",
+    "rowWealth90": "Freies Vermögen mit 90 (Median)",
+    "rowLasts": "Vermögen reicht",
+    "lastsAll": "bis 95",
+    "rowSuccess": "Simulationen mit Vermögen bis 95",
+    "rowTaxes": "Steuern gesamt (Kapital + Ruhestand)",
+    "explain": "Rente: lebenslang und garantiert, auch wenn Sie sehr alt werden; Ehepartner erhalten meist 60 % als Hinterlassenenrente; sie ist voll als Einkommen steuerbar und wird nicht der Teuerung angepasst. Kapital: einmal zum reduzierten Satz besteuert, frei verfügbar und vererbbar, trägt aber das Anlagerisiko und das Risiko eines langen Lebens. Viele wählen einen Mix. Beachten Sie die Anmeldefrist Ihrer Kasse für den Kapitalbezug und die Sperrfrist von 3 Jahren nach einem Einkauf. Steuern: Einkommens- und Vermögenssteuer laut ESTV-Steuerrechner für den Kantonshauptort, 2 % Vermögensertrag als Einkommen, ohne Kirchensteuer. Keine Finanz- oder Steuerberatung."
+  },
+  "peer": {
+    "toggle": "Median Schweiz einblenden (gleiches Alter)",
+    "line": "Median Schweiz (freies Vermögen)",
+    "hint": "Median des freien Vermögens von Haushalten im selben Alter, ohne Pensionskasse und 3a. Quelle: Steuerdaten Kanton Luzern 2020 (LUSTAT) als Näherung – eine schweizweite Statistik nach Alter gibt es nicht, die ESTV erhält keine Altersangaben. Paare × 1.5 (Äquivalenzskala), Werte bis 74.",
+    "pensions": "Zum Vergleich, Median der Neurenten 2024 (BFS): Pensionskassen-Rente {{menMonthly}} (Männer) bzw. {{womenMonthly}} (Frauen) pro Monat, Kapitalbezug {{menCapital}} bzw. {{womenCapital}}."
   }
 }

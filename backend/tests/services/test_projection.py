@@ -11,6 +11,7 @@ import numpy as np
 import pytest
 from app.services.projection import (
     BVG_CONTRIBUTION_RATES,
+    bvg_steps,
     ProjectionService,
     build_annual_flows,
 )
@@ -408,34 +409,22 @@ class TestBVGProjection:
 
     def test_bvg_after_retirement_conversion(self):
         """Test BVG conversion to annual pension after retirement."""
-        pension_value = self.service._project_bvg(
-            age_at_year=66,
-            retirement_age=65,
-            record={
-                "current_balance": 200000.0,
-                "annual_contribution": 8000.0,
-                "expected_return_rate": 0.04,
-            },
-            annual_income=80000.0,
-            years_elapsed=0,
+        steps, _ = bvg_steps(
+            {"current_balance": 200000.0, "annual_contribution": 8000.0, "expected_return_rate": 0.04},
+            annual_income=80000.0, current_age=65, retirement_age=65,
         )
+        pension_value = steps[-1]["pension"]
 
         # Should apply conversion rate (0.068)
         assert pension_value > 0.0
 
     def test_bvg_zero_balance(self):
         """Test BVG with zero initial balance."""
-        pension_value = self.service._project_bvg(
-            age_at_year=66,
-            retirement_age=65,
-            record={
-                "current_balance": 0.0,
-                "annual_contribution": 0.0,
-                "expected_return_rate": 0.01,
-            },
-            annual_income=30000.0,  # Low salary
-            years_elapsed=0,
+        steps, _ = bvg_steps(
+            {"current_balance": 0.0, "annual_contribution": 0.0, "expected_return_rate": 0.01},
+            annual_income=30000.0, current_age=65, retirement_age=65,  # Low salary
         )
+        pension_value = steps[-1]["pension"]
 
         # Should still have some value from contributions
         assert pension_value >= 0.0
@@ -554,13 +543,14 @@ class TestPillar3bProjection:
 
     def test_3b_zero_balance(self):
         """Test 3b with zero balance and contributions."""
-        value = self.service._project_3b(
+        value = self.service._project_3a(
             age_at_year=50,
             retirement_age=65,
             record={
                 "current_balance": 0.0,
                 "annual_contribution": 0.0,
                 "expected_return_rate": 0.0,
+                "withdrawal_age": 65,
             },
             years_elapsed=5,
         )

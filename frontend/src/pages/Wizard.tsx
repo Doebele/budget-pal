@@ -140,6 +140,8 @@ interface WizardData {
   bvgUmwandlungssatz: number;
   /** Anteil der Pensionskasse, der als Kapital bezogen wird, in Prozent. */
   bvgKapitalanteil: number;
+  /** Teilpensionierung vor dem Erwerbsende, Prozentwerte wie die Regler. */
+  bvgTeilpensionierung: PartialRetirementStep[];
   pillar3aAccounts: Pillar3aAccount[];
   hasLifeInsurance: boolean;
   lifeInsuranceType: "kapital" | "risiko" | "gemischt";
@@ -230,6 +232,7 @@ const DEFAULT_WIZARD_DATA: WizardData = {
   bvgRentenalter: 65,
   bvgUmwandlungssatz: 5.3,
   bvgKapitalanteil: 0,
+  bvgTeilpensionierung: [],
   pillar3aAccounts: [{ provider: "VIAC", balance: 20_000, annualContribution: 7_258, strategy: "funds" }],
   hasLifeInsurance: false,
   lifeInsuranceType: "kapital",
@@ -292,6 +295,40 @@ function healthInsuranceMonthly(data: WizardData): number {
  * mit derselben Funktion wie das Rentendiagramm. Vorher rechnete der Wizard
  * eine eigene Kopie und zeigte andere Zahlen.
  */
+interface PartialRetirementStep {
+  alter: number;
+  /** Pensum danach, Prozent. */
+  pensum: number;
+  /** Anteil des frei werdenden Guthabens als Kapital, Prozent. */
+  kapitalanteil: number;
+}
+
+/** Dieselben Regeln wie das Backend (Art. 13a BVG): hoechstens zwei
+ *  Teilschritte vor dem Erwerbsende, ab 58, Alter steigend, Pensum sinkend,
+ *  der erste Schritt mindestens 20 %. */
+function partialStepsValid(steps: PartialRetirementStep[], retirementAge: number): boolean {
+  let lastAge = 57;
+  let lastPensum = 100;
+  for (const s of steps) {
+    if (s.alter <= lastAge || s.alter >= retirementAge || s.pensum <= 0 || s.pensum >= lastPensum) return false;
+    lastAge = s.alter;
+    lastPensum = s.pensum;
+  }
+  return steps.length <= 2 && (steps.length === 0 || steps[0].pensum <= 80);
+}
+
+/** Nur gueltige Schritte gehen an den Server — sonst rechnet er ohne. */
+function validPartialSteps(data: WizardData): PartialRetirementStep[] {
+  const steps = data.bvgTeilpensionierung ?? [];
+  return partialStepsValid(steps, data.zielRentenalter) ? steps : [];
+}
+
+/** Alter bei Ablauf der Lebensversicherung (Kalenderjahr minus Geburtsjahr). */
+function lifeInsuranceAge(data: WizardData): number | null {
+  const year = Number(data.lifeInsuranceAblauf?.slice(0, 4));
+  return year ? year - data.geburtsjahr : null;
+}
+
 function usePensionEstimate(data: WizardData, retirementAge: number): PensionEstimate | undefined {
   const input = {
     current_age: new Date().getFullYear() - data.geburtsjahr,
@@ -302,6 +339,14 @@ function usePensionEstimate(data: WizardData, retirementAge: number): PensionEst
     bvg_annual_contribution: data.bvgJahresbeitrag,
     bvg_conversion_rate: (data.bvgUmwandlungssatz ?? 5.3) / 100,
     bvg_capital_share: (data.bvgKapitalanteil ?? 0) / 100,
+    bvg_partial_steps: validPartialSteps(data).map((s) => ({
+      age: s.alter, pensum: s.pensum / 100, capital_share: s.kapitalanteil / 100,
+    })),
+    // Nur Kapital- und gemischte Policen haben eine Ablaufleistung
+    pillar_3b:
+      data.hasLifeInsurance && data.lifeInsuranceType !== "risiko" && data.lifeInsuranceLeistung > 0
+        ? [{ balance: data.lifeInsuranceLeistung, provider: "Lebensversicherung", withdrawal_age: lifeInsuranceAge(data) }]
+        : [],
     pillar_3a: data.pillar3aAccounts.map((a, i) => ({
       balance: a.balance,
       annual_contribution: a.annualContribution,
@@ -322,6 +367,78 @@ function usePensionEstimate(data: WizardData, retirementAge: number): PensionEst
     staleTime: 60_000,
   });
   return estimate;
+}
+
+// ── Teilpensionierung ──────────────────────────────────────────
+
+function PartialRetirement({ data, update }: { data: WizardData; update: (p: Partial<WizardData>) => void }) {
+  const { t } = useTranslation();
+  const steps = data.bvgTeilpensionierung ?? [];
+  const set = (next: PartialRetirementStep[]) => update({ bvgTeilpensionierung: next });
+  const change = (i: number, patch: Partial<PartialRetirementStep>) =>
+    set(steps.map((s, j) => (j === i ? { ...s, ...patch } : s)));
+  const add = () => {
+    const last = steps[steps.length - 1];
+    set([
+      ...steps,
+      last
+        ? { alter: Math.min(last.alter + 1, 69), pensum: Math.max(10, last.pensum - 20), kapitalanteil: 0 }
+        : { alter: Math.max(58, data.zielRentenalter - 2), pensum: 60, kapitalanteil: 0 },
+    ]);
+  };
+
+  return (
+    <div className="border border-white/8 rounded-md p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-text-primary text-sm font-medium">{t("pages:wizard.partialTitle")}</p>
+        {steps.length < 2 && (
+          <button type="button" className="text-accent text-xs hover:text-accent/80" onClick={add}>
+            {t("pages:wizard.partialAdd")}
+          </button>
+        )}
+      </div>
+      <p className="text-text-tertiary text-xs leading-relaxed">{t("pages:wizard.partialHint")}</p>
+      {steps.map((s, i) => (
+        <div key={i} className="grid grid-cols-1 gap-3 sm:grid-cols-4 sm:items-end">
+          <Field label={t("pages:wizard.partialAge")}>
+            <select className="input" value={s.alter} onChange={(e) => change(i, { alter: Number(e.target.value) })}>
+              {Array.from({ length: 12 }, (_, k) => 58 + k).map((age) => (
+                <option key={age} value={age}>{age}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label={t("pages:wizard.partialPensum")}>
+            <select className="input" value={s.pensum} onChange={(e) => change(i, { pensum: Number(e.target.value) })}>
+              {[90, 80, 70, 60, 50, 40, 30, 20, 10].map((p) => (
+                <option key={p} value={p}>{p} %</option>
+              ))}
+            </select>
+          </Field>
+          <Field label={t("pages:wizard.partialCapital")}>
+            <select
+              className="input"
+              value={s.kapitalanteil}
+              onChange={(e) => change(i, { kapitalanteil: Number(e.target.value) })}
+            >
+              {[0, 25, 50, 75, 100].map((c) => (
+                <option key={c} value={c}>{c === 0 ? t("pages:wizard.pensionOnly") : `${c} %`}</option>
+              ))}
+            </select>
+          </Field>
+          <button
+            type="button"
+            className="text-loss text-xs hover:text-loss/80 text-left sm:pb-2"
+            onClick={() => set(steps.filter((_, j) => j !== i))}
+          >
+            {t("pages:wizard.partialRemove")}
+          </button>
+        </div>
+      ))}
+      {!partialStepsValid(steps, data.zielRentenalter) && (
+        <p className="text-loss text-xs">{t("pages:wizard.partialInvalid", { age: data.zielRentenalter })}</p>
+      )}
+    </div>
+  );
 }
 
 // ── Section wrapper ────────────────────────────────────────────
@@ -1440,13 +1557,14 @@ function Step6({ data, update }: { data: WizardData; update: (p: Partial<WizardD
 
 function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardData>) => void }) {
   const { t } = useTranslation();
-  const estimate = usePensionEstimate(data, data.bvgRentenalter);
+  const estimate = usePensionEstimate(data, data.zielRentenalter);
   const ahvRente = Math.round(estimate?.ahv_monthly ?? 0);
   const bvgKapital = Math.round(estimate?.bvg_capital ?? 0);
   const bvgRente = Math.round(estimate?.bvg_monthly ?? 0);
   const umwandlungssatz = data.bvgUmwandlungssatz ?? 5.3;
 
   const pillar3aTotal = data.pillar3aAccounts.reduce((sum, a) => sum + a.balance, 0);
+  const lifeInsurancePayout = estimate?.capital_withdrawals.find((w) => w.source === "3b");
 
   function updateAccount(idx: number, partial: Partial<Pillar3aAccount>) {
     const next = data.pillar3aAccounts.map((a, i) => (i === idx ? { ...a, ...partial } : a));
@@ -1510,7 +1628,7 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
               <p className="text-text-tertiary text-xs">{t("pages:wizard.w07")}</p>
               <p className="text-text-primary font-mono font-semibold text-xl mt-0.5">{chf(ahvRente)}</p>
               <p className="text-text-tertiary text-xs mt-0.5">
-                {t("pages:wizard.ahvFromAge", { age: estimate?.ahv_start_age ?? data.bvgRentenalter })}
+                {t("pages:wizard.ahvFromAge", { age: estimate?.ahv_start_age ?? data.zielRentenalter })}
               </p>
             </div>
             <div className="text-right">
@@ -1550,7 +1668,16 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
             />
           </Field>
 
-          <Field label={t("pages:wizard.bvgCapitalShare")} hint={t("pages:wizard.bvgCapitalShareHint")}>
+          <p className="text-text-tertiary text-xs leading-relaxed">
+            {t("pages:wizard.bvgStart", { age: estimate?.bvg_start_age ?? data.zielRentenalter })}
+          </p>
+
+          <PartialRetirement data={data} update={update} />
+
+          <Field
+            label={t(data.bvgTeilpensionierung?.length ? "pages:wizard.bvgFinalShare" : "pages:wizard.bvgCapitalShare")}
+            hint={t("pages:wizard.bvgCapitalShareHint")}
+          >
             <Slider
               value={data.bvgKapitalanteil ?? 0}
               min={0}
@@ -1561,19 +1688,9 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
             />
           </Field>
 
-          <Field label={t("pages:wizard.w128")}>
-            <Slider
-              value={data.bvgRentenalter}
-              min={63}
-              max={70}
-              onChange={(v) => update({ bvgRentenalter: v })}
-              format={(v) => t("pages:wizard.years", { count: v })}
-            />
-          </Field>
-
           <div className="bg-white/3 rounded-md p-3 grid grid-cols-2 gap-4">
             <div>
-              <p className="text-text-tertiary text-xs">Kapital bei {data.bvgRentenalter}</p>
+              <p className="text-text-tertiary text-xs">Kapital bei {estimate?.bvg_start_age ?? data.zielRentenalter}</p>
               <p className="text-accent font-mono font-semibold text-lg mt-0.5">{chf(bvgKapital)}</p>
             </div>
             <div>
@@ -1584,6 +1701,21 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
               </p>
             </div>
           </div>
+          {estimate && estimate.bvg_steps.length > 1 && (
+            <ul className="text-text-tertiary text-xs space-y-1">
+              {estimate.bvg_steps.map((s) => (
+                <li key={s.age}>
+                  {t(s.pensum > 0 ? "pages:wizard.partialStep" : "pages:wizard.partialFinal", {
+                    age: s.age,
+                    released: chf(s.released),
+                    capital: chf(s.capital),
+                    pension: chf(s.pension_monthly),
+                    pensum: Math.round(s.pensum * 100),
+                  })}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
 
@@ -1732,6 +1864,15 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
             />
           </Field>
         </div>
+        {lifeInsurancePayout && (
+          <p className="text-text-tertiary text-xs mt-3">
+            {t("pages:wizard.lvPayout", {
+              age: lifeInsurancePayout.age,
+              year: lifeInsurancePayout.year,
+              amount: chf(lifeInsurancePayout.amount),
+            })}
+          </p>
+        )}
       </ToggleCard>
     </div>
   );
@@ -2158,6 +2299,7 @@ export default function Wizard() {
 
       await api.post("/wizard/complete", {
         ...wizardData,
+        bvgTeilpensionierung: validPartialSteps(wizardData),
         propertyAssetDebt: syncedPropertyDebt,
         propertyValue: syncedPropertyValue,
         outstandingDebt: syncedOutstandingDebt,

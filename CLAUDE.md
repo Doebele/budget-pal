@@ -219,8 +219,8 @@ hooks/
 
 components/
   transactions/   # TransactionOverviewHeader (bulk archive modal), DeletedTransactionsView
-  charts/         # MonteCarloChart (Recharts), SankeyChart / CategoryGaugeChart /
-                  # BudgetStackedBarChart (ECharts)
+  charts/         # MonteCarloChart, PensionOverviewChart (Recharts), SankeyChart /
+                  # CategoryGaugeChart / BudgetStackedBarChart (ECharts)
   wizard/         # Multi-step onboarding wizard components
   layout/         # LoadingScreen, navigation shell
 ```
@@ -247,20 +247,44 @@ Central definition of all 11 supercategories (wohnen, essen, mobilitaet, versich
 - BVG (Pillar 2): contributions stop at retirement; pension = capital at retirement ×
   `pension_data.conversion_rate` (from the certificate) or `BVG_CONVERSION_RATE_DEFAULT` (5.3 %).
   The legal 6.8 % only applies to the mandatory part. Fixed in nominal CHF after retirement.
+  Partial retirement (`pension_data.partial_steps`, Art. 13a BVG: at most two steps before the
+  final one, first ≥ 20 %): each step releases the share the workload drops by, as capital
+  and/or pension; the rest keeps saving at the lower workload. `bvg_steps()` is the one place
+  that walks the BVG year by year; the wealth path loses the missing salary
+  (`NET_INCOME_SHARE`) and gains the partial pension.
 - Pillar 3a: contributions stop at retirement; each account is withdrawn **as capital** at its
   `withdrawal_age` or at the staggered age from `plan_3a_ages` (one account per year, latest
   first, never in the BVG capital year). The series holds the balance until then, 0 after.
   Max `PILLAR_3A_MAX_CONTRIBUTION` CHF/year.
-- Pillar 3b: contributions stop at retirement, then a fixed payout for `PAYOUT_YEARS`, then 0.
-- Capital withdrawals (`ProjectionService.capital_withdrawals`: BVG `capital_share` + 3a) are
+- Pillar 3b / life insurance: paid out **as capital** at `withdrawal_age` (policy expiry; the
+  wizard derives it from the expiry date), else at retirement — tax-free. `current_balance` is
+  the fixed maturity sum (return 0), so it loses real value until then.
+- Capital withdrawals (`ProjectionService.capital_withdrawals`: BVG steps + 3a + 3b) are
   taxed per calendar year by `services/capital_tax.py` (federal tariff 2026 exact, cantonal from
-  ESTV data for the cantonal capital) and flow into free wealth net of tax.
-- Payout starts per pillar (`payout_start_ages`): AHV 63-70, BVG 58-70 (conversion rate
+  ESTV data for the cantonal capital; `TAXED_SOURCES` excludes 3b) and flow into free wealth.
+- Payout starts (`payout_start_ages`): AHV 63-70, BVG final step 58-70 (conversion rate
   ±`BVG_CONVERSION_STEP` per year vs. 65), 3a 60-70. Before its start a series holds *capital*,
-  not income — use `pension_income()` for cash flows, never the raw sum of the series.
+  not income — use `pension_income` from `run()` for cash flows (AHV + BVG pensions incl.
+  partial ones), never the raw sum of the series. For charts `run()` also returns the BVG
+  split: `capital_bvg` (balance until the final step, then 0) and `income_bvg`, plus
+  `capital_drawdown`: one constant real amount from retirement that uses up the median wealth
+  at retirement plus later capital withdrawals by `drawdown_until_age` (life expectancy).
 - Wealth path (`ProjectionService.run`): savings only until retirement, then pensions minus
-  `retirement_spending` (plus AHV non-employed contributions until 65); floored at 0. Early
-  retirement is just an earlier `retirement_age` — no special window logic.
+  `retirement_spending` (plus AHV non-employed contributions until 65) minus taxes in
+  retirement; floored at 0. Early retirement is just an earlier `retirement_age` — no special
+  window logic.
+- Taxes in retirement (`services/retirement_tax.py`, ESTV data `data/income_tax_2026.json`):
+  income tax on pensions + 2 % investment yield of free wealth, plus wealth tax — per run,
+  because they depend on wealth. `retirement_spending` is therefore **without** taxes: the
+  wizard's "Direkte Steuern" budget is subtracted (`monthly_taxes` in the scenario, else
+  `wizard_data_json.direkteSteuern`). `tax_in_retirement=False` switches it off (tests of
+  other flows).
+- Comparison with the Swiss median (`services/swiss_medians.py`): `run()` returns
+  `peer_wealth` (median free wealth at the same age, LUSTAT tax data canton of Lucerne 2020 as a
+  proxy — no Swiss-wide statistic by age exists; couples × 1.5; None outside 18–74) and
+  `peer_pensions` (BFS new pensions 2024). The charts show it via `PeerCheckbox` (off by default).
+- Pension or lump sum (`compare_bvg_options`, `POST /projections/compare-bvg`): the same
+  projection with BVG 0 % / 100 % capital (and the own plan), same `seed`, until 95.
 - One calculation: Wizard and Finanzplan call `/api/pension/estimate`
   (`ProjectionService.estimate_at_retirement`) — never re-implement pension math in the frontend.
 - All monetary projections are inflation-adjusted using `SWISS_INFLATION_RATE` (default 1.5%)

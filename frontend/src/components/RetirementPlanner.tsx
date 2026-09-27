@@ -12,6 +12,7 @@
  */
 import { clsx } from "clsx";
 import { useState } from "react";
+import PeerCheckbox, { PEER_COLOR, peerK } from "@/components/charts/PeerCheckbox";
 import { useQuery } from "@tanstack/react-query";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -46,6 +47,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
   const { t } = useTranslation();
   const [retirementAge, setRetirementAge] = useState(65);
   const [annualIncome, setAnnualIncome] = useState(90_000);
+  const [showPeer, setShowPeer] = useState(false);
   const [meanReturn, setMeanReturn] = useState(0.07);
   // Lebenskosten im Ruhestand pro Monat; null = der Server schaetzt sie
   const [spendingMonthly, setSpendingMonthly] = useState<number | null>(null);
@@ -84,24 +86,27 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
     : (yearsToRetirement > 0 ? Math.min(yearsToRetirement, (projection?.years?.length ?? 0) - 1) : 0);
   const wealthAtRetirement = projection?.p50?.[retirementIdx] ?? 0;
 
-  // Renten ab dem Jahr, in dem alle Saeulen zahlen (AHV frühestens mit 63,
-  // BVG ab 58). Vor dem Bezugsbeginn stehen in den Reihen Kapitalien. Die 3a
-  // zahlt keine Rente — sie wird als Kapital bezogen (Bezugsplan unten).
+  // Renten ab dem Jahr, in dem AHV (frühestens mit 63) und Pensionskasse
+  // zahlen. Die BVG-Rente kommt aus pension_income (auch Teilrenten), die
+  // Reihe pension_bvg haelt vor dem Endbezug das Kapital. 3a und 3b werden als
+  // Kapital bezogen (Bezugsplan unten).
   const starts = projection?.payout_start_idx;
   const lastIdx = (projection?.years?.length ?? 1) - 1;
   const fullIdx = Math.min(
-    starts ? Math.max(starts["1"], starts["2"], starts["3b"], retirementIdx) : retirementIdx,
+    starts ? Math.max(starts["1"], starts["2"], retirementIdx) : retirementIdx,
     Math.max(lastIdx, 0),
   );
-  const paying = (pillar: "1" | "2" | "3b", idx: number) => !starts || idx >= starts[pillar];
-  const ahvMonthly       = (projection?.pension_ahv?.[fullIdx] ?? 0) / 12;
-  const bvgMonthly       = (projection?.pension_bvg?.[fullIdx] ?? 0) / 12;
-  const pillar3bMonthly  = paying("3b", fullIdx) ? (projection?.pension_3b?.[fullIdx] ?? 0) / 12 : 0;
-  const totalPensionMonthly = ahvMonthly + bvgMonthly + pillar3bMonthly;
+  const ahvAt = (idx: number) => projection?.pension_ahv?.[idx] ?? 0;
+  const bvgAt = (idx: number) => (projection?.pension_income?.[idx] ?? 0) - ahvAt(idx);
+  const ahvMonthly = ahvAt(fullIdx) / 12;
+  const bvgMonthly = bvgAt(fullIdx) / 12;
+  const totalPensionMonthly = ahvMonthly + bvgMonthly;
 
   // Lebenskosten: die, mit denen der Server gerechnet hat
   const expenseMonthly = (projection?.retirement_spending ?? 0) / 12;
-  const monthlyDeficitOrSurplus = totalPensionMonthly - expenseMonthly;
+  // Bedarf = Ausgaben plus Steuern im Ruhestand (Median-Pfad)
+  const taxMonthly = (projection?.retirement_tax?.[fullIdx] ?? 0) / 12;
+  const monthlyDeficitOrSurplus = totalPensionMonthly - expenseMonthly - taxMonthly;
   const isSurplus = monthlyDeficitOrSurplus >= 0;
   const depletionAge = projection?.depletion_age ?? null;
   const successPct = Math.round((projection?.success_rate ?? 0) * 100);
@@ -112,6 +117,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
     p10: Math.round((projection.p10?.[i] ?? 0) / 1000),
     p50: Math.round((projection.p50?.[i] ?? 0) / 1000),
     p90: Math.round((projection.p90?.[i] ?? 0) / 1000),
+    peer: peerK(projection.peer_wealth, i),
     isRetirement: i === retirementIdx,
   })) ?? [];
 
@@ -120,14 +126,10 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
     ?.slice(retirementIdx, retirementIdx + 20)
     ?.map((yr: number, i: number) => {
       const idx = retirementIdx + i;
-      // Vor dem Bezugsbeginn ist es Kapital, keine Rente
-      const monthly = (pillar: "1" | "2" | "3b", series?: number[]) =>
-        paying(pillar, idx) ? Math.round((series?.[idx] ?? 0) / 12) : 0;
       return {
         year: yr,
-        ahv:  monthly("1", projection.pension_ahv),
-        bvg:  monthly("2", projection.pension_bvg),
-        "3b": monthly("3b", projection.pension_3b),
+        ahv: Math.round(ahvAt(idx) / 12),
+        bvg: Math.round(bvgAt(idx) / 12),
       };
     }) ?? [];
 
@@ -223,7 +225,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
         <KPICard
           label={isSurplus ? "Überschuss/Monat" : "Lücke/Monat"}
           value={formatCHF(Math.abs(monthlyDeficitOrSurplus))}
-          sub={t("pages:ui.afterSpending", { amount: formatCHF(expenseMonthly) })}
+          sub={t("pages:ui.afterSpendingTax", { amount: formatCHF(expenseMonthly), tax: formatCHF(taxMonthly) })}
           icon={
             isSurplus
               ? <ShieldCheck className="w-4 h-4 text-gain" />
@@ -244,7 +246,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
         />
       </div>
 
-      {/* Kapitalbezuege: Pensionskasse und 3a, mit Steuer */}
+      {/* Kapitalbezuege: Pensionskasse, 3a und Lebensversicherung, mit Steuer */}
       {projection && projection.capital_withdrawals.length > 0 && (
         <div className="card">
           <WithdrawalPlan
@@ -271,13 +273,12 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
                 formatter={(v: number) => [formatCHF(v), ""]}
               />
               <Bar dataKey="ahv" name="AHV (Säule 1)" stackId="a" fill={PILLAR_COLORS.ahv} radius={[0, 0, 0, 0]} />
-              <Bar dataKey="bvg" name="BVG (Säule 2)" stackId="a" fill={PILLAR_COLORS.bvg} />
-              <Bar dataKey="3b" name="Säule 3b" stackId="a" fill={PILLAR_COLORS["3b"]} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="bvg" name="BVG (Säule 2)" stackId="a" fill={PILLAR_COLORS.bvg} radius={[4, 4, 0, 0]} />
               <ReferenceLine
-                y={Math.round(expenseMonthly)}
+                y={Math.round(expenseMonthly + taxMonthly)}
                 stroke="#f87171"
                 strokeDasharray="4 3"
-                label={{ value: "Ausgaben", position: "right", fill: "#f87171", fontSize: 10 }}
+                label={{ value: t("pages:overview.spendingTax"), position: "right", fill: "#f87171", fontSize: 10 }}
               />
               <Legend wrapperStyle={{ fontSize: 11 }} formatter={(v) => <span style={{ color: "#94a3b8" }}>{v}</span>} />
             </BarChart>
@@ -290,9 +291,14 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
 
       {/* Wealth Monte Carlo */}
       <div className="card">
-        <h3 className="text-text-primary font-semibold text-sm mb-4">
-          {t("pages:ui.vermoegensentwicklung_monte_carlo_p10_p50_p9")}
-        </h3>
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+          <h3 className="text-text-primary font-semibold text-sm">
+            {t("pages:ui.vermoegensentwicklung_monte_carlo_p10_p50_p9")}
+          </h3>
+          {projection?.peer_wealth?.some((v) => v != null) && (
+            <PeerCheckbox checked={showPeer} onChange={setShowPeer} />
+          )}
+        </div>
         {isLoading ? (
           <div className="h-56 flex items-center justify-center text-text-tertiary text-sm animate-pulse">
             Berechne…
@@ -323,6 +329,10 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
               <Area type="monotone" dataKey="p90" stroke="#60a5fa" fill="url(#wealthGrad)" strokeWidth={1} name="p90 (optimistisch)" />
               <Area type="monotone" dataKey="p50" stroke="#3b82f6" fill="none" strokeWidth={2} name="p50 (Median)" />
               <Area type="monotone" dataKey="p10" stroke="#1d4ed8" fill="none" strokeWidth={1} strokeDasharray="3 3" name="p10 (pessimistisch)" />
+              {showPeer && (
+                <Area type="monotone" dataKey="peer" stroke={PEER_COLOR} fill="none" strokeWidth={2}
+                  strokeDasharray="6 4" name={t("pages:peer.line")} />
+              )}
               <Legend wrapperStyle={{ fontSize: 11 }} formatter={(v) => <span style={{ color: "#94a3b8" }}>{v}</span>} />
             </AreaChart>
           </ResponsiveContainer>

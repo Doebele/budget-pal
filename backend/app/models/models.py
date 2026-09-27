@@ -380,8 +380,11 @@ class PensionData(Base):
     conversion_rate: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     # Nur Saeule 2: Anteil, der als Kapital bezogen wird (0-1). NULL = 0, reine Rente.
     capital_share: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    # Nur Saeule 3a: Alter beim Bezug dieses Kontos (60-70). NULL = der Planer staffelt.
+    # Saeule 3a: Alter beim Bezug dieses Kontos (60-70), NULL = der Planer staffelt.
+    # Saeule 3b: Alter bei Ablauf der Police, NULL = beim Erwerbsende.
     withdrawal_age: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # Nur Saeule 2: Teilpensionierung, [{age, pensum (danach, 0-1), capital_share (0-1)}]
+    partial_steps: Mapped[Optional[list]] = mapped_column(PortableJSON, nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     as_of_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
