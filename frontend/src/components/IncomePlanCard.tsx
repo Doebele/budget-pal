@@ -9,6 +9,7 @@ import { projectionsApi } from "@/lib/api";
 import { formatCHF } from "@/lib/theme";
 import { useThemeColors } from "@/hooks/useThemeColors";
 import { PILLAR_COLORS } from "@/components/charts/PensionOverviewChart";
+import PeerCheckbox, { PEER_COLOR } from "@/components/charts/PeerCheckbox";
 
 const FUND_COLOR = "#22d3ee";
 const UNTIL = [85, 90, 95, 0] as const; // 0 = nur Ertrag
@@ -35,6 +36,7 @@ export default function IncomePlanCard({
   const [until, setUntil] = useState<(typeof UNTIL)[number]>(90);
   const [indexed, setIndexed] = useState(true);
   const [includeWealth, setIncludeWealth] = useState(true);
+  const [showPeer, setShowPeer] = useState(true);
   const retirementAge = age ?? defaultAge;
 
   const { data: plan } = useQuery({
@@ -65,6 +67,20 @@ export default function IncomePlanCard({
     balance: Math.round(r.fund_balance / 1000),
   }));
   const at = (a: number) => rows.find((r) => r.age === a);
+  // Vergleich mit dem Median der Pensionierten, bei Pensionierung und mit 75
+  const peer = plan?.peer_income_monthly ?? null;
+  const compare = (a: number) => {
+    const r = plan?.rows.find((x) => x.age === a);
+    if (!r || !peer) return null;
+    const withoutFund = r.ahv + r.bvg - r.tax;
+    return {
+      age: a,
+      net: formatCHF(r.net),
+      pct: Math.round((r.net / peer - 1) * 100),
+      withoutFund: formatCHF(withoutFund),
+      pctWithout: Math.round((withoutFund / peer - 1) * 100),
+    };
+  };
   const axis = { fill: colors.textTertiary, fontSize: 11 };
   const tooltipStyle = {
     backgroundColor: colors.bgElevated, border: `1px solid ${colors.border}`,
@@ -146,8 +162,32 @@ export default function IncomePlanCard({
               <Line type="monotone" dataKey="net" name={t("pages:incomePlan.net")} stroke={colors.gain} strokeWidth={2.5} dot={false} />
               <Line type="monotone" dataKey={() => Math.round(plan.spending_monthly)} name={t("pages:overview.spending")}
                 stroke={colors.loss} strokeDasharray="4 3" strokeWidth={1.5} dot={false} />
+              {showPeer && peer != null && (
+                <Line type="monotone" dataKey={() => Math.round(peer)} name={t("pages:incomePlan.peerLine")}
+                  stroke={PEER_COLOR} strokeDasharray="6 4" strokeWidth={2} dot={false} />
+              )}
             </ComposedChart>
           </ResponsiveContainer>
+
+          {peer != null && (
+            <div className="space-y-1">
+              <PeerCheckbox checked={showPeer} onChange={setShowPeer}
+                label={t("pages:incomePlan.peerToggle")} hint={t("pages:incomePlan.peerHint")} />
+              {[plan.retirement_age, Math.max(plan.retirement_age, 75)]
+                .filter((a, i, all) => all.indexOf(a) === i)
+                .map(compare)
+                .filter((c): c is NonNullable<ReturnType<typeof compare>> => c != null)
+                .map((c) => (
+                  <p key={c.age} className="text-text-secondary text-xs">
+                    {t(c.pct >= 0 ? "pages:incomePlan.peerAbove" : "pages:incomePlan.peerBelow", {
+                      ...c, pct: Math.abs(c.pct), peer: formatCHF(peer),
+                    })}{" "}
+                    {t("pages:incomePlan.peerWithoutFund", { ...c, pctWithout: c.pctWithout > 0 ? `+${c.pctWithout}` : c.pctWithout })}
+                  </p>
+                ))}
+              <p className="text-text-tertiary text-[11px]">{t("pages:incomePlan.peerHint")}</p>
+            </div>
+          )}
 
           <div>
             <p className="text-text-secondary text-xs font-semibold mb-1">{t("pages:incomePlan.balanceTitle")}</p>

@@ -8,6 +8,11 @@
   ponytail: Luzern als Naeherung fuer die Schweiz; ab 75 fehlt der Wert.
 - Neurenten 2024 (BFS, Statistik der beruflichen Vorsorge, 27.11.2025): Median
   der Pensionskassen-Rente und des Kapitalbezugs, nach Geschlecht.
+- Einkommen im Ruhestand: Median des verfuegbaren Aequivalenzeinkommens der
+  Personen ab 65, SILC 2018 (BFS, "Armut im Alter", 2020): 44'899 CHF/Jahr
+  (Erwerbsalter 53'141). Verfuegbar = nach Steuern, Sozialbeitraegen und
+  Krankenkasse; Vermoegensertrag zaehlt, Kapitalverzehr nicht.
+  ponytail: aktuellste Zahl nach Alter; ein Paar hat das 1.5-fache.
 """
 from typing import Optional
 
@@ -25,6 +30,15 @@ NEW_PENSIONS_2024 = {
     "bvg_monthly": {"men": 2_042, "women": 1_227},
     "bvg_capital": {"men": 201_825, "women": 82_942},
 }
+
+
+#: verfuegbares Aequivalenzeinkommen ab 65, CHF pro Jahr (SILC 2018)
+RETIREE_INCOME_MEDIAN = 44_899
+
+
+def retiree_income_monthly(married: bool = False) -> float:
+    """Median-Einkommen eines Rentnerhaushalts pro Monat."""
+    return RETIREE_INCOME_MEDIAN / 12 * (COUPLE_FACTOR if married else 1.0)
 
 
 def median_wealth(age: int, married: bool = False) -> Optional[float]:

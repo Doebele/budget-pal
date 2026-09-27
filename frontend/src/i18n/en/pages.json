@@ -954,7 +954,13 @@
     "net": "Net after tax",
     "balanceTitle": "Fund balance (drawn down by the payouts)",
     "balance": "Fund balance",
-    "hint": "The fund pays a fixed amount until the chosen age and is then empty; \"yield only\" keeps the capital. Calculated with the expected return without fluctuations – the wealth projection shows how much market years shift this. The withdrawal is capital consumption and tax-free; pensions, fund yield (2 %) and wealth are taxed. Changing the retirement age changes AHV (−6.8 % per early year), pension fund (conversion rate, contribution years) and 3a withdrawals. Model calculation, not investment or financial advice."
+    "hint": "The fund pays a fixed amount until the chosen age and is then empty; \"yield only\" keeps the capital. Calculated with the expected return without fluctuations – the wealth projection shows how much market years shift this. The withdrawal is capital consumption and tax-free; pensions, fund yield (2 %) and wealth are taxed. Changing the retirement age changes AHV (−6.8 % per early year), pension fund (conversion rate, contribution years) and 3a withdrawals. Model calculation, not investment or financial advice.",
+    "peerLine": "Median retirees",
+    "peerAbove": "At {{age}} you have {{net}} net per month – {{pct}} % above the retirees' median ({{peer}}).",
+    "peerBelow": "At {{age}} you have {{net}} net per month – {{pct}} % below the retirees' median ({{peer}}).",
+    "peerWithoutFund": "Without drawing down capital (pensions after tax only): {{withoutFund}}, {{pctWithout}} %.",
+    "peerHint": "Median disposable income of people aged 65+ (FSO, SILC 2018: CHF 44,899 per year, couples × 1.5 – the latest figure by age). Disposable means after taxes, social contributions and health insurance; drawing down capital does not count as income there. Your value here excludes health insurance premiums, so it is slightly too high.",
+    "peerToggle": "Show retirees' median"
   },
   "scenarios": {
     "title": "Scenarios: when to retire, how to draw the pension fund?",

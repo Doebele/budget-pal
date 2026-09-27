@@ -289,7 +289,8 @@ Central definition of all 11 supercategories (wohnen, essen, mobilitaet, versich
 - Comparison with the Swiss median (`services/swiss_medians.py`): `run()` returns
   `peer_wealth` (median free wealth at the same age, LUSTAT tax data canton of Lucerne 2020 as a
   proxy — no Swiss-wide statistic by age exists; couples × 1.5; None outside 18–74) and
-  `peer_pensions` (BFS new pensions 2024). The charts show it via `PeerCheckbox` (off by default).
+  `peer_pensions` (BFS new pensions 2024); `income_plan` returns `peer_income_monthly` (median
+  disposable income 65+, SILC 2018). The charts show it via `PeerCheckbox` (off by default).
 - Pension or lump sum (`compare_bvg_options`, `POST /projections/compare-bvg`): the same
   projection with BVG 0 % / 100 % capital (and the own plan), same `seed`, until 95.
 - One calculation: Wizard and Finanzplan call `/api/pension/estimate`

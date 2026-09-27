@@ -19,7 +19,7 @@ import numpy as np
 from app.core.config import settings
 from app.services.capital_tax import DEFAULT_CANTON, capital_tax
 from app.services.retirement_tax import retirement_tax
-from app.services.swiss_medians import NEW_PENSIONS_2024, median_wealth
+from app.services.swiss_medians import NEW_PENSIONS_2024, median_wealth, retiree_income_monthly
 
 logger = logging.getLogger(__name__)
 
@@ -1001,6 +1001,8 @@ class ProjectionService:
             "fund_start": opening,
             "fund_inflows": [{"age": a, "amount": v} for a, v in sorted(later.items())],
             "spending_monthly": (r["retirement_spending"] or 0.0) / 12,
+            # Vergleich: Median-Einkommen der Pensionierten (verfuegbar, ohne Kapitalverzehr)
+            "peer_income_monthly": retiree_income_monthly(married),
             "rows": rows,
         }
 

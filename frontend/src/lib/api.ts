@@ -279,6 +279,8 @@ export interface IncomePlan {
   fund_start: number;
   fund_inflows: { age: number; amount: number }[];
   spending_monthly: number;
+  /** Median-Einkommen der Pensionierten pro Monat (verfuegbar, SILC 2018). */
+  peer_income_monthly: number | null;
   rows: IncomePlanRow[];
 }
 
