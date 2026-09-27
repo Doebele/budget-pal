@@ -180,3 +180,21 @@ def test_wizard_rejects_a_step_that_is_too_small(client):
         "bvgTeilpensionierung": [{"alter": 61, "pensum": 90}],
     })
     assert res.status_code == 422
+
+
+def test_compare_pension_or_capital(client):
+    assert client.post("/api/pension", json={"pillar": "2", "current_balance": 400_000}).status_code == 201
+    dob = f"{datetime.now().year - 50}-06-01"
+    res = client.post("/api/projections/compare-bvg", json={
+        "current_net_worth": 100_000, "annual_savings": 10_000, "annual_income": 90_000,
+        "date_of_birth": dob, "retirement_age": 65, "years_to_project": 10,
+    })
+    assert res.status_code == 200, res.text
+    data = res.json()
+    assert [v["key"] for v in data["variants"]] == ["pension", "capital"]
+    assert len(data["years"]) == 95 - 50 + 1   # bis 95, nicht der Horizont der Anfrage
+    run = client.post("/api/projections/run", json={
+        "current_net_worth": 100_000, "annual_savings": 10_000, "annual_income": 90_000,
+        "date_of_birth": dob, "retirement_age": 65, "years_to_project": 30,
+    }).json()
+    assert run["retirement_tax"][14] == 0 and run["retirement_tax"][15] > 0

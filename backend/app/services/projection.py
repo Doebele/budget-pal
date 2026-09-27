@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional, Sequence
 import numpy as np
 from app.core.config import settings
 from app.services.capital_tax import DEFAULT_CANTON, capital_tax
+from app.services.retirement_tax import retirement_tax
 
 logger = logging.getLogger(__name__)
 
@@ -416,6 +417,8 @@ class ProjectionService:
         canton: str = DEFAULT_CANTON,
         married: bool = False,
         drawdown_until_age: int = 90,
+        seed: Optional[int] = None,
+        tax_in_retirement: bool = True,
     ) -> Dict[str, Any]:
         """
         Run Monte Carlo simulation and pension projections.
@@ -425,9 +428,11 @@ class ProjectionService:
             einer Teilpensionierung abzueglich des Lohnausfalls, zuzueglich der
             Teilrente
           - ab dem Rentenalter: tatsaechlich fliessende Renten minus
-            Lebenskosten (`retirement_spending`, heutige CHF; ohne Angabe
-            `default_retirement_spending`), bis 65 zusaetzlich die AHV-Beitraege
-            als Nichterwerbstaetige
+            Lebenskosten (`retirement_spending`, heutige CHF, ohne Steuern; ohne
+            Angabe `default_retirement_spending`) minus Einkommens- und
+            Vermoegenssteuer (`tax_in_retirement`, je Lauf, weil sie am
+            Vermoegen haengt), bis 65 zusaetzlich die AHV-Beitraege als
+            Nichterwerbstaetige
           - Kapitalbezuege (Pensionskasse, 3a nach Steuer, 3b steuerfrei) im
             Bezugsjahr (`canton`, `married` fuer die Steuer)
           - dazu die Szenario-Cashflows (`annual_flows`, nominal)
@@ -469,12 +474,14 @@ class ProjectionService:
                 capital_inflow_real[idx] += w["amount"] - w["tax"]
 
         # ── Monte Carlo ────────────────────────────────────────
-        np.random.seed(None)
+        # Gleicher `seed` = gleiche Maerkte: so lassen sich Varianten (Rente
+        # oder Kapital) Lauf fuer Lauf vergleichen
+        rng = np.random.default_rng(seed)
 
         # Random annual returns: log-normal distribution
         # ln(1+r) ~ Normal(mu, sigma)
         log_mean = np.log(1 + mean_return) - 0.5 * volatility**2
-        annual_log_returns = np.random.normal(
+        annual_log_returns = rng.normal(
             loc=log_mean,
             scale=volatility,
             size=(runs, years),
@@ -501,6 +508,9 @@ class ProjectionService:
                     # verschieden, weil sie am Vermoegen haengen
                     basis = portfolio / inflation_factor + 20 * income_real[yr]
                     flow = flow - ahv_nonemployed_contribution(basis) * inflation_factor
+                if tax_in_retirement:
+                    tax = retirement_tax(income_real[yr], portfolio / inflation_factor, canton, married)
+                    flow = flow - tax * inflation_factor
             flow = flow + capital_inflow_real[yr] * inflation_factor
             if annual_flows is not None and yr < len(annual_flows):
                 # Szenario-Cashflows sind bereits nominal
@@ -542,6 +552,13 @@ class ProjectionService:
             for i in range(years + 1)
         ]
 
+        # Steuern im Ruhestand entlang des Median-Pfads, fuer die Anzeige
+        tax_median = [
+            float(retirement_tax(income_real[i], p50[i], canton, married))
+            if tax_in_retirement and i >= retirement_idx else 0.0
+            for i in range(years + 1)
+        ]
+
         # Bis wann reicht das Vermoegen? Median-Pfad nach der Pensionierung.
         depletion_age = next(
             (current_age + i for i in range(retirement_idx, years + 1) if p50[i] <= 0),
@@ -576,6 +593,7 @@ class ProjectionService:
                 for pillar, start in payout_start_ages(retirement_age).items()
             },
             "retirement_spending": retirement_spending,
+            "retirement_tax": tax_median,
             "capital_withdrawals": withdrawals,
             "capital_tax_total": sum(w["tax"] for w in withdrawals),
             "capital_tax_single_year": single_year_tax(withdrawals, canton, married),
@@ -903,6 +921,78 @@ class ProjectionService:
         if age_at_year >= withdrawal_age:
             return 0.0
         return _pillar_3a_balance(record, age_at_year - years_elapsed, retirement_age, age_at_year)
+
+    def compare_bvg_options(self, pension_records: List[Dict], **run_kwargs) -> Dict[str, Any]:
+        """Pensionskasse ganz als Rente, ganz als Kapital (nach Steuer ins freie
+        Vermoegen, dort weiter angelegt) und — wenn es davon abweicht — wie
+        geplant. Dieselben Maerkte fuer alle Varianten (gleicher seed), sonst
+        alles gleich; die Steuern im Ruhestand sind abgezogen.
+
+        Returns years, current_age, retirement_age, variants (je Median- und
+        10-%-Pfad des freien Vermoegens, BVG-Rente, Kapital netto, Steuern,
+        Vermoegen mit 85/90, wie lange es reicht) und breakeven_age: ab wann
+        die Rente im Median mehr freies Vermoegen uebrig laesst als das Kapital.
+        """
+        bvg = next((r for r in pension_records if r["pillar"] == "2"), None)
+        if bvg is None:
+            return {"variants": [], "breakeven_age": None}
+        run_kwargs["seed"] = run_kwargs.get("seed") or int(np.random.default_rng().integers(2**31))
+
+        def with_share(share: float) -> List[Dict]:
+            steps = [{**s, "capital_share": share} for s in bvg.get("partial_steps") or []]
+            return [
+                {**r, "capital_share": share, "partial_steps": steps} if r is bvg else r
+                for r in pension_records
+            ]
+
+        shares = {_share(bvg.get("capital_share"))} | {
+            _share(s.get("capital_share")) for s in bvg.get("partial_steps") or []
+        }
+        variants = [("pension", with_share(0.0)), ("capital", with_share(1.0))]
+        if shares not in ({0.0}, {1.0}):
+            variants.append(("own", pension_records))
+
+        current_age = _current_age(run_kwargs.get("date_of_birth"))
+
+        def at_age(series, age):
+            i = age - current_age
+            return series[i] if 0 <= i < len(series) else None
+
+        out, medians = [], {}
+        for key, records in variants:
+            r = self.run(pension_records=records, **run_kwargs)
+            start = min(r["payout_start_idx"]["2"], len(r["income_bvg"]) - 1)
+            bvg_capital = [w for w in r["capital_withdrawals"] if w["source"] == "bvg"]
+            medians[key] = r["p50"]
+            out.append({
+                "key": key,
+                "bvg_monthly": r["income_bvg"][start] / 12,
+                "capital_net": sum(w["amount"] - w["tax"] for w in bvg_capital),
+                "p50": r["p50"],
+                "p10": r["p10"],
+                "depletion_age": r["depletion_age"],
+                "success_rate": r["success_rate"],
+                "wealth_85": at_age(r["p50"], 85),
+                "wealth_90": at_age(r["p50"], 90),
+                "wealth_85_p10": at_age(r["p10"], 85),
+                "taxes_total": r["capital_tax_total"] + sum(r["retirement_tax"]),
+            })
+        retirement_idx = r["retirement_idx"]
+        # Ab dem Jahr nach dem Endbezug (dann ist das Kapital im Vermoegen)
+        first = r["payout_start_idx"]["2"] + 1
+        pension, capital = medians["pension"], medians["capital"]
+        breakeven_age = next(
+            (current_age + i for i in range(first, len(pension))
+             if pension[i] >= capital[i] and pension[i] > 0),
+            None,
+        )
+        return {
+            "years": r["years"],
+            "current_age": current_age,
+            "retirement_age": current_age + retirement_idx,
+            "variants": out,
+            "breakeven_age": breakeven_age,
+        }
 
     def compare_scenarios(
         self,

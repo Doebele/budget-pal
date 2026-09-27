@@ -123,7 +123,8 @@ class TestCapitalWithdrawals:
         dob = f"{datetime.now().year - 50}-06-01"
         common = dict(current_net_worth=0, annual_savings=0, annual_income=0, years=20,
                       mean_return=0.0, volatility=0.0, inflation_rate=0.0,
-                      date_of_birth=dob, retirement_age=65, runs=10, retirement_spending=0.0)
+                      date_of_birth=dob, retirement_age=65, runs=10, retirement_spending=0.0,
+                      tax_in_retirement=False)
         r = SERVICE.run(pension_records=RECORDS[2:3], **common)
         event = r["capital_withdrawals"][0]
         idx = event["age"] - 50

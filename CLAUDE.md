@@ -270,8 +270,17 @@ Central definition of all 11 supercategories (wohnen, essen, mobilitaet, versich
   `capital_drawdown`: one constant real amount from retirement that uses up the median wealth
   at retirement plus later capital withdrawals by `drawdown_until_age` (life expectancy).
 - Wealth path (`ProjectionService.run`): savings only until retirement, then pensions minus
-  `retirement_spending` (plus AHV non-employed contributions until 65); floored at 0. Early
-  retirement is just an earlier `retirement_age` — no special window logic.
+  `retirement_spending` (plus AHV non-employed contributions until 65) minus taxes in
+  retirement; floored at 0. Early retirement is just an earlier `retirement_age` — no special
+  window logic.
+- Taxes in retirement (`services/retirement_tax.py`, ESTV data `data/income_tax_2026.json`):
+  income tax on pensions + 2 % investment yield of free wealth, plus wealth tax — per run,
+  because they depend on wealth. `retirement_spending` is therefore **without** taxes: the
+  wizard's "Direkte Steuern" budget is subtracted (`monthly_taxes` in the scenario, else
+  `wizard_data_json.direkteSteuern`). `tax_in_retirement=False` switches it off (tests of
+  other flows).
+- Pension or lump sum (`compare_bvg_options`, `POST /projections/compare-bvg`): the same
+  projection with BVG 0 % / 100 % capital (and the own plan), same `seed`, until 95.
 - One calculation: Wizard and Finanzplan call `/api/pension/estimate`
   (`ProjectionService.estimate_at_retirement`) — never re-implement pension math in the frontend.
 - All monetary projections are inflation-adjusted using `SWISS_INFLATION_RATE` (default 1.5%)

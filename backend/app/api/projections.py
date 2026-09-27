@@ -7,6 +7,7 @@ POST /projections/scenarios           — save a new scenario
 PUT  /projections/scenarios/{id}      — update scenario
 DELETE /projections/scenarios/{id}    — delete scenario
 """
+import json
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -18,7 +19,7 @@ from sqlalchemy import select, desc
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.core.config import settings
-from app.models.models import Scenario, PensionData, User
+from app.models.models import Scenario, PensionData, User, UserWizardConfig
 from app.api.budget_multimodal import _get_wizard_scenario
 from app.api.pension import record_dict
 from app.services.capital_tax import tax_profile
@@ -83,6 +84,8 @@ class ProjectionResult(BaseModel):
     # Index, ab dem AHV ("1") und Pensionskasse ("2", Endbezug) eine Rente zahlen
     payout_start_idx: Dict[str, int] = {}
     retirement_spending: Optional[float] = None
+    # Einkommens- und Vermoegenssteuer im Ruhestand entlang des Medians, real
+    retirement_tax: List[float] = []
     # Alter, ab dem das Vermoegen im Median aufgebraucht ist (None = reicht)
     depletion_age: Optional[int] = None
     # Anteil der Simulationen mit Vermoegen am Ende des Horizonts
@@ -98,6 +101,30 @@ class ProjectionResult(BaseModel):
     inflation_adjusted: bool
     computed_at: str
     runs: int
+
+
+class BvgVariant(BaseModel):
+    """Eine Variante des Pensionskassen-Bezugs, heutige CHF."""
+    key: str                  # "pension" | "capital" | "own"
+    bvg_monthly: float        # Pensionskassen-Rente ab dem Endbezug
+    capital_net: float        # BVG-Kapital nach Steuer
+    p50: List[float]          # freies Vermoegen, Median
+    p10: List[float]          # freies Vermoegen, schlechte Maerkte
+    depletion_age: Optional[int] = None
+    success_rate: float
+    wealth_85: Optional[float] = None
+    wealth_90: Optional[float] = None
+    wealth_85_p10: Optional[float] = None
+    taxes_total: float        # Kapitalsteuer + Steuern im Ruhestand (Median)
+
+
+class BvgComparison(BaseModel):
+    years: List[int] = []
+    current_age: Optional[int] = None
+    retirement_age: Optional[int] = None
+    variants: List[BvgVariant]
+    # Ab diesem Alter hinterlaesst die Rente im Median mehr freies Vermoegen
+    breakeven_age: Optional[int] = None
 
 
 class ScenarioCreate(BaseModel):
@@ -163,14 +190,21 @@ def _params_from_scenario(parameters_json: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
-def _flow_inputs(parameters_json: Dict[str, Any]) -> Dict[str, Any]:
+def _flow_inputs(parameters_json: Dict[str, Any], monthly_taxes: float = 0.0) -> Dict[str, Any]:
     """Rohwerte fuer `build_annual_flows` — getrennt von den run()-Argumenten,
-    weil sie nicht direkt an die Simulation gehen."""
+    weil sie nicht direkt an die Simulation gehen.
+
+    Die Ausgaben des Wizards enthalten den Posten "Direkte Steuern" des
+    Erwerbslebens. Im Ruhestand rechnet die Prognose die Steuern selbst
+    (retirement_tax) — darum ohne diesen Posten (`monthly_taxes` im Szenario,
+    sonst der Wert aus dem Wizard).
+    """
     p = parameters_json or {}
     monthly_expenses = p.get("monthly_expenses_base", p.get("monthly_expenses")) or 0.0
+    taxes = p.get("monthly_taxes", monthly_taxes) or 0.0
     return {
         "active_scenarios": p.get("active_scenarios") or [],
-        "annual_expenses": float(monthly_expenses) * 12,
+        "annual_expenses": max(0.0, float(monthly_expenses) - float(taxes)) * 12,
         "lifestyle_factor": float(p.get("lifestyle_factor") or 0.8),
         "care_cost_annual": float(p.get("care_cost_annual") or CARE_COST_ANNUAL_DEFAULT),
         "mortgage_debt": float(p.get("mortgage_debt") or 0.0),
@@ -182,21 +216,28 @@ def _flow_inputs(parameters_json: Dict[str, Any]) -> Dict[str, Any]:
 
 # ── Routes ────────────────────────────────────────────────────
 
-@router.post("/run", response_model=ProjectionResult)
-async def run_projection(
-    params: ProjectionParameters,
-    scenario_id: Optional[int] = None,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Run Monte Carlo simulation and Swiss pension projection.
+async def _wizard_monthly_taxes(user_id: int, db: AsyncSession) -> float:
+    """Posten "Direkte Steuern" aus dem gespeicherten Wizard (monatlich)."""
+    row = (await db.execute(
+        select(UserWizardConfig.wizard_data_json).where(UserWizardConfig.user_id == user_id)
+    )).scalar_one_or_none()
+    try:
+        data = json.loads(row) if row else {}
+    except ValueError:
+        data = {}
+    return float(data.get("direkteSteuern", data.get("direkte_steuern")) or 0.0)
 
-    Kein Ergebnis-Cache: der frühere Cache war auf (user_id, scenario_id)
-    geschlüsselt und ignorierte die Body-Parameter komplett. Jeder Reglerzug
-    hätte danach 24 Stunden lang dieselbe Kurve geliefert. 10'000 Läufe
-    rechnet NumPy in Millisekunden — ein Cache lohnt den Invalidierungsaufwand
-    nicht. Tabelle und Modell ProjectionCache bleiben für Altdaten bestehen.
-    """
+
+async def _run_kwargs(
+    params: ProjectionParameters,
+    scenario_id: Optional[int],
+    current_user: User,
+    db: AsyncSession,
+    until_age: Optional[int] = None,
+) -> Dict[str, Any]:
+    """Argumente fuer ProjectionService.run() aus Szenario und Anfrage.
+    `until_age` rechnet bis zu diesem Alter statt ueber den Horizont der
+    Anfrage (Vergleich Rente/Kapital)."""
     # Szenario laden und mit dem Body zusammenfuehren. `exclude_unset` sorgt
     # dafuer, dass nur ausdruecklich gesendete Felder das Szenario uebersteuern
     # — Pydantic-Defaults duerfen es nicht ueberschreiben.
@@ -214,7 +255,9 @@ async def run_projection(
         if not scenario:
             raise HTTPException(status_code=404, detail="Scenario not found.")
         merged.update(_params_from_scenario(scenario.parameters_json))
-        flow_inputs = _flow_inputs(scenario.parameters_json)
+        flow_inputs = _flow_inputs(
+            scenario.parameters_json, await _wizard_monthly_taxes(current_user.id, db)
+        )
         scenario_params = scenario.parameters_json
     merged.update(params.model_dump(exclude_unset=True))
 
@@ -248,6 +291,8 @@ async def run_projection(
         current_age = (datetime.now() - dob).days / 365.25
         years_to_project = max(1, int(merged["life_expectancy"] - current_age))
     years_to_project = years_to_project or 30
+    if until_age:
+        years_to_project = max(1, until_age - _current_age(date_of_birth))
 
     pension_payload = [record_dict(r) for r in pension_records]
 
@@ -297,8 +342,7 @@ async def run_projection(
     if merged.get("married") is not None:
         married = bool(merged["married"])
 
-    # Run simulation
-    result_data = projection_service.run(
+    return dict(
         current_net_worth=merged["current_net_worth"],
         annual_savings=merged["annual_savings"],
         annual_income=merged["annual_income"],
@@ -317,11 +361,46 @@ async def run_projection(
         drawdown_until_age=int(merged.get("life_expectancy") or 90),
     )
 
-    result_dict = result_data.copy()
+
+@router.post("/run", response_model=ProjectionResult)
+async def run_projection(
+    params: ProjectionParameters,
+    scenario_id: Optional[int] = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Run Monte Carlo simulation and Swiss pension projection.
+
+    Kein Ergebnis-Cache: der frühere Cache war auf (user_id, scenario_id)
+    geschlüsselt und ignorierte die Body-Parameter komplett. Jeder Reglerzug
+    hätte danach 24 Stunden lang dieselbe Kurve geliefert. 10'000 Läufe
+    rechnet NumPy in Millisekunden — ein Cache lohnt den Invalidierungsaufwand
+    nicht. Tabelle und Modell ProjectionCache bleiben für Altdaten bestehen.
+    """
+    kwargs = await _run_kwargs(params, scenario_id, current_user, db)
+    result_dict = projection_service.run(**kwargs)
     result_dict["computed_at"] = datetime.now(timezone.utc).isoformat()
     result_dict["runs"] = settings.monte_carlo_runs
 
     return ProjectionResult(**result_dict)
+
+
+#: Der Vergleich Rente/Kapital rechnet bis 95 — Langlebigkeit ist das Risiko
+#: des Kapitalbezugs.
+COMPARISON_END_AGE = 95
+
+
+@router.post("/compare-bvg", response_model=BvgComparison)
+async def compare_bvg(
+    params: ProjectionParameters,
+    scenario_id: Optional[int] = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Pensionskasse als Rente oder als Kapital: dieselbe Prognose dreimal,
+    mit denselben Maerkten (siehe ProjectionService.compare_bvg_options)."""
+    kwargs = await _run_kwargs(params, scenario_id, current_user, db, until_age=COMPARISON_END_AGE)
+    return projection_service.compare_bvg_options(**kwargs)
 
 
 @router.get("/scenarios", response_model=List[ScenarioResponse])
