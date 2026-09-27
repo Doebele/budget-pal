@@ -12,6 +12,7 @@
  */
 import { clsx } from "clsx";
 import { useState } from "react";
+import PeerCheckbox, { PEER_COLOR, peerK } from "@/components/charts/PeerCheckbox";
 import { useQuery } from "@tanstack/react-query";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -46,6 +47,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
   const { t } = useTranslation();
   const [retirementAge, setRetirementAge] = useState(65);
   const [annualIncome, setAnnualIncome] = useState(90_000);
+  const [showPeer, setShowPeer] = useState(false);
   const [meanReturn, setMeanReturn] = useState(0.07);
   // Lebenskosten im Ruhestand pro Monat; null = der Server schaetzt sie
   const [spendingMonthly, setSpendingMonthly] = useState<number | null>(null);
@@ -115,6 +117,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
     p10: Math.round((projection.p10?.[i] ?? 0) / 1000),
     p50: Math.round((projection.p50?.[i] ?? 0) / 1000),
     p90: Math.round((projection.p90?.[i] ?? 0) / 1000),
+    peer: peerK(projection.peer_wealth, i),
     isRetirement: i === retirementIdx,
   })) ?? [];
 
@@ -288,9 +291,14 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
 
       {/* Wealth Monte Carlo */}
       <div className="card">
-        <h3 className="text-text-primary font-semibold text-sm mb-4">
-          {t("pages:ui.vermoegensentwicklung_monte_carlo_p10_p50_p9")}
-        </h3>
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+          <h3 className="text-text-primary font-semibold text-sm">
+            {t("pages:ui.vermoegensentwicklung_monte_carlo_p10_p50_p9")}
+          </h3>
+          {projection?.peer_wealth?.some((v) => v != null) && (
+            <PeerCheckbox checked={showPeer} onChange={setShowPeer} />
+          )}
+        </div>
         {isLoading ? (
           <div className="h-56 flex items-center justify-center text-text-tertiary text-sm animate-pulse">
             Berechne…
@@ -321,6 +329,10 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
               <Area type="monotone" dataKey="p90" stroke="#60a5fa" fill="url(#wealthGrad)" strokeWidth={1} name="p90 (optimistisch)" />
               <Area type="monotone" dataKey="p50" stroke="#3b82f6" fill="none" strokeWidth={2} name="p50 (Median)" />
               <Area type="monotone" dataKey="p10" stroke="#1d4ed8" fill="none" strokeWidth={1} strokeDasharray="3 3" name="p10 (pessimistisch)" />
+              {showPeer && (
+                <Area type="monotone" dataKey="peer" stroke={PEER_COLOR} fill="none" strokeWidth={2}
+                  strokeDasharray="6 4" name={t("pages:peer.line")} />
+              )}
               <Legend wrapperStyle={{ fontSize: 11 }} formatter={(v) => <span style={{ color: "#94a3b8" }}>{v}</span>} />
             </AreaChart>
           </ResponsiveContainer>

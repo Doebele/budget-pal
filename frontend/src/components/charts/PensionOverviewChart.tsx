@@ -8,6 +8,7 @@ import {
 import type { ProjectionResult } from "@/lib/api";
 import { formatCHF } from "@/lib/theme";
 import { useThemeColors } from "@/hooks/useThemeColors";
+import PeerCheckbox, { PEER_COLOR, peerK } from "@/components/charts/PeerCheckbox";
 
 export const PILLAR_COLORS = {
   ahv: "#38bdf8",  // Säule 1 — sky
@@ -42,6 +43,7 @@ export default function PensionOverviewChart({
   const { colors } = useThemeColors();
   const [view, setView] = useState<View>("capital");
   const [showWealth, setShowWealth] = useState(true);
+  const [showPeer, setShowPeer] = useState(false);
 
   const k = (v?: number) => Math.round((v ?? 0) / 1000);
   const capitalData = projection.years.map((year, i) => ({
@@ -50,6 +52,7 @@ export default function PensionOverviewChart({
     "3a": k(projection.pension_3a[i]),
     "3b": k(projection.pension_3b[i]),
     wealth: k(projection.p50[i]),
+    peer: peerK(projection.peer_wealth, i),
   }));
 
   const spending = (projection.retirement_spending ?? 0) / 12;
@@ -111,6 +114,9 @@ export default function PensionOverviewChart({
             {t("pages:overview.showWealth")}
           </label>
         )}
+        {view === "capital" && projection.peer_wealth?.some((v) => v != null) && (
+          <PeerCheckbox checked={showPeer} onChange={setShowPeer} />
+        )}
       </div>
 
       <ResponsiveContainer width="100%" height={300}>
@@ -131,6 +137,10 @@ export default function PensionOverviewChart({
             {showWealth && (
               <Line type="monotone" dataKey="wealth" name={t("pages:overview.wealth")}
                 stroke={colors.accent} strokeWidth={2.5} dot={false} />
+            )}
+            {showPeer && (
+              <Line type="monotone" dataKey="peer" name={t("pages:peer.line")} stroke={PEER_COLOR}
+                strokeWidth={2} strokeDasharray="6 4" dot={false} connectNulls={false} />
             )}
             {retirementYear != null && (
               <ReferenceLine x={retirementYear} stroke={colors.textTertiary} strokeDasharray="4 3"

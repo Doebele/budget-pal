@@ -86,6 +86,10 @@ class ProjectionResult(BaseModel):
     retirement_spending: Optional[float] = None
     # Einkommens- und Vermoegenssteuer im Ruhestand entlang des Medians, real
     retirement_tax: List[float] = []
+    # Vergleich: Median des freien Vermoegens im selben Alter (Luzern 2020)
+    # und Median der Neurenten 2024 (BFS)
+    peer_wealth: List[Optional[float]] = []
+    peer_pensions: Dict[str, Dict[str, float]] = {}
     # Alter, ab dem das Vermoegen im Median aufgebraucht ist (None = reicht)
     depletion_age: Optional[int] = None
     # Anteil der Simulationen mit Vermoegen am Ende des Horizonts

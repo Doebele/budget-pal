@@ -19,6 +19,7 @@ import numpy as np
 from app.core.config import settings
 from app.services.capital_tax import DEFAULT_CANTON, capital_tax
 from app.services.retirement_tax import retirement_tax
+from app.services.swiss_medians import NEW_PENSIONS_2024, median_wealth
 
 logger = logging.getLogger(__name__)
 
@@ -594,6 +595,9 @@ class ProjectionService:
             },
             "retirement_spending": retirement_spending,
             "retirement_tax": tax_median,
+            # Vergleich: Median des freien Vermoegens im selben Alter (None = keiner)
+            "peer_wealth": [median_wealth(current_age + i, married) for i in range(years + 1)],
+            "peer_pensions": NEW_PENSIONS_2024,
             "capital_withdrawals": withdrawals,
             "capital_tax_total": sum(w["tax"] for w in withdrawals),
             "capital_tax_single_year": single_year_tax(withdrawals, canton, married),

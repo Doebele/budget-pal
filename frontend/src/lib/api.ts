@@ -222,6 +222,10 @@ export interface ProjectionResult {
   retirement_spending: number | null;
   /** Einkommens- und Vermoegenssteuer im Ruhestand entlang des Medians, real. */
   retirement_tax: number[];
+  /** Vergleich: Median des freien Vermoegens im selben Alter (Luzern 2020), null = keiner. */
+  peer_wealth: (number | null)[];
+  /** Median der Neurenten 2024 (BFS): bvg_monthly / bvg_capital je men/women. */
+  peer_pensions: Record<"bvg_monthly" | "bvg_capital", { men: number; women: number }>;
   /** Alter, ab dem das Vermoegen im Median aufgebraucht ist; null = reicht. */
   depletion_age: number | null;
   /** Anteil der Simulationen mit Vermoegen am Ende des Horizonts (0-1). */
