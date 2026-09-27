@@ -926,6 +926,84 @@ class ProjectionService:
             return 0.0
         return _pillar_3a_balance(record, age_at_year - years_elapsed, retirement_age, age_at_year)
 
+    def income_plan(
+        self,
+        fund_return: float = 0.04,
+        payout_until_age: Optional[int] = 90,
+        indexed: bool = True,
+        include_wealth: bool = True,
+        until_age: int = 95,
+        **run_kwargs,
+    ) -> Dict[str, Any]:
+        """Monatliches Einkommen ab dem Rentenalter, in heutigen CHF.
+
+        Renten (AHV, Pensionskasse) wie in run(). Alle Kapitalbezuege (BVG-
+        Kapital, 3a, Lebensversicherung, netto) und — mit `include_wealth` — das
+        freie Vermoegen bei Pensionierung (Median) gehen in einen Fonds mit der
+        erwarteten Rendite `fund_return` (nominal). Der Fonds zahlt einen festen
+        Betrag bis `payout_until_age` (dann ist er leer); `indexed` = der Betrag
+        steigt mit der Teuerung, sonst bleibt er in Franken gleich und verliert
+        real an Wert. `payout_until_age=None`: nur der Ertrag, das Kapital
+        bleibt. Deterministisch mit der erwarteten Rendite — die Streuung zeigt
+        die Vermoegensprognose. Steuern: retirement_tax auf Renten plus
+        Fondsertrag und Vermoegen; die Entnahme selbst ist Kapitalverzehr und
+        steuerfrei.
+        """
+        r = self.run(**run_kwargs)
+        inflation = run_kwargs.get("inflation_rate", 0.015)
+        canton = run_kwargs.get("canton", DEFAULT_CANTON)
+        married = run_kwargs.get("married", False)
+        current_age = _current_age(run_kwargs.get("date_of_birth"))
+        start = r["retirement_idx"]
+        retirement_age = current_age + start
+        real_rate = (1 + fund_return) / (1 + inflation) - 1
+
+        inflow = {w["age"]: 0.0 for w in r["capital_withdrawals"]}
+        for w in r["capital_withdrawals"]:
+            inflow[w["age"]] += w["amount"] - w["tax"]
+        # Was vor der Pensionierung bezogen wurde, steckt schon im Vermoegen
+        early = sum(v for age, v in inflow.items() if age < retirement_age)
+        opening = (r["p50"][start] if include_wealth else early)
+        later = {age: v for age, v in inflow.items() if age >= retirement_age}
+
+        # Fester Betrag aus Anfangsbestand und spaeteren Zufluessen (Barwert)
+        pv = opening + sum(v / (1 + real_rate) ** (age - retirement_age) for age, v in later.items())
+        if payout_until_age is None:
+            payout0 = pv * real_rate
+        elif indexed:
+            payout0 = level_withdrawal(pv, real_rate, payout_until_age - retirement_age + 1)
+        else:
+            # nominal fest: mit dem nominalen Zins rechnen, real schrumpft er
+            payout0 = level_withdrawal(pv, fund_return, payout_until_age - retirement_age + 1)
+
+        rows, balance = [], opening
+        for age in range(retirement_age, until_age + 1):
+            i = age - current_age
+            balance += later.get(age, 0.0)
+            t = age - retirement_age
+            if payout_until_age is not None and age > payout_until_age:
+                payout = 0.0
+            else:
+                payout = payout0 if indexed or payout_until_age is None else payout0 / (1 + inflation) ** t
+            payout = min(payout, max(balance, 0.0))
+            ahv = r["pension_ahv"][i] if i < len(r["pension_ahv"]) else r["pension_ahv"][-1]
+            bvg = r["income_bvg"][i] if i < len(r["income_bvg"]) else r["income_bvg"][-1]
+            tax = float(retirement_tax(ahv + bvg, balance, canton, married))
+            rows.append({
+                "age": age, "year": r["years"][0] + i,
+                "ahv": ahv / 12, "bvg": bvg / 12, "fund": payout / 12, "tax": tax / 12,
+                "net": (ahv + bvg + payout - tax) / 12,
+                "fund_balance": balance,
+            })
+            balance = (balance - payout) * (1 + real_rate)
+        return {
+            "retirement_age": retirement_age,
+            "fund_start": opening,
+            "fund_inflows": [{"age": a, "amount": v} for a, v in sorted(later.items())],
+            "spending_monthly": (r["retirement_spending"] or 0.0) / 12,
+            "rows": rows,
+        }
+
     def compare_bvg_options(self, pension_records: List[Dict], **run_kwargs) -> Dict[str, Any]:
         """Pensionskasse ganz als Rente, ganz als Kapital (nach Steuer ins freie
         Vermoegen, dort weiter angelegt) und — wenn es davon abweicht — wie

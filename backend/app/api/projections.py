@@ -238,6 +238,7 @@ async def _run_kwargs(
     current_user: User,
     db: AsyncSession,
     until_age: Optional[int] = None,
+    exact_retirement: bool = False,
 ) -> Dict[str, Any]:
     """Argumente fuer ProjectionService.run() aus Szenario und Anfrage.
     `until_age` rechnet bis zu diesem Alter statt ueber den Horizont der
@@ -307,9 +308,10 @@ async def _run_kwargs(
     planned_retirement = merged.get("retirement_age", 65)
     early_years = flow_inputs.pop("early_retirement_years", 3)
     active_scenarios = flow_inputs.get("active_scenarios", [])
+    # `exact_retirement`: das Alter ist ausdruecklich gewaehlt (Einkommensplan)
     retirement = (
         planned_retirement - early_years
-        if "early_retirement" in active_scenarios
+        if "early_retirement" in active_scenarios and not exact_retirement
         else planned_retirement
     )
 
@@ -387,6 +389,53 @@ async def run_projection(
     result_dict["runs"] = settings.monte_carlo_runs
 
     return ProjectionResult(**result_dict)
+
+
+class IncomePlanRequest(ProjectionParameters):
+    """Wie /run, dazu der Entnahmeplan des Fonds."""
+    fund_return: float = Field(default=0.04, ge=-0.05, le=0.15)
+    # None = nur der Ertrag, das Kapital bleibt
+    payout_until_age: Optional[int] = Field(default=90, ge=60, le=110)
+    indexed: bool = True
+    include_wealth: bool = True
+
+
+class IncomePlanRow(BaseModel):
+    age: int
+    year: int
+    ahv: float
+    bvg: float
+    fund: float
+    tax: float
+    net: float
+    fund_balance: float
+
+
+class IncomePlan(BaseModel):
+    """Monatsbetraege in heutigen CHF ab dem Rentenalter."""
+    retirement_age: int
+    fund_start: float
+    fund_inflows: List[Dict[str, float]]
+    spending_monthly: float
+    rows: List[IncomePlanRow]
+
+
+@router.post("/income-plan", response_model=IncomePlan)
+async def income_plan(
+    params: IncomePlanRequest,
+    scenario_id: Optional[int] = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Monatliches Einkommen ab dem gewaehlten Rentenalter: Renten plus
+    Entnahmeplan aus einem Fonds (ProjectionService.income_plan)."""
+    plan = params.model_dump(include={"fund_return", "payout_until_age", "indexed", "include_wealth"})
+    base = ProjectionParameters(**params.model_dump(
+        exclude_unset=True, exclude={"fund_return", "payout_until_age", "indexed", "include_wealth"},
+    ))
+    kwargs = await _run_kwargs(base, scenario_id, current_user, db,
+                               until_age=COMPARISON_END_AGE, exact_retirement=True)
+    return projection_service.income_plan(**plan, until_age=COMPARISON_END_AGE, **kwargs)
 
 
 #: Der Vergleich Rente/Kapital rechnet bis 95 — Langlebigkeit ist das Risiko

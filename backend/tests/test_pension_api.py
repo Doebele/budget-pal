@@ -198,3 +198,16 @@ def test_compare_pension_or_capital(client):
         "date_of_birth": dob, "retirement_age": 65, "years_to_project": 30,
     }).json()
     assert run["retirement_tax"][14] == 0 and run["retirement_tax"][15] > 0
+
+
+def test_income_plan_endpoint(client):
+    client.post("/api/pension", json={"pillar": "2", "current_balance": 400_000, "capital_share": 1.0})
+    res = client.post("/api/projections/income-plan", json={
+        "current_net_worth": 100_000, "annual_savings": 10_000, "annual_income": 90_000,
+        "date_of_birth": f"{datetime.now().year - 55}-06-01", "retirement_age": 62,
+        "fund_return": 0.04, "payout_until_age": 90,
+    })
+    assert res.status_code == 200, res.text
+    data = res.json()
+    assert data["retirement_age"] == 62 and data["rows"][-1]["age"] == 95
+    assert data["rows"][0]["fund"] > 0

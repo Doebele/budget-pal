@@ -8,6 +8,7 @@ import MonteCarloChart from "@/components/charts/MonteCarloChart";
 import WithdrawalPlan from "@/components/WithdrawalPlan";
 import PensionOverviewChart, { PILLAR_COLORS } from "@/components/charts/PensionOverviewChart";
 import BvgComparisonCard from "@/components/BvgComparisonCard";
+import IncomePlanCard from "@/components/IncomePlanCard";
 import { Refresh } from "@/lib/icons";
 import { useTranslation } from "react-i18next";
 
@@ -421,6 +422,8 @@ export default function Projections() {
           ))}
         </div>
       </div>
+
+      <IncomePlanCard body={runBody} scenarioId={scenarioId} defaultAge={params.retirement_age} />
 
       {bvgComparison && bvgComparison.variants.length > 0 && <BvgComparisonCard data={bvgComparison} />}
 

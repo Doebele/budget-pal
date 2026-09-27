@@ -262,7 +262,31 @@ export interface BvgComparison {
   breakeven_age: number | null;
 }
 
+/** Monatliches Einkommen ab dem Rentenalter, heutige CHF (Monatsbetraege). */
+export interface IncomePlanRow {
+  age: number;
+  year: number;
+  ahv: number;
+  bvg: number;
+  fund: number;
+  tax: number;
+  net: number;
+  fund_balance: number;
+}
+
+export interface IncomePlan {
+  retirement_age: number;
+  fund_start: number;
+  fund_inflows: { age: number; amount: number }[];
+  spending_monthly: number;
+  rows: IncomePlanRow[];
+}
+
 export const projectionsApi = {
+  incomePlan: (params: Record<string, unknown>, scenarioId?: number) =>
+    api.post<IncomePlan>("/projections/income-plan", params, {
+      params: scenarioId ? { scenario_id: scenarioId } : {},
+    }),
   run: (params: Record<string, unknown>, scenarioId?: number) =>
     api.post<ProjectionResult>("/projections/run", params, {
       params: scenarioId ? { scenario_id: scenarioId } : {},
