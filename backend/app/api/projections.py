@@ -438,6 +438,43 @@ async def income_plan(
     return projection_service.income_plan(**plan, until_age=COMPARISON_END_AGE, **kwargs)
 
 
+class ScenarioCell(BaseModel):
+    age: int
+    capital_share: float
+    net_start: float
+    net_75: Optional[float] = None
+    net_85: Optional[float] = None
+    success_rate: float
+    depletion_age: Optional[int] = None
+    wealth_85: Optional[float] = None
+    capital_tax: float
+
+
+class RetirementScenarios(BaseModel):
+    """Rentenalter x Pensionskasse als Kapital; Monatsbetraege netto, heutige CHF."""
+    ages: List[int]
+    shares: List[float]
+    planned_age: int
+    own_share: float
+    cells: List[ScenarioCell]
+    # Hinweise als Uebersetzungsschluessel mit Werten
+    hints: List[Dict[str, Any]]
+
+
+@router.post("/retirement-scenarios", response_model=RetirementScenarios)
+async def retirement_scenarios(
+    params: ProjectionParameters,
+    scenario_id: Optional[int] = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Szenarienmatrix und Hinweise (ProjectionService.retirement_scenarios)."""
+    kwargs = await _run_kwargs(params, scenario_id, current_user, db, until_age=COMPARISON_END_AGE)
+    return projection_service.retirement_scenarios(
+        life_expectancy=kwargs.get("drawdown_until_age", 90), **kwargs,
+    )
+
+
 #: Der Vergleich Rente/Kapital rechnet bis 95 — Langlebigkeit ist das Risiko
 #: des Kapitalbezugs.
 COMPARISON_END_AGE = 95

@@ -9,6 +9,7 @@ import WithdrawalPlan from "@/components/WithdrawalPlan";
 import PensionOverviewChart, { PILLAR_COLORS } from "@/components/charts/PensionOverviewChart";
 import BvgComparisonCard from "@/components/BvgComparisonCard";
 import IncomePlanCard from "@/components/IncomePlanCard";
+import ScenarioMatrixCard from "@/components/ScenarioMatrixCard";
 import { Refresh } from "@/lib/icons";
 import { useTranslation } from "react-i18next";
 
@@ -124,6 +125,12 @@ export default function Projections() {
   const { data: bvgComparison } = useQuery({
     queryKey: ["bvg-comparison", runBody, scenarioId],
     queryFn: () => projectionsApi.compareBvg(runBody, scenarioId ?? undefined).then((r) => r.data),
+  });
+
+  // Szenarienmatrix Rentenalter x Pensionskasse, mit Hinweisen
+  const { data: scenarioMatrix } = useQuery({
+    queryKey: ["retirement-scenarios", runBody, scenarioId],
+    queryFn: () => projectionsApi.retirementScenarios(runBody, scenarioId ?? undefined).then((r) => r.data),
   });
 
   const { data: projection, isLoading, refetch } = useQuery({
@@ -424,6 +431,8 @@ export default function Projections() {
       </div>
 
       <IncomePlanCard body={runBody} scenarioId={scenarioId} defaultAge={params.retirement_age} />
+
+      {scenarioMatrix && scenarioMatrix.cells.length > 0 && <ScenarioMatrixCard data={scenarioMatrix} />}
 
       {bvgComparison && bvgComparison.variants.length > 0 && <BvgComparisonCard data={bvgComparison} />}
 

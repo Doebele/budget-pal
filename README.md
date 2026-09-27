@@ -672,6 +672,10 @@ Rentendiagramm über `/api/pension/estimate`):
   und Auszahlung aus einem Fonds, in den die Kapitalbezüge (und auf Wunsch das freie Vermögen)
   fliessen – Rendite, Auszahldauer (bis 85/90/95 oder nur Ertrag) und Teuerungsausgleich wählbar,
   netto nach Steuern, dazu der Abbau des Fondsvermögens.
+- **Szenarien und Hinweise:** Matrix Rentenalter (60/62/63/65 und das eigene) × Pensionskasse als
+  Rente, halb/halb oder Kapital – Nettoeinkommen pro Monat, mit 75, Erfolgsquote – und Hinweise aus
+  den eigenen Zahlen (Kosten der Frühpensionierung, AHV-Brücke, Rente oder Kapital, Staffelung,
+  Lebensversicherung, Sperrfrist nach Einkauf). Keine Anlageberatung.
 - **Vergleich mit dem Median:** einblendbare Linie in Vermögensprognose, Rentenübersicht und
   Ruhestandsplaner – Median des freien Vermögens im selben Alter (Steuerdaten Kanton Luzern 2020,
   LUSTAT, als Näherung; eine schweizweite Statistik nach Alter gibt es nicht), dazu der Median der
