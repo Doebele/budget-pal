@@ -984,5 +984,11 @@
     "hint_lifeInsurance": "The life insurance pays about {{amount}} tax-free at {{age}}. Invested in the fund it feeds the income plan; if you don't need the return, keep it as a reserve for larger expenses.",
     "hint_buyInLock": "Buy-ins into the pension fund save tax but are locked for 3 years before a lump-sum withdrawal – otherwise the deductions are reversed. Announce the lump sum early to your fund.",
     "disclaimer": "Model calculation with your details and general rules – not investment, financial or tax advice. Consult your pension fund and a professional for decisions."
+  },
+  "params": {
+    "retirementAge": "Retirement age",
+    "meanReturn": "Avg. return p.a. (%)",
+    "volatility": "Volatility σ (%)",
+    "inflation": "CHF inflation p.a. (%)"
   }
 }

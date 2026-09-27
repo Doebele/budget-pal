@@ -255,7 +255,7 @@ export default function Projections() {
             />
           </div>
           <div>
-            <label className="label">Rentenalter</label>
+            <label className="label">{t("pages:params.retirementAge")}</label>
             <input
               type="number"
               className="input"
@@ -263,36 +263,23 @@ export default function Projections() {
               onChange={(e) => setParams((p) => ({ ...p, retirement_age: +e.target.value }))}
             />
           </div>
-          <div>
-            <label className="label">Ø Rendite p.a.</label>
-            <input
-              type="number"
-              step="0.01"
-              className="input"
-              value={params.mean_return}
-              onChange={(e) => setParams((p) => ({ ...p, mean_return: +e.target.value }))}
-            />
-          </div>
-          <div>
-            <label className="label">{t("pages:misc.r37")}</label>
-            <input
-              type="number"
-              step="0.01"
-              className="input"
-              value={params.return_volatility}
-              onChange={(e) => setParams((p) => ({ ...p, return_volatility: +e.target.value }))}
-            />
-          </div>
-          <div>
-            <label className="label">Inflation CHF</label>
-            <input
-              type="number"
-              step="0.001"
-              className="input"
-              value={params.inflation_rate}
-              onChange={(e) => setParams((p) => ({ ...p, inflation_rate: +e.target.value }))}
-            />
-          </div>
+          {/* Die Rechnung arbeitet mit Bruchteilen (0.015), angezeigt werden Prozent (1.5) */}
+          {([
+            ["mean_return", "pages:params.meanReturn", 0.5],
+            ["return_volatility", "pages:params.volatility", 0.5],
+            ["inflation_rate", "pages:params.inflation", 0.1],
+          ] as const).map(([key, label, step]) => (
+            <div key={key}>
+              <label className="label">{t(label)}</label>
+              <input
+                type="number"
+                step={step}
+                className="input"
+                value={Math.round(params[key] * 1000) / 10}
+                onChange={(e) => setParams((p) => ({ ...p, [key]: +e.target.value / 100 }))}
+              />
+            </div>
+          ))}
           <div>
             <label className="label">{t("pages:ui.retirementSpendingLabel")}</label>
             <input

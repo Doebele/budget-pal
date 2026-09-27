@@ -984,5 +984,11 @@
     "hint_lifeInsurance": "Die Lebensversicherung zahlt mit {{age}} rund {{amount}} steuerfrei aus. Im Fonds angelegt fliesst sie in den Einkommensplan; wer keine Rendite braucht, hält sie als Reserve für grössere Ausgaben.",
     "hint_buyInLock": "Einkäufe in die Pensionskasse sparen Steuern, sind aber 3 Jahre vor einem Kapitalbezug gesperrt – sonst werden die Abzüge rückgängig gemacht. Den Kapitalbezug früh bei der Kasse anmelden.",
     "disclaimer": "Modellrechnung mit Ihren Angaben und allgemeinen Regeln – keine Anlage-, Finanz- oder Steuerberatung. Für Entscheide Ihre Pensionskasse und eine Fachperson beiziehen."
+  },
+  "params": {
+    "retirementAge": "Rentenalter",
+    "meanReturn": "Ø Rendite p.a. (%)",
+    "volatility": "Volatilität σ (%)",
+    "inflation": "Teuerung CHF p.a. (%)"
   }
 }
