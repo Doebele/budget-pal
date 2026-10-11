@@ -85,7 +85,7 @@ export default function ProviderSidebar({
             title={viewMode === "simple" ? "Individuelle Eingabe" : "Einfache Ansicht"}
             onClick={() => switchMode(viewMode === "simple" ? "individual" : "simple")}
             className={clsx(
-              "p-1.5 rounded-md transition-all flex-shrink-0",
+              "p-1 rounded-md transition-all flex-shrink-0",
               viewMode === "individual"
                 ? "bg-accent/20 text-accent"
                 : "text-text-tertiary hover:text-text-primary hover:bg-white/[0.05]"
@@ -116,7 +116,7 @@ export default function ProviderSidebar({
         {/* Peer popularity */}
         {(provider.peerPopularity ?? 0) > 0 && (
           <div className="flex items-start gap-2 bg-accent/8 border border-accent/15 rounded-lg px-3 py-2">
-            <Group className="w-3.5 h-3.5 text-accent flex-shrink-0 mt-0.5" />
+            <Group className="w-3.5 h-3.5 text-accent flex-shrink-0 mt-1" />
             <p className="text-text-secondary text-xs leading-relaxed">
               <strong className="text-accent">{provider.peerPopularity}%</strong> {t("pages:ui.deiner_peer_gruppe_nutzen_diesen_dienst")}
             </p>
@@ -127,8 +127,8 @@ export default function ProviderSidebar({
         {viewMode === "simple" && (
           <>
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-2">{t("pages:step5.s08")}</p>
-              <div className="space-y-1.5">
+              <p className="text-[10px] font-semibold text-text-tertiary mb-2">{t("pages:step5.s08")}</p>
+              <div className="space-y-1">
                 {provider.variants.map(variant => {
                   const isActive = entry?.variantId === variant.id && entry?.customPrice == null;
                   return (
@@ -138,7 +138,7 @@ export default function ProviderSidebar({
                       disabled={!entry}
                       onClick={() => entry && onUpdate({ variantId: variant.id, customPrice: undefined })}
                       className={clsx(
-                        "w-full flex items-start justify-between rounded-md px-3 py-2.5 text-left text-xs transition-all border",
+                        "w-full flex items-start justify-between rounded-md px-3 py-2 text-left text-xs transition-all border",
                         isActive
                           ? "border-accent/60 bg-accent/12 text-text-primary"
                           : "border-border/50 hover:border-border text-text-secondary hover:bg-white/[0.03]",
@@ -147,7 +147,7 @@ export default function ProviderSidebar({
                     >
                       <div className="flex items-start gap-2">
                         <div className={clsx(
-                          "w-3.5 h-3.5 rounded-full border mt-0.5 flex-shrink-0 flex items-center justify-center transition-all",
+                          "w-3.5 h-3.5 rounded-full border mt-1 flex-shrink-0 flex items-center justify-center transition-all",
                           isActive ? "border-accent bg-accent" : "border-white/25"
                         )}>
                           {isActive && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
@@ -156,15 +156,15 @@ export default function ProviderSidebar({
                           <div className="font-medium flex items-center gap-1 flex-wrap">
                             {catalogText(variant.label)}
                             {variant.popular && (
-                              <span className="text-[9px] bg-gain/15 text-gain px-1.5 py-px rounded-full font-semibold">{t("pages:step5.s04")}</span>
+                              <span className="text-[9px] bg-gain/15 text-gain px-1 py-px rounded-full font-semibold">{t("pages:step5.s04")}</span>
                             )}
                           </div>
                           {variant.description && (
-                            <div className="text-text-tertiary text-[10px] mt-0.5">{catalogText(variant.description)}</div>
+                            <div className="text-text-tertiary text-[10px] mt-1">{catalogText(variant.description)}</div>
                           )}
                         </div>
                       </div>
-                      <span className={clsx("font-mono flex-shrink-0 ml-2 mt-0.5 text-xs", isActive ? "text-accent font-semibold" : "text-text-tertiary")}>
+                      <span className={clsx("font-mono flex-shrink-0 ml-2 mt-1 text-xs", isActive ? "text-accent font-semibold" : "text-text-tertiary")}>
                         {fchf(variant.price)}
                       </span>
                     </button>
@@ -184,7 +184,7 @@ export default function ProviderSidebar({
                         }
                       }}
                       className={clsx(
-                        "w-full flex items-start justify-between rounded-md px-3 py-2.5 text-left text-xs transition-all border",
+                        "w-full flex items-start justify-between rounded-md px-3 py-2 text-left text-xs transition-all border",
                         isCustomActive
                           ? "border-accent/60 bg-accent/12 text-text-primary"
                           : "border-border/50 hover:border-border text-text-secondary hover:bg-white/[0.03]"
@@ -192,7 +192,7 @@ export default function ProviderSidebar({
                     >
                       <div className="flex items-start gap-2 flex-1 min-w-0">
                         <div className={clsx(
-                          "w-3.5 h-3.5 rounded-full border mt-0.5 flex-shrink-0 flex items-center justify-center transition-all",
+                          "w-3.5 h-3.5 rounded-full border mt-1 flex-shrink-0 flex items-center justify-center transition-all",
                           isCustomActive ? "border-accent bg-accent" : "border-white/25"
                         )}>
                           {isCustomActive && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
@@ -203,13 +203,13 @@ export default function ProviderSidebar({
                             {t("pages:ui.eigener_preis")}
                           </div>
                           {isCustomActive && (
-                            <div className="flex items-center gap-1.5 mt-1.5" onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center gap-1 mt-1" onClick={e => e.stopPropagation()}>
                               <div className="relative">
                                 <span className="absolute left-2 top-1/2 -translate-y-1/2 text-text-tertiary text-xs pointer-events-none">CHF</span>
                                 <input
                                   ref={customInputRef}
                                   type="number"
-                                  className="input pl-9 text-sm w-28"
+                                  className="input input-amount pl-9 text-sm w-28"
                                   placeholder="0.00"
                                   value={entry.customPrice === 0 ? "" : (entry.customPrice ?? "")}
                                   onChange={e => onUpdate({ customPrice: e.target.value ? parseFloat(e.target.value) : 0 })}
@@ -231,7 +231,7 @@ export default function ProviderSidebar({
                         </div>
                       </div>
                       {!isCustomActive && (
-                        <span className="font-mono flex-shrink-0 ml-2 mt-0.5 text-xs text-text-tertiary">—</span>
+                        <span className="font-mono flex-shrink-0 ml-2 mt-1 text-xs text-text-tertiary">—</span>
                       )}
                     </button>
                   );
@@ -245,7 +245,7 @@ export default function ProviderSidebar({
             {/* Note */}
             {entry && (
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">{t("pages:step5.s07")}</p>
+                <p className="text-[10px] font-semibold text-text-tertiary mb-1">{t("pages:step5.s07")}</p>
                 <input
                   type="text"
                   className="input text-sm w-full"
@@ -263,12 +263,12 @@ export default function ProviderSidebar({
           <>
             {/* Amount + Currency */}
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">{t("pages:step5.s05")}</p>
+              <p className="text-[10px] font-semibold text-text-tertiary mb-1">{t("pages:step5.s05")}</p>
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <input
                     type="number"
-                    className="input text-sm w-full pr-2"
+                    className="input input-amount text-sm w-full pr-2"
                     placeholder="0.00"
                     value={entry.individualAmount ?? ""}
                     onChange={e => onUpdate({ individualAmount: e.target.value ? parseFloat(e.target.value) : undefined })}
@@ -296,8 +296,8 @@ export default function ProviderSidebar({
 
             {/* Frequency */}
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">{t("pages:step5.s10")}</p>
-              <div className="grid grid-cols-2 gap-1.5">
+              <p className="text-[10px] font-semibold text-text-tertiary mb-1">{t("pages:step5.s10")}</p>
+              <div className="grid grid-cols-2 gap-1">
                 {FREQUENCIES.map(freq => (
                   <button
                     key={freq}
@@ -318,8 +318,8 @@ export default function ProviderSidebar({
 
             {/* First payment date */}
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">
-                <Calendar className="w-3 h-3 inline mr-1 mb-0.5" />
+              <p className="text-[10px] font-semibold text-text-tertiary mb-1">
+                <Calendar className="w-3 h-3 inline mr-1 mb-1" />
                 Erste Zahlung
               </p>
               <input
@@ -333,7 +333,7 @@ export default function ProviderSidebar({
 
             {/* Note */}
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">{t("pages:step5.s07")}</p>
+              <p className="text-[10px] font-semibold text-text-tertiary mb-1">{t("pages:step5.s07")}</p>
               <input
                 type="text"
                 className="input text-sm w-full"
@@ -351,7 +351,7 @@ export default function ProviderSidebar({
             href={provider.website}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-accent hover:text-accent-light text-xs transition-colors"
+            className="flex items-center gap-1 text-accent hover:text-accent-light text-xs transition-colors"
           >
             <OpenNewWindow className="w-3 h-3" />
             {t("pages:ui.webseite_besuchen")}
@@ -364,7 +364,7 @@ export default function ProviderSidebar({
             <button
               type="button"
               onClick={onDeselect}
-              className="w-full flex items-center justify-center gap-1.5 rounded-md border border-loss/30 bg-loss/8 text-loss hover:bg-loss/15 px-3 py-2 text-xs font-medium transition-all"
+              className="w-full flex items-center justify-center gap-1 rounded-md border border-loss/30 bg-loss/8 text-loss hover:bg-loss/15 px-3 py-2 text-xs font-medium transition-all"
             >
               <Trash className="w-3 h-3" />
               {t("pages:ui.entfernen")}
@@ -387,7 +387,7 @@ export default function ProviderSidebar({
         <footer className="flex-shrink-0 border-t border-border/50 bg-bg-surface2 px-4 py-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-text-tertiary text-[10px] uppercase tracking-wide font-semibold">{t("pages:step5.s06")}</p>
+              <p className="text-text-tertiary text-[10px] font-semibold">{t("pages:step5.s06")}</p>
               {viewMode === "individual" && entry.frequency && entry.frequency !== "monthly" && (
                 <p className="text-text-tertiary text-[10px]">{FREQUENCY_LABELS[entry.frequency ?? "monthly"]}</p>
               )}

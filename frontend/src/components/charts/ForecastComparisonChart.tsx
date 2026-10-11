@@ -140,7 +140,7 @@ function CustomTooltip({ active, payload, label, peerNet, empiricalNet }: any) {
     <div className="bg-bg-surface border border-border rounded-lg p-3 shadow-xl text-xs space-y-1 min-w-[200px]">
       <p className="font-semibold text-text-primary mb-1">{formatMonth(label)}</p>
       {isForecast && (
-        <span className="inline-block border msg-info text-[10px] px-1.5 py-0.5 rounded mb-1">
+        <span className="inline-block border msg-info text-[10px] px-1 py-1 rounded mb-1">
           Prognose
         </span>
       )}
@@ -164,7 +164,7 @@ function CustomTooltip({ active, payload, label, peerNet, empiricalNet }: any) {
       )}
       {/* Always show peer/empirical reference in tooltip */}
       {(peerNet !== 0 || empiricalNet !== 0) && (
-        <div className="border-t border-border/50 pt-1 mt-1 space-y-0.5">
+        <div className="border-t border-border/50 pt-1 mt-1 space-y-1">
           {peerNet !== 0 && (
             <div className="flex justify-between gap-4">
               <span style={{ color: COLORS.peer }} className="flex items-center gap-1">
@@ -186,7 +186,7 @@ function CustomTooltip({ active, payload, label, peerNet, empiricalNet }: any) {
         </div>
       )}
       {isForecast && payload[0]?.payload?.peer_calibrated && (
-        <div className="text-[10px] txt-info pt-0.5">⊕ Peer-Gruppe kalibriert</div>
+        <div className="text-[10px] txt-info pt-1">⊕ Peer-Gruppe kalibriert</div>
       )}
     </div>
   );
@@ -213,7 +213,7 @@ function LinePill({
     <button
       onClick={() => onToggle(id)}
       className={clsx(
-        "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all border",
+        "flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium transition-all border",
         active
           ? "border-transparent text-white"
           : "border-border/50 text-text-tertiary bg-transparent hover:text-text-secondary"
@@ -307,7 +307,7 @@ export default function ForecastComparisonChart({
   return (
     <div className="space-y-3">
       {/* ── Toggle controls ── */}
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap gap-1">
         {(Object.keys(DEFAULT_VISIBILITY) as (keyof LineVisibility)[]).map((key) => (
           <LinePill
             key={key}

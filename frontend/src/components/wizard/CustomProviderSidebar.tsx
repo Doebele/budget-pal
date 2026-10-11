@@ -152,7 +152,7 @@ export default function CustomProviderSidebar({
 
         {/* Name */}
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">
+          <p className="text-[10px] font-semibold text-text-tertiary mb-1">
             Name
           </p>
           <input
@@ -167,7 +167,7 @@ export default function CustomProviderSidebar({
 
         {/* Website */}
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">
+          <p className="text-[10px] font-semibold text-text-tertiary mb-1">
             Website <span className="normal-case font-normal">(optional)</span>
           </p>
           <div className="relative flex items-center gap-2">
@@ -197,7 +197,7 @@ export default function CustomProviderSidebar({
 
         {/* Kategorie */}
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">
+          <p className="text-[10px] font-semibold text-text-tertiary mb-1">
             {t("pages:ui.kategorie")}
           </p>
           <select
@@ -213,13 +213,13 @@ export default function CustomProviderSidebar({
 
         {/* Betrag */}
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">
+          <p className="text-[10px] font-semibold text-text-tertiary mb-1">
             {t("pages:ui.betrag")}
           </p>
           <div className="flex gap-2">
             <input
               type="number"
-              className="input text-sm flex-1"
+              className="input input-amount text-sm flex-1"
               placeholder="0.00"
               value={amount}
               onChange={e => setAmount(e.target.value)}
@@ -246,10 +246,10 @@ export default function CustomProviderSidebar({
 
         {/* Zahlungsrhythmus */}
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">
+          <p className="text-[10px] font-semibold text-text-tertiary mb-1">
             Zahlungsrhythmus
           </p>
-          <div className="grid grid-cols-2 gap-1.5">
+          <div className="grid grid-cols-2 gap-1">
             {FREQUENCIES.map(freq => (
               <button
                 key={freq}
@@ -270,8 +270,8 @@ export default function CustomProviderSidebar({
 
         {/* Erste Zahlung */}
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">
-            <Calendar className="w-3 h-3 inline mr-1 mb-0.5" />
+          <p className="text-[10px] font-semibold text-text-tertiary mb-1">
+            <Calendar className="w-3 h-3 inline mr-1 mb-1" />
             Erste Zahlung <span className="normal-case font-normal">(optional)</span>
           </p>
           <input
@@ -285,7 +285,7 @@ export default function CustomProviderSidebar({
 
         {/* Notiz */}
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary mb-1.5">
+          <p className="text-[10px] font-semibold text-text-tertiary mb-1">
             Notiz <span className="normal-case font-normal">(optional)</span>
           </p>
           <input
@@ -303,7 +303,7 @@ export default function CustomProviderSidebar({
             <button
               type="button"
               onClick={() => onDelete(entry!.id)}
-              className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-loss/30 bg-loss/8 text-loss hover:bg-loss/15 px-3 py-2 text-xs font-medium transition-all"
+              className="w-full flex items-center justify-center gap-1 rounded-lg border border-loss/30 bg-loss/8 text-loss hover:bg-loss/15 px-3 py-2 text-xs font-medium transition-all"
             >
               <Trash className="w-3 h-3" />
               {t("pages:ui.anbieter_loeschen")}
@@ -316,7 +316,7 @@ export default function CustomProviderSidebar({
       <footer className="flex-shrink-0 border-t border-border/50 bg-bg-surface2 px-4 py-3 space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-text-tertiary text-[10px] uppercase tracking-wide font-semibold">
+            <p className="text-text-tertiary text-[10px] font-semibold">
               {t("pages:ui.monatlicher_betrag")}
             </p>
             {frequency !== "monthly" && (
@@ -340,7 +340,7 @@ export default function CustomProviderSidebar({
           disabled={!canSave}
           onClick={handleSave}
           className={clsx(
-            "w-full flex items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 text-sm font-semibold transition-all",
+            "w-full flex items-center justify-center gap-1 rounded-lg px-3 py-2 text-sm font-semibold transition-all",
             canSave
               ? "btn-primary"
               : "bg-bg-surface2 text-text-tertiary border border-border/50 cursor-not-allowed opacity-50"

@@ -63,7 +63,7 @@ export default function Login() {
         </div>
 
         <div className="card">
-          <h1 className="text-text-primary font-semibold text-lg mb-6">{t("login.title")}</h1>
+          <h1 className="text-xl font-light text-text-primary mb-6">{t("login.title")}</h1>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -87,7 +87,7 @@ export default function Login() {
                 required
                 autoComplete="current-password"
               />
-              <div className="text-right mt-1.5">
+              <div className="text-right mt-1">
                 <Link to="/forgot-password" className="text-accent hover:text-accent-light text-xs">
                   {t("login.forgot")}
                 </Link>
@@ -100,7 +100,7 @@ export default function Login() {
               </p>
             )}
 
-            <button type="submit" className="btn-primary w-full py-2.5" disabled={loading}>
+            <button type="submit" className="btn-primary w-full py-2" disabled={loading}>
               {loading ? t("login.loading") : t("login.submit")}
             </button>
           </form>
@@ -116,7 +116,7 @@ export default function Login() {
                 type="button"
                 onClick={handlePasskeyLogin}
                 disabled={passkeyLoading}
-                className="btn-secondary w-full py-2.5 flex items-center justify-center gap-2"
+                className="btn-secondary w-full py-2 flex items-center justify-center gap-2"
               >
                 <Key className="w-4 h-4" />
                 {passkeyLoading ? t("login.passkeyWaiting") : t("login.passkey")}

@@ -126,7 +126,7 @@ function IncomeComparison({
   const above = delta >= 0;
 
   return (
-    <div className="space-y-2.5">
+    <div className="space-y-2">
       <div className="flex items-center gap-3">
         <span className="text-text-tertiary text-xs w-24 shrink-0">{t("pages:misc.r17")}</span>
         <div className="flex-1 h-2.5 bg-white/8 rounded-full overflow-hidden">
@@ -216,7 +216,7 @@ export default function PeerGroupCard({
       )}
     >
       {/* ── Header card ─────────────────────────────────── */}
-      <div className="card border-accent/20 bg-accent/5">
+      <div className="card">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-lg bg-accent/20 flex items-center justify-center shrink-0">
@@ -226,7 +226,7 @@ export default function PeerGroupCard({
               <h3 className="text-text-primary font-semibold text-sm leading-tight">
                 {defaults.peerLabel}
               </h3>
-              <p className="text-text-tertiary text-xs mt-0.5">{defaults.sampleSize}</p>
+              <p className="text-text-tertiary text-xs mt-1">{defaults.sampleSize}</p>
             </div>
           </div>
           <span className={clsx("badge shrink-0", confidenceColor)}>
@@ -255,7 +255,7 @@ export default function PeerGroupCard({
       {/* ── Expense breakdown ────────────────────────────── */}
       <div className="card">
         <h4 className="text-text-primary text-sm font-medium mb-4">{t("pages:misc.r18")}</h4>
-        <div className="space-y-2.5">
+        <div className="space-y-2">
           {DISPLAY_CATEGORIES.filter(c => c.key !== "savings_rate").map((cat, i) => (
             <BarRow
               key={cat.key}
@@ -275,7 +275,7 @@ export default function PeerGroupCard({
           {t("pages:ui.basierend_auf_bfs_daten_fuer_dein_profil_kli")}
         </p>
 
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {DISPLAY_CATEGORIES.map((cat, i) => {
             const rawValue = defaults[cat.key];
             const isSavings = cat.key === "savings_rate";
@@ -292,9 +292,9 @@ export default function PeerGroupCard({
                 style={{ animationDelay: `${i * 60 + 200}ms` }}
                 onClick={() => !isEditing && startEdit(cat.key)}
               >
-                <div className="flex items-center gap-1.5 mb-1.5">
+                <div className="flex items-center gap-1 mb-1">
                   <span className="text-base leading-none">{cat.icon}</span>
-                  <span className="text-text-tertiary text-[10px] font-medium uppercase tracking-wide">
+                  <span className="text-text-tertiary text-[10px] font-medium">
                     {cat.label}
                   </span>
                 </div>
@@ -303,7 +303,7 @@ export default function PeerGroupCard({
                   <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                     <input
                       type="number"
-                      className="input py-1 px-2 text-xs w-full"
+                      className="input input-amount py-1 px-2 text-xs w-full"
                       value={editValue}
                       onChange={(e) => setEditValue(e.target.value)}
                       onKeyDown={(e) => {
@@ -313,7 +313,7 @@ export default function PeerGroupCard({
                       autoFocus
                     />
                     <button
-                      className="text-accent text-xs px-1.5 py-1 rounded hover:bg-accent/10 shrink-0"
+                      className="text-accent text-xs px-1 py-1 rounded hover:bg-accent/10 shrink-0"
                       onClick={() => handleEditSave(cat.key)}
                     >
                       OK

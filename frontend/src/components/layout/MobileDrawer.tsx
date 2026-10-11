@@ -41,7 +41,7 @@ export default function MobileDrawer() {
                 to={item.path}
                 onClick={() => setOpen(false)}
                 className={clsx(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-all duration-150",
+                  "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all duration-150",
                   isNavItemActive(location.pathname, item.path)
                     ? "bg-accent/15 text-accent"
                     : "text-text-secondary hover:text-text-primary hover:bg-bg-surface2"
@@ -64,7 +64,7 @@ export default function MobileDrawer() {
           to={SETTINGS_ITEM.path}
           onClick={() => setOpen(false)}
           className={clsx(
-            "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-all duration-150",
+            "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all duration-150",
             isNavItemActive(location.pathname, SETTINGS_ITEM.path)
               ? "bg-accent/15 text-accent"
               : "text-text-secondary hover:text-text-primary hover:bg-bg-surface2"
@@ -74,7 +74,7 @@ export default function MobileDrawer() {
           <span>{t(SETTINGS_ITEM.labelKey)}</span>
         </NavLink>
 
-        <div className="flex items-center gap-3 px-3 py-2.5 mt-1">
+        <div className="flex items-center gap-3 px-3 py-2 mt-1">
           <div className="w-7 h-7 rounded-full bg-accent/20 border border-accent/30 flex items-center justify-center flex-shrink-0">
             <span className="text-accent text-xs font-semibold">
               {user?.name?.charAt(0).toUpperCase() || "U"}

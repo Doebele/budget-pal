@@ -221,8 +221,8 @@ export default function Accounts() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-display text-text-primary">{t("pages:accounts.title")}</h1>
-          <p className="text-text-tertiary text-sm mt-0.5">
+          <h1 className="text-xl font-light text-text-primary">{t("pages:accounts.title")}</h1>
+          <p className="text-text-tertiary text-sm mt-1">
             Gesamtsaldo:{" "}
             <span className="text-text-primary font-mono font-semibold">
               {formatCHF(totalBalance)}
@@ -274,7 +274,7 @@ export default function Accounts() {
                 type="number"
                 step="0.01"
                 min="0"
-                className="input"
+                className="input input-amount"
                 value={form.balance}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, balance: +e.target.value }))
@@ -345,7 +345,7 @@ export default function Accounts() {
 
                           return (
                             <div key={category}>
-                              <div className="px-4 py-1.5 text-xs font-semibold text-text-tertiary bg-bg-elevated/50 sticky top-0">
+                              <div className="px-4 py-1 text-xs font-semibold text-text-tertiary bg-bg-elevated/50 sticky top-0">
                                 {getBankCategoryLabel(category)}
                               </div>
                               {typeBanks.map((bank) => (
@@ -353,7 +353,7 @@ export default function Accounts() {
                                   key={bank.id}
                                   type="button"
                                   className={clsx(
-                                    "w-full px-3 py-2.5 text-left text-sm hover:bg-bg-elevated transition-colors flex items-center gap-3",
+                                    "w-full px-3 py-2 text-left text-sm hover:bg-bg-elevated transition-colors flex items-center gap-3",
                                     selectedBankId === bank.id && "bg-bg-elevated/80 text-accent"
                                   )}
                                   onClick={() => {
@@ -570,7 +570,7 @@ export default function Accounts() {
                   <button
                     onClick={() => handleEditClick(account)}
                     className={clsx(
-                      "p-1.5 rounded-md transition-colors",
+                      "p-1 rounded-md transition-colors",
                       editingAccountId === account.id
                         ? "bg-accent/20 text-accent"
                         : "text-text-tertiary hover:text-text-primary hover:bg-white/5"
@@ -586,7 +586,7 @@ export default function Accounts() {
                 {/* Primary Amount: CHF Converted */}
                 <p
                   className={clsx(
-                    "text-xl font-mono font-semibold",
+                    "text-xl font-mono font-light",
                     account.balance >= 0 ? "text-text-primary" : "text-loss"
                   )}
                 >
@@ -597,7 +597,7 @@ export default function Accounts() {
                 </p>
                 {/* Secondary Amount: Original Currency (if not CHF) */}
                 {account.currency !== "CHF" && (
-                  <p className="text-xs text-text-tertiary mt-0.5">
+                  <p className="text-xs text-text-tertiary mt-1">
                     {formatCurrency(account.balance, account.currency)} (≈)
                   </p>
                 )}

@@ -89,7 +89,7 @@ export default function StepIndicator({
                 onClick={() => onStepClick?.(step)}
                 title={clickable ? t(STEP_LABELS[step - 1]) : undefined}
                 className={clsx(
-                  "flex flex-col items-center gap-1.5 rounded-lg",
+                  "flex flex-col items-center gap-1 rounded-lg",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base",
                   clickable && "group",
                   interactive && "cursor-pointer",
@@ -143,7 +143,7 @@ export default function StepIndicator({
       {/* ── Mobile: compact current / total ───────────────────── */}
       <div className={clsx("flex md:hidden items-center gap-3", className)}>
         {/* Mini dots */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1">
           {steps.map((step, i) => {
             const isCompleted = i < position;
             const isActive = step === currentStep;

@@ -96,14 +96,14 @@ export default function CategoryDrillDown({
                 <h2 className="text-text-primary font-semibold text-base truncate">
                   {superCategory.label}
                 </h2>
-                <p className="text-text-tertiary text-xs mt-0.5">
+                <p className="text-text-tertiary text-xs mt-1">
                   {months > 1 ? `${months} Monate` : "Aktueller Monat"}
                 </p>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="shrink-0 p-1.5 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-bg-elevated transition-colors"
+              className="shrink-0 p-1 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-bg-elevated transition-colors"
             >
               <Xmark className="w-5 h-5" />
             </button>
@@ -116,7 +116,7 @@ export default function CategoryDrillDown({
           {/* ── Ist vs Soll totals ───────────────── */}
           <div className="px-5 py-4 border-b border-border-subtle">
             <div className="grid grid-cols-2 gap-3 mb-3">
-              <div className="bg-bg-surface2 rounded-xl px-3 py-2.5">
+              <div className="bg-bg-surface2 rounded-xl px-3 py-2">
                 <p className="text-text-tertiary text-xs mb-1">IST (Historisch)</p>
                 <p
                   className={clsx(
@@ -127,7 +127,7 @@ export default function CategoryDrillDown({
                   {hasActual ? formatCHF(actual!) : "—"}
                 </p>
               </div>
-              <div className="bg-bg-surface2 rounded-xl px-3 py-2.5">
+              <div className="bg-bg-surface2 rounded-xl px-3 py-2">
                 <p className="text-text-tertiary text-xs mb-1">SOLL (Empirisch)</p>
                 <p className="text-lg font-mono font-semibold text-text-secondary">
                   {hasPlanned ? formatCHF(planned!) : "—"}
@@ -149,7 +149,7 @@ export default function CategoryDrillDown({
 
             {delta !== undefined && deltaPct !== undefined && (
               <div className={clsx(
-                "flex items-center gap-1.5 text-sm font-medium",
+                "flex items-center gap-1 text-sm font-medium",
                 isOver ? "text-loss" : "text-gain",
               )}>
                 {isOver
@@ -178,7 +178,7 @@ export default function CategoryDrillDown({
             <div className="px-5 py-4 border-b border-border-subtle">
               {/* Header + view toggle */}
               <div className="flex items-center justify-between mb-3 gap-2">
-                <h3 className="text-text-secondary text-xs font-semibold uppercase tracking-wide">
+                <h3 className="text-text-secondary text-xs font-semibold">
                   Ausgabenverteilung
                 </h3>
                 <div className="flex items-center rounded-lg border border-border overflow-hidden text-xs shrink-0">
@@ -188,7 +188,7 @@ export default function CategoryDrillDown({
                       type="button"
                       onClick={() => setSubView(mode)}
                       className={clsx(
-                        "px-2.5 py-1 transition-colors border-l border-border first:border-l-0",
+                        "px-2 py-1 transition-colors border-l border-border first:border-l-0",
                         subView === mode
                           ? "bg-accent/20 text-accent"
                           : "text-text-tertiary hover:text-text-secondary",
@@ -228,7 +228,7 @@ export default function CategoryDrillDown({
                 const scRef = Math.max(primaryTotal, 1);
 
                 return (
-                  <div className="space-y-2.5">
+                  <div className="space-y-2">
                     {visible.map((sub) => {
                       const hasAct  = (sub.actual  ?? 0) > 0;
                       const hasPlan = (sub.planned ?? 0) > 0;
@@ -305,14 +305,14 @@ export default function CategoryDrillDown({
           {/* ── Recent transactions ──────────────── */}
           {transactions && transactions.length > 0 && (
             <div className="px-5 py-4">
-              <h3 className="text-text-secondary text-xs font-semibold uppercase tracking-wide mb-3">
+              <h3 className="text-text-secondary text-xs font-semibold mb-3">
                 {t("pages:ui.transaktionen")}
               </h3>
               <div className="space-y-2">
                 {transactions.slice(0, 12).map((txn) => (
                   <div
                     key={txn.id}
-                    className="flex items-center justify-between py-1.5 border-b border-border-subtle last:border-0"
+                    className="flex items-center justify-between py-1 border-b border-border-subtle last:border-0"
                   >
                     <div className="min-w-0 flex-1">
                       <p className="text-text-primary text-xs font-medium truncate">

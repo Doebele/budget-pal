@@ -108,7 +108,7 @@ function makeOption(row: GaugeRow, hasPeer: boolean, colors: ThemePalette): any 
       offsetCenter: [0, actualOffset],
       fontSize: 14,
       fontWeight: 700,
-      fontFamily: "JetBrains Mono, Fira Code, monospace",
+      fontFamily: "Fira Sans, system-ui, sans-serif",
       color: isOverPeer ? "#f87171" : isOverPlan ? "#fbbf24" : sc.color,
       formatter: () => `CHF ${fmtCompact(actual)}`,
     },
@@ -135,7 +135,7 @@ function makeOption(row: GaugeRow, hasPeer: boolean, colors: ThemePalette): any 
         offsetCenter: [0, peerOffset],
         fontSize: 11,
         fontWeight: 400,
-        fontFamily: "JetBrains Mono, Fira Code, monospace",
+        fontFamily: "Fira Sans, system-ui, sans-serif",
         color: "#64748b",
         formatter: () => `Ø ${fmtCompact(peer!)}`,
       },
@@ -163,7 +163,7 @@ function makeOption(row: GaugeRow, hasPeer: boolean, colors: ThemePalette): any 
         offsetCenter: [0, plannedOffset],
         fontSize: 11,
         fontWeight: 400,
-        fontFamily: "JetBrains Mono, Fira Code, monospace",
+        fontFamily: "Fira Sans, system-ui, sans-serif",
         color: sc.color + "bb",
         formatter: () => `≈ ${fmtCompact(planned)}`,
       },
@@ -186,7 +186,7 @@ function makeOption(row: GaugeRow, hasPeer: boolean, colors: ThemePalette): any 
       textStyle: {
         color: colors.textPrimary,
         fontSize: 12,
-        fontFamily: "Syne, system-ui, sans-serif",
+        fontFamily: "Fira Sans, system-ui, sans-serif",
       },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       formatter: (params: any) => {
@@ -233,17 +233,17 @@ export default function CategoryGaugeChart({ rows, hasPeer, onToggleHide }: Cate
     <div className="px-4 py-4">
       {/* Legend */}
       <div className="flex flex-wrap gap-x-5 gap-y-2 mb-4 text-[13px] leading-relaxed text-text-tertiary">
-        <span className="flex items-center gap-1.5">
+        <span className="flex items-center gap-1">
           <span className="w-3 h-3 rounded-full inline-block bg-accent/80" />
           Historisch (Ist)
         </span>
         {hasPeer && (
-          <span className="flex items-center gap-1.5">
+          <span className="flex items-center gap-1">
             <span className="w-3 h-3 rounded-full inline-block bg-bg-elevated" />
             {t("pages:ui.peer_immer_bei_50")}
           </span>
         )}
-        <span className="flex items-center gap-1.5">
+        <span className="flex items-center gap-1">
           <span className="w-3 h-3 rounded-full inline-block bg-accent/30" />
           Empirisch (Soll)
         </span>
@@ -279,7 +279,7 @@ export default function CategoryGaugeChart({ rows, hasPeer, onToggleHide }: Cate
                 />
 
                 {/* Category label */}
-                <div className="flex items-center gap-1.5 mt-1.5">
+                <div className="flex items-center gap-1 mt-1">
                   <span
                     className="w-5 h-5 rounded-md flex items-center justify-center shrink-0"
                     style={{ backgroundColor: row.sc.color + "22" }}

@@ -480,8 +480,8 @@ export default function Import() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
-        <h1 className="text-2xl font-display text-text-primary">{t("pages:import.i19")}</h1>
-        <p className="text-text-tertiary text-sm mt-0.5">{t("pages:import.i12")}</p>
+        <h1 className="text-xl font-light text-text-primary">{t("pages:import.i19")}</h1>
+        <p className="text-text-tertiary text-sm mt-1">{t("pages:import.i12")}</p>
       </div>
 
       {/* Config */}
@@ -579,7 +579,7 @@ export default function Import() {
             )}
 
             {pdfJobRunning && elapsed >= 10 && (
-              <p className="text-text-disabled text-[11px] mt-1.5 leading-relaxed">
+              <p className="text-text-disabled text-[11px] mt-1 leading-relaxed">
                 Das Format ist offenbar unbekannt — {activeModel ? (
                   <>
                     <span className="font-mono text-text-tertiary">{activeModel}</span>{" "}
@@ -594,7 +594,7 @@ export default function Import() {
             )}
 
             {job?.status === "failed" && (
-              <p className="text-loss text-[11px] mt-1.5">
+              <p className="text-loss text-[11px] mt-1">
                 Auswertung fehlgeschlagen: {job.error_message}
               </p>
             )}
@@ -646,11 +646,11 @@ export default function Import() {
                 </div>
                 {pdfPreview.total_rows === 0 && (
                   <div className="mt-3 rounded-lg bg-bg-surface2 border border-border px-4 py-3">
-                    <p className="text-text-primary text-xs font-semibold flex items-center gap-1.5">
+                    <p className="text-text-primary text-xs font-semibold flex items-center gap-1">
                       <WarningCircle className="w-3.5 h-3.5 shrink-0" />
                       Keine Buchungen gefunden
                     </p>
-                    <p className="text-text-secondary text-[11px] mt-1.5 leading-relaxed">
+                    <p className="text-text-secondary text-[11px] mt-1 leading-relaxed">
                       {pdfPreview.ai_attempted ? (
                         <>
                           Das Format wurde nicht erkannt, deshalb hat das KI-Modell den
@@ -672,7 +672,7 @@ export default function Import() {
                   </div>
                 )}
                 {pdfPreview.ai_truncated && (
-                  <p className="text-loss text-[11px] mt-2 flex items-start gap-1.5">
+                  <p className="text-loss text-[11px] mt-2 flex items-start gap-1">
                     <WarningCircle className="w-3.5 h-3.5 shrink-0 mt-px" />
                     <span>
                       <strong>{t("pages:import.i40")}</strong> Das Dokument ist länger, als in
@@ -683,7 +683,7 @@ export default function Import() {
                   </p>
                 )}
                 {pdfPreview.ai_extracted && (
-                  <p className="txt-warning text-[11px] mt-2 flex items-start gap-1.5">
+                  <p className="txt-warning text-[11px] mt-2 flex items-start gap-1">
                     <WarningCircle className="w-3.5 h-3.5 shrink-0 mt-px" />
                     <span>
                       Unbekanntes PDF-Format — diese Zeilen wurden per KI aus dem Text
@@ -713,18 +713,18 @@ export default function Import() {
                   <thead className="sticky top-0 z-10 bg-bg-surface2">
                     <tr>
                       {/* Status badges column */}
-                      <th className="text-left px-2 py-2.5 text-text-tertiary font-medium w-[90px] whitespace-nowrap">{t("pages:import.i38")}</th>
+                      <th className="text-left px-2 py-2 text-text-tertiary font-medium w-[90px] whitespace-nowrap">{t("pages:import.i38")}</th>
                       {/* Date */}
-                      <th className="text-left px-2 py-2.5 text-text-tertiary font-medium w-[108px]">{t("pages:import.i14")}</th>
+                      <th className="text-left px-2 py-2 text-text-tertiary font-medium w-[108px]">{t("pages:import.i14")}</th>
                       {/* Description — gets max remaining space */}
-                      <th className="text-left px-2 py-2.5 text-text-tertiary font-medium min-w-[220px]">{t("pages:import.i06")}</th>
+                      <th className="text-left px-2 py-2 text-text-tertiary font-medium min-w-[220px]">{t("pages:import.i06")}</th>
                       {/* Amount */}
-                      <th className="text-right px-2 py-2.5 text-text-tertiary font-medium w-[110px]">{t("pages:import.i08")}</th>
+                      <th className="text-right px-2 py-2 text-text-tertiary font-medium w-[110px]">{t("pages:import.i08")}</th>
                       {/* AI Category + Frequency */}
-                      <th className="text-left px-2 py-2.5 text-text-tertiary font-medium w-[310px]">{t("pages:import.i26")}</th>
+                      <th className="text-left px-2 py-2 text-text-tertiary font-medium w-[310px]">{t("pages:import.i26")}</th>
                       {/* Duplicate action — only shown if there are duplicates */}
                       {hasDuplicates && (
-                        <th className="text-left px-2 py-2.5 text-text-tertiary font-medium w-[160px]">{t("pages:import.i15")}</th>
+                        <th className="text-left px-2 py-2 text-text-tertiary font-medium w-[160px]">{t("pages:import.i15")}</th>
                       )}
                     </tr>
                   </thead>
@@ -744,19 +744,19 @@ export default function Import() {
                         >
                           {/* ── Status badges ── */}
                           <td className="px-2 py-2 align-middle">
-                            <div className="flex flex-col gap-0.5">
+                            <div className="flex flex-col gap-1">
                               {row.duplicate_kind === "database" && (
-                                <span className="inline-flex rounded px-1.5 py-0.5 msg-warning text-[10px] font-medium leading-tight">
+                                <span className="inline-flex rounded px-1 py-1 msg-warning text-[10px] font-medium leading-tight">
                                   {t("pages:ui.konto")}
                                 </span>
                               )}
                               {row.duplicate_kind === "pdf" && (
-                                <span className="inline-flex rounded px-1.5 py-0.5 bg-bg-elevated text-text-secondary text-[10px] font-medium leading-tight">
+                                <span className="inline-flex rounded px-1 py-1 bg-bg-elevated text-text-secondary text-[10px] font-medium leading-tight">
                                   PDF-Dup
                                 </span>
                               )}
                               {recurring && (
-                                <span className={clsx("inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium leading-tight", getFrequencyBadgeStyle(row.periodicity))} title={row.periodicity ? PERIODICITY_LABELS[row.periodicity] : "Wiederkehrend"}>
+                                <span className={clsx("inline-flex items-center gap-1 rounded px-1 py-1 text-[10px] font-medium leading-tight", getFrequencyBadgeStyle(row.periodicity))} title={row.periodicity ? PERIODICITY_LABELS[row.periodicity] : "Wiederkehrend"}>
                                   ↻ {row.periodicity ? PERIODICITY_LABELS[row.periodicity] : "Abo"}
                                 </span>
                               )}
@@ -823,7 +823,7 @@ export default function Import() {
                               <select
                                 value={row.category ?? ""}
                                 onChange={(e) => handleCategoryChange(row.id, idx, e.target.value)}
-                                className="flex-1 min-w-0 bg-bg-surface2 border border-border rounded px-1.5 py-1 text-text-secondary text-[11px]"
+                                className="input flex-1 min-w-0 text-[11px]"
                               >
                                 <option value="">{t("pages:misc.r29")}</option>
                                 {pdfCategoryOptions.map((name) => (
@@ -842,7 +842,7 @@ export default function Import() {
                                   })
                                 }
                                 className={clsx(
-                                  "w-[130px] flex-shrink-0 rounded border px-1.5 py-1 text-[11px] focus:outline-none",
+                                  "w-[130px] flex-shrink-0 rounded border px-1 py-1 text-[11px] focus:outline-none",
                                   getFrequencyStyle(row.periodicity)
                                 )}
                               >
@@ -861,7 +861,7 @@ export default function Import() {
                             <td className="px-2 py-2 align-middle">
                               {row.duplicate_kind === "database" ? (
                                 <select
-                                  className="bg-bg-surface2 border border-border rounded px-1.5 py-1 text-text-primary text-[11px] w-full"
+                                  className="input text-[11px] w-full"
                                   value={row.merge_action}
                                   onChange={(e) =>
                                     setPdfPreview((prev) => {
@@ -879,7 +879,7 @@ export default function Import() {
                                 </select>
                               ) : row.duplicate_kind === "pdf" ? (
                                 <select
-                                  className="bg-bg-surface2 border border-border rounded px-1.5 py-1 text-text-primary text-[11px] w-full"
+                                  className="input text-[11px] w-full"
                                   value={row.merge_action === "import" ? "import" : "skip"}
                                   onChange={(e) =>
                                     setPdfPreview((prev) => {
@@ -961,7 +961,7 @@ export default function Import() {
               <button
                 onClick={() => setShowColumnMapping(!showColumnMapping)}
                 className={clsx(
-                  "px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors",
+                  "px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors",
                   showColumnMapping
                     ? "bg-accent/20 text-accent border border-accent/30"
                     : "bg-bg-surface2 text-text-secondary hover:bg-bg-elevated border border-border"
@@ -998,7 +998,7 @@ export default function Import() {
                     {mappedColumnsCount} von {availableColumns.length} Spalten zugewiesen
                   </span>
                   {mappingWarnings.length === 0 && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gain/20 text-gain text-xs">
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gain/20 text-gain text-xs">
                       <Check className="w-3 h-3" />
                       OK
                     </span>
@@ -1039,7 +1039,7 @@ export default function Import() {
                             </td>
                             <td className="px-3 py-2">
                               {isMapped ? (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded bg-accent/20 text-accent text-xs">
+                                <span className="inline-flex items-center px-2 py-1 rounded bg-accent/20 text-accent text-xs">
                                   <MapPin className="w-3 h-3 mr-1" />
                                   {label}
                                 </span>
@@ -1213,12 +1213,12 @@ export default function Import() {
                     </td>
                     <td className="px-3 py-2 text-center">
                       {row.parsed ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gain/20 text-gain text-xs">
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gain/20 text-gain text-xs">
                           <Check className="w-3 h-3" />
                           OK
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border msg-error text-xs" title={row.errors.join(", ")}>
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border msg-error text-xs" title={row.errors.join(", ")}>
                           <WarningTriangle className="w-3 h-3" />
                           {t("pages:ui.fehler")}
                         </span>
@@ -1288,7 +1288,7 @@ export default function Import() {
           </div>
           <div className="space-y-2 max-h-64 overflow-y-auto">
             {importResult.preview?.map((p, i) => (
-              <div key={i} className={clsx("flex items-center justify-between py-1.5 px-2 rounded", p.is_duplicate ? "opacity-40" : "")}>
+              <div key={i} className={clsx("flex items-center justify-between py-1 px-2 rounded", p.is_duplicate ? "opacity-40" : "")}>
                 <div>
                   <p className="text-text-primary text-xs">{p.description.slice(0, 50)}</p>
                   <p className="text-text-tertiary text-xs">{p.date} · {p.category || "?"}</p>

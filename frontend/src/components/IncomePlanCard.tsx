@@ -91,7 +91,7 @@ export default function IncomePlanCard({
     <div className="card space-y-4">
       <div>
         <h2 className="text-text-primary font-semibold text-sm">{t("pages:incomePlan.title")}</h2>
-        <p className="text-text-tertiary text-xs mt-0.5">{t("pages:incomePlan.subtitle")}</p>
+        <p className="text-text-tertiary text-xs mt-1">{t("pages:incomePlan.subtitle")}</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -115,7 +115,7 @@ export default function IncomePlanCard({
             ))}
           </div>
         </div>
-        <div className="space-y-1.5 text-xs text-text-secondary">
+        <div className="space-y-1 text-xs text-text-secondary">
           <label className="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" checked={indexed} onChange={(e) => setIndexed(e.target.checked)} className="accent-accent" />
             {t("pages:incomePlan.indexed")}

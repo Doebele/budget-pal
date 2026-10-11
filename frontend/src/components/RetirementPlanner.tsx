@@ -166,7 +166,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
               value={annualIncome}
               onChange={(e) => setAnnualIncome(Number(e.target.value))}
               step={5000}
-              className="input-field w-full"
+              className="input-field input-amount w-full"
             />
           </div>
 
@@ -183,7 +183,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
               onChange={(e) => setMeanReturn(Number(e.target.value))}
               className="w-full accent-accent"
             />
-            <div className="flex justify-between text-[10px] text-text-tertiary mt-0.5">
+            <div className="flex justify-between text-[10px] text-text-tertiary mt-1">
               <span>2% (konservativ)</span>
               <span>12% (aggressiv)</span>
             </div>
@@ -199,9 +199,9 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
               value={spendingMonthly ?? ""}
               placeholder={expenseMonthly ? String(Math.round(expenseMonthly)) : ""}
               onChange={(e) => setSpendingMonthly(e.target.value === "" ? null : Math.max(0, Number(e.target.value)))}
-              className="input-field w-full"
+              className="input-field input-amount w-full"
             />
-            <p className="text-[10px] text-text-tertiary mt-0.5">{t("pages:ui.retirementSpendingHint")}</p>
+            <p className="text-[10px] text-text-tertiary mt-1">{t("pages:ui.retirementSpendingHint")}</p>
           </div>
         </div>
       </div>
@@ -361,12 +361,12 @@ function KPICard({
     <div className="bg-bg-surface2 rounded-xl border border-border/40 px-4 py-3">
       <div className="flex items-center gap-2 mb-1">
         {icon}
-        <p className="text-text-tertiary text-[11px] uppercase tracking-widest font-semibold">
+        <p className="text-text-tertiary text-[11px] font-semibold">
           {label}
         </p>
       </div>
       <p
-        className="font-mono font-bold text-xl"
+        className="font-mono font-light text-xl"
         style={valueColor ? { color: valueColor } : undefined}
       >
         {value}

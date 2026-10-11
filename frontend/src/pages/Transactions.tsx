@@ -283,8 +283,8 @@ export default function Transactions() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-display text-text-primary">{t("pages:transactions.title")}</h1>
-          <p className="text-text-tertiary text-sm mt-0.5">
+          <h1 className="text-xl font-light text-text-primary">{t("pages:transactions.title")}</h1>
+          <p className="text-text-tertiary text-sm mt-1">
             {range.label} · {t("pages:ui.entriesCount", { count: transactions?.length || 0 })}
           </p>
         </div>
@@ -403,7 +403,7 @@ export default function Transactions() {
                         setShowAccountDropdown(false);
                       }}
                       className={clsx(
-                        "w-full flex items-center gap-3 px-3 py-2.5 text-left text-sm hover:bg-bg-elevated transition-colors",
+                        "w-full flex items-center gap-3 px-3 py-2 text-left text-sm hover:bg-bg-elevated transition-colors",
                         viewMode === "all" && "bg-bg-elevated/80"
                       )}
                     >
@@ -429,7 +429,7 @@ export default function Transactions() {
                             setShowAccountDropdown(false);
                           }}
                           className={clsx(
-                            "w-full flex items-center gap-3 px-3 py-2.5 text-left text-sm hover:bg-bg-elevated transition-colors",
+                            "w-full flex items-center gap-3 px-3 py-2 text-left text-sm hover:bg-bg-elevated transition-colors",
                             String(viewMode) === String(acc.id) && "bg-bg-elevated/80"
                           )}
                         >
@@ -531,7 +531,7 @@ export default function Transactions() {
                       <tr key={idx} className="hover:bg-bg-surface2/50">
                         <td className="px-3 py-2 text-text-secondary">{item.description}</td>
                         <td className="px-3 py-2">
-                          <span className={clsx("inline-flex items-center px-2 py-0.5 rounded text-xs", getFrequencyBadgeStyle(item.periodicity))}>
+                          <span className={clsx("inline-flex items-center px-2 py-1 rounded text-xs", getFrequencyBadgeStyle(item.periodicity))}>
                             {PERIODICITY_LABELS[item.periodicity] ?? item.periodicity}
                           </span>
                         </td>
@@ -660,7 +660,7 @@ export default function Transactions() {
                   <th
                     key={h || "actions"}
                     className={clsx(
-                      "text-text-tertiary text-xs uppercase tracking-wide px-4 py-3 font-medium",
+                      "text-text-tertiary text-xs   px-4 py-3 font-medium",
                       // Betrag (5) und Referenz (6): rechts wie die Zahlen in den Zellen
                       colIdx === 5 || colIdx === 6 ? "text-right" : "text-left",
                     )}
@@ -697,7 +697,7 @@ export default function Transactions() {
                           : (txn.merchant_normalized || txn.description || undefined)
                       }
                     >
-                      <div className="flex items-center gap-1.5 flex-wrap">
+                      <div className="flex items-center gap-1 flex-wrap">
                         <p
                           className="text-text-primary text-sm truncate"
                           title={txn.merchant_normalized || txn.description || undefined}
@@ -705,13 +705,13 @@ export default function Transactions() {
                           {txn.merchant_normalized || txn.description}
                         </p>
                         {txn.is_split && (
-                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-accent/15 text-accent border border-accent/25 shrink-0">
+                          <span className="inline-flex items-center gap-1 px-1 py-1 rounded text-[10px] font-medium bg-accent/15 text-accent border border-accent/25 shrink-0">
                             <Scissor className="w-2.5 h-2.5" />
                             {txn.split_count ?? ""}
                           </span>
                         )}
                         {txn.parent_id && (
-                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-text-tertiary/10 text-text-tertiary border border-border/40 shrink-0">
+                          <span className="inline-flex items-center gap-1 px-1 py-1 rounded text-[10px] font-medium bg-text-tertiary/10 text-text-tertiary border border-border/40 shrink-0">
                             Teil
                           </span>
                         )}
@@ -727,7 +727,7 @@ export default function Transactions() {
                     </td>
                     <td className="px-4 py-3">
                       {editingId === txn.id ? (
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1">
                           <select
                             autoFocus
                             value={editCategory}
@@ -739,7 +739,7 @@ export default function Transactions() {
                             }}
                             onBlur={() => setEditingId(null)}
                             onKeyDown={(e) => e.key === "Escape" && setEditingId(null)}
-                            className="input py-0.5 pr-6 text-xs rounded text-text-primary bg-bg-surface2 border border-border"
+                            className="input py-1 pr-6 text-xs text-text-primary"
                           >
                             {/* Keep current value selectable even if not in canonical list */}
                             {editCategory && !ALL_CAT_GROUPS.some((g) =>
@@ -762,7 +762,7 @@ export default function Transactions() {
                       ) : (
                         <button
                           onClick={() => handleCategoryEdit(txn)}
-                          className="flex items-center gap-1.5 group"
+                          className="flex items-center gap-1 group"
                         >
                           {(() => {
                             const sc = resolveSuperCategory(txn.category || "");
@@ -790,7 +790,7 @@ export default function Transactions() {
                     </td>
                     <td className="px-4 py-3">
                       <div className={clsx(
-                        "inline-flex items-center gap-1.5 rounded text-xs transition-colors",
+                        "inline-flex items-center gap-1 rounded text-xs transition-colors",
                         txn.is_recurring
                           ? getFrequencyBadgeStyle(txn.periodicity)
                           : "text-text-disabled"
@@ -836,7 +836,7 @@ export default function Transactions() {
                           <button
                             onClick={() => deleteMutation.mutate(txn.id)}
                             disabled={deleteMutation.isPending}
-                            className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-loss/20 text-loss border border-loss/30 hover:bg-loss/40 transition-colors whitespace-nowrap"
+                            className="text-[10px] font-medium px-1 py-1 rounded bg-loss/20 text-loss border border-loss/30 hover:bg-loss/40 transition-colors whitespace-nowrap"
                           >
                             {t("pages:ui.loeschen")}
                           </button>

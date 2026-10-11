@@ -371,7 +371,7 @@ export default function Finanzplan() {
           <Reports className="w-8 h-8 text-accent" />
         </div>
         <div>
-          <h1 className="text-text-primary font-display font-bold text-2xl mb-2">Kein Finanzplan vorhanden</h1>
+          <h1 className="text-xl font-light text-text-primary mb-2">Kein Finanzplan vorhanden</h1>
           <p className="text-text-secondary text-sm leading-relaxed">
             {t("pages:ui.erstelle_deinen_persoenlichen_finanzplan_mit")}
           </p>
@@ -393,7 +393,7 @@ export default function Finanzplan() {
       {/* ── Header ───────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-text-primary font-display font-bold text-2xl mb-1">Finanzplan</h1>
+          <h1 className="text-xl font-light text-text-primary mb-1">Finanzplan</h1>
           <p className="text-text-secondary text-sm">
             {t("pages:ui.empirische_angaben_monatliche_uebersicht")}
           </p>
@@ -401,21 +401,21 @@ export default function Finanzplan() {
         <div className="flex items-center gap-2 flex-wrap">
           <Link
             to="/wizard"
-            className="btn-secondary flex items-center gap-1.5 text-xs py-1.5 px-3"
+            className="btn-secondary flex items-center gap-1 text-xs py-1 px-3"
           >
             <MagicWand className="w-3.5 h-3.5" />
             Wizard
           </Link>
           <Link
             to="/budget"
-            className="btn-secondary flex items-center gap-1.5 text-xs py-1.5 px-3"
+            className="btn-secondary flex items-center gap-1 text-xs py-1 px-3"
           >
             <PiggyBank className="w-3.5 h-3.5" />
             Budgetanalyse
           </Link>
           <Link
             to="/projections"
-            className="btn-primary flex items-center gap-1.5 text-xs py-1.5 px-3"
+            className="btn-primary flex items-center gap-1 text-xs py-1 px-3"
           >
             <GraphUp className="w-3.5 h-3.5" />
             Rentenprognose
@@ -426,23 +426,23 @@ export default function Finanzplan() {
       {/* ── Cashflow-Karten ───────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-bg-surface2 rounded-xl border border-border/40 px-4 py-3">
-          <p className="text-text-tertiary text-[11px] uppercase tracking-widest font-semibold mb-1">{t("pages:finanzplan.expensesPerMonth")}</p>
-          <p className="text-text-primary font-mono font-bold text-xl">{fmtCHF(totalExpenses)}</p>
+          <p className="text-text-tertiary text-[11px] font-semibold mb-1">{t("pages:finanzplan.expensesPerMonth")}</p>
+          <p className="text-text-primary font-mono font-light text-xl">{fmtCHF(totalExpenses)}</p>
           <p className="text-text-tertiary text-xs mt-1">{wizardBudgets.length} Budgetposten</p>
         </div>
         <div className="bg-bg-surface2 rounded-xl border border-border/40 px-4 py-3">
-          <p className="text-text-tertiary text-[11px] uppercase tracking-widest font-semibold mb-1">{t("pages:finanzplan.netWorth")}</p>
-          <p className="font-mono font-bold text-xl" style={{ color: "#10b981" }}>{fmtCHF(totalAssets)}</p>
+          <p className="text-text-tertiary text-[11px] font-semibold mb-1">{t("pages:finanzplan.netWorth")}</p>
+          <p className="font-mono font-light text-xl" style={{ color: "#10b981" }}>{fmtCHF(totalAssets)}</p>
           <p className="text-text-tertiary text-xs mt-1">{assets.length} Positionen</p>
         </div>
         <div className="bg-bg-surface2 rounded-xl border border-border/40 px-4 py-3">
-          <p className="text-text-tertiary text-[11px] uppercase tracking-widest font-semibold mb-1">Vorsorgekapital</p>
-          <p className="font-mono font-bold text-xl" style={{ color: "#a78bfa" }}>{fmtCHF(totalPension)}</p>
+          <p className="text-text-tertiary text-[11px] font-semibold mb-1">Vorsorgekapital</p>
+          <p className="font-mono font-light text-xl" style={{ color: "#a78bfa" }}>{fmtCHF(totalPension)}</p>
           <p className="text-text-tertiary text-xs mt-1">{t("pages:ui.entriesCount", { count: pension.length })}</p>
         </div>
         <div className="bg-bg-surface2 rounded-xl border border-border/40 px-4 py-3">
-          <p className="text-text-tertiary text-[11px] uppercase tracking-widest font-semibold mb-1">{t("pages:finanzplan.liabilities")}</p>
-          <p className="font-mono font-bold text-xl" style={{ color: totalLiabilities > 0 ? "#f87171" : "#94a3b8" }}>
+          <p className="text-text-tertiary text-[11px] font-semibold mb-1">{t("pages:finanzplan.liabilities")}</p>
+          <p className="font-mono font-light text-xl" style={{ color: totalLiabilities > 0 ? "#f87171" : "#94a3b8" }}>
             {fmtCHF(totalLiabilities)}
           </p>
           <p className="text-text-tertiary text-xs mt-1">
@@ -488,7 +488,7 @@ export default function Finanzplan() {
                   />
                   {/* Sub-items */}
                   {group.items.length > 1 && (
-                    <div className="mt-2 ml-9 space-y-0.5">
+                    <div className="mt-2 ml-9 space-y-1">
                       {group.items.map((item) => (
                         <div key={item.id} className="flex items-center justify-between">
                           <span className="text-text-tertiary text-[11px]">{item.notes}</span>
@@ -518,7 +518,7 @@ export default function Finanzplan() {
               const label = ASSET_LABEL[type] ? t(ASSET_LABEL[type]) : type;
               return (
                 <div key={type} className="px-5 py-3">
-                  <div className="flex items-center gap-3 mb-1.5">
+                  <div className="flex items-center gap-3 mb-1">
                     <Coins className="w-4 h-4 flex-shrink-0" style={{ color }} />
                     <span className="text-text-primary text-sm flex-1">{label}</span>
                     <span className="text-text-secondary font-mono text-sm">{fmtCHF(value)}</span>
@@ -574,7 +574,7 @@ export default function Finanzplan() {
                   {entries.length === 0 ? (
                     <p className="text-text-tertiary text-xs">Nicht erfasst</p>
                   ) : (
-                    <div className="space-y-1.5">
+                    <div className="space-y-1">
                       {/* Säule 1: estimated monthly pension */}
                       {ahvMonthlyEst !== null && (
                         <>
@@ -691,10 +691,10 @@ export default function Finanzplan() {
 
           {/* Summary table header */}
           <div className="px-5 py-2 grid grid-cols-4 gap-2 border-b border-border/20 bg-bg-elevated/40">
-            <span className="text-text-tertiary text-[10px] uppercase tracking-wide font-semibold">Position</span>
-            <span className="text-text-tertiary text-[10px] uppercase tracking-wide font-semibold text-right">{t("pages:ui.marktwert")}</span>
-            <span className="text-text-tertiary text-[10px] uppercase tracking-wide font-semibold text-right">Eigenkapital</span>
-            <span className="text-text-tertiary text-[10px] uppercase tracking-wide font-semibold text-right">{t("pages:ui.hypothek")}</span>
+            <span className="text-text-tertiary text-[10px] font-semibold">Position</span>
+            <span className="text-text-tertiary text-[10px] font-semibold text-right">{t("pages:ui.marktwert")}</span>
+            <span className="text-text-tertiary text-[10px] font-semibold text-right">Eigenkapital</span>
+            <span className="text-text-tertiary text-[10px] font-semibold text-right">{t("pages:ui.hypothek")}</span>
           </div>
 
           <div className="divide-y divide-border/30">
@@ -734,7 +734,7 @@ export default function Finanzplan() {
                           }}
                         />
                       </div>
-                      <div className="flex justify-between text-[9px] text-text-tertiary mt-0.5">
+                      <div className="flex justify-between text-[9px] text-text-tertiary mt-1">
                         <span>FINMA-Richtwert ≤ 65%</span>
                         <span>Max. Tragbarkeit ≤ 80%</span>
                       </div>

@@ -31,7 +31,7 @@ export default function BottomNav() {
               key={path}
               to={path}
               className={clsx(
-                "flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors",
+                "flex-1 flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition-colors",
                 active
                   ? "text-accent"
                   : "text-text-tertiary hover:text-text-secondary"

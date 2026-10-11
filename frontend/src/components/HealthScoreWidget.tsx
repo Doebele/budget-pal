@@ -118,7 +118,7 @@ function Ring({
           {label}
         </span>
         {sublabel && (
-          <span className="text-text-tertiary font-mono leading-none mt-0.5" style={{ fontSize: size < 60 ? 8 : 10 }}>
+          <span className="text-text-tertiary font-mono leading-none mt-1" style={{ fontSize: size < 60 ? 8 : 10 }}>
             {sublabel}
           </span>
         )}
@@ -188,7 +188,7 @@ export default function HealthScoreWidget() {
           <div className="skeleton rounded-full shrink-0" style={{ width: 96, height: 96 }} />
           <div className="flex gap-4 flex-1">
             {[...Array(5)].map((_, i) => (
-              <div key={i} className="flex flex-col items-center gap-1.5 flex-1">
+              <div key={i} className="flex flex-col items-center gap-1 flex-1">
                 <div className="skeleton rounded-full" style={{ width: 52, height: 52 }} />
                 <div className="skeleton h-2.5 w-12 rounded" />
               </div>
@@ -207,7 +207,7 @@ export default function HealthScoreWidget() {
     <div className="card space-y-4">
       {/* Header: title + mode toggle */}
       <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex items-center gap-2 text-text-tertiary text-xs uppercase tracking-widest flex-1">
+        <div className="flex items-center gap-2 text-text-tertiary text-xs flex-1">
           <Activity className="w-3.5 h-3.5" />
           {t("pages:ui.budget_gesundheit")}
         </div>
@@ -261,7 +261,7 @@ export default function HealthScoreWidget() {
               : cDetail;
             return (
               <Tooltip key={c.name} text={tooltipText}>
-                <div className="flex flex-col items-center gap-1.5 min-w-0 cursor-default">
+                <div className="flex flex-col items-center gap-1 min-w-0 cursor-default">
                   <Ring
                     score={c.score}
                     size={64}
@@ -291,7 +291,7 @@ export default function HealthScoreWidget() {
           <button
             type="button"
             onClick={() => setShowLevers((v) => !v)}
-            className="flex items-center gap-1.5 text-[11px] text-text-tertiary hover:text-text-secondary transition-colors w-full"
+            className="flex items-center gap-1 text-[11px] text-text-tertiary hover:text-text-secondary transition-colors w-full"
           >
             <GraphUp className="w-3 h-3 text-accent" />
             <span className="flex-1 text-left">{t("pages:ui.verbesserungspotenzial")}</span>
@@ -299,11 +299,11 @@ export default function HealthScoreWidget() {
           </button>
 
           {showLevers && (
-            <div className="mt-2 space-y-1.5 animate-fade-in">
+            <div className="mt-2 space-y-1 animate-fade-in">
               {top_levers.map((lever, i) => (
-                <div key={i} className="bg-accent/5 border border-accent/15 rounded-lg px-2.5 py-1.5">
+                <div key={i} className="bg-accent/5 border border-accent/15 rounded-lg px-2 py-1">
                   <p className="text-[11px] font-medium text-text-secondary">{lever.title_key ? t(`pages:health.${lever.title_key}`) : lever.title}</p>
-                  <p className="text-[10px] text-text-tertiary mt-0.5">{lever.body_key ? t(`pages:health.${lever.body_key}`, lever.body_params ?? {}) : lever.body}</p>
+                  <p className="text-[10px] text-text-tertiary mt-1">{lever.body_key ? t(`pages:health.${lever.body_key}`, lever.body_params ?? {}) : lever.body}</p>
                 </div>
               ))}
             </div>

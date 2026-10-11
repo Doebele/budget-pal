@@ -29,7 +29,7 @@ function Shell({ title, children }: { title: string; children: React.ReactNode }
           </span>
         </div>
         <div className="card">
-          <h1 className="text-text-primary font-semibold text-lg mb-4">{title}</h1>
+          <h1 className="text-xl font-light text-text-primary mb-4">{title}</h1>
           {children}
         </div>
       </div>
@@ -85,7 +85,7 @@ export function ForgotPassword() {
             />
           </div>
           {error && <Notice tone="error">{error}</Notice>}
-          <button type="submit" className="btn-primary w-full py-2.5" disabled={loading}>
+          <button type="submit" className="btn-primary w-full py-2" disabled={loading}>
             {loading ? t("forgot.loading") : t("forgot.submit")}
           </button>
         </form>
@@ -135,7 +135,7 @@ export function ResetPassword() {
       {state === "done" && (
         <div className="space-y-4">
           <Notice tone="ok">{t("reset.done")}</Notice>
-          <Link to="/login" className="btn-primary w-full py-2.5 block text-center">
+          <Link to="/login" className="btn-primary w-full py-2 block text-center">
             {t("reset.toLogin")}
           </Link>
         </div>
@@ -143,7 +143,7 @@ export function ResetPassword() {
       {state === "invalid" && (
         <div className="space-y-4">
           <Notice tone="error">{t("reset.invalid")}</Notice>
-          <Link to="/forgot-password" className="btn-primary w-full py-2.5 block text-center">
+          <Link to="/forgot-password" className="btn-primary w-full py-2 block text-center">
             {t("reset.requestNew")}
           </Link>
         </div>
@@ -174,7 +174,7 @@ export function ResetPassword() {
             />
           </div>
           {error && <Notice tone="error">{error}</Notice>}
-          <button type="submit" className="btn-primary w-full py-2.5" disabled={loading}>
+          <button type="submit" className="btn-primary w-full py-2" disabled={loading}>
             {loading ? t("reset.loading") : t("reset.submit")}
           </button>
         </form>

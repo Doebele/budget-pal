@@ -925,7 +925,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
         </div>
 
         {/* Summary bar */}
-        <div className="flex items-center justify-between rounded-lg bg-bg-surface2 border border-border/50 px-4 py-2.5">
+        <div className="flex items-center justify-between rounded-lg bg-bg-surface2 border border-border/50 px-4 py-2">
           <div className="flex items-center gap-2 text-text-secondary text-sm">
             <Check className="w-3.5 h-3.5 text-gain" />
             <span>{totalCount} Positionen ausgewählt</span>
@@ -955,7 +955,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
                   <div className="text-text-tertiary text-xs">{catalogText(cat.description)}</div>
                 </div>
                 {selCount > 0 && (
-                  <span className="bg-accent/20 text-accent text-[11px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0">
+                  <span className="bg-accent/20 text-accent text-[11px] font-semibold px-2 py-1 rounded-full flex-shrink-0">
                     {selCount}
                   </span>
                 )}
@@ -1004,7 +1004,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
                         {/* Name + tagline */}
                         <div className="flex-1 min-w-0">
                           <div className="text-text-primary text-sm font-medium leading-tight">{prov.name}</div>
-                          <div className="text-text-tertiary text-[11px] truncate mt-0.5">{catalogText(prov.tagline)}</div>
+                          <div className="text-text-tertiary text-[11px] truncate mt-1">{catalogText(prov.tagline)}</div>
                         </div>
 
                         {/* Price + peer */}
@@ -1019,7 +1019,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
                             {(activeVariant?.price ?? 0) > 0 && <span className="text-[10px] font-normal opacity-70">/Mo</span>}
                           </div>
                           {prov.peerPopularity && (
-                            <div className="flex items-center gap-1 justify-end mt-0.5 text-[10px] text-text-tertiary">
+                            <div className="flex items-center gap-1 justify-end mt-1 text-[10px] text-text-tertiary">
                               <Activity className="w-2.5 h-2.5" />
                               {prov.peerPopularity}%
                             </div>
@@ -1067,7 +1067,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
                         <Search className="w-3.5 h-3.5 text-text-tertiary flex-shrink-0" />
                         <input
                           type="text"
-                          className="input flex-1 text-sm py-1.5"
+                          className="input flex-1 text-sm py-1"
                           placeholder={t("pages:step5.s01")}
                           value={searchQuery}
                           onChange={e => setSearchQuery(e.target.value)}
@@ -1093,7 +1093,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
                                 type="button"
                                 onClick={() => handleSearchSelect(provider, resCat)}
                                 className={clsx(
-                                  "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md hover:bg-white/[0.04] transition-colors text-left",
+                                  "w-full flex items-center gap-2 px-2 py-2 rounded-md hover:bg-white/[0.04] transition-colors text-left",
                                   selectedMap[provider.id] && "opacity-60"
                                 )}
                               >
@@ -1113,7 +1113,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
                             <button
                               type="button"
                               onClick={() => openCustomNew(cat.id, searchQuery)}
-                              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md hover:bg-accent/8 text-accent text-left transition-colors border border-dashed border-accent/30 mt-1"
+                              className="w-full flex items-center gap-2 px-2 py-2 rounded-md hover:bg-accent/8 text-accent text-left transition-colors border border-dashed border-accent/30 mt-1"
                             >
                               <Plus className="w-3.5 h-3.5 flex-shrink-0" />
                               <span className="text-xs font-medium">
@@ -1131,7 +1131,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
                         <button
                           type="button"
                           onClick={() => openCustomNew(cat.id)}
-                          className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md hover:bg-accent/8 text-accent text-left transition-colors border border-dashed border-accent/30"
+                          className="w-full flex items-center gap-2 px-2 py-2 rounded-md hover:bg-accent/8 text-accent text-left transition-colors border border-dashed border-accent/30"
                         >
                           <Plus className="w-3.5 h-3.5 flex-shrink-0" />
                           <span className="text-xs font-medium">{t("pages:step5.s02")}</span>
@@ -1148,7 +1148,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
                         setCustomSidebarState(null);
                         closeSidebarProvider();
                       }}
-                      className="w-full flex items-center gap-2 px-4 py-2.5 text-text-tertiary hover:text-text-secondary hover:bg-white/[0.02] text-xs transition-colors border-t border-border/40"
+                      className="w-full flex items-center gap-2 px-4 py-2 text-text-tertiary hover:text-text-secondary hover:bg-white/[0.02] text-xs transition-colors border-t border-border/40"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       {t("pages:ui.anbieter_hinzufuegen")}

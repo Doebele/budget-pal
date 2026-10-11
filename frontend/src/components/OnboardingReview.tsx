@@ -101,7 +101,7 @@ export default function OnboardingReview() {
                 setPicked((prev) => ({ ...prev, [group.merchant]: e.target.value }))
               }
               aria-label={group.merchant}
-              className="bg-bg-surface2 border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-accent max-w-[12rem]"
+              className="input text-xs max-w-[12rem]"
             >
               <option value="">{t("pages:onboarding.reviewNoCategory")}</option>
               {options.map((c) => (
@@ -117,7 +117,7 @@ export default function OnboardingReview() {
           type="button"
           onClick={submit}
           disabled={confirmMut.isPending}
-          className="px-3 py-1.5 rounded-lg bg-accent hover:bg-accent/90 text-white text-xs font-medium transition-colors disabled:opacity-50"
+          className="px-3 py-1 rounded-lg bg-accent hover:bg-accent/90 text-white text-xs font-medium transition-colors disabled:opacity-50"
         >
           {confirmMut.isPending
             ? t("pages:onboarding.reviewSaving")

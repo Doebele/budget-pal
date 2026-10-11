@@ -181,8 +181,8 @@ export default function Projections() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-display text-text-primary">Finanzprognosen</h1>
-          <p className="text-text-tertiary text-sm mt-0.5">{t("pages:ui.monte_carlo_simulation_schweizer_rente_ahv_b")}</p>
+          <h1 className="text-xl font-light text-text-primary">Finanzprognosen</h1>
+          <p className="text-text-tertiary text-sm mt-1">{t("pages:ui.monte_carlo_simulation_schweizer_rente_ahv_b")}</p>
         </div>
         <button onClick={() => refetch()} className="btn-secondary flex items-center gap-2" disabled={isLoading}>
           <Refresh className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
@@ -237,7 +237,7 @@ export default function Projections() {
             <label className="label">{t("pages:misc.r30")}</label>
             <input
               type="number"
-              className="input"
+              className="input input-amount"
               value={params.current_net_worth}
               onChange={(e) => setParams((p) => ({ ...p, current_net_worth: +e.target.value }))}
             />
@@ -246,7 +246,7 @@ export default function Projections() {
             <label className="label">{t("pages:misc.r32")}</label>
             <input
               type="number"
-              className="input"
+              className="input input-amount"
               value={params.annual_savings}
               onChange={(e) => setParams((p) => ({ ...p, annual_savings: +e.target.value }))}
             />
@@ -255,7 +255,7 @@ export default function Projections() {
             <label className="label">{t("pages:ui.jahreseinkommen")}</label>
             <input
               type="number"
-              className="input"
+              className="input input-amount"
               value={params.annual_income}
               onChange={(e) => setParams((p) => ({ ...p, annual_income: +e.target.value }))}
             />
@@ -280,7 +280,7 @@ export default function Projections() {
               <input
                 type="number"
                 step={step}
-                className="input"
+                className="input input-amount"
                 value={Math.round(params[key] * 1000) / 10}
                 onChange={(e) => setParams((p) => ({ ...p, [key]: +e.target.value / 100 }))}
               />
@@ -292,12 +292,12 @@ export default function Projections() {
               type="number"
               min={0}
               step={500}
-              className="input"
+              className="input input-amount"
               value={spendingMonthly ?? ""}
               placeholder={projection?.retirement_spending ? String(Math.round(projection.retirement_spending / 12)) : ""}
               onChange={(e) => setSpendingMonthly(e.target.value === "" ? null : Math.max(0, +e.target.value))}
             />
-            <p className="text-text-tertiary text-[10px] mt-0.5">{t("pages:ui.retirementSpendingHint")}</p>
+            <p className="text-text-tertiary text-[10px] mt-1">{t("pages:ui.retirementSpendingHint")}</p>
           </div>
         </div>
       </div>
@@ -307,7 +307,7 @@ export default function Projections() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-text-primary font-semibold text-sm">{t("pages:misc.r34")}</h2>
-            <p className="text-text-tertiary text-xs mt-0.5">
+            <p className="text-text-tertiary text-xs mt-1">
               {t("pages:ui.ahv_saeule_1_bvg_pensionskasse_saeule_2_saeu")}
             </p>
           </div>
@@ -330,7 +330,7 @@ export default function Projections() {
                 amount: formatCHF((projection.retirement_spending ?? 0) / 12),
               })}
             </p>
-            <p className="text-text-secondary text-xs font-semibold uppercase tracking-wide">
+            <p className="text-text-secondary text-xs font-semibold">
               {t("pages:hints.pensionAtRetirement", { year: projection.years[retIdx] })}
             </p>
             <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
@@ -343,7 +343,7 @@ export default function Projections() {
                   <p className="font-mono font-bold text-lg" style={{ color }}>
                     {formatCHF(annual / 12)}
                   </p>
-                  <p className="text-text-tertiary text-[10px] mt-0.5">{t("pages:ui.monat_real_chf")}</p>
+                  <p className="text-text-tertiary text-[10px] mt-1">{t("pages:ui.monat_real_chf")}</p>
                   <p className="text-text-tertiary text-[10px]">{formatCHF(annual)} / Jahr</p>
                 </div>
               ))}
@@ -353,7 +353,7 @@ export default function Projections() {
                 <p className="font-mono font-bold text-lg" style={{ color: PILLAR_COLORS["3a"] }}>
                   {formatCHF(p3aNet)}
                 </p>
-                <p className="text-text-tertiary text-[10px] mt-0.5">{t("pages:plan.p3aCard")}</p>
+                <p className="text-text-tertiary text-[10px] mt-1">{t("pages:plan.p3aCard")}</p>
               </div>
               {/* Lebensversicherung: am Ablauf, steuerfrei */}
               {p3bNet > 0 && (
@@ -362,7 +362,7 @@ export default function Projections() {
                   <p className="font-mono font-bold text-lg" style={{ color: PILLAR_COLORS["3b"] }}>
                     {formatCHF(p3bNet)}
                   </p>
-                  <p className="text-text-tertiary text-[10px] mt-0.5">{t("pages:plan.p3bCard")}</p>
+                  <p className="text-text-tertiary text-[10px] mt-1">{t("pages:plan.p3bCard")}</p>
                 </div>
               )}
             </div>
@@ -370,10 +370,10 @@ export default function Projections() {
             <div className="flex items-center justify-between bg-accent/8 border border-accent/20 rounded-lg px-4 py-3">
               <div>
                 <p className="text-text-secondary text-xs font-semibold">{t("pages:misc.r31")}</p>
-                <p className="text-text-tertiary text-[10px] mt-0.5">{t("pages:misc.r36")}</p>
+                <p className="text-text-tertiary text-[10px] mt-1">{t("pages:misc.r36")}</p>
               </div>
               <div className="text-right">
-                <p className="font-mono font-bold text-xl text-accent">{formatCHF(totalPensionAnnual / 12)}</p>
+                <p className="font-mono font-light text-xl text-accent">{formatCHF(totalPensionAnnual / 12)}</p>
                 <p className="text-text-tertiary text-[10px]">pro Monat · {formatCHF(totalPensionAnnual)} / Jahr</p>
               </div>
             </div>
@@ -417,7 +417,7 @@ export default function Projections() {
             <div key={label} className="card-elevated">
               <p className="text-text-tertiary text-xs">{label}</p>
               <p className="text-sm font-semibold mt-1 font-mono" style={{ color }}>{value}</p>
-              <p className="text-text-tertiary text-xs mt-0.5">{desc}</p>
+              <p className="text-text-tertiary text-xs mt-1">{desc}</p>
             </div>
           ))}
         </div>
@@ -434,7 +434,7 @@ export default function Projections() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-text-primary font-semibold text-sm">{t("pages:misc.r33")}</h2>
-            <p className="text-text-tertiary text-xs mt-0.5">
+            <p className="text-text-tertiary text-xs mt-1">
               {(10000).toLocaleString()} Monte Carlo Simulationen · Reale CHF (inflationsbereinigt)
             </p>
           </div>

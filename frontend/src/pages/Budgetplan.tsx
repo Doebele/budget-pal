@@ -313,7 +313,7 @@ function EntryTooltip({ entry, account, targetRef, visible, recon, refCcy }: Ent
       />
 
       {/* Header: description + amount */}
-      <div className="flex items-start justify-between gap-2 mb-2.5">
+      <div className="flex items-start justify-between gap-2 mb-2">
         <p className="font-semibold text-text-primary text-sm leading-snug flex-1 min-w-0 break-words">
           {entry.description}
         </p>
@@ -332,7 +332,7 @@ function EntryTooltip({ entry, account, targetRef, visible, recon, refCcy }: Ent
       </div>
 
       {/* Detail rows */}
-      <div className="space-y-1.5 text-xs">
+      <div className="space-y-1 text-xs">
         {/* Periodicity — bei woechentlich zusaetzlich der Monatswert, sonst
             passt der Betrag hier nicht zu dem auf dem Chip. */}
         <div className="flex items-center gap-2 text-text-secondary">
@@ -381,14 +381,14 @@ function EntryTooltip({ entry, account, targetRef, visible, recon, refCcy }: Ent
         {/* Notes */}
         {entry.notes && (
           <div className="flex items-start gap-2 text-text-secondary">
-            <Page className="w-3 h-3 text-text-tertiary shrink-0 mt-0.5" />
+            <Page className="w-3 h-3 text-text-tertiary shrink-0 mt-1" />
             <span className="leading-snug break-words">{entry.notes}</span>
           </div>
         )}
 
         {/* Account with bank logo */}
         {account && (
-          <div className="flex items-center gap-2 text-text-secondary pt-0.5 mt-0.5 border-t border-border/40">
+          <div className="flex items-center gap-2 text-text-secondary pt-1 mt-1 border-t border-border/40">
             {bank ? (
               <img
                 src={bank.logoUrl}
@@ -440,7 +440,7 @@ function ReconSummary({ counts }: { counts: ReconCounts }) {
         return (
           <span
             key={s}
-            className={clsx("flex items-center gap-0.5", color)}
+            className={clsx("flex items-center gap-1", color)}
             title={t(`pages:budgetplan.recon.${s}`)}
           >
             <Icon className="w-3 h-3" />
@@ -520,7 +520,7 @@ function EntryChip({
       onMouseLeave={handleMouseLeave}
     >
       {selected !== null && (
-        <label className="flex items-center px-1.5 shrink-0 border-r border-border/30 cursor-pointer">
+        <label className="flex items-center px-1 shrink-0 border-r border-border/30 cursor-pointer">
           <input
             type="checkbox"
             checked={selected}
@@ -551,7 +551,7 @@ function EntryChip({
         onClick={() => onEdit(entry)}
         title={entry.description}
         className={clsx(
-          "flex flex-1 min-w-0 flex-col gap-1.5 text-left px-2 py-2 rounded-r-lg transition-colors",
+          "flex flex-1 min-w-0 flex-col gap-1 text-left px-2 py-2 rounded-r-lg transition-colors",
           entry.amount < 0 ? "hover:border-loss/40" : "hover:border-gain/40"
         )}
       >
@@ -590,7 +590,7 @@ function EntryChip({
           </span>
         </div>
         <span
-          className="inline-flex self-start max-w-full rounded-full px-2 py-0.5 text-[10px] font-semibold truncate border"
+          className="inline-flex self-start max-w-full rounded-full px-2 py-1 text-[10px] font-semibold truncate border"
           style={{
             backgroundColor: `${scColor}28`,
             color: scColor,
@@ -731,7 +731,7 @@ function BudgetplanCategoryPicker({
             )}
             {showOrphanAssigned && !search && selectedCat && (
               <div className="border-t border-border/40 pt-1 mt-1">
-                <p className="px-3 py-1 text-[10px] font-medium uppercase tracking-wide text-text-tertiary">
+                <p className="px-3 py-1 text-[10px] font-medium text-text-tertiary">
                   Aktuell zugewiesen
                 </p>
                 {(() => {
@@ -755,7 +755,7 @@ function BudgetplanCategoryPicker({
             )}
             {filteredOptions.map((group) => (
               <div key={group.label} className="border-t border-border/40 first:border-t-0">
-                <p className="sticky top-0 z-[1] px-3 py-1.5 text-[10px] font-medium uppercase tracking-wide text-text-tertiary bg-bg-surface/95 backdrop-blur-sm">
+                <p className="sticky top-0 z-[1] px-3 py-1 text-[10px] font-medium text-text-tertiary bg-bg-surface/95 backdrop-blur-sm">
                   {group.label}
                 </p>
                 {group.items.map((c) => {
@@ -1544,7 +1544,7 @@ export default function Budgetplan() {
       <div className="flex flex-wrap items-center gap-3 mb-5">
         <div className="flex items-center gap-2">
           <Calendar className="w-5 h-5 text-accent" />
-          <h1 className="text-text-primary font-semibold text-lg">{t("pages:budgetplan.title")}</h1>
+          <h1 className="text-xl font-light text-text-primary">{t("pages:budgetplan.title")}</h1>
         </div>
 
         {/* Year nav */}
@@ -1567,7 +1567,7 @@ export default function Budgetplan() {
         </div>
 
         {/* Filter: type pills + category chips */}
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1">
           {/* Type pills */}
           {(["all", "expense", "income"] as const).map((f) => (
             <button
@@ -1585,13 +1585,13 @@ export default function Budgetplan() {
           {/* Category chips (multi-select) — only shown when entries have categories */}
           {availableCatChips.length > 0 && (
             <>
-              <span className="w-px h-4 bg-border/60 mx-0.5 shrink-0" />
+              <span className="w-px h-4 bg-border/60 mx-1 shrink-0" />
               {availableCatChips.map((chip) => (
                 <button
                   key={chip.scId}
                   onClick={() => toggleCatFilter(chip.scId)}
                   className={clsx(
-                    "px-2.5 py-1 rounded-full text-xs font-medium border transition-colors",
+                    "px-2 py-1 rounded-full text-xs font-medium border transition-colors",
                     catFilter.has(chip.scId)
                       ? "bg-accent/20 border-accent text-accent"
                       : "bg-bg-surface2 border-border text-text-tertiary hover:text-text-secondary hover:border-border/80"
@@ -1617,7 +1617,7 @@ export default function Budgetplan() {
         <div className="flex-1" />
 
         {/* Sort control */}
-        <div className="flex items-center gap-1.5 bg-bg-surface2 border border-border rounded-lg px-2.5 py-1.5">
+        <div className="flex items-center gap-1 bg-bg-surface2 border border-border rounded-lg px-2 py-1">
           <DataTransferBoth className="w-3.5 h-3.5 text-text-tertiary shrink-0" />
           <select
             className="bg-transparent text-xs text-text-secondary focus:outline-none cursor-pointer"
@@ -1642,7 +1642,7 @@ export default function Budgetplan() {
             setSelected(new Set());
           }}
           className={clsx(
-            "flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm font-medium transition-colors",
+            "flex items-center gap-1 px-3 py-1 border rounded-lg text-sm font-medium transition-colors",
             selectMode
               ? "bg-accent/15 border-accent text-accent"
               : "bg-bg-surface2 hover:bg-bg-surface border-border text-text-secondary hover:text-text-primary",
@@ -1672,7 +1672,7 @@ export default function Budgetplan() {
         {/* Vorbefüllen button */}
         <button
           onClick={() => { closeEditor(); setPrefillOpen(true); }}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-bg-surface2 hover:bg-bg-surface border border-border text-text-secondary hover:text-text-primary rounded-lg text-sm font-medium transition-colors"
+          className="flex items-center gap-1 px-3 py-1 bg-bg-surface2 hover:bg-bg-surface border border-border text-text-secondary hover:text-text-primary rounded-lg text-sm font-medium transition-colors"
         >
           <Sparks className="w-4 h-4" />
           {t("pages:budgetplan.prefill")}
@@ -1681,7 +1681,7 @@ export default function Budgetplan() {
         {/* Add button */}
         <button
           onClick={() => openAdd()}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-accent hover:bg-accent/90 text-white rounded-lg text-sm font-medium transition-colors"
+          className="flex items-center gap-1 px-3 py-1 bg-accent hover:bg-accent/90 text-white rounded-lg text-sm font-medium transition-colors"
         >
           <Plus className="w-4 h-4" />
           {t("pages:budgetplan.entryButton")}
@@ -1689,8 +1689,8 @@ export default function Budgetplan() {
       </div>
 
       {/* ── Jahresbilanz ── */}
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-4 px-4 py-2.5 bg-bg-surface rounded-xl border border-border/50 text-sm">
-        <span className="text-text-tertiary text-xs font-medium uppercase tracking-wide">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-4 px-4 py-2 bg-bg-surface rounded-xl border border-border/50 text-sm">
+        <span className="text-text-tertiary text-xs font-medium">
           {t("pages:budgetplan.yearTotal", { year })}
         </span>
         <span className="text-gain font-medium tabular-nums">
@@ -1726,7 +1726,7 @@ export default function Budgetplan() {
 
       {/* ── Massenänderungen ── */}
       {selectMode && (
-        <div className="flex flex-wrap items-center gap-3 mb-4 px-4 py-2.5 bg-accent/8 border border-accent/40 rounded-xl text-sm">
+        <div className="flex flex-wrap items-center gap-3 mb-4 px-4 py-2 bg-accent/8 border border-accent/40 rounded-xl text-sm">
           <span className="text-text-primary font-medium">
             {t("pages:budgetplan.selectedCount", { count: selected.size })}
           </span>
@@ -1756,7 +1756,7 @@ export default function Budgetplan() {
             />
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             <input
               type="number"
               step="0.1"
@@ -1764,13 +1764,13 @@ export default function Budgetplan() {
               onChange={(e) => setBulkPct(e.target.value)}
               placeholder={t("pages:budgetplan.percentPlaceholder")}
               aria-label={t("pages:budgetplan.percentLabel")}
-              className="w-20 bg-bg-surface2 border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-accent"
+              className="w-20 bg-bg-surface2 border border-border rounded-lg px-2 py-1 text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-accent"
             />
             <span className="text-text-tertiary text-xs">%</span>
             <button
               onClick={bulkApplyPercent}
               disabled={selected.size === 0 || bulkMut.isPending || !bulkPct.trim()}
-              className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-bg-surface2 border border-border text-text-secondary hover:text-text-primary transition-colors disabled:opacity-40"
+              className="px-2 py-1 rounded-lg text-xs font-medium bg-bg-surface2 border border-border text-text-secondary hover:text-text-primary transition-colors disabled:opacity-40"
             >
               {t("pages:budgetplan.applyPercent")}
             </button>
@@ -1779,7 +1779,7 @@ export default function Budgetplan() {
           <button
             onClick={() => setBulkDeleteOpen(true)}
             disabled={selected.size === 0 || bulkMut.isPending}
-            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-loss hover:bg-loss/10 border border-loss/40 transition-colors disabled:opacity-40"
+            className="ml-auto flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-medium text-loss hover:bg-loss/10 border border-loss/40 transition-colors disabled:opacity-40"
           >
             <Trash className="w-3.5 h-3.5" />
             {t("pages:budgetplan.deleteSelected")}
@@ -1878,7 +1878,7 @@ export default function Budgetplan() {
                       )}
                     </div>
                     <ReconSummary counts={monthReconCounts(m)} />
-                    <div className="mt-2 flex flex-col items-end gap-0.5 text-right tabular-nums">
+                    <div className="mt-2 flex flex-col items-end gap-1 text-right tabular-nums">
                       {income === 0 && expense === 0 ? (
                         <span className="text-text-tertiary text-xs">—</span>
                       ) : (
@@ -1894,8 +1894,8 @@ export default function Budgetplan() {
                             </span>
                           )}
                           {(income > 0 || expense > 0) && (
-                            <div className="w-full mt-1.5 pt-1.5 border-t border-border/25 text-right">
-                              <p className="text-[10px] font-medium uppercase tracking-wide text-text-tertiary mb-0.5">
+                            <div className="w-full mt-1 pt-1 border-t border-border/25 text-right">
+                              <p className="text-[10px] font-medium text-text-tertiary mb-1">
                                 {t("pages:budgetplan.balance")}
                               </p>
                               <p
@@ -1907,7 +1907,7 @@ export default function Budgetplan() {
                                 {net >= 0 ? "+" : "−"}
                                 {formatAmount(Math.abs(net), refCcy)}
                               </p>
-                              <p className="text-[10px] text-text-tertiary tabular-nums mt-0.5">
+                              <p className="text-[10px] text-text-tertiary tabular-nums mt-1">
                                 {t("pages:budgetplan.cumulative")}{" "}
                                 <span
                                   className={
@@ -1926,7 +1926,7 @@ export default function Budgetplan() {
                   </div>
 
                   {/* Entry chips */}
-                  <div className="flex-1 overflow-y-auto scrollbar-hide p-2 space-y-1.5">
+                  <div className="flex-1 overflow-y-auto scrollbar-hide p-2 space-y-1">
                     {list.length === 0 && (
                       <p className="text-text-tertiary text-xs text-center py-2">{t("pages:budgetplan.noEntries")}</p>
                     )}
@@ -1967,7 +1967,7 @@ export default function Budgetplan() {
                   <div className="px-2 pb-2">
                     <button
                       onClick={() => openAdd(m)}
-                      className="w-full flex items-center justify-center gap-1 py-1.5 text-text-tertiary hover:text-text-primary hover:bg-bg-surface2 rounded-lg text-xs transition-colors"
+                      className="w-full flex items-center justify-center gap-1 py-1 text-text-tertiary hover:text-text-primary hover:bg-bg-surface2 rounded-lg text-xs transition-colors"
                     >
                       <Plus className="w-3 h-3" />
                       {t("pages:budgetplan.add")}
@@ -2057,7 +2057,7 @@ export default function Budgetplan() {
                     ) : (
                       <table className="w-full text-sm">
                         <thead>
-                          <tr className="text-text-tertiary text-xs uppercase tracking-wide">
+                          <tr className="text-text-tertiary text-xs">
                             {selectMode && <th className="w-8" />}
                             <th className="text-left pb-2 font-medium">{t("table.description")}</th>
                             <th className="text-right pb-2 font-medium">{t("table.amount")}</th>
@@ -2089,7 +2089,7 @@ export default function Budgetplan() {
                                   </td>
                                 )}
                                 <td className="py-2 text-text-primary font-medium">
-                                  <span className="flex items-center gap-1.5">
+                                  <span className="flex items-center gap-1">
                                     {badge && (
                                       <span
                                         className={clsx("flex items-center", badge.color)}
@@ -2164,7 +2164,7 @@ export default function Budgetplan() {
                   <button
                     type="button"
                     onClick={() => setEditorTemplateOpen((o) => !o)}
-                    className="w-full flex items-center justify-between gap-2 px-3 py-2.5 bg-bg-surface2 hover:bg-bg-surface2/80 text-left transition-colors"
+                    className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-bg-surface2 hover:bg-bg-surface2/80 text-left transition-colors"
                   >
                     <span className="flex items-center gap-2 text-sm font-medium text-text-primary">
                       <BookStack className="w-4 h-4 text-accent shrink-0" />
@@ -2177,7 +2177,7 @@ export default function Budgetplan() {
                   {editorTemplateOpen && (
                     <div className="px-3 py-3 space-y-3 border-t border-border/40 bg-bg-surface">
                       <div>
-                        <label className="block text-xs text-text-tertiary mb-1.5">Datenquelle</label>
+                        <label className="block text-xs text-text-tertiary mb-1">Datenquelle</label>
                         <div className="toggle-group w-full">
                           {(["empirical", "historical"] as const).map((src) => (
                             <button
@@ -2215,15 +2215,15 @@ export default function Budgetplan() {
                             <NavArrowRight className="w-4 h-4" />
                           </button>
                         </div>
-                        <p className="text-[11px] text-text-tertiary mt-1.5">
+                        <p className="text-[11px] text-text-tertiary mt-1">
                           {t("pages:budgetplan.suggestionHint")}{" "}
                           <span className="font-semibold text-text-primary">{year}</span> speichern.
                         </p>
                       </div>
                       <div>
-                        <label className="block text-xs text-text-tertiary mb-1.5">{t("pages:budgetplan.suggestions")}</label>
+                        <label className="block text-xs text-text-tertiary mb-1">{t("pages:budgetplan.suggestions")}</label>
                         {editorSuggestLoading && (
-                          <div className="space-y-1.5">
+                          <div className="space-y-1">
                             {[1, 2, 3].map((i) => (
                               <div key={i} className="h-9 bg-bg-surface2 rounded-lg animate-pulse" />
                             ))}
@@ -2236,7 +2236,7 @@ export default function Budgetplan() {
                               : "Keine wiederkehrenden Transaktionen im Quelljahr."}
                           </p>
                         )}
-                        <div className="max-h-72 overflow-y-auto space-y-1 pr-0.5">
+                        <div className="max-h-72 overflow-y-auto space-y-1 pr-1">
                           {!editorSuggestLoading && (() => {
                             const selected = editorSuggestions.filter((s) => s.notes === "wizard-selected");
                             const rest = editorSuggestions.filter((s) => s.notes !== "wizard-selected");
@@ -2248,7 +2248,7 @@ export default function Budgetplan() {
                                   type="button"
                                   onClick={() => applySuggestionToForm(s)}
                                   className={clsx(
-                                    "w-full flex items-center gap-2 px-2.5 py-2 rounded-lg border text-left text-xs transition-colors",
+                                    "w-full flex items-center gap-2 px-2 py-2 rounded-lg border text-left text-xs transition-colors",
                                     dimmed
                                       ? "bg-bg-surface2 border-border/40 hover:border-border text-text-tertiary"
                                       : s.amount < 0
@@ -2354,7 +2354,7 @@ export default function Budgetplan() {
                     onChange={(e) => setForm((f) => ({ ...f, amountAbs: e.target.value }))}
                   />
                   <select
-                    className="bg-bg-surface2 border border-border rounded-lg px-1.5 py-2 text-xs text-text-primary font-mono font-medium focus:outline-none focus:ring-1 focus:ring-accent shrink-0 w-16"
+                    className="input text-xs shrink-0 w-16"
                     value={form.currency}
                     onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))}
                   >
@@ -2363,7 +2363,7 @@ export default function Budgetplan() {
                     ))}
                   </select>
                   <select
-                    className="bg-bg-surface2 border border-border rounded-lg px-2 py-2 text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-accent shrink-0"
+                    className="input text-xs shrink-0"
                     value={form.periodicity}
                     onChange={(e) => setForm((f) => ({ ...f, periodicity: e.target.value }))}
                   >
@@ -2413,7 +2413,7 @@ export default function Budgetplan() {
               <div>
                 <label className="block text-xs text-text-tertiary mb-1">{t("pages:budgetplan.accountOptional")}</label>
                 <select
-                  className="w-full bg-bg-surface2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-accent"
+                  className="input w-full text-sm"
                   value={form.account_id}
                   onChange={(e) => {
                     const acctId = e.target.value;
@@ -2463,7 +2463,7 @@ export default function Budgetplan() {
                 <label className="block text-xs text-text-tertiary mb-1">Notizen (optional)</label>
                 <textarea
                   rows={2}
-                  className="w-full bg-bg-surface2 border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent resize-none"
+                  className="input w-full text-sm resize-none"
                   placeholder="Beliebige Notizen…"
                   value={form.notes}
                   onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
@@ -2481,7 +2481,7 @@ export default function Budgetplan() {
                 <button
                   onClick={() => deleteMut.mutate(editEntry.id)}
                   disabled={deleteMut.isPending}
-                  className="flex items-center gap-1.5 px-3 py-2 text-sm text-loss hover:bg-loss/10 rounded-lg transition-colors"
+                  className="flex items-center gap-1 px-3 py-2 text-sm text-loss hover:bg-loss/10 rounded-lg transition-colors"
                 >
                   <Trash className="w-4 h-4" />
                   {t("pages:ui.loeschen")}
@@ -2565,7 +2565,7 @@ export default function Budgetplan() {
                     <NavArrowRight className="w-4 h-4" />
                   </button>
                 </div>
-                <p className="text-xs text-text-tertiary mt-1.5">
+                <p className="text-xs text-text-tertiary mt-1">
                   {t("pages:ui.eintraege_werden_in")} <span className="font-semibold text-text-primary">{year}</span> erstellt.
                 </p>
               </div>
@@ -2577,7 +2577,7 @@ export default function Budgetplan() {
                 </label>
 
                 {suggestLoading && (
-                  <div className="space-y-1.5">
+                  <div className="space-y-1">
                     {[1, 2, 3, 4].map((i) => (
                       <div key={i} className="h-10 bg-bg-surface2 rounded-lg animate-pulse" />
                     ))}
@@ -2607,7 +2607,7 @@ export default function Budgetplan() {
                           })
                         }
                         className={clsx(
-                          "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg border text-left text-xs transition-colors",
+                          "w-full flex items-center gap-2 px-3 py-2 rounded-lg border text-left text-xs transition-colors",
                           checked
                             ? s.amount < 0
                               ? "bg-loss/5 border-loss/20 hover:border-loss/40"

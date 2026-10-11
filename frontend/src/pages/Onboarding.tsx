@@ -50,7 +50,7 @@ export default function Onboarding() {
           <div className="w-12 h-12 rounded-xl bg-accent/15 flex items-center justify-center mx-auto mb-4">
             <Reports className="w-6 h-6 text-accent" />
           </div>
-          <h1 className="font-display text-2xl font-semibold text-text-primary mb-2">
+          <h1 className="text-xl font-light text-text-primary mb-2">
             {t("pages:onboarding.title")}
           </h1>
           <p className="text-text-secondary text-sm max-w-lg mx-auto">
@@ -72,7 +72,7 @@ export default function Onboarding() {
             <div className="w-9 h-9 rounded-lg bg-accent/15 flex items-center justify-center mb-3">
               <Upload className="w-4 h-4 text-accent" />
             </div>
-            <h2 className="text-text-primary font-semibold text-sm mb-1.5">
+            <h2 className="text-text-primary font-semibold text-sm mb-1">
               {t("pages:onboarding.importTitle")}
             </h2>
             <p className="text-text-secondary text-xs leading-relaxed">
@@ -93,7 +93,7 @@ export default function Onboarding() {
             <div className="w-9 h-9 rounded-lg bg-gain/15 flex items-center justify-center mb-3">
               <EditPencil className="w-4 h-4 text-gain" />
             </div>
-            <h2 className="text-text-primary font-semibold text-sm mb-1.5">
+            <h2 className="text-text-primary font-semibold text-sm mb-1">
               {t("pages:onboarding.estimateTitle")}
             </h2>
             <p className="text-text-secondary text-xs leading-relaxed">
@@ -111,7 +111,7 @@ export default function Onboarding() {
             <div className="w-9 h-9 rounded-lg bg-purple/15 flex items-center justify-center mb-3">
               <Flask className="w-4 h-4 text-purple" />
             </div>
-            <h2 className="text-text-primary font-semibold text-sm mb-1.5">
+            <h2 className="text-text-primary font-semibold text-sm mb-1">
               {t("pages:onboarding.demoTitle")}
             </h2>
             <p className="text-text-secondary text-xs leading-relaxed mb-4">
@@ -127,7 +127,7 @@ export default function Onboarding() {
                   <button
                     type="button"
                     onClick={() => navigate("/")}
-                    className="px-3 py-1.5 rounded-lg bg-accent hover:bg-accent/90 text-white text-xs font-medium transition-colors"
+                    className="px-3 py-1 rounded-lg bg-accent hover:bg-accent/90 text-white text-xs font-medium transition-colors"
                   >
                     {t("pages:onboarding.toDashboard")}
                   </button>
@@ -135,7 +135,7 @@ export default function Onboarding() {
                     type="button"
                     onClick={() => removeMut.mutate()}
                     disabled={removeMut.isPending}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-loss/40 text-loss hover:bg-loss/10 text-xs font-medium transition-colors disabled:opacity-50"
+                    className="flex items-center gap-1 px-3 py-1 rounded-lg border border-loss/40 text-loss hover:bg-loss/10 text-xs font-medium transition-colors disabled:opacity-50"
                   >
                     <Trash className="w-3.5 h-3.5" />
                     {t("pages:onboarding.removeDemo")}
@@ -147,7 +147,7 @@ export default function Onboarding() {
                 type="button"
                 onClick={() => demoMut.mutate()}
                 disabled={demoMut.isPending}
-                className="px-3 py-1.5 rounded-lg bg-purple hover:bg-purple/90 text-white text-xs font-medium transition-colors disabled:opacity-50"
+                className="px-3 py-1 rounded-lg bg-purple hover:bg-purple/90 text-white text-xs font-medium transition-colors disabled:opacity-50"
               >
                 {demoMut.isPending
                   ? t("pages:onboarding.loading")

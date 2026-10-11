@@ -58,7 +58,7 @@ export default function ForecastCard({ data, isSelected, onClick }: Props) {
       {/* Month header */}
       <div className="flex items-start justify-between mb-3">
         <p className="text-text-secondary text-xs font-medium">{formatMonthFull(data.month)}</p>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1">
           {data.peer_calibrated && (
             <span title="Peer-Gruppe kalibriert">
               <Group className="w-3 h-3 text-violet-400" />
@@ -69,7 +69,7 @@ export default function ForecastCard({ data, isSelected, onClick }: Props) {
       </div>
 
       {/* Net amount — primary */}
-      <p className={`text-xl font-mono font-semibold ${netColor} mb-1`}>
+      <p className={`text-xl font-mono font-light ${netColor} mb-1`}>
         {isPositive ? "+" : ""}{formatCHF(data.net)}
       </p>
 
@@ -79,7 +79,7 @@ export default function ForecastCard({ data, isSelected, onClick }: Props) {
       </p>
 
       {/* Income / Expense bar */}
-      <div className="space-y-1.5">
+      <div className="space-y-1">
         <div className="flex justify-between text-[11px]">
           <span className="text-gain">↑ {formatCHF(data.predicted_income)}</span>
           <span className="text-loss">↓ {formatCHF(data.predicted_expense)}</span>

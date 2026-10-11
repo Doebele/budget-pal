@@ -97,11 +97,11 @@ export default function ExpenseDetailPanel({
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <h2 className="text-text-primary font-semibold text-base">{t("pages:misc.r07")}</h2>
-              <p className="text-text-tertiary text-xs mt-0.5">{periodLabel}</p>
+              <p className="text-text-tertiary text-xs mt-1">{periodLabel}</p>
             </div>
             <button
               onClick={onClose}
-              className="shrink-0 p-1.5 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-bg-elevated transition-colors"
+              className="shrink-0 p-1 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-bg-elevated transition-colors"
             >
               <Xmark className="w-5 h-5" />
             </button>
@@ -109,7 +109,7 @@ export default function ExpenseDetailPanel({
 
           {/* Total */}
           <div className="mt-3 flex items-baseline gap-3">
-            <span className="text-2xl font-mono font-semibold text-text-primary">
+            <span className="text-2xl font-mono font-light text-text-primary">
               {formatCHF(grandTotal)}
             </span>
             {excludeTransfers && (
@@ -139,7 +139,7 @@ export default function ExpenseDetailPanel({
           {groups.map(({ sc, total, subs, isSavings }) => {
             const pct = grandTotal > 0 ? (total / grandTotal) * 100 : 0;
             return (
-              <div key={sc.id} className={clsx("px-5 py-3.5", isSavings && "bg-amber-500/5")}>
+              <div key={sc.id} className={clsx("px-5 py-3", isSavings && "bg-amber-500/5")}>
                 {/* SC header row */}
                 <div className="flex items-center justify-between mb-2 gap-2">
                   <div className="flex items-center gap-2 min-w-0">
@@ -153,7 +153,7 @@ export default function ExpenseDetailPanel({
                       {sc.label}
                     </span>
                     {isSavings && (
-                      <span className="text-xs px-1.5 py-0.5 rounded-full border msg-warning shrink-0">
+                      <span className="text-xs px-1 py-1 rounded-full border msg-warning shrink-0">
                         {t("pages:ui.kontouebertrag_sparen")}
                       </span>
                     )}
@@ -173,7 +173,7 @@ export default function ExpenseDetailPanel({
                 </div>
 
                 {/* Sub-categories */}
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   {subs.slice(0, 10).map((sub) => {
                     const subPct = total > 0 ? (sub.total / total) * 100 : 0;
                     return (

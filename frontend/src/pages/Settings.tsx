@@ -448,11 +448,11 @@ export default function Settings() {
     const superId = type === "txn" ? sc.id : `wl:${sc.id}`;
     const placeholder = type === "txn" ? "z.B. Kontoübertrag" : "z.B. Säule 3A";
     return (
-      <div className="flex items-center gap-1 mt-1.5 w-full min-w-0 max-w-[320px]">
+      <div className="flex items-center gap-1 mt-1 w-full min-w-0 max-w-[320px]">
         <input
           autoFocus
           type="text"
-          className="input-field text-[11px] flex-1 py-0.5 min-w-0"
+          className="input-field text-[11px] flex-1 py-1 min-w-0"
           placeholder={placeholder}
           value={taxoAdd.value}
           onChange={(e) => setTaxoAdd((a) => (a ? { ...a, value: e.target.value } : null))}
@@ -494,8 +494,8 @@ export default function Settings() {
   return (
     <div className="space-y-6 animate-fade-in max-w-4xl">
       <div>
-        <h1 className="text-2xl font-display text-text-primary">{t("pages:settings2.g08")}</h1>
-        <p className="text-text-tertiary text-sm mt-0.5">{t("pages:settings2.g34")}</p>
+        <h1 className="text-xl font-light text-text-primary">{t("pages:settings2.g08")}</h1>
+        <p className="text-text-tertiary text-sm mt-1">{t("pages:settings2.g34")}</p>
       </div>
 
       {/* Profile */}
@@ -542,7 +542,7 @@ export default function Settings() {
                 min={0}
                 max={25}
                 step={0.01}
-                className="input w-28 font-mono"
+                className="input input-amount w-28 font-mono"
                 value={saronReferenceAnnualPct}
                 onChange={(e) => setSaronReferenceAnnualPct(parseFloat(e.target.value) || 0)}
               />
@@ -616,14 +616,14 @@ export default function Settings() {
       </div>
 
       {/* Empirische Angaben — Link zur Erfassung */}
-      <div className="card border border-accent/20 bg-accent/5">
+      <div className="card">
         <div className="flex items-start gap-3">
-          <div className="w-9 h-9 rounded-lg bg-accent/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+          <div className="w-9 h-9 rounded-lg bg-accent/15 flex items-center justify-center flex-shrink-0 mt-1">
             <MagicWand className="w-4 h-4 text-accent" />
           </div>
           <div className="flex-1">
             <h2 className="text-text-primary font-semibold text-sm">{t("pages:settings2.g10")}</h2>
-            <p className="text-text-tertiary text-xs mt-0.5 mb-3">
+            <p className="text-text-tertiary text-xs mt-1 mb-3">
               {t("pages:ui.aktualisiere_deine_basisdaten_peer_gruppe_vo")}
             </p>
             <Link to="/wizard" className="btn-primary inline-flex items-center gap-2 text-sm py-2">
@@ -638,11 +638,11 @@ export default function Settings() {
       <div className="card">
         <div className="mb-4">
           <h2 className="text-text-primary font-semibold text-sm">{t("pages:settings2.g40")}</h2>
-          <p className="text-text-tertiary text-xs mt-0.5">
+          <p className="text-text-tertiary text-xs mt-1">
             {t("pages:hints.taxonomyOverview")}
           </p>
           {peerConfig?.peerLabel && (
-            <div className="mt-2 flex items-center gap-1.5 text-xs text-text-tertiary">
+            <div className="mt-2 flex items-center gap-1 text-xs text-text-tertiary">
               <Group className="w-3 h-3 text-accent shrink-0" />
               <span>{t("pages:hints.peerGroupLabel")} <span className="text-text-secondary font-medium">{peerConfig.peerLabel}</span></span>
               <span className="text-text-disabled">·</span>
@@ -666,19 +666,19 @@ export default function Settings() {
           <div className="overflow-x-auto">
             <table className="w-full text-xs min-w-[640px]">
               <thead>
-                <tr className="text-text-tertiary text-[11px] uppercase tracking-wide border-b border-border/30">
-                  <th className="text-left py-2.5 px-3 w-[22%]">{t("pages:settings2.g39")}</th>
-                  <th className="text-left py-2.5 px-3 w-[39%]">{t("pages:settings2.g09")}</th>
-                  <th className="text-left py-2.5 px-3 w-[39%]">{t("pages:settings2.g35")}</th>
+                <tr className="text-text-tertiary text-[11px] border-b border-border/30">
+                  <th className="text-left py-2 px-3 w-[22%]">{t("pages:settings2.g39")}</th>
+                  <th className="text-left py-2 px-3 w-[39%]">{t("pages:settings2.g09")}</th>
+                  <th className="text-left py-2 px-3 w-[39%]">{t("pages:settings2.g35")}</th>
                 </tr>
               </thead>
               <tbody>
                 {SUPER_CATEGORIES.map((sc) => (
                   <tr key={sc.id} className="border-b border-border/20 last:border-0 align-top">
-                    <td className="py-2.5 px-3">
+                    <td className="py-2 px-3">
                       <div className="flex items-start gap-2">
                         <span
-                          className="w-1 rounded-full shrink-0 mt-0.5 self-stretch min-h-[2rem]"
+                          className="w-1 rounded-full shrink-0 mt-1 self-stretch min-h-[2rem]"
                           style={{ backgroundColor: sc.color }}
                           aria-hidden
                         />
@@ -688,11 +688,11 @@ export default function Settings() {
                         >
                           <sc.icon className="w-4 h-4" style={{ color: sc.color }} />
                         </span>
-                        <span className="text-text-primary font-medium leading-snug pt-0.5">{sc.label}</span>
+                        <span className="text-text-primary font-medium leading-snug pt-1">{sc.label}</span>
                       </div>
                     </td>
-                    <td className="py-2.5 px-3">
-                      <div className="flex flex-col gap-1.5">
+                    <td className="py-2 px-3">
+                      <div className="flex flex-col gap-1">
                         <div className="flex flex-wrap gap-1 items-center">
                           {(() => {
                             const ownWlNames = new Set(ownCats.filter((c) => c.icon === `wl:${sc.id}`).map((c) => c.name.toLowerCase()));
@@ -705,7 +705,7 @@ export default function Settings() {
                                 {canonicalWl.map((l) => (
                                   <span
                                     key={l}
-                                    className="px-1.5 py-0.5 rounded text-[11px] text-text-secondary"
+                                    className="px-1 py-1 rounded text-[11px] text-text-secondary"
                                     style={{ backgroundColor: sc.color + "24", border: `1px solid ${sc.color}44` }}
                                   >
                                     {l}
@@ -714,7 +714,7 @@ export default function Settings() {
                                 {ownWl.map((c) => (
                                   <span
                                     key={c.id}
-                                    className="px-1.5 py-0.5 rounded text-[11px] text-text-secondary border"
+                                    className="px-1 py-1 rounded text-[11px] text-text-secondary border"
                                     style={{ backgroundColor: sc.color + "18", borderColor: sc.color + "55" }}
                                   >
                                     {c.name}
@@ -736,8 +736,8 @@ export default function Settings() {
                         {renderTaxonomyAddForm(sc, "wizard")}
                       </div>
                     </td>
-                    <td className="py-2.5 px-3">
-                      <div className="flex flex-col gap-1.5">
+                    <td className="py-2 px-3">
+                      <div className="flex flex-col gap-1">
                         <div className="flex flex-wrap gap-1 items-center">
                           {(() => {
                             const ownTxnNames = new Set(ownCats.filter((c) => c.icon === sc.id).map((c) => c.name.toLowerCase()));
@@ -750,7 +750,7 @@ export default function Settings() {
                                 {canonicalTxn.map((c) => (
                                   <span
                                     key={c}
-                                    className="px-1.5 py-0.5 rounded text-[11px] text-text-secondary"
+                                    className="px-1 py-1 rounded text-[11px] text-text-secondary"
                                     style={{ backgroundColor: sc.color + "18" }}
                                   >
                                     {c}
@@ -759,7 +759,7 @@ export default function Settings() {
                                 {ownTxn.map((cat) => (
                                   <span
                                     key={cat.id}
-                                    className="px-1.5 py-0.5 rounded text-[11px] text-text-secondary border"
+                                    className="px-1 py-1 rounded text-[11px] text-text-secondary border"
                                     style={{ backgroundColor: sc.color + "14", borderColor: sc.color + "44" }}
                                   >
                                     {cat.name}
@@ -800,9 +800,9 @@ export default function Settings() {
                 <button
                   type="button"
                   onClick={() => setExpandedSc(isOpen ? null : sc.id)}
-                  className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-bg-surface2 transition-colors"
+                  className="w-full flex items-center justify-between px-3 py-2 hover:bg-bg-surface2 transition-colors"
                 >
-                  <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
                     <span
                       className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
                       style={{ backgroundColor: sc.color + "22" }}
@@ -818,7 +818,7 @@ export default function Settings() {
                   <div className="flex items-center gap-3 shrink-0">
                     {peer != null && peer > 0 && (
                       <span
-                        className="flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded-full"
+                        className="flex items-center gap-1 text-[11px] font-mono px-2 py-1 rounded-full"
                         style={{ backgroundColor: sc.color + "18", color: sc.color }}
                       >
                         <Group className="w-2.5 h-2.5" />
@@ -835,7 +835,7 @@ export default function Settings() {
                     {/* Peer-Gruppe Detail */}
                     {peerConfig && peer != null && (
                       <div>
-                        <p className="text-text-tertiary font-semibold uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                        <p className="text-text-tertiary font-semibold mb-1 flex items-center gap-1">
                           <Group className="w-3 h-3" />
                           Peer-Gruppe (BFS HABE 2021)
                         </p>
@@ -862,7 +862,7 @@ export default function Settings() {
                             return (
                               <div
                                 key={key}
-                                className="flex items-center justify-between px-3 py-1.5 border-b border-border/20 last:border-0"
+                                className="flex items-center justify-between px-3 py-1 border-b border-border/20 last:border-0"
                                 style={{ backgroundColor: sc.color + "08" }}
                               >
                                 <span className="text-text-secondary">{LABEL[key] ?? key}</span>
@@ -872,7 +872,7 @@ export default function Settings() {
                           })}
                           {(PEER_KEYS_BY_SC[sc.id] ?? []).length > 1 && (
                             <div
-                              className="flex items-center justify-between px-3 py-1.5 font-semibold"
+                              className="flex items-center justify-between px-3 py-1 font-semibold"
                               style={{ backgroundColor: sc.color + "15" }}
                             >
                               <span style={{ color: sc.color }}>{t("pages:settings2.g16")}</span>
@@ -884,7 +884,7 @@ export default function Settings() {
                     )}
                     {peerConfig && peer == null && (
                       <div>
-                        <p className="text-text-tertiary font-semibold uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                        <p className="text-text-tertiary font-semibold mb-1 flex items-center gap-1">
                           <Group className="w-3 h-3" />
                           Peer-Gruppe (BFS HABE 2021)
                         </p>
@@ -896,8 +896,8 @@ export default function Settings() {
                     <div className="grid grid-cols-2 gap-4">
                       {/* ── Empirische Labels (Wizard) ── */}
                       <div>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <p className="text-text-tertiary font-semibold uppercase tracking-wide text-[11px]">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-text-tertiary font-semibold text-[11px]">
                             Empirische Labels (Wizard)
                           </p>
                           <button
@@ -916,7 +916,7 @@ export default function Settings() {
                             <>
                               {sc.wizardLabels.filter((l) => !isLabelHidden(sc.id, l, "wl") && !ownCats.some((oc) => oc.icon === "wl:" + sc.id && oc.name.toLowerCase() === l.toLowerCase())).map((l) => (
                                 taxoDelete?.label === l && taxoDelete.scId === sc.id && taxoDelete.type === "wizard" ? (
-                                  <div key={l} className="w-full mt-1 p-2 rounded-lg border border-loss/30 bg-loss/5 space-y-1.5 text-[11px]">
+                                  <div key={l} className="w-full mt-1 p-2 rounded-lg border border-loss/30 bg-loss/5 space-y-1 text-[11px]">
                                     <p className="text-text-secondary">
                                       <span className="font-semibold text-loss">«{l}»</span> ausblenden?
                                       {taxoDelete.txnCount > 0 && (
@@ -940,7 +940,7 @@ export default function Settings() {
                                         type="button"
                                         disabled={(taxoDelete.txnCount > 0 && !taxoDeleteTarget) || migrateLabelMutation.isPending || hideLabelMutation.isPending}
                                         onClick={handleConfirmTaxoDelete}
-                                        className="px-2 py-0.5 rounded bg-loss/20 text-loss border border-loss/30 hover:bg-loss/30 disabled:opacity-40 transition-colors"
+                                        className="px-2 py-1 rounded bg-loss/20 text-loss border border-loss/30 hover:bg-loss/30 disabled:opacity-40 transition-colors"
                                       >
                                         {taxoDelete.txnCount > 0 ? "Migrieren & Ausblenden" : "Ausblenden"}
                                       </button>
@@ -950,7 +950,7 @@ export default function Settings() {
                                 ) : (
                                 <span
                                   key={l}
-                                  className="group flex items-center gap-0.5 px-1.5 py-0.5 rounded text-text-secondary text-[11px]"
+                                  className="group flex items-center gap-1 px-1 py-1 rounded text-text-secondary text-[11px]"
                                   style={{ backgroundColor: sc.color + "18" }}
                                 >
                                   {l}
@@ -958,7 +958,7 @@ export default function Settings() {
                                     type="button"
                                     title={t("pages:settings2.g03")}
                                     onClick={() => openTaxoDelete(sc.id, l, "wizard")}
-                                    className="opacity-0 group-hover:opacity-100 ml-0.5 w-3.5 h-3.5 flex items-center justify-center rounded-full hover:bg-loss/20 text-text-tertiary hover:text-loss transition-all"
+                                    className="opacity-0 group-hover:opacity-100 ml-1 w-3.5 h-3.5 flex items-center justify-center rounded-full hover:bg-loss/20 text-text-tertiary hover:text-loss transition-all"
                                   >
                                     <Xmark className="w-2.5 h-2.5" />
                                   </button>
@@ -969,14 +969,14 @@ export default function Settings() {
                               {ownCats.filter((cat) => cat.icon === "wl:" + sc.id).map((cat) => (
                                 <span
                                   key={cat.id}
-                                  className="group flex items-center gap-0.5 px-1.5 py-0.5 rounded border text-text-secondary text-[11px]"
+                                  className="group flex items-center gap-1 px-1 py-1 rounded border text-text-secondary text-[11px]"
                                   style={{ backgroundColor: sc.color + "18", borderColor: sc.color + "44" }}
                                 >
                                   {cat.name}
                                   <button
                                     type="button"
                                     onClick={() => { setCatDeleteId(cat.id); setCatReassignTo(""); }}
-                                    className="opacity-0 group-hover:opacity-100 ml-0.5 w-3.5 h-3.5 flex items-center justify-center rounded-full hover:bg-loss/20 text-text-tertiary hover:text-loss transition-all"
+                                    className="opacity-0 group-hover:opacity-100 ml-1 w-3.5 h-3.5 flex items-center justify-center rounded-full hover:bg-loss/20 text-text-tertiary hover:text-loss transition-all"
                                   >
                                     <Xmark className="w-2.5 h-2.5" />
                                   </button>
@@ -990,8 +990,8 @@ export default function Settings() {
 
                       {/* ── Transaktionskategorien ── */}
                       <div>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <p className="text-text-tertiary font-semibold uppercase tracking-wide text-[11px]">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-text-tertiary font-semibold text-[11px]">
                             {t("pages:ui.transaktionskategorien_reale_angaben")}
                           </p>
                           <button
@@ -1008,7 +1008,7 @@ export default function Settings() {
                           {sc.txnCategories.filter((c) => !isLabelHidden(sc.id, c, "txn") && !ownCats.some((oc) => oc.icon === sc.id && oc.name.toLowerCase() === c.toLowerCase())).map((c) => (
                             taxoDelete?.label === c && taxoDelete.scId === sc.id && taxoDelete.type === "txn" ? (
                               /* Delete confirmation inline */
-                              <div key={c} className="w-full mt-1 p-2 rounded-lg border border-loss/30 bg-loss/5 space-y-1.5 text-[11px]">
+                              <div key={c} className="w-full mt-1 p-2 rounded-lg border border-loss/30 bg-loss/5 space-y-1 text-[11px]">
                                 <p className="text-text-secondary">
                                   <span className="font-semibold text-loss">«{c}»</span> entfernen?
                                   {taxoDelete.txnCount > 0 && (
@@ -1037,7 +1037,7 @@ export default function Settings() {
                                     type="button"
                                     disabled={(taxoDelete.txnCount > 0 && !taxoDeleteTarget) || migrateLabelMutation.isPending || hideLabelMutation.isPending}
                                     onClick={handleConfirmTaxoDelete}
-                                    className="px-2 py-0.5 rounded bg-loss/20 text-loss border border-loss/30 hover:bg-loss/30 disabled:opacity-40 transition-colors"
+                                    className="px-2 py-1 rounded bg-loss/20 text-loss border border-loss/30 hover:bg-loss/30 disabled:opacity-40 transition-colors"
                                   >
                                     {taxoDelete.txnCount > 0 ? "Migrieren & Ausblenden" : "Ausblenden"}
                                   </button>
@@ -1047,7 +1047,7 @@ export default function Settings() {
                             ) : (
                               <span
                                 key={c}
-                                className="group flex items-center gap-0.5 px-1.5 py-0.5 rounded text-text-secondary"
+                                className="group flex items-center gap-1 px-1 py-1 rounded text-text-secondary"
                                 style={{ backgroundColor: sc.color + "18" }}
                               >
                                 {c}
@@ -1055,7 +1055,7 @@ export default function Settings() {
                                   type="button"
                                   title={t("pages:settings2.g11")}
                                   onClick={() => openTaxoDelete(sc.id, c, "txn")}
-                                  className="opacity-0 group-hover:opacity-100 ml-0.5 w-3.5 h-3.5 flex items-center justify-center rounded-full hover:bg-loss/20 text-text-tertiary hover:text-loss transition-all"
+                                  className="opacity-0 group-hover:opacity-100 ml-1 w-3.5 h-3.5 flex items-center justify-center rounded-full hover:bg-loss/20 text-text-tertiary hover:text-loss transition-all"
                                 >
                                   <Xmark className="w-2.5 h-2.5" />
                                 </button>
@@ -1066,7 +1066,7 @@ export default function Settings() {
                           {ownCats.filter((cat) => cat.icon === sc.id).map((cat) => (
                             <span
                               key={cat.id}
-                              className="group flex items-center gap-0.5 px-1.5 py-0.5 rounded border text-text-secondary"
+                              className="group flex items-center gap-1 px-1 py-1 rounded border text-text-secondary"
                               style={{ backgroundColor: sc.color + "18", borderColor: sc.color + "44" }}
                               title={t("pages:settings2.g07")}
                             >
@@ -1074,7 +1074,7 @@ export default function Settings() {
                               <button
                                 type="button"
                                 onClick={() => { setCatDeleteId(cat.id); setCatReassignTo(""); }}
-                                className="opacity-0 group-hover:opacity-100 ml-0.5 w-3.5 h-3.5 flex items-center justify-center rounded-full hover:bg-loss/20 text-text-tertiary hover:text-loss transition-all"
+                                className="opacity-0 group-hover:opacity-100 ml-1 w-3.5 h-3.5 flex items-center justify-center rounded-full hover:bg-loss/20 text-text-tertiary hover:text-loss transition-all"
                               >
                                 <Xmark className="w-2.5 h-2.5" />
                               </button>
@@ -1096,7 +1096,7 @@ export default function Settings() {
                       if (hiddenTxn.length === 0 && hiddenWl.length === 0) return null;
                       return (
                         <div className="pt-2 border-t border-border/20">
-                          <p className="text-text-disabled text-[10px] uppercase tracking-wide mb-1 flex items-center gap-1">
+                          <p className="text-text-disabled text-[10px] mb-1 flex items-center gap-1">
                             <Eye className="w-2.5 h-2.5" />
                             {t("pages:ui.ausgeblendete_labels_klicken_zum_einblenden")}
                           </p>
@@ -1107,7 +1107,7 @@ export default function Settings() {
                                 type="button"
                                 title={t("pages:settings2.g45")}
                                 onClick={() => unhideLabelMutation.mutate({ sc_id: sc.id, label: l, label_type: "txn" })}
-                                className="px-1.5 py-0.5 rounded text-[11px] text-text-disabled border border-dashed border-border/40 hover:border-text-tertiary hover:text-text-secondary transition-colors"
+                                className="px-1 py-1 rounded text-[11px] text-text-disabled border border-dashed border-border/40 hover:border-text-tertiary hover:text-text-secondary transition-colors"
                               >
                                 {l}
                                 <span className="ml-1 text-[10px] opacity-60">{t("pages:settings2.g18")}</span>
@@ -1119,7 +1119,7 @@ export default function Settings() {
                                 type="button"
                                 title={t("pages:settings2.g46")}
                                 onClick={() => unhideLabelMutation.mutate({ sc_id: sc.id, label: l, label_type: "wl" })}
-                                className="px-1.5 py-0.5 rounded text-[11px] text-text-disabled border border-dashed border-border/40 hover:border-text-tertiary hover:text-text-secondary transition-colors"
+                                className="px-1 py-1 rounded text-[11px] text-text-disabled border border-dashed border-border/40 hover:border-text-tertiary hover:text-text-secondary transition-colors"
                               >
                                 {l}
                                 <span className="ml-1 text-[10px] opacity-60">Emp</span>
@@ -1142,7 +1142,7 @@ export default function Settings() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-text-primary font-semibold text-sm">{t("pages:settings2.g19")}</h2>
-            <p className="text-text-tertiary text-xs mt-0.5">
+            <p className="text-text-tertiary text-xs mt-1">
               {t("pages:hints.mappingNote")}
             </p>
           </div>
@@ -1150,7 +1150,7 @@ export default function Settings() {
             type="button"
             onClick={() => resetMappingsMutation.mutate()}
             disabled={resetMappingsMutation.isPending}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/60 text-text-secondary text-xs hover:bg-bg-surface2 transition-colors disabled:opacity-40"
+            className="flex items-center gap-1 px-3 py-1 rounded-lg border border-border/60 text-text-secondary text-xs hover:bg-bg-surface2 transition-colors disabled:opacity-40"
             title={t("pages:settings2.g02")}
           >
             <Undo className="w-3 h-3" />
@@ -1235,14 +1235,14 @@ export default function Settings() {
               <Label className="w-4 h-4 text-accent" />
               {t("pages:ui.eigene_kategorien")}
             </h2>
-            <p className="text-text-tertiary text-xs mt-0.5">
+            <p className="text-text-tertiary text-xs mt-1">
               {t("pages:ui.benutzerdefinierte_kategorien_fuer_transakti")}
             </p>
           </div>
           <button
             type="button"
             onClick={() => setCatAddForm({ name: "", super_id: "sonstiges", color: "#94a3b8" })}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/10 border border-accent/30 text-accent text-xs font-medium hover:bg-accent/20 transition-colors"
+            className="flex items-center gap-1 px-3 py-1 rounded-lg bg-accent/10 border border-accent/30 text-accent text-xs font-medium hover:bg-accent/20 transition-colors"
           >
             <Plus className="w-3 h-3" />
             {t("pages:ui.neue_kategorie")}
@@ -1251,7 +1251,7 @@ export default function Settings() {
 
         {/* Add form */}
         {catAddForm && (
-          <div className="mb-4 p-3 rounded-lg border border-accent/30 bg-accent/5 space-y-3">
+          <div className="mb-4 p-3 rounded-lg border border-border bg-bg-surface2 space-y-3">
             <p className="text-text-primary text-xs font-semibold">{t("pages:settings2.g26")}</p>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -1295,7 +1295,7 @@ export default function Settings() {
                 type="button"
                 onClick={() => createCatMutation.mutate(catAddForm)}
                 disabled={!catAddForm.name.trim() || createCatMutation.isPending}
-                className="btn-primary text-xs flex items-center gap-1.5 disabled:opacity-40"
+                className="btn-primary text-xs flex items-center gap-1 disabled:opacity-40"
               >
                 <Check className="w-3 h-3" />
                 Erstellen
@@ -1303,7 +1303,7 @@ export default function Settings() {
               <button
                 type="button"
                 onClick={() => setCatAddForm(null)}
-                className="p-1.5 rounded text-text-tertiary hover:text-text-primary hover:bg-bg-surface2"
+                className="p-1 rounded text-text-tertiary hover:text-text-primary hover:bg-bg-surface2"
               >
                 <Xmark className="w-3.5 h-3.5" />
               </button>
@@ -1380,7 +1380,7 @@ export default function Settings() {
                               type="button"
                               onClick={() => deleteCatMutation.mutate({ id: cat.id, reassignTo: catReassignTo })}
                               disabled={deleteCatMutation.isPending}
-                              className="text-[11px] px-2.5 py-1 rounded bg-loss/20 text-loss border border-loss/30 hover:bg-loss/30 transition-colors disabled:opacity-40"
+                              className="text-[11px] px-2 py-1 rounded bg-loss/20 text-loss border border-loss/30 hover:bg-loss/30 transition-colors disabled:opacity-40"
                             >
                               {t("pages:ui.endgueltig_loeschen")}
                             </button>
@@ -1413,14 +1413,14 @@ export default function Settings() {
                             type="button"
                             onClick={() => updateCatMutation.mutate({ id: cat.id, name: catEditName, icon: cat.icon, color: cat.color })}
                             disabled={!catEditName.trim() || updateCatMutation.isPending}
-                            className="p-1.5 rounded text-gain hover:bg-gain/10 disabled:opacity-40"
+                            className="p-1 rounded text-gain hover:bg-gain/10 disabled:opacity-40"
                           >
                             <Check className="w-3.5 h-3.5" />
                           </button>
                           <button
                             type="button"
                             onClick={() => setCatEditId(null)}
-                            className="p-1.5 rounded text-text-tertiary hover:text-text-primary hover:bg-bg-surface2"
+                            className="p-1 rounded text-text-tertiary hover:text-text-primary hover:bg-bg-surface2"
                           >
                             <Xmark className="w-3.5 h-3.5" />
                           </button>
@@ -1434,7 +1434,7 @@ export default function Settings() {
                           />
                           <span className="text-text-primary text-sm flex-1">{cat.name}</span>
                           {cat.txn_count > 0 && (
-                            <span className="text-[11px] text-text-tertiary font-mono bg-bg-surface2 px-1.5 py-0.5 rounded">
+                            <span className="text-[11px] text-text-tertiary font-mono bg-bg-surface2 px-1 py-1 rounded">
                               {cat.txn_count} Txn
                             </span>
                           )}
@@ -1442,7 +1442,7 @@ export default function Settings() {
                             type="button"
                             title={t("pages:settings2.g43")}
                             onClick={() => { setCatEditId(cat.id); setCatEditName(cat.name); }}
-                            className="p-1.5 rounded text-text-tertiary hover:text-text-primary hover:bg-bg-surface2 transition-colors"
+                            className="p-1 rounded text-text-tertiary hover:text-text-primary hover:bg-bg-surface2 transition-colors"
                           >
                             <EditPencil className="w-3 h-3" />
                           </button>
@@ -1450,7 +1450,7 @@ export default function Settings() {
                             type="button"
                             title={t("pages:settings2.g24")}
                             onClick={() => { setCatDeleteId(cat.id); setCatReassignTo(""); }}
-                            className="p-1.5 rounded text-text-tertiary hover:text-loss hover:bg-loss/10 transition-colors"
+                            className="p-1 rounded text-text-tertiary hover:text-loss hover:bg-loss/10 transition-colors"
                           >
                             <Trash className="w-3 h-3" />
                           </button>
@@ -1501,7 +1501,7 @@ export default function Settings() {
                 Gauge-Ansicht
               </button>
             </div>
-            <p className="text-text-disabled text-xs mt-1.5">
+            <p className="text-text-disabled text-xs mt-1">
               {t("pages:ui.wird_beim_oeffnen_der_budgetanalyse_als_stan")}
             </p>
           </div>
@@ -1517,7 +1517,7 @@ export default function Settings() {
 
         {/* Export */}
         <div className="space-y-2">
-          <h3 className="text-text-secondary text-xs font-medium uppercase tracking-wide">{t("pages:settings2.g13")}</h3>
+          <h3 className="text-text-secondary text-xs font-medium">{t("pages:settings2.g13")}</h3>
           <p className="text-text-tertiary text-xs">
             {t("pages:hints.exportNote")}
           </p>
@@ -1538,7 +1538,7 @@ export default function Settings() {
 
           {includeKeys && (
             <div className="space-y-2">
-              <p className="msg msg-warning text-xs flex items-start gap-1.5">
+              <p className="msg msg-warning text-xs flex items-start gap-1">
                 <WarningCircle className="w-3.5 h-3.5 shrink-0 mt-px" />
                 {t("settings:backup.keysWarn")}
               </p>
@@ -1579,7 +1579,7 @@ export default function Settings() {
 
         {/* Import */}
         <div className="space-y-3">
-          <h3 className="text-text-secondary text-xs font-medium uppercase tracking-wide">{t("pages:settings2.g17")}</h3>
+          <h3 className="text-text-secondary text-xs font-medium">{t("pages:settings2.g17")}</h3>
           <p className="text-text-tertiary text-xs">
             {t("pages:hints.restoreNote")}
           </p>
@@ -1871,7 +1871,7 @@ function SecuritySection() {
               <option key={v} value={v}>{SESSION_TIMEOUT_LABELS[v]}</option>
             ))}
           </select>
-          <p className="text-text-disabled text-[11px] mt-1.5">
+          <p className="text-text-disabled text-[11px] mt-1">
             {t("security.sessionDurationHint")}
           </p>
         </div>
@@ -1914,7 +1914,7 @@ function SecuritySection() {
                 </button>
               </div>
               {error && (
-                <p className="text-loss text-[11px] mt-1.5 flex items-center gap-1">
+                <p className="text-loss text-[11px] mt-1 flex items-center gap-1">
                   <WarningCircle className="w-3.5 h-3.5" /> {error}
                 </p>
               )}
@@ -2197,7 +2197,7 @@ function AiModelSection() {
                   </p>
                 )}
                 {info.note && (
-                  <p className="msg msg-warning text-[11px] mt-2 flex items-start gap-1.5">
+                  <p className="msg msg-warning text-[11px] mt-2 flex items-start gap-1">
                     <WarningCircle className="w-3.5 h-3.5 shrink-0 mt-px" />
                     {t(info.note)}
                   </p>
@@ -2292,7 +2292,7 @@ function AiModelSection() {
                   : t("ai.contextAuto")}
               </span>
             </div>
-            <p className="text-text-disabled text-[11px] mt-1.5 leading-relaxed">
+            <p className="text-text-disabled text-[11px] mt-1 leading-relaxed">
               {settings?.detected_context_tokens ? (
                 <>
                   {t("ai.contextDetected", {

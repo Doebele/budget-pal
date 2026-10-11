@@ -93,23 +93,30 @@ export default {
         },
       },
 
+      // Nur Fira Sans (wie Pension-Pal); font-mono/font-display bleiben als
+      // Namen erhalten und setzen Tabellenziffern bzw. Light (index.css).
       fontFamily: {
-        sans: ["Syne", "system-ui", "sans-serif"],
-        mono: ["JetBrains Mono", "Fira Code", "monospace"],
-        display: ["DM Serif Display", "Georgia", "serif"],
+        sans: ['"Fira Sans"', "system-ui", "-apple-system", "Segoe UI", "sans-serif"],
+        mono: ['"Fira Sans"', "system-ui", "sans-serif"],
+        display: ['"Fira Sans"', "system-ui", "sans-serif"],
       },
 
       fontSize: {
         "2xs": ["0.625rem", { lineHeight: "0.875rem" }],
       },
 
+      // An die Radius-Tokens gebunden (index.css), damit alle rounded-*
+      // gemeinsam klein bleiben — wie Pension-Pal.
       borderRadius: {
         none: "0",
-        sm: "2px",      // Level 4 – Badges, Icon-Container, Tags
-        DEFAULT: "4px", // Level 3 – Inputs, Buttons
-        md: "6px",      // Level 2 – Sub-Cards, Accordions, Toggle-Cards
-        lg: "8px",      // Level 1 – Haupt-Cards, Sections
-        full: "9999px", // Kreise, Progress-Bars, Avatare
+        sm: "var(--r-xs)",     // 2px – Badges, Icon-Container, Tags
+        DEFAULT: "var(--r-sm)", // 3px – Buttons, Controls
+        md: "var(--r-md)",     // 4px – Sub-Cards, Inputs
+        lg: "var(--r-lg)",     // 6px – Cards, Sections
+        xl: "var(--r-xl)",     // 8px
+        "2xl": "var(--r-2xl)", // 10px – grosse Schalen
+        "3xl": "var(--r-2xl)",
+        full: "9999px",        // Kreise, Progress-Bars, Avatare
       },
 
       boxShadow: {
