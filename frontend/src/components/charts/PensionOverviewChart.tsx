@@ -40,7 +40,7 @@ export default function PensionOverviewChart({
   retirementIdx: number | null;
 }) {
   const { t } = useTranslation();
-  const { colors } = useThemeColors();
+  const { colors, fs } = useThemeColors();
   const [view, setView] = useState<View>("capital");
   const [showWealth, setShowWealth] = useState(true);
   const [showPeer, setShowPeer] = useState(false);
@@ -79,13 +79,13 @@ export default function PensionOverviewChart({
   });
 
   const retirementYear = retirementIdx != null ? projection.years[retirementIdx] : undefined;
-  const axis = { fill: colors.textTertiary, fontSize: 11 };
+  const axis = { fill: colors.textTertiary, fontSize: fs.xs };
   const tooltipStyle = {
     backgroundColor: colors.bgElevated,
     border: `1px solid ${colors.border}`,
     borderRadius: "6px",
     color: colors.textPrimary,
-    fontSize: 12,
+    fontSize: fs.sm,
   };
 
   return (
@@ -104,7 +104,7 @@ export default function PensionOverviewChart({
           ))}
         </div>
         {view === "capital" && (
-          <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer">
+          <label className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer">
             <input
               type="checkbox"
               checked={showWealth}
@@ -126,7 +126,7 @@ export default function PensionOverviewChart({
             <XAxis dataKey="year" tick={axis} axisLine={false} tickLine={false} />
             <YAxis tick={axis} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}k`} />
             <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => formatCHF(v * 1000)} />
-            <Legend iconType="line" wrapperStyle={{ fontSize: 11, color: colors.textSecondary }} />
+            <Legend iconType="line" wrapperStyle={{ fontSize: fs.xs, color: colors.textSecondary }} />
             {/* Stufen: ein Bezug ist ein Ereignis in einem Jahr, kein Verlauf */}
             <Area type="stepAfter" dataKey="bvg" stackId="cap" name={t("pages:overview.bvgCapital")}
               stroke={PILLAR_COLORS.bvg} fill={PILLAR_COLORS.bvg} fillOpacity={0.25} />
@@ -144,7 +144,7 @@ export default function PensionOverviewChart({
             )}
             {retirementYear != null && (
               <ReferenceLine x={retirementYear} stroke={colors.textTertiary} strokeDasharray="4 3"
-                label={{ value: t("pages:overview.retirement"), position: "insideTopLeft", fill: colors.textTertiary, fontSize: 10 }} />
+                label={{ value: t("pages:overview.retirement"), position: "insideTopLeft", fill: colors.textTertiary, fontSize: fs["2xs"] }} />
             )}
           </ComposedChart>
         ) : (
@@ -153,7 +153,7 @@ export default function PensionOverviewChart({
             <XAxis dataKey="year" tick={axis} axisLine={false} tickLine={false} />
             <YAxis tick={axis} axisLine={false} tickLine={false} width={48} />
             <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => `${formatCHF(v)} / Mt.`} />
-            <Legend wrapperStyle={{ fontSize: 11, color: colors.textSecondary }} />
+            <Legend wrapperStyle={{ fontSize: fs.xs, color: colors.textSecondary }} />
             <Bar dataKey="ahv" stackId="inc" name={t("pages:overview.ahv")} fill={PILLAR_COLORS.ahv} />
             <Bar dataKey="bvg" stackId="inc" name={t("pages:overview.bvgPension")} fill={PILLAR_COLORS.bvg} />
             <Bar dataKey="wealth" stackId="inc" name={t("pages:overview.fromWealth")} fill={colors.accent} fillOpacity={0.5} />
@@ -165,7 +165,7 @@ export default function PensionOverviewChart({
           </ComposedChart>
         )}
       </ResponsiveContainer>
-      <p className="text-text-tertiary text-[11px] leading-relaxed max-w-3xl">
+      <p className="text-text-tertiary text-xs leading-relaxed max-w-3xl">
         {t(view === "capital" ? "pages:overview.capitalHint" : "pages:overview.incomeHint")}
       </p>
     </div>

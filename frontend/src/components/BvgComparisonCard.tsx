@@ -21,7 +21,7 @@ const VARIANT_COLORS: Record<BvgVariant["key"], string> = {
  */
 export default function BvgComparisonCard({ data }: { data: BvgComparison }) {
   const { t } = useTranslation();
-  const { colors } = useThemeColors();
+  const { colors, fs } = useThemeColors();
   const [showBad, setShowBad] = useState(false);
   const age0 = data.current_age ?? 0;
 
@@ -47,16 +47,16 @@ export default function BvgComparisonCard({ data }: { data: BvgComparison }) {
     { label: t("pages:bvgCompare.rowSuccess"), value: (v) => `${Math.round(v.success_rate * 100)} %` },
     { label: t("pages:bvgCompare.rowTaxes"), value: (v) => formatCHF(v.taxes_total) },
   ];
-  const axis = { fill: colors.textTertiary, fontSize: 11 };
+  const axis = { fill: colors.textTertiary, fontSize: fs.xs };
 
   return (
     <div className="card space-y-4">
       <div>
-        <h2 className="text-text-primary font-semibold text-sm">{t("pages:bvgCompare.title")}</h2>
-        <p className="text-text-tertiary text-xs mt-1">{t("pages:bvgCompare.subtitle")}</p>
+        <h2 className="text-text-primary font-semibold text-base">{t("pages:bvgCompare.title")}</h2>
+        <p className="text-text-tertiary text-sm mt-1">{t("pages:bvgCompare.subtitle")}</p>
       </div>
 
-      <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer">
+      <label className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer">
         <input type="checkbox" checked={showBad} onChange={(e) => setShowBad(e.target.checked)} className="accent-accent" />
         {t("pages:bvgCompare.showBad")}
       </label>
@@ -67,11 +67,11 @@ export default function BvgComparisonCard({ data }: { data: BvgComparison }) {
           <XAxis dataKey="age" tick={axis} axisLine={false} tickLine={false} />
           <YAxis tick={axis} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}k`} />
           <Tooltip
-            contentStyle={{ backgroundColor: colors.bgElevated, border: `1px solid ${colors.border}`, borderRadius: "6px", color: colors.textPrimary, fontSize: 12 }}
+            contentStyle={{ backgroundColor: colors.bgElevated, border: `1px solid ${colors.border}`, borderRadius: "6px", color: colors.textPrimary, fontSize: fs.sm }}
             labelFormatter={(age) => t("pages:bvgCompare.atAge", { age })}
             formatter={(v: number) => formatCHF(v * 1000)}
           />
-          <Legend wrapperStyle={{ fontSize: 11, color: colors.textSecondary }} />
+          <Legend wrapperStyle={{ fontSize: fs.xs, color: colors.textSecondary }} />
           {data.variants.map((v) => (
             <Line key={v.key} type="monotone" dataKey={v.key} name={t(`pages:bvgCompare.${v.key}`)}
               stroke={VARIANT_COLORS[v.key]} strokeWidth={2.5} dot={false} />
@@ -84,14 +84,14 @@ export default function BvgComparisonCard({ data }: { data: BvgComparison }) {
         </LineChart>
       </ResponsiveContainer>
 
-      <p className="text-text-secondary text-xs">
+      <p className="text-text-secondary text-sm">
         {data.breakeven_age != null
           ? t("pages:bvgCompare.breakeven", { age: data.breakeven_age })
           : t("pages:bvgCompare.noBreakeven", { age: age0 + data.years.length - 1 })}
       </p>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-xs">
+        <table className="w-full text-sm">
           <thead>
             <tr className="text-text-tertiary text-left">
               <th className="py-1 pr-3 font-medium" />
@@ -115,7 +115,7 @@ export default function BvgComparisonCard({ data }: { data: BvgComparison }) {
         </table>
       </div>
 
-      <p className="text-text-tertiary text-[11px] leading-relaxed max-w-3xl">{t("pages:bvgCompare.explain")}</p>
+      <p className="text-text-tertiary text-xs leading-relaxed max-w-3xl">{t("pages:bvgCompare.explain")}</p>
     </div>
   );
 }

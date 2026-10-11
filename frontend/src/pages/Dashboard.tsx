@@ -40,20 +40,20 @@ function StatCard({
   return (
     <div className="card flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <span className="text-text-tertiary text-xs">{label}</span>
+        <span className="text-text-tertiary text-sm">{label}</span>
         <div className="w-8 h-8 rounded-lg bg-bg-surface2 flex items-center justify-center">
           <Icon className="w-4 h-4 text-text-tertiary" />
         </div>
       </div>
       {periodHint && (
-        <p className="text-text-tertiary text-xs -mt-2 truncate" title={periodHint}>
+        <p className="text-text-tertiary text-sm -mt-2 truncate" title={periodHint}>
           {periodHint}
         </p>
       )}
       <div>
         <p className={clsx("text-2xl font-mono font-light", colorClass)}>{value}</p>
         {delta !== undefined && (
-          <p className={clsx("text-xs mt-1 flex items-center gap-1", delta >= 0 ? "text-gain" : "text-loss")}>
+          <p className={clsx("text-sm mt-1 flex items-center gap-1", delta >= 0 ? "text-gain" : "text-loss")}>
             {delta >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
             {Math.abs(delta).toFixed(1)}% ggü. Vormonat
           </p>
@@ -145,7 +145,7 @@ export default function Dashboard() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-xl font-light text-text-primary">Dashboard</h1>
-          <p className="text-text-tertiary text-sm mt-1">{range.label}</p>
+          <p className="text-text-tertiary text-base mt-1">{range.label}</p>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center lg:justify-end">
           <GranularityNavigator
@@ -217,8 +217,8 @@ export default function Dashboard() {
       <div className="card">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-text-primary font-semibold text-sm">Cashflow</h2>
-            <p className="text-text-tertiary text-xs mt-1">{range.label}</p>
+            <h2 className="text-text-primary font-semibold text-base">Cashflow</h2>
+            <p className="text-text-tertiary text-sm mt-1">{range.label}</p>
           </div>
           <div className="toggle-group shrink-0" role="group" aria-label="Sankey-Sortierung">
             <button
@@ -240,7 +240,7 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 xl:gap-8">
           <div className="min-w-0">
-            <h3 className="text-text-secondary text-xs font-semibold mb-3">
+            <h3 className="text-text-secondary text-sm font-semibold mb-3">
               {t("pages:ui.reale_angaben")}
             </h3>
             {sankeyDataReal.links.length > 0 ? (
@@ -260,18 +260,18 @@ export default function Dashboard() {
                 />
               </Suspense>
             ) : (
-              <div className="h-56 flex items-center justify-center text-text-tertiary text-sm text-center px-3 rounded-xl bg-bg-surface2/40 border border-border/30">
+              <div className="h-56 flex items-center justify-center text-text-tertiary text-base text-center px-3 rounded-xl bg-bg-surface2/40 border border-border/30">
                 {`Noch keine Transaktionen im gewählten Zeitraum (${range.label})`}
               </div>
             )}
           </div>
 
           <div className="min-w-0">
-            <h3 className="text-text-secondary text-xs font-semibold mb-3">
+            <h3 className="text-text-secondary text-sm font-semibold mb-3">
               {t("pages:ui.empirische_angaben")}
             </h3>
             {wizardLoading ? (
-              <div className="h-56 flex items-center justify-center text-text-tertiary text-sm rounded-xl bg-bg-surface2/40 border border-border/30">
+              <div className="h-56 flex items-center justify-center text-text-tertiary text-base rounded-xl bg-bg-surface2/40 border border-border/30">
                 {t("pages:ui.lade_empirische_angaben")}
               </div>
             ) : sankeyDataEmpirical.links.length > 0 ? (
@@ -291,7 +291,7 @@ export default function Dashboard() {
                 />
               </Suspense>
             ) : (
-              <div className="h-56 flex items-center justify-center text-text-tertiary text-sm text-center px-3 rounded-xl bg-bg-surface2/40 border border-border/30">
+              <div className="h-56 flex items-center justify-center text-text-tertiary text-base text-center px-3 rounded-xl bg-bg-surface2/40 border border-border/30">
                 {t("pages:ui.keine_empirischen_angaben_bitte_zuerst_den_s")}
               </div>
             )}
@@ -309,8 +309,8 @@ export default function Dashboard() {
         {stats?.top_categories && stats.top_categories.length > 0 && (
           <div className="card">
             <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between mb-4">
-              <h2 className="text-text-primary font-semibold text-sm">{t("pages:dashboard.topExpenseCategories")}</h2>
-              <span className="text-text-tertiary text-xs">{range.label}</span>
+              <h2 className="text-text-primary font-semibold text-base">{t("pages:dashboard.topExpenseCategories")}</h2>
+              <span className="text-text-tertiary text-sm">{range.label}</span>
             </div>
             <div className="space-y-3">
               {stats.top_categories.slice(0, 10).map((cat: { category: string; total: number }) => {
@@ -319,7 +319,7 @@ export default function Dashboard() {
                 return (
                   <div key={cat.category}>
                     <div className="flex items-center justify-between mb-1">
-                      <span className="flex items-center gap-1 text-text-secondary text-xs">
+                      <span className="flex items-center gap-1 text-text-secondary text-sm">
                         <span
                           className="w-4 h-4 rounded flex items-center justify-center shrink-0"
                           style={{ backgroundColor: sc.color + "22" }}
@@ -328,7 +328,7 @@ export default function Dashboard() {
                         </span>
                         {cat.category ? translateCategory(cat.category) : t("pages:ui.sonstige_anlagen")}
                       </span>
-                      <span className="text-text-primary text-xs font-mono">{formatCHF(cat.total)}</span>
+                      <span className="text-text-primary text-sm font-mono">{formatCHF(cat.total)}</span>
                     </div>
                     <ProgressBar value={pct} color={sc.color} opacity={0.75} />
                   </div>
@@ -340,8 +340,8 @@ export default function Dashboard() {
 
         <div className="card flex flex-col">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-text-primary font-semibold text-sm">{t("pages:ui.letzte_transaktionen")}</h2>
-            <Link to="/transactions" className="text-accent text-xs flex items-center gap-1 hover:text-accent-light">
+            <h2 className="text-text-primary font-semibold text-base">{t("pages:ui.letzte_transaktionen")}</h2>
+            <Link to="/transactions" className="text-accent text-sm flex items-center gap-1 hover:text-accent-light">
               Alle <ArrowRight className="w-3 h-3" />
             </Link>
           </div>
@@ -367,22 +367,22 @@ export default function Dashboard() {
                       <sc.icon className="w-3.5 h-3.5" style={{ color: sc.color }} />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-text-primary text-xs font-medium truncate">
+                      <p className="text-text-primary text-sm font-medium truncate">
                         {txn.merchant_normalized || txn.description.slice(0, 30)}
                       </p>
-                      <p className="text-text-tertiary text-xs">
+                      <p className="text-text-tertiary text-sm">
                         {format(new Date(txn.date), "dd.MM.")} · {txn.category ? translateCategory(txn.category) : t("txn.uncategorized")}
                       </p>
                     </div>
                   </div>
-                  <span className={clsx("text-xs font-mono flex-shrink-0 ml-2", txn.amount >= 0 ? "text-gain" : "text-loss")}>
+                  <span className={clsx("text-sm font-mono flex-shrink-0 ml-2", txn.amount >= 0 ? "text-gain" : "text-loss")}>
                     {txn.amount >= 0 ? "+" : ""}{formatCHF(txn.amount)}
                   </span>
                 </div>
               );
             })}
             {(!recentTxns || recentTxns.length === 0) && (
-              <p className="text-text-tertiary text-xs text-center py-8">{t("pages:misc.r24")}</p>
+              <p className="text-text-tertiary text-sm text-center py-8">{t("pages:misc.r24")}</p>
             )}
           </div>
         </div>
@@ -392,11 +392,11 @@ export default function Dashboard() {
       {goals && goals.length > 0 && (
         <div className="card">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-text-primary font-semibold text-sm flex items-center gap-2">
+            <h2 className="text-text-primary font-semibold text-base flex items-center gap-2">
               <Position className="w-4 h-4 text-accent" />
               Sparziele
             </h2>
-            <Link to="/goals" className="text-accent text-xs flex items-center gap-1 hover:text-accent-light">
+            <Link to="/goals" className="text-accent text-sm flex items-center gap-1 hover:text-accent-light">
               Alle <ArrowRight className="w-3 h-3" />
             </Link>
           </div>
@@ -409,10 +409,10 @@ export default function Dashboard() {
               };
               const color = COLORS[g.goal_type] ?? "#6b7280";
               return (
-                <div key={g.id} className="bg-bg-surface2 rounded-xl p-3 border border-border/50">
+                <div key={g.id} className="bg-bg-surface2 rounded-xl p-box border border-border/50">
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-text-primary text-xs font-medium truncate">{g.name}</p>
-                    <span className="text-xs font-mono text-text-tertiary shrink-0 ml-2">
+                    <p className="text-text-primary text-sm font-medium truncate">{g.name}</p>
+                    <span className="text-sm font-mono text-text-tertiary shrink-0 ml-2">
                       {g.progress_pct.toFixed(0)}%
                     </span>
                   </div>
@@ -424,7 +424,7 @@ export default function Dashboard() {
                     className="mb-1"
                     label={g.name}
                   />
-                  <div className="flex justify-between text-[10px] text-text-tertiary">
+                  <div className="flex justify-between text-2xs text-text-tertiary">
                     <span>{formatCHF(g.current_amount)}</span>
                     {g.months_to_target != null && g.months_to_target > 0 && (
                       <span>~{g.months_to_target} Monate</span>
@@ -452,8 +452,8 @@ export default function Dashboard() {
             className="card hover:border-accent/30 transition-colors cursor-pointer group"
           >
             <Icon className="w-7 h-7 mb-2 text-accent" />
-            <p className="text-text-primary text-sm font-semibold group-hover:text-accent transition-colors">{label}</p>
-            <p className="text-text-tertiary text-xs mt-1">{desc}</p>
+            <p className="text-text-primary text-base font-semibold group-hover:text-accent transition-colors">{label}</p>
+            <p className="text-text-tertiary text-sm mt-1">{desc}</p>
           </Link>
         ))}
       </div>

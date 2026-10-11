@@ -129,10 +129,10 @@ export default function CustomProviderSidebar({
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="text-text-primary font-semibold text-sm truncate">
+          <div className="text-text-primary font-semibold text-base truncate">
             {name.trim() || "Eigener Anbieter"}
           </div>
-          <div className="text-text-tertiary text-[11px]">
+          <div className="text-text-tertiary text-xs">
             {isEditing ? "Bearbeiten" : "Neu erstellen"}
           </div>
         </div>
@@ -152,12 +152,12 @@ export default function CustomProviderSidebar({
 
         {/* Name */}
         <div>
-          <p className="text-[10px] font-semibold text-text-tertiary mb-1">
+          <p className="text-2xs font-semibold text-text-tertiary mb-1">
             Name
           </p>
           <input
             type="text"
-            className="input text-sm w-full"
+            className="input text-base w-full"
             placeholder={t("pages:step5.s15")}
             value={name}
             onChange={e => setName(e.target.value)}
@@ -167,13 +167,13 @@ export default function CustomProviderSidebar({
 
         {/* Website */}
         <div>
-          <p className="text-[10px] font-semibold text-text-tertiary mb-1">
+          <p className="text-2xs font-semibold text-text-tertiary mb-1">
             Website <span className="normal-case font-normal">(optional)</span>
           </p>
           <div className="relative flex items-center gap-2">
             <input
               type="url"
-              className="input text-sm w-full pr-8"
+              className="input text-base w-full pr-8"
               placeholder="https://example.com"
               value={website}
               onChange={e => {
@@ -197,11 +197,11 @@ export default function CustomProviderSidebar({
 
         {/* Kategorie */}
         <div>
-          <p className="text-[10px] font-semibold text-text-tertiary mb-1">
+          <p className="text-2xs font-semibold text-text-tertiary mb-1">
             {t("pages:ui.kategorie")}
           </p>
           <select
-            className="input text-sm w-full cursor-pointer"
+            className="input text-base w-full cursor-pointer"
             value={categoryId}
             onChange={e => setCategoryId(e.target.value)}
           >
@@ -213,13 +213,13 @@ export default function CustomProviderSidebar({
 
         {/* Betrag */}
         <div>
-          <p className="text-[10px] font-semibold text-text-tertiary mb-1">
+          <p className="text-2xs font-semibold text-text-tertiary mb-1">
             {t("pages:ui.betrag")}
           </p>
           <div className="flex gap-2">
             <input
               type="number"
-              className="input input-amount text-sm flex-1"
+              className="input input-amount text-base flex-1"
               placeholder="0.00"
               value={amount}
               onChange={e => setAmount(e.target.value)}
@@ -227,7 +227,7 @@ export default function CustomProviderSidebar({
               step={0.01}
             />
             <select
-              className="input text-sm w-24 cursor-pointer"
+              className="input text-base w-24 cursor-pointer"
               value={currency}
               onChange={e => setCurrency(e.target.value as SupportedCurrency)}
             >
@@ -237,7 +237,7 @@ export default function CustomProviderSidebar({
             </select>
           </div>
           {currency !== "CHF" && parsedAmount > 0 && (
-            <p className="text-text-tertiary text-[10px] mt-1 flex items-center gap-1">
+            <p className="text-text-tertiary text-2xs mt-1 flex items-center gap-1">
               <Refresh className="w-2.5 h-2.5" />
               {t("pages:ui.indikativer_kurs_angaben_ohne_gewaehr")}
             </p>
@@ -246,7 +246,7 @@ export default function CustomProviderSidebar({
 
         {/* Zahlungsrhythmus */}
         <div>
-          <p className="text-[10px] font-semibold text-text-tertiary mb-1">
+          <p className="text-2xs font-semibold text-text-tertiary mb-1">
             Zahlungsrhythmus
           </p>
           <div className="grid grid-cols-2 gap-1">
@@ -256,7 +256,7 @@ export default function CustomProviderSidebar({
                 type="button"
                 onClick={() => setFrequency(freq)}
                 className={clsx(
-                  "rounded-lg border px-2 py-2 text-[11px] font-medium transition-all text-left",
+                  "rounded-lg border px-2 py-2 text-xs font-medium transition-all text-left",
                   frequency === freq
                     ? "border-accent/50 bg-accent/10 text-accent"
                     : "border-border/50 text-text-secondary hover:border-border"
@@ -270,13 +270,13 @@ export default function CustomProviderSidebar({
 
         {/* Erste Zahlung */}
         <div>
-          <p className="text-[10px] font-semibold text-text-tertiary mb-1">
+          <p className="text-2xs font-semibold text-text-tertiary mb-1">
             <Calendar className="w-3 h-3 inline mr-1 mb-1" />
             Erste Zahlung <span className="normal-case font-normal">(optional)</span>
           </p>
           <input
             type="date"
-            className="input text-sm w-full"
+            className="input text-base w-full"
             value={firstPaymentDate}
             onChange={e => setFirstPaymentDate(e.target.value)}
             max="2030-12-31"
@@ -285,12 +285,12 @@ export default function CustomProviderSidebar({
 
         {/* Notiz */}
         <div>
-          <p className="text-[10px] font-semibold text-text-tertiary mb-1">
+          <p className="text-2xs font-semibold text-text-tertiary mb-1">
             Notiz <span className="normal-case font-normal">(optional)</span>
           </p>
           <input
             type="text"
-            className="input text-sm w-full"
+            className="input text-base w-full"
             placeholder={t("pages:step5.s14")}
             value={note}
             onChange={e => setNote(e.target.value)}
@@ -303,7 +303,7 @@ export default function CustomProviderSidebar({
             <button
               type="button"
               onClick={() => onDelete(entry!.id)}
-              className="w-full flex items-center justify-center gap-1 rounded-lg border border-loss/30 bg-loss/8 text-loss hover:bg-loss/15 px-3 py-2 text-xs font-medium transition-all"
+              className="w-full flex items-center justify-center gap-1 rounded-lg border border-loss/30 bg-loss/8 text-loss hover:bg-loss/15 px-3 py-2 text-sm font-medium transition-all"
             >
               <Trash className="w-3 h-3" />
               {t("pages:ui.anbieter_loeschen")}
@@ -316,21 +316,21 @@ export default function CustomProviderSidebar({
       <footer className="flex-shrink-0 border-t border-border/50 bg-bg-surface2 px-4 py-3 space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-text-tertiary text-[10px] font-semibold">
+            <p className="text-text-tertiary text-2xs font-semibold">
               {t("pages:ui.monatlicher_betrag")}
             </p>
             {frequency !== "monthly" && (
-              <p className="text-text-tertiary text-[10px]">{FREQUENCY_LABELS[frequency]}</p>
+              <p className="text-text-tertiary text-2xs">{FREQUENCY_LABELS[frequency]}</p>
             )}
           </div>
           <div className="text-right">
-            <span className="font-mono font-bold text-gain text-base">
+            <span className="font-mono font-bold text-gain text-lg">
               {effectiveMonthly != null && effectiveMonthly > 0
                 ? fchf(effectiveMonthly)
                 : "—"}
             </span>
             {effectiveMonthly != null && effectiveMonthly > 0 && (
-              <span className="text-text-tertiary text-xs font-normal">/Mo</span>
+              <span className="text-text-tertiary text-sm font-normal">/Mo</span>
             )}
           </div>
         </div>
@@ -340,7 +340,7 @@ export default function CustomProviderSidebar({
           disabled={!canSave}
           onClick={handleSave}
           className={clsx(
-            "w-full flex items-center justify-center gap-1 rounded-lg px-3 py-2 text-sm font-semibold transition-all",
+            "w-full flex items-center justify-center gap-1 rounded-lg px-3 py-2 text-base font-semibold transition-all",
             canSave
               ? "btn-primary"
               : "bg-bg-surface2 text-text-tertiary border border-border/50 cursor-not-allowed opacity-50"

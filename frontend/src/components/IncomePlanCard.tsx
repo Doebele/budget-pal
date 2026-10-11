@@ -30,7 +30,7 @@ export default function IncomePlanCard({
   defaultAge: number;
 }) {
   const { t } = useTranslation();
-  const { colors } = useThemeColors();
+  const { colors, fs } = useThemeColors();
   const [age, setAge] = useState<number | null>(null);
   const [fundReturn, setFundReturn] = useState(4);
   const [until, setUntil] = useState<(typeof UNTIL)[number]>(90);
@@ -81,17 +81,17 @@ export default function IncomePlanCard({
       pctWithout: Math.round((withoutFund / peer - 1) * 100),
     };
   };
-  const axis = { fill: colors.textTertiary, fontSize: 11 };
+  const axis = { fill: colors.textTertiary, fontSize: fs.xs };
   const tooltipStyle = {
     backgroundColor: colors.bgElevated, border: `1px solid ${colors.border}`,
-    borderRadius: "6px", color: colors.textPrimary, fontSize: 12,
+    borderRadius: "6px", color: colors.textPrimary, fontSize: fs.sm,
   };
 
   return (
     <div className="card space-y-4">
       <div>
-        <h2 className="text-text-primary font-semibold text-sm">{t("pages:incomePlan.title")}</h2>
-        <p className="text-text-tertiary text-xs mt-1">{t("pages:incomePlan.subtitle")}</p>
+        <h2 className="text-text-primary font-semibold text-base">{t("pages:incomePlan.title")}</h2>
+        <p className="text-text-tertiary text-sm mt-1">{t("pages:incomePlan.subtitle")}</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -115,7 +115,7 @@ export default function IncomePlanCard({
             ))}
           </div>
         </div>
-        <div className="space-y-1 text-xs text-text-secondary">
+        <div className="space-y-1 text-sm text-text-secondary">
           <label className="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" checked={indexed} onChange={(e) => setIndexed(e.target.checked)} className="accent-accent" />
             {t("pages:incomePlan.indexed")}
@@ -134,17 +134,17 @@ export default function IncomePlanCard({
               .filter((a, i, all) => all.indexOf(a) === i)
               .map((a) => (
                 <div key={a} className="bg-bg-elevated rounded-lg px-4 py-3 border border-border/30">
-                  <p className="text-text-tertiary text-[11px]">{t("pages:incomePlan.netAt", { age: a })}</p>
+                  <p className="text-text-tertiary text-xs">{t("pages:incomePlan.netAt", { age: a })}</p>
                   <p className="font-mono font-bold text-lg text-accent">{formatCHF(at(a)?.net ?? 0)}</p>
-                  <p className="text-text-tertiary text-[10px]">{t("pages:incomePlan.perMonth")}</p>
+                  <p className="text-text-tertiary text-2xs">{t("pages:incomePlan.perMonth")}</p>
                 </div>
               ))}
             <div className="bg-bg-elevated rounded-lg px-4 py-3 border border-border/30">
-              <p className="text-text-tertiary text-[11px]">{t("pages:incomePlan.fundCapital")}</p>
+              <p className="text-text-tertiary text-xs">{t("pages:incomePlan.fundCapital")}</p>
               <p className="font-mono font-bold text-lg" style={{ color: FUND_COLOR }}>
                 {formatCHF(plan.fund_start + plan.fund_inflows.reduce((s, i) => s + i.amount, 0))}
               </p>
-              <p className="text-text-tertiary text-[10px]">{t("pages:incomePlan.fundCapitalHint")}</p>
+              <p className="text-text-tertiary text-2xs">{t("pages:incomePlan.fundCapitalHint")}</p>
             </div>
           </div>
 
@@ -155,7 +155,7 @@ export default function IncomePlanCard({
               <YAxis tick={axis} axisLine={false} tickLine={false} width={52} />
               <Tooltip contentStyle={tooltipStyle} labelFormatter={(a) => t("pages:bvgCompare.atAge", { age: a })}
                 formatter={(v: number) => `${formatCHF(v)} / Mt.`} />
-              <Legend wrapperStyle={{ fontSize: 11, color: colors.textSecondary }} />
+              <Legend wrapperStyle={{ fontSize: fs.xs, color: colors.textSecondary }} />
               <Bar dataKey="ahv" stackId="m" name={t("pages:overview.ahv")} fill={PILLAR_COLORS.ahv} />
               <Bar dataKey="bvg" stackId="m" name={t("pages:overview.bvgPension")} fill={PILLAR_COLORS.bvg} />
               <Bar dataKey="fund" stackId="m" name={t("pages:incomePlan.fund")} fill={FUND_COLOR} />
@@ -178,19 +178,19 @@ export default function IncomePlanCard({
                 .map(compare)
                 .filter((c): c is NonNullable<ReturnType<typeof compare>> => c != null)
                 .map((c) => (
-                  <p key={c.age} className="text-text-secondary text-xs">
+                  <p key={c.age} className="text-text-secondary text-sm">
                     {t(c.pct >= 0 ? "pages:incomePlan.peerAbove" : "pages:incomePlan.peerBelow", {
                       ...c, pct: Math.abs(c.pct), peer: formatCHF(peer),
                     })}{" "}
                     {t("pages:incomePlan.peerWithoutFund", { ...c, pctWithout: c.pctWithout > 0 ? `+${c.pctWithout}` : c.pctWithout })}
                   </p>
                 ))}
-              <p className="text-text-tertiary text-[11px]">{t("pages:incomePlan.peerHint")}</p>
+              <p className="text-text-tertiary text-xs">{t("pages:incomePlan.peerHint")}</p>
             </div>
           )}
 
           <div>
-            <p className="text-text-secondary text-xs font-semibold mb-1">{t("pages:incomePlan.balanceTitle")}</p>
+            <p className="text-text-secondary text-sm font-semibold mb-1">{t("pages:incomePlan.balanceTitle")}</p>
             <ResponsiveContainer width="100%" height={140}>
               <AreaChart data={rows} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={colors.borderSubtle} vertical={false} />
@@ -204,7 +204,7 @@ export default function IncomePlanCard({
           </div>
         </>
       )}
-      <p className="text-text-tertiary text-[11px] leading-relaxed max-w-3xl">{t("pages:incomePlan.hint")}</p>
+      <p className="text-text-tertiary text-xs leading-relaxed max-w-3xl">{t("pages:incomePlan.hint")}</p>
     </div>
   );
 }

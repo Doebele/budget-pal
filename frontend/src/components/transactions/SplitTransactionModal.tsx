@@ -107,8 +107,8 @@ export default function SplitTransactionModal({ transaction, onClose }: Props) {
           <div className="flex items-center gap-2">
             <Scissor className="w-4 h-4 text-accent" />
             <div>
-              <h2 className="text-sm font-semibold text-text-primary">Transaktion aufteilen</h2>
-              <p className="text-xs text-text-tertiary truncate max-w-xs">{displayName}</p>
+              <h2 className="text-base font-semibold text-text-primary">Transaktion aufteilen</h2>
+              <p className="text-sm text-text-tertiary truncate max-w-xs">{displayName}</p>
             </div>
           </div>
           <button onClick={onClose} className="text-text-tertiary hover:text-text-primary transition-colors">
@@ -118,7 +118,7 @@ export default function SplitTransactionModal({ transaction, onClose }: Props) {
 
         {/* Parent amount chip */}
         <div className="px-5 pt-3 pb-1">
-          <div className="flex items-center justify-between text-xs text-text-tertiary">
+          <div className="flex items-center justify-between text-sm text-text-tertiary">
             <span>Gesamtbetrag</span>
             <span className={clsx("font-mono font-medium", transaction.amount >= 0 ? "text-gain" : "text-loss")}>
               {transaction.amount >= 0 ? "+" : ""}
@@ -130,9 +130,9 @@ export default function SplitTransactionModal({ transaction, onClose }: Props) {
         {/* Split entries */}
         <div className="overlay-body px-5 py-2 space-y-2">
           {entries.map((entry, idx) => (
-            <div key={entry.id} className="bg-bg-surface2 border border-border/60 rounded-xl p-3 space-y-2">
+            <div key={entry.id} className="bg-bg-surface2 border border-border/60 rounded-xl p-box space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] text-text-tertiary font-medium">
+                <span className="text-2xs text-text-tertiary font-medium">
                   Teil {idx + 1}
                 </span>
                 {entries.length > 2 && (
@@ -148,7 +148,7 @@ export default function SplitTransactionModal({ transaction, onClose }: Props) {
                 <input
                   type="text"
                   placeholder="Beschreibung"
-                  className="input text-sm col-span-2"
+                  className="input text-base col-span-2"
                   value={entry.description}
                   onChange={(e) => updateEntry(entry.id, "description", e.target.value)}
                 />
@@ -156,14 +156,14 @@ export default function SplitTransactionModal({ transaction, onClose }: Props) {
                   type="number"
                   step="0.01"
                   placeholder={`Betrag (${ccy})`}
-                  className="input input-amount text-sm font-mono"
+                  className="input input-amount text-base font-mono"
                   value={entry.amount}
                   onChange={(e) => updateEntry(entry.id, "amount", e.target.value)}
                 />
                 <input
                   type="text"
                   placeholder={t("table.category")}
-                  className="input text-sm"
+                  className="input text-base"
                   value={entry.category}
                   onChange={(e) => updateEntry(entry.id, "category", e.target.value)}
                 />
@@ -174,13 +174,13 @@ export default function SplitTransactionModal({ transaction, onClose }: Props) {
 
         {/* Balance indicator */}
         <div className="px-5 py-2">
-          <div className="flex items-center justify-between text-xs">
+          <div className="flex items-center justify-between text-sm">
             <span className="text-text-tertiary">Aufgeteilt</span>
             <span className="font-mono font-medium text-text-secondary">
               {formatAmount(total, ccy)}
             </span>
           </div>
-          <div className="flex items-center justify-between text-xs mt-1">
+          <div className="flex items-center justify-between text-sm mt-1">
             <span className="text-text-tertiary">Differenz</span>
             <span
               className={clsx(
@@ -207,7 +207,7 @@ export default function SplitTransactionModal({ transaction, onClose }: Props) {
         </div>
 
         {splitMutation.isError && (
-          <div className="mx-5 mb-2 flex items-center gap-2 text-xs text-loss bg-loss/10 border border-loss/20 rounded-lg px-3 py-2">
+          <div className="mx-5 mb-2 flex items-center gap-2 text-sm text-loss bg-loss/10 border border-loss/20 rounded-lg px-3 py-2">
             <WarningCircle className="w-3.5 h-3.5 shrink-0" />
             {(splitMutation.error as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Fehler beim Aufteilen."}
           </div>
@@ -217,7 +217,7 @@ export default function SplitTransactionModal({ transaction, onClose }: Props) {
         <div className="flex items-center justify-between gap-2 px-5 py-4 border-t border-border">
           <button
             onClick={addEntry}
-            className="flex items-center gap-1 text-xs text-text-secondary hover:text-text-primary transition-colors px-2 py-1 rounded-lg hover:bg-bg-surface2"
+            className="flex items-center gap-1 text-sm text-text-secondary hover:text-text-primary transition-colors px-2 py-1 rounded-lg hover:bg-bg-surface2"
           >
             <Plus className="w-3.5 h-3.5" />
             {t("pages:ui.teil_hinzufuegen")}
@@ -225,14 +225,14 @@ export default function SplitTransactionModal({ transaction, onClose }: Props) {
           <div className="flex gap-2">
             <button
               onClick={onClose}
-              className="px-3 py-1 text-sm text-text-secondary hover:text-text-primary rounded-lg hover:bg-bg-surface2 transition-colors"
+              className="px-3 py-1 text-base text-text-secondary hover:text-text-primary rounded-lg hover:bg-bg-surface2 transition-colors"
             >
               {t("pages:ui.abbrechen")}
             </button>
             <button
               onClick={() => splitMutation.mutate()}
               disabled={!isBalanced || splitMutation.isPending || entries.some((e) => !e.description.trim())}
-              className="btn-primary px-4 py-1 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+              className="btn-primary px-4 py-1 text-base disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {splitMutation.isPending ? "Aufteilen…" : "Aufteilen"}
             </button>

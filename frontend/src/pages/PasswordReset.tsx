@@ -42,7 +42,7 @@ function Notice({ tone, children }: { tone: "error" | "ok"; children: React.Reac
     tone === "error"
       ? "text-loss bg-loss-muted border-loss/30"
       : "text-gain bg-gain-muted border-gain/30";
-  return <p className={`text-sm border rounded-lg px-3 py-2 ${cls}`}>{children}</p>;
+  return <p className={`text-base border rounded-lg px-3 py-2 ${cls}`}>{children}</p>;
 }
 
 export function ForgotPassword() {
@@ -72,7 +72,7 @@ export function ForgotPassword() {
         <Notice tone="ok">{t("forgot.sent")}</Notice>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
-          <p className="text-text-secondary text-sm">{t("forgot.intro")}</p>
+          <p className="text-text-secondary text-base">{t("forgot.intro")}</p>
           <div>
             <label className="label">{t("forgot.email")}</label>
             <input
@@ -90,7 +90,7 @@ export function ForgotPassword() {
           </button>
         </form>
       )}
-      <p className="text-text-tertiary text-sm mt-4 text-center">
+      <p className="text-text-tertiary text-base mt-4 text-center">
         <Link to="/login" className="text-accent hover:text-accent-light">
           {t("forgot.back")}
         </Link>

@@ -101,8 +101,23 @@ export default {
         display: ['"Fira Sans"', "system-ui", "sans-serif"],
       },
 
+      // Dichte-abhaengige Schrift-Skala wie Pension-Pal (Komfort = Kompakt + 2 px,
+      // kleinste Komfort-Groesse 12 px), Werte in index.css
       fontSize: {
-        "2xs": ["0.625rem", { lineHeight: "0.875rem" }],
+        "2xs": ["var(--fs-2xs)", { lineHeight: "1.4" }],
+        xs: ["var(--fs-xs)", { lineHeight: "1.4" }],
+        sm: ["var(--fs-sm)", { lineHeight: "1.45" }],
+        base: ["var(--fs-base)", { lineHeight: "1.5" }],
+        lg: ["var(--fs-lg)", { lineHeight: "1.4" }],
+        xl: ["var(--fs-xl)", { lineHeight: "1.25" }],
+        "2xl": ["var(--fs-2xl)", { lineHeight: "1.2" }],
+        "3xl": ["var(--fs-3xl)", { lineHeight: "1" }],
+      },
+      // Innenabstaende nach Dichte: Kompakt = Komfort − 4 px
+      spacing: {
+        section: "var(--pad-section)",
+        box: "var(--pad-box)",
+        "box-sm": "var(--pad-box-sm)",
       },
 
       // An die Radius-Tokens gebunden (index.css), damit alle rounded-*

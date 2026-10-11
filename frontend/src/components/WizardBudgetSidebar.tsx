@@ -147,8 +147,8 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
         <div className="shrink-0 px-5 py-4 border-b border-border bg-bg-surface2/90 backdrop-blur-sm">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-text-primary font-semibold text-base">Empirische Budgets bearbeiten</h2>
-              <p className="text-text-tertiary text-xs mt-1">
+              <h2 className="text-text-primary font-semibold text-lg">Empirische Budgets bearbeiten</h2>
+              <p className="text-text-tertiary text-sm mt-1">
                 {periodLabel} · {visibleBudgets.length} von {latestBatch.length} Positionen
               </p>
             </div>
@@ -174,7 +174,7 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
               <select
                 value={activeSc}
                 onChange={(e) => setActiveSc(e.target.value)}
-                className="input flex-1 text-sm cursor-pointer"
+                className="input flex-1 text-base cursor-pointer"
               >
                 <option value="">Alle Kategorien ({latestBatch.length})</option>
                 {availableScs.map((sc) => {
@@ -192,7 +192,7 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
           </div>
 
           {months > 1 && (
-            <div className="mt-2 px-3 py-2 bg-bg-elevated/40 rounded-lg text-xs text-text-tertiary">
+            <div className="mt-2 px-3 py-2 bg-bg-elevated/40 rounded-lg text-sm text-text-tertiary">
               Monatlich × {months} Monate = Periodengesamtbetrag
             </div>
           )}
@@ -201,9 +201,9 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
         {/* ── Scrollable budget list ─────────────────────────── */}
         <div className="flex-1 overflow-y-auto">
           {isLoading ? (
-            <p className="text-text-tertiary text-sm text-center py-10">Wird geladen…</p>
+            <p className="text-text-tertiary text-base text-center py-10">Wird geladen…</p>
           ) : visibleBudgets.length === 0 ? (
-            <p className="text-text-tertiary text-sm text-center py-10 px-5">
+            <p className="text-text-tertiary text-base text-center py-10 px-5">
               {latestBatch.length === 0
                 ? "Keine Budgets aus empirischen Angaben. Bitte zuerst den Setup-Wizard abschliessen."
                 : "Keine Einträge für diese Kategorie."}
@@ -227,18 +227,18 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
                         >
                           <sc.icon className="w-3.5 h-3.5" style={{ color: sc.color }} />
                         </span>
-                        <span className="text-text-primary text-sm font-medium truncate">
+                        <span className="text-text-primary text-base font-medium truncate">
                           {b.notes}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         {isSaved && (
-                          <span className="text-xs text-gain bg-gain/10 px-2 py-1 rounded-full border border-gain/30">
+                          <span className="text-sm text-gain bg-gain/10 px-2 py-1 rounded-full border border-gain/30">
                             Gespeichert
                           </span>
                         )}
                         {isDirty && !isSaved && (
-                          <span className="text-xs text-warning bg-warning/10 px-2 py-1 rounded-full border border-warning/30">
+                          <span className="text-sm text-warning bg-warning/10 px-2 py-1 rounded-full border border-warning/30">
                             {t("pages:ui.geaendert")}
                           </span>
                         )}
@@ -248,7 +248,7 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
                     <div className="flex items-center gap-3">
                       {/* Monthly amount input */}
                       <div className="flex-1">
-                        <label className="flex items-center gap-1 text-xs text-text-tertiary mb-1">
+                        <label className="flex items-center gap-1 text-sm text-text-tertiary mb-1">
                           <Dollar className="w-3 h-3" /> {t("pages:ui.monatlich_chf")}
                         </label>
                         <input
@@ -257,15 +257,15 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
                           min="0"
                           value={drafts[b.id] ?? b.amount}
                           onChange={(e) => updateDraft(b.id, e.target.value)}
-                          className="w-full bg-bg-elevated border border-border-strong rounded-lg px-3 py-2 text-sm text-text-primary font-mono focus:outline-none focus:border-accent"
+                          className="w-full bg-bg-elevated border border-border-strong rounded-lg px-3 py-2 text-base text-text-primary font-mono focus:outline-none focus:border-accent"
                         />
                       </div>
 
                       {/* Period total hint */}
                       {months > 1 && (
                         <div className="shrink-0 text-right">
-                          <p className="text-xs text-text-tertiary mb-1">× {months} Monate</p>
-                          <p className="text-sm font-mono txt-info">{formatCHF(periodVal)}</p>
+                          <p className="text-sm text-text-tertiary mb-1">× {months} Monate</p>
+                          <p className="text-base font-mono txt-info">{formatCHF(periodVal)}</p>
                         </div>
                       )}
 
@@ -275,7 +275,7 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
                         onClick={() => handleSave(b.id)}
                         disabled={!isDirty || saveMutation.isPending}
                         className={clsx(
-                          "shrink-0 p-2 rounded-lg border transition-all",
+                          "shrink-0 p-box-sm rounded-lg border transition-all",
                           isDirty
                             ? "border-accent bg-accent/15 text-accent hover:bg-accent/25"
                             : "border-border-strong bg-bg-elevated/30 text-text-disabled cursor-not-allowed",
@@ -294,14 +294,14 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
         {/* ── Footer ─────────────────────────────────────────── */}
         {visibleBudgets.length > 0 && (
           <div className="shrink-0 border-t border-border bg-bg-surface2 px-5 py-4">
-            <div className="flex items-center justify-between mb-2 text-sm">
+            <div className="flex items-center justify-between mb-2 text-base">
               <span className="text-text-tertiary">
                 {activeSc ? "Kategorie-Summe / Monat" : "Gesamtausgaben / Monat"}
               </span>
               <span className="font-mono text-text-primary">{formatCHF(monthlyTotal)}</span>
             </div>
             {months > 1 && (
-              <div className="flex items-center justify-between mb-3 text-sm">
+              <div className="flex items-center justify-between mb-3 text-base">
                 <span className="text-text-tertiary">
                   {activeSc ? "Kategorie-Summe" : "Gesamtausgaben"} / Periode ({months} Monate)
                 </span>
@@ -310,7 +310,7 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
             )}
 
             {saveMutation.isError && (
-              <div className="flex items-center gap-2 text-loss text-xs bg-loss/10 border border-loss/30 rounded-lg px-3 py-2 mb-3">
+              <div className="flex items-center gap-2 text-loss text-sm bg-loss/10 border border-loss/30 rounded-lg px-3 py-2 mb-3">
                 <WarningCircle className="w-4 h-4 shrink-0" />
                 {t("pages:ui.fehler_beim_speichern_bitte_erneut_versuchen")}
               </div>
@@ -320,7 +320,7 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
               type="button"
               onClick={handleSaveAll}
               disabled={dirtyIds.size === 0 || saveMutation.isPending}
-              className="w-full flex items-center justify-center gap-1 px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium hover:bg-accent/90 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
+              className="w-full flex items-center justify-center gap-1 px-4 py-2 rounded-lg bg-accent text-white text-base font-medium hover:bg-accent/90 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
             >
               {saveMutation.isPending ? (
                 <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />

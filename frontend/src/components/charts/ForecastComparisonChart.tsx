@@ -22,6 +22,7 @@ import {
   ReferenceLine,
 } from "recharts";
 import { formatCHF } from "@/lib/theme";
+import { useThemeColors } from "@/hooks/useThemeColors";
 import { clsx } from "clsx";
 
 export interface HistoricalPoint {
@@ -137,10 +138,10 @@ function CustomTooltip({ active, payload, label, peerNet, empiricalNet }: any) {
   };
 
   return (
-    <div className="bg-bg-surface border border-border rounded-lg p-3 shadow-xl text-xs space-y-1 min-w-[200px]">
+    <div className="bg-bg-surface border border-border rounded-lg p-box shadow-xl text-sm space-y-1 min-w-[200px]">
       <p className="font-semibold text-text-primary mb-1">{formatMonth(label)}</p>
       {isForecast && (
-        <span className="inline-block border msg-info text-[10px] px-1 py-1 rounded mb-1">
+        <span className="inline-block border msg-info text-2xs px-1 py-1 rounded mb-1">
           Prognose
         </span>
       )}
@@ -186,7 +187,7 @@ function CustomTooltip({ active, payload, label, peerNet, empiricalNet }: any) {
         </div>
       )}
       {isForecast && payload[0]?.payload?.peer_calibrated && (
-        <div className="text-[10px] txt-info pt-1">⊕ Peer-Gruppe kalibriert</div>
+        <div className="text-2xs txt-info pt-1">⊕ Peer-Gruppe kalibriert</div>
       )}
     </div>
   );
@@ -213,7 +214,7 @@ function LinePill({
     <button
       onClick={() => onToggle(id)}
       className={clsx(
-        "flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium transition-all border",
+        "flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-all border",
         active
           ? "border-transparent text-white"
           : "border-border/50 text-text-tertiary bg-transparent hover:text-text-secondary"
@@ -247,6 +248,7 @@ export default function ForecastComparisonChart({
   empiricalNetMonthly = 0,
   height = 320,
 }: Props) {
+  const { fs } = useThemeColors();
   const [vis, setVis] = useState<LineVisibility>(DEFAULT_VISIBILITY);
 
   const toggle = (id: keyof LineVisibility) =>
@@ -329,14 +331,14 @@ export default function ForecastComparisonChart({
           <XAxis
             dataKey="month"
             tickFormatter={formatMonth}
-            tick={{ fill: "#94a3b8", fontSize: 11 }}
+            tick={{ fill: "#94a3b8", fontSize: fs.xs }}
             axisLine={{ stroke: "#334155" }}
             tickLine={false}
             interval="preserveStartEnd"
           />
           <YAxis
             tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
-            tick={{ fill: "#94a3b8", fontSize: 11 }}
+            tick={{ fill: "#94a3b8", fontSize: fs.xs }}
             axisLine={false}
             tickLine={false}
             width={44}
@@ -366,7 +368,7 @@ export default function ForecastComparisonChart({
                 value: `Peer-Ø ${formatCHF(peerNetMonthly)}`,
                 position: "insideTopRight",
                 fill: COLORS.peer,
-                fontSize: 10,
+                fontSize: fs["2xs"],
               }}
             />
           )}
@@ -382,7 +384,7 @@ export default function ForecastComparisonChart({
                 value: `Empirisch ${formatCHF(empiricalNetMonthly)}`,
                 position: "insideTopRight",
                 fill: COLORS.empirical,
-                fontSize: 10,
+                fontSize: fs["2xs"],
               }}
             />
           )}

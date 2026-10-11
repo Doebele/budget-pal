@@ -576,7 +576,7 @@ export default function Budget() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-xl font-light text-text-primary">{t("pages:budget.title")}</h1>
-          <p className="text-text-tertiary text-sm mt-1">{range.label}</p>
+          <p className="text-text-tertiary text-base mt-1">{range.label}</p>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
           <GranularityNavigator
@@ -588,7 +588,7 @@ export default function Budget() {
             <button
               type="button"
               onClick={() => { setWizardEditorScId(undefined); setShowWizardEditor(true); }}
-              className="btn-secondary text-xs flex items-center gap-1"
+              className="btn-secondary text-sm flex items-center gap-1"
             >
               {t("pages:budget.editBudgets")}
             </button>
@@ -604,7 +604,7 @@ export default function Budget() {
             type="button"
             onClick={() => toggleFreq(key)}
             className={clsx(
-              "px-3 py-1 rounded-lg text-xs border transition-colors",
+              "px-3 py-1 rounded-lg text-sm border transition-colors",
               selectedFreqs.has(key)
                 ? "bg-accent/15 border-accent/40 text-accent"
                 : "bg-bg-surface2 border-border text-text-tertiary hover:text-text-primary",
@@ -623,7 +623,7 @@ export default function Budget() {
           title={t("pages:misc.r23")}
           onClick={toggleExcludeTransfers}
           className={clsx(
-            "px-3 py-1 rounded-lg text-xs border transition-colors",
+            "px-3 py-1 rounded-lg text-sm border transition-colors",
             excludeTransfers
               ? "msg-warning"
               : "bg-bg-surface2 border-border text-text-tertiary hover:text-text-primary",
@@ -633,12 +633,12 @@ export default function Budget() {
         </button>
 
         {!ALL_FREQS_SELECTED ? (
-          <span className="txt-warning text-xs self-center ml-1 flex items-center gap-1">
+          <span className="txt-warning text-sm self-center ml-1 flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
             {t("pages:ui.alle_werte_gefiltert_nach_wiederkehrend")}
           </span>
         ) : (
-          <span className="text-text-disabled text-xs self-center ml-1">
+          <span className="text-text-disabled text-sm self-center ml-1">
             {t("pages:budget.appliesToAll")}
           </span>
         )}
@@ -650,7 +650,7 @@ export default function Budget() {
         {/* Netto */}
         <div className="card flex flex-col gap-2">
           <div className="flex items-center justify-between">
-            <span className="text-text-tertiary text-xs">{t("pages:budget.netSurplus")}</span>
+            <span className="text-text-tertiary text-sm">{t("pages:budget.netSurplus")}</span>
             <div className="w-8 h-8 rounded-lg bg-bg-surface2 flex items-center justify-center">
               {kpi.net >= 0
                 ? <GraphUp className="w-4 h-4 text-gain" />
@@ -663,7 +663,7 @@ export default function Budget() {
           )}>
             {kpi.net >= 0 ? "+" : ""}{fmtRef(kpi.net)}
           </p>
-          <p className="text-text-tertiary text-xs">
+          <p className="text-text-tertiary text-sm">
             {fmtRef(kpi.income)} Einnahmen · {fmtRef(kpi.expenses)} Ausgaben
           </p>
         </div>
@@ -675,7 +675,7 @@ export default function Budget() {
           className="card flex flex-col gap-2 text-left hover:ring-1 hover:ring-accent/30 transition-all cursor-pointer"
         >
           <div className="flex items-center justify-between">
-            <span className="text-text-tertiary text-xs">{t("pages:dashboard.expenses")}</span>
+            <span className="text-text-tertiary text-sm">{t("pages:dashboard.expenses")}</span>
             <div className="w-8 h-8 rounded-lg bg-bg-surface2 flex items-center justify-center">
               <Wallet className="w-4 h-4 text-text-tertiary" />
             </div>
@@ -685,7 +685,7 @@ export default function Budget() {
           </p>
           {totalPlanned > 0 ? (
             <div>
-              <p className="text-text-tertiary text-xs mb-1">
+              <p className="text-text-tertiary text-sm mb-1">
                 {t("pages:budget.plannedOf", { amount: fmtRef(totalPlanned) })} · <span className="text-accent/70">{t("pages:budget.showDetails")}</span>
               </p>
               <ProgressBar
@@ -696,7 +696,7 @@ export default function Budget() {
               />
             </div>
           ) : (
-            <p className="text-text-tertiary text-xs">
+            <p className="text-text-tertiary text-sm">
               {capabilities?.wizard_available ? t("pages:budget.empiricalLoaded") : t("pages:budget.showDetailsArrow")}
             </p>
           )}
@@ -705,7 +705,7 @@ export default function Budget() {
         {/* Budget-Ausschöpfung */}
         <div className="card flex flex-col gap-2">
           <div className="flex items-center justify-between">
-            <span className="text-text-tertiary text-xs">{t("pages:budget.utilisation")}</span>
+            <span className="text-text-tertiary text-sm">{t("pages:budget.utilisation")}</span>
             <div className="w-8 h-8 rounded-lg bg-bg-surface2 flex items-center justify-center">
               <Position className="w-4 h-4 text-text-tertiary" />
             </div>
@@ -718,7 +718,7 @@ export default function Budget() {
               )}>
                 {utilisation}%
               </p>
-              <p className="text-text-tertiary text-xs">
+              <p className="text-text-tertiary text-sm">
                 {utilisation > 100
                   ? t("pages:budget.overBudget", { pct: utilisation - 100 })
                   : utilisation > 80 ? t("pages:budget.nearLimit") : t("pages:budget.inTheGreen")}
@@ -727,7 +727,7 @@ export default function Budget() {
           ) : (
             <>
               <p className="text-2xl font-mono font-light text-text-disabled">—</p>
-              <p className="text-text-tertiary text-xs">{t("pages:budget.noTargetBudget")}</p>
+              <p className="text-text-tertiary text-sm">{t("pages:budget.noTargetBudget")}</p>
             </>
           )}
         </div>
@@ -739,10 +739,10 @@ export default function Budget() {
         {/* Card header */}
         <div className="px-4 pt-4 pb-2 border-b border-border">
           <div className="flex items-center justify-between gap-2">
-            <h2 className="text-text-primary font-semibold text-sm">{t("pages:budget.expenseCategories")}</h2>
+            <h2 className="text-text-primary font-semibold text-base">{t("pages:budget.expenseCategories")}</h2>
 
             <div className="flex items-center gap-2">
-              <span className="text-text-tertiary text-xs hidden sm:inline">{range.label}</span>
+              <span className="text-text-tertiary text-sm hidden sm:inline">{range.label}</span>
 
               {/* Sort order toggle */}
               <button
@@ -750,7 +750,7 @@ export default function Budget() {
                 title={sortOrder === "default" ? t("pages:budget.sortToAmount") : t("pages:budget.sortToDefault")}
                 onClick={() => handleSetSortOrder(sortOrder === "default" ? "amount" : "default")}
                 className={clsx(
-                  "flex items-center gap-1 px-2 py-1 rounded-lg border text-xs transition-colors",
+                  "flex items-center gap-1 px-2 py-1 rounded-lg border text-sm transition-colors",
                   sortOrder === "amount"
                     ? "bg-accent/15 border-accent/40 text-accent"
                     : "border-border text-text-tertiary hover:text-text-secondary",
@@ -820,7 +820,7 @@ export default function Budget() {
 
           {/* Bar-view legend */}
           {view === "bar" && totalPlanned > 0 && (
-            <div className="flex items-center gap-4 mt-2 text-xs text-text-tertiary">
+            <div className="flex items-center gap-4 mt-2 text-sm text-text-tertiary">
               <span className="flex items-center gap-1">
                 <span className="w-3 h-1.5 rounded-full bg-accent/60 inline-block" />
                 Ist (Historisch)
@@ -844,7 +844,7 @@ export default function Budget() {
                 title={isHidden ? `${sc.label} einblenden` : `${sc.label} ausblenden`}
                 onClick={() => toggleHideCategory(sc.id)}
                 className={clsx(
-                  "flex items-center gap-1 px-2 py-1 rounded-lg border text-xs transition-all",
+                  "flex items-center gap-1 px-2 py-1 rounded-lg border text-sm transition-all",
                   isHidden
                     ? "border-border bg-bg-surface2 text-text-disabled opacity-50"
                     : "border-border/60 bg-bg-elevated text-text-secondary",
@@ -865,7 +865,7 @@ export default function Budget() {
                 setHiddenScIds(new Set());
                 try { localStorage.removeItem("budgetpal_budget_hidden_cats"); } catch {}
               }}
-              className="flex items-center gap-1 px-2 py-1 rounded-lg border border-border/40 text-xs text-text-tertiary hover:text-text-secondary transition-colors"
+              className="flex items-center gap-1 px-2 py-1 rounded-lg border border-border/40 text-sm text-text-tertiary hover:text-text-secondary transition-colors"
             >
               <Eye className="w-3 h-3" />
               <span className="hidden sm:inline">{t("pages:budget.showAll")}</span>
@@ -893,7 +893,7 @@ export default function Budget() {
         {view === "gauge" && hasSomeData && (
           <Suspense
             fallback={
-              <div className="py-10 flex items-center justify-center text-text-tertiary text-sm">
+              <div className="py-10 flex items-center justify-center text-text-tertiary text-base">
                 Lade DashboardSpeed…
               </div>
             }
@@ -906,7 +906,7 @@ export default function Budget() {
         {view === "stacked" && hasSomeData && (
           <Suspense
             fallback={
-              <div className="py-10 flex items-center justify-center text-text-tertiary text-sm">
+              <div className="py-10 flex items-center justify-center text-text-tertiary text-base">
                 Lade Diagramm…
               </div>
             }
@@ -942,7 +942,7 @@ export default function Budget() {
               <>
                 <button
                   type="button"
-                  className="w-full flex items-center justify-between px-4 py-2 text-text-tertiary hover:text-text-primary text-xs transition-colors"
+                  className="w-full flex items-center justify-between px-4 py-2 text-text-tertiary hover:text-text-primary text-sm transition-colors"
                   onClick={() => setShowSonstiges((v) => !v)}
                 >
                   <span className="flex items-center gap-1">
@@ -969,9 +969,9 @@ export default function Budget() {
         {/* ── Compare view (3-Weg: Ist / Soll / Peer-Ø) ── */}
         {view === "compare" && hasSomeData && (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[520px]">
+            <table className="w-full text-base min-w-[520px]">
               <thead>
-                <tr className="border-b border-border/60 text-[11px] text-text-tertiary">
+                <tr className="border-b border-border/60 text-xs text-text-tertiary">
                   <th className="px-4 py-2 text-left font-medium w-40">{t("table.category")}</th>
                   <th className="px-3 py-2 text-right font-medium">Ist</th>
                   <th className="px-3 py-2 text-right font-medium">Soll</th>
@@ -1006,17 +1006,17 @@ export default function Budget() {
                             >
                               <row.sc.icon className="w-3 h-3" style={{ color: row.sc.color }} />
                             </span>
-                            <span className="text-text-secondary text-xs truncate max-w-[100px]">{row.sc.label}</span>
+                            <span className="text-text-secondary text-sm truncate max-w-[100px]">{row.sc.label}</span>
                           </div>
                         </td>
 
                         {/* Ist */}
-                        <td className="px-3 py-2 text-right font-mono text-xs text-text-primary">
+                        <td className="px-3 py-2 text-right font-mono text-sm text-text-primary">
                           {row.actual > 0 ? fmtRef(row.actual) : <span className="text-text-disabled">—</span>}
                         </td>
 
                         {/* Soll */}
-                        <td className="px-3 py-2 text-right font-mono text-xs text-text-tertiary">
+                        <td className="px-3 py-2 text-right font-mono text-sm text-text-tertiary">
                           {row.planned > 0 ? fmtRef(row.planned) : <span className="text-text-disabled">—</span>}
                         </td>
 
@@ -1025,25 +1025,25 @@ export default function Budget() {
                           {vsSoll !== null ? (
                             <div className="flex flex-col items-end">
                               <span className={clsx(
-                                "text-xs font-mono",
+                                "text-sm font-mono",
                                 vsSoll > 0 ? "text-loss" : "text-gain",
                               )}>
                                 {vsSoll > 0 ? "+" : ""}{fmtRef(vsSoll)}
                               </span>
                               {vsSollPct !== null && (
                                 <span className={clsx(
-                                  "text-[10px]",
+                                  "text-2xs",
                                   vsSollPct > 0 ? "text-loss/70" : "text-gain/70",
                                 )}>
                                   {vsSollPct > 0 ? "+" : ""}{vsSollPct.toFixed(0)}%
                                 </span>
                               )}
                             </div>
-                          ) : <span className="text-text-disabled text-xs">—</span>}
+                          ) : <span className="text-text-disabled text-sm">—</span>}
                         </td>
 
                         {/* Peer-Ø */}
-                        <td className="px-3 py-2 text-right font-mono text-xs text-text-tertiary">
+                        <td className="px-3 py-2 text-right font-mono text-sm text-text-tertiary">
                           {peer > 0 ? fmtRef(peer) : <span className="text-text-disabled">—</span>}
                         </td>
 
@@ -1052,21 +1052,21 @@ export default function Budget() {
                           {vsPeer !== null ? (
                             <div className="flex flex-col items-end">
                               <span className={clsx(
-                                "text-xs font-mono",
+                                "text-sm font-mono",
                                 vsPeer > 0 ? "text-loss" : "text-gain",
                               )}>
                                 {vsPeer > 0 ? "+" : ""}{fmtRef(vsPeer)}
                               </span>
                               {vsPeerPct !== null && (
                                 <span className={clsx(
-                                  "text-[10px]",
+                                  "text-2xs",
                                   vsPeerPct > 0 ? "text-loss/70" : "text-gain/70",
                                 )}>
                                   {vsPeerPct > 0 ? "+" : ""}{vsPeerPct.toFixed(0)}%
                                 </span>
                               )}
                             </div>
-                          ) : <span className="text-text-disabled text-xs">—</span>}
+                          ) : <span className="text-text-disabled text-sm">—</span>}
                         </td>
                       </tr>
                     );
@@ -1075,7 +1075,7 @@ export default function Budget() {
 
               {/* Totals footer */}
               <tfoot>
-                <tr className="border-t border-border text-xs font-semibold">
+                <tr className="border-t border-border text-sm font-semibold">
                   <td className="px-4 py-2 text-text-secondary">Total</td>
                   <td className="px-3 py-2 text-right font-mono text-text-primary">{fmtRef(kpi.expenses)}</td>
                   <td className="px-3 py-2 text-right font-mono text-text-tertiary">
@@ -1109,7 +1109,7 @@ export default function Budget() {
             </table>
 
             {/* Legend */}
-            <div className="flex flex-wrap gap-4 px-4 py-3 border-t border-border/40 text-[10px] text-text-tertiary">
+            <div className="flex flex-wrap gap-4 px-4 py-3 border-t border-border/40 text-2xs text-text-tertiary">
               <span>
                 <span className="text-gain">{t("pages:budget.legendGreen")}</span>{t("pages:budget.legendGreenText")}
               </span>
@@ -1133,7 +1133,7 @@ export default function Budget() {
         <div className="card !p-0 overflow-hidden">
           <button
             type="button"
-            className="w-full flex items-center justify-between px-4 py-3 text-sm hover:bg-bg-surface2 transition-colors"
+            className="w-full flex items-center justify-between px-4 py-3 text-base hover:bg-bg-surface2 transition-colors"
             onClick={() => setShowPeer((v) => !v)}
           >
             <span className="flex items-center gap-2 text-text-secondary font-medium">
@@ -1148,7 +1148,7 @@ export default function Budget() {
           {showPeer && peerData && (
             <div className="border-t border-border px-4 py-4 space-y-4">
               {peerData.peer_info && (
-                <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-text-tertiary border-b border-border pb-3">
+                <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-text-tertiary border-b border-border pb-3">
                   <span>Altersgruppe: <strong className="text-text-secondary">{peerData.peer_info.age_range}</strong></span>
                   <span>{t("pages:ui.haushalt_2")} <strong className="text-text-secondary">{peerData.peer_info.household_type}</strong></span>
                   <span>Medianeinkommen: <strong className="text-text-secondary">{fmtRef(peerData.peer_info.median_income)}/Monat</strong></span>
@@ -1169,7 +1169,7 @@ export default function Budget() {
                     const isOver  = (cat.actual ?? 0) > peerPeriod;
                     return (
                       <div key={cat.category}>
-                        <div className="flex items-center justify-between mb-1 text-xs">
+                        <div className="flex items-center justify-between mb-1 text-sm">
                           <span className="text-text-secondary flex items-center gap-1">
                             <span
                               className="w-4 h-4 rounded flex items-center justify-center shrink-0"
@@ -1204,7 +1204,7 @@ export default function Budget() {
 
               {peerData.opportunities && peerData.opportunities.length > 0 && (
                 <div className="border-t border-border pt-3">
-                  <p className="text-text-tertiary text-xs font-semibold mb-2">
+                  <p className="text-text-tertiary text-sm font-semibold mb-2">
                     {t("pages:ui.einspar_potenzial")}
                   </p>
                   <div className="space-y-2">
@@ -1214,7 +1214,7 @@ export default function Budget() {
                         className="flex items-start gap-2 bg-warning/5 border border-warning/20 rounded-lg px-3 py-2"
                       >
                         <LightBulb className="w-3.5 h-3.5 text-warning shrink-0 mt-1" />
-                        <p className="text-text-secondary text-xs">{opp.action}</p>
+                        <p className="text-text-secondary text-sm">{opp.action}</p>
                       </div>
                     ))}
                   </div>

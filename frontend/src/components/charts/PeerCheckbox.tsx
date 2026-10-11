@@ -19,7 +19,7 @@ export default function PeerCheckbox({
 }: { checked: boolean; onChange: (v: boolean) => void; label?: string; hint?: string }) {
   const { t } = useTranslation();
   return (
-    <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer" title={hint ?? t("pages:peer.hint")}>
+    <label className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer" title={hint ?? t("pages:peer.hint")}>
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="accent-accent" />
       {label ?? t("pages:peer.toggle")}
     </label>

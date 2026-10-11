@@ -23,6 +23,7 @@ import { projectionsApi, api } from "@/lib/api";
 import { formatCHF } from "@/lib/theme";
 import WithdrawalPlan from "@/components/WithdrawalPlan";
 import { useTranslation } from "react-i18next";
+import { useThemeColors } from "@/hooks/useThemeColors";
 
 interface Props {
   /** Current total net worth from accounts */
@@ -45,6 +46,7 @@ const PILLAR_COLORS = {
 
 export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dateOfBirth }: Props) {
   const { t } = useTranslation();
+  const { fs } = useThemeColors();
   const [retirementAge, setRetirementAge] = useState(65);
   const [annualIncome, setAnnualIncome] = useState(90_000);
   const [showPeer, setShowPeer] = useState(false);
@@ -137,13 +139,13 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
     <div className="space-y-6">
       {/* Controls */}
       <div className="card">
-        <h3 className="text-text-primary font-semibold text-sm mb-4 flex items-center gap-2">
+        <h3 className="text-text-primary font-semibold text-base mb-4 flex items-center gap-2">
           <Calendar className="w-4 h-4 text-accent" />
           Rentenparameter
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
-            <label className="text-text-tertiary text-xs mb-1 block">Rentenalter</label>
+            <label className="text-text-tertiary text-sm mb-1 block">Rentenalter</label>
             <div className="flex gap-1 flex-wrap">
               {AGES.map((age) => (
                 <button
@@ -158,7 +160,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
           </div>
 
           <div>
-            <label className="text-text-tertiary text-xs mb-1 block">
+            <label className="text-text-tertiary text-sm mb-1 block">
               {t("pages:ui.jahreseinkommen_chf")}
             </label>
             <input
@@ -171,7 +173,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
           </div>
 
           <div>
-            <label className="text-text-tertiary text-xs mb-1 block">
+            <label className="text-text-tertiary text-sm mb-1 block">
               Ø-Rendite ({(meanReturn * 100).toFixed(1)}%)
             </label>
             <input
@@ -183,13 +185,13 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
               onChange={(e) => setMeanReturn(Number(e.target.value))}
               className="w-full accent-accent"
             />
-            <div className="flex justify-between text-[10px] text-text-tertiary mt-1">
+            <div className="flex justify-between text-2xs text-text-tertiary mt-1">
               <span>2% (konservativ)</span>
               <span>12% (aggressiv)</span>
             </div>
           </div>
           <div>
-            <label className="text-text-tertiary text-xs mb-1 block">
+            <label className="text-text-tertiary text-sm mb-1 block">
               {t("pages:ui.retirementSpendingLabel")}
             </label>
             <input
@@ -201,7 +203,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
               onChange={(e) => setSpendingMonthly(e.target.value === "" ? null : Math.max(0, Number(e.target.value)))}
               className="input-field input-amount w-full"
             />
-            <p className="text-[10px] text-text-tertiary mt-1">{t("pages:ui.retirementSpendingHint")}</p>
+            <p className="text-2xs text-text-tertiary mt-1">{t("pages:ui.retirementSpendingHint")}</p>
           </div>
         </div>
       </div>
@@ -259,15 +261,15 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
       {/* Pension income breakdown (post retirement) */}
       {pensionBarData.length > 0 && (
         <div className="card">
-          <h3 className="text-text-primary font-semibold text-sm mb-4 flex items-center gap-2">
+          <h3 className="text-text-primary font-semibold text-base mb-4 flex items-center gap-2">
             <ArrowRight className="w-4 h-4 text-accent" />
             {t("pages:ui.monatliche_rente_nach_saeule_chf_real")}
           </h3>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={pensionBarData} margin={{ top: 8, right: 16, bottom: 0, left: 16 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-              <XAxis dataKey="year" tick={{ fill: "#94a3b8", fontSize: 10 }} axisLine={{ stroke: "#334155" }} tickLine={false} interval={3} />
-              <YAxis tickFormatter={(v) => `${v}`} tick={{ fill: "#94a3b8", fontSize: 10 }} axisLine={false} tickLine={false} width={40} />
+              <XAxis dataKey="year" tick={{ fill: "#94a3b8", fontSize: fs["2xs"] }} axisLine={{ stroke: "#334155" }} tickLine={false} interval={3} />
+              <YAxis tickFormatter={(v) => `${v}`} tick={{ fill: "#94a3b8", fontSize: fs["2xs"] }} axisLine={false} tickLine={false} width={40} />
               <Tooltip
                 contentStyle={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 8 }}
                 formatter={(v: number) => [formatCHF(v), ""]}
@@ -278,12 +280,12 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
                 y={Math.round(expenseMonthly + taxMonthly)}
                 stroke="#f87171"
                 strokeDasharray="4 3"
-                label={{ value: t("pages:overview.spendingTax"), position: "right", fill: "#f87171", fontSize: 10 }}
+                label={{ value: t("pages:overview.spendingTax"), position: "right", fill: "#f87171", fontSize: fs["2xs"] }}
               />
-              <Legend wrapperStyle={{ fontSize: 11 }} formatter={(v) => <span style={{ color: "#94a3b8" }}>{v}</span>} />
+              <Legend wrapperStyle={{ fontSize: fs.xs }} formatter={(v) => <span style={{ color: "#94a3b8" }}>{v}</span>} />
             </BarChart>
           </ResponsiveContainer>
-          <p className="text-text-tertiary text-[11px] mt-2">
+          <p className="text-text-tertiary text-xs mt-2">
             {t("pages:ui.rote_linie_geschaetzte_monatliche_ausgaben_i")}
           </p>
         </div>
@@ -292,7 +294,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
       {/* Wealth Monte Carlo */}
       <div className="card">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-          <h3 className="text-text-primary font-semibold text-sm">
+          <h3 className="text-text-primary font-semibold text-base">
             {t("pages:ui.vermoegensentwicklung_monte_carlo_p10_p50_p9")}
           </h3>
           {projection?.peer_wealth?.some((v) => v != null) && (
@@ -300,7 +302,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
           )}
         </div>
         {isLoading ? (
-          <div className="h-56 flex items-center justify-center text-text-tertiary text-sm animate-pulse">
+          <div className="h-56 flex items-center justify-center text-text-tertiary text-base animate-pulse">
             Berechne…
           </div>
         ) : (
@@ -313,8 +315,8 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-              <XAxis dataKey="year" tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={{ stroke: "#334155" }} tickLine={false} />
-              <YAxis tickFormatter={(v) => `${v}k`} tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} width={44} />
+              <XAxis dataKey="year" tick={{ fill: "#94a3b8", fontSize: fs.xs }} axisLine={{ stroke: "#334155" }} tickLine={false} />
+              <YAxis tickFormatter={(v) => `${v}k`} tick={{ fill: "#94a3b8", fontSize: fs.xs }} axisLine={false} tickLine={false} width={44} />
               <Tooltip
                 contentStyle={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 8 }}
                 labelStyle={{ color: "#f1f5f9" }}
@@ -324,7 +326,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
                 x={projection?.years?.[retirementIdx]}
                 stroke="#f59e0b"
                 strokeDasharray="4 3"
-                label={{ value: "Rente", position: "top", fill: "#f59e0b", fontSize: 10 }}
+                label={{ value: "Rente", position: "top", fill: "#f59e0b", fontSize: fs["2xs"] }}
               />
               <Area type="monotone" dataKey="p90" stroke="#60a5fa" fill="url(#wealthGrad)" strokeWidth={1} name="p90 (optimistisch)" />
               <Area type="monotone" dataKey="p50" stroke="#3b82f6" fill="none" strokeWidth={2} name="p50 (Median)" />
@@ -333,7 +335,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
                 <Area type="monotone" dataKey="peer" stroke={PEER_COLOR} fill="none" strokeWidth={2}
                   strokeDasharray="6 4" name={t("pages:peer.line")} />
               )}
-              <Legend wrapperStyle={{ fontSize: 11 }} formatter={(v) => <span style={{ color: "#94a3b8" }}>{v}</span>} />
+              <Legend wrapperStyle={{ fontSize: fs.xs }} formatter={(v) => <span style={{ color: "#94a3b8" }}>{v}</span>} />
             </AreaChart>
           </ResponsiveContainer>
         )}
@@ -361,7 +363,7 @@ function KPICard({
     <div className="bg-bg-surface2 rounded-xl border border-border/40 px-4 py-3">
       <div className="flex items-center gap-2 mb-1">
         {icon}
-        <p className="text-text-tertiary text-[11px] font-semibold">
+        <p className="text-text-tertiary text-xs font-semibold">
           {label}
         </p>
       </div>
@@ -371,7 +373,7 @@ function KPICard({
       >
         {value}
       </p>
-      <p className="text-text-tertiary text-xs mt-1">{sub}</p>
+      <p className="text-text-tertiary text-sm mt-1">{sub}</p>
     </div>
   );
 }

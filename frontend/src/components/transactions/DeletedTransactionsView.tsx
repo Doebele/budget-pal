@@ -40,7 +40,7 @@ export function DeletedTransactionsView({
         </div>
         <div>
           <h2 className="text-text-primary font-light text-xl">{t("pages:misc.r14")}</h2>
-          <p className="text-text-tertiary text-sm">
+          <p className="text-text-tertiary text-base">
             {t("pages:ui.weich_geloeschte_buchungen_wiederherstellen_")}
           </p>
         </div>
@@ -48,8 +48,8 @@ export function DeletedTransactionsView({
 
       <div className="card p-0 overflow-hidden border border-border">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-bg-surface2 text-text-tertiary text-xs">
+          <table className="w-full text-base">
+            <thead className="bg-bg-surface2 text-text-tertiary text-sm">
               <tr>
                 <th className="text-left px-4 py-3 font-medium">{t("table.date")}</th>
                 <th className="text-left px-4 py-3 font-medium">{t("table.account")}</th>
@@ -64,19 +64,19 @@ export function DeletedTransactionsView({
             <tbody className="divide-y divide-border/50">
               {transactions.map((txn) => (
                 <tr key={txn.id} className="hover:bg-bg-surface2/40 transition-colors">
-                  <td className="px-4 py-3 text-text-primary font-mono text-xs whitespace-nowrap">
+                  <td className="px-4 py-3 text-text-primary font-mono text-sm whitespace-nowrap">
                     {format(new Date(txn.date), "dd.MM.yyyy", { locale: de })}
                   </td>
-                  <td className="px-4 py-3 text-text-tertiary text-xs max-w-[140px] truncate" title={txn.accountName}>
+                  <td className="px-4 py-3 text-text-tertiary text-sm max-w-[140px] truncate" title={txn.accountName}>
                     {txn.accountName}
                   </td>
                   <td className="px-4 py-3 text-text-primary max-w-xs truncate" title={txn.description}>
                     {txn.description}
                   </td>
-                  <td className="px-4 py-3 text-text-tertiary text-xs">
+                  <td className="px-4 py-3 text-text-tertiary text-sm">
                     {txn.category || "—"}
                   </td>
-                  <td className="px-4 py-3 text-text-tertiary text-xs whitespace-nowrap">
+                  <td className="px-4 py-3 text-text-tertiary text-sm whitespace-nowrap">
                     {txn.is_recurring && txn.periodicity
                       ? (PERIODICITY_LABELS[txn.periodicity] ?? txn.periodicity)
                       : txn.is_recurring
@@ -92,7 +92,7 @@ export function DeletedTransactionsView({
                     {txn.amount >= 0 ? "+" : ""}
                     {formatCHF(txn.amount)}
                   </td>
-                  <td className="px-4 py-3 text-text-tertiary text-xs font-mono whitespace-nowrap">
+                  <td className="px-4 py-3 text-text-tertiary text-sm font-mono whitespace-nowrap">
                     {txn.deletedAt
                       ? format(new Date(txn.deletedAt), "dd.MM.yyyy HH:mm", { locale: de })
                       : "—"}
@@ -103,7 +103,7 @@ export function DeletedTransactionsView({
                         type="button"
                         disabled={busyId === txn.id}
                         onClick={() => onRestore(txn.id)}
-                        className="inline-flex items-center gap-1 bg-emerald-600/90 hover:bg-emerald-600 disabled:opacity-50 text-white rounded-md px-3 py-1 font-medium text-xs transition-colors"
+                        className="inline-flex items-center gap-1 bg-emerald-600/90 hover:bg-emerald-600 disabled:opacity-50 text-white rounded-md px-3 py-1 font-medium text-sm transition-colors"
                       >
                         <Undo className="w-3.5 h-3.5" />
                         Wiederherstellen
@@ -112,7 +112,7 @@ export function DeletedTransactionsView({
                         type="button"
                         disabled={busyId === txn.id}
                         onClick={() => onDeletePermanently(txn.id)}
-                        className="inline-flex items-center gap-1 bg-red-600/90 hover:bg-red-600 disabled:opacity-50 text-white rounded-md px-3 py-1 font-medium text-xs transition-colors"
+                        className="inline-flex items-center gap-1 bg-red-600/90 hover:bg-red-600 disabled:opacity-50 text-white rounded-md px-3 py-1 font-medium text-sm transition-colors"
                       >
                         <Trash className="w-3.5 h-3.5" />
                         {t("pages:ui.endgueltig_loeschen")}
@@ -127,7 +127,7 @@ export function DeletedTransactionsView({
       </div>
 
       {transactions.length === 0 && (
-        <p className="text-text-tertiary text-center py-12 text-sm">
+        <p className="text-text-tertiary text-center py-12 text-base">
           {t("pages:ui.keine_geloeschten_transaktionen_vorhanden")}
         </p>
       )}

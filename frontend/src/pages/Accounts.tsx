@@ -222,7 +222,7 @@ export default function Accounts() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-light text-text-primary">{t("pages:accounts.title")}</h1>
-          <p className="text-text-tertiary text-sm mt-1">
+          <p className="text-text-tertiary text-base mt-1">
             Gesamtsaldo:{" "}
             <span className="text-text-primary font-mono font-semibold">
               {formatCHF(totalBalance)}
@@ -245,7 +245,7 @@ export default function Accounts() {
 
       {showForm && (
         <div className="card">
-          <h2 className="text-text-primary font-semibold text-sm mb-4">
+          <h2 className="text-text-primary font-semibold text-base mb-4">
             {editingAccountId ? t("pages:accounts.editAccount") : t("pages:accounts.newAccount")}
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
@@ -330,7 +330,7 @@ export default function Accounts() {
 
                     if (filtered.length === 0) {
                       return (
-                        <div className="px-4 py-3 text-sm text-text-tertiary">
+                        <div className="px-4 py-3 text-base text-text-tertiary">
                           Keine Bank gefunden. Eigenen Namen verwenden.
                         </div>
                       );
@@ -345,7 +345,7 @@ export default function Accounts() {
 
                           return (
                             <div key={category}>
-                              <div className="px-4 py-1 text-xs font-semibold text-text-tertiary bg-bg-elevated/50 sticky top-0">
+                              <div className="px-4 py-1 text-sm font-semibold text-text-tertiary bg-bg-elevated/50 sticky top-0">
                                 {getBankCategoryLabel(category)}
                               </div>
                               {typeBanks.map((bank) => (
@@ -353,7 +353,7 @@ export default function Accounts() {
                                   key={bank.id}
                                   type="button"
                                   className={clsx(
-                                    "w-full px-3 py-2 text-left text-sm hover:bg-bg-elevated transition-colors flex items-center gap-3",
+                                    "w-full px-3 py-2 text-left text-base hover:bg-bg-elevated transition-colors flex items-center gap-3",
                                     selectedBankId === bank.id && "bg-bg-elevated/80 text-accent"
                                   )}
                                   onClick={() => {
@@ -401,7 +401,7 @@ export default function Accounts() {
                           ) && (
                             <button
                               type="button"
-                              className="w-full px-3 py-3 text-left text-sm hover:bg-bg-elevated transition-colors text-accent border-t border-border flex items-center gap-3"
+                              className="w-full px-3 py-3 text-left text-base hover:bg-bg-elevated transition-colors text-accent border-t border-border flex items-center gap-3"
                               onClick={() => {
                                 setSelectedBankId(null);
                                 setForm((f) => ({ ...f, bank: bankSearchQuery }));
@@ -504,7 +504,7 @@ export default function Accounts() {
             <p className="text-text-secondary mb-2">
               {t("pages:ui.moechtest_du_das_konto")} <strong className="text-text-primary">"{accountToDelete.name}"</strong> {t("pages:ui.wirklich_loeschen")}
             </p>
-            <p className="text-sm text-text-disabled">
+            <p className="text-base text-text-disabled">
               {t("pages:ui.diese_aktion_kann_nicht_rueckgaengig_gemacht")}
             </p>
             <div className="mt-6 flex justify-end gap-3">
@@ -556,10 +556,10 @@ export default function Accounts() {
                     })()}
                   </div>
                   <div>
-                    <p className="text-text-primary font-medium text-sm">
+                    <p className="text-text-primary font-medium text-base">
                       {account.name}
                     </p>
-                    <p className="text-text-tertiary text-xs">
+                    <p className="text-text-tertiary text-sm">
                       {account.bank} ·{" "}
                       {ACCOUNT_TYPE_LABELS[account.account_type] ||
                         account.account_type}
@@ -597,7 +597,7 @@ export default function Accounts() {
                 </p>
                 {/* Secondary Amount: Original Currency (if not CHF) */}
                 {account.currency !== "CHF" && (
-                  <p className="text-xs text-text-tertiary mt-1">
+                  <p className="text-sm text-text-tertiary mt-1">
                     {formatCurrency(account.balance, account.currency)} (≈)
                   </p>
                 )}

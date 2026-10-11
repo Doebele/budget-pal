@@ -35,12 +35,12 @@ export default function OnboardingProgress() {
   const next = steps.find((s) => !s.done);
 
   return (
-    <div className="card p-4">
+    <div className="card">
       <div className="flex items-center justify-between gap-3 mb-3">
-        <p className="text-text-secondary text-xs font-medium">
+        <p className="text-text-secondary text-sm font-medium">
           {t("pages:onboarding.progressTitle")}
         </p>
-        <span className="text-text-tertiary text-xs tabular-nums">
+        <span className="text-text-tertiary text-sm tabular-nums">
           {data.completeness_pct}%
         </span>
       </div>
@@ -56,7 +56,7 @@ export default function OnboardingProgress() {
           <span
             key={step.label}
             className={clsx(
-              "flex items-center gap-1 text-xs",
+              "flex items-center gap-1 text-sm",
               step.done ? "text-gain" : "text-text-tertiary",
             )}
           >
@@ -73,7 +73,7 @@ export default function OnboardingProgress() {
       {next && (
         <Link
           to={next.to}
-          className="mt-3 inline-flex items-center gap-1 text-accent text-xs hover:underline"
+          className="mt-3 inline-flex items-center gap-1 text-accent text-sm hover:underline"
         >
           {next.unlocks}
           <NavArrowRight className="w-3.5 h-3.5" />

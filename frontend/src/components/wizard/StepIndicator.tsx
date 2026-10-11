@@ -98,7 +98,7 @@ export default function StepIndicator({
               >
                 <div
                   className={clsx(
-                    "w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all duration-300",
+                    "w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold border-2 transition-all duration-300",
                     isCompleted && "bg-accent border-accent text-white",
                     isCompleted && clickable && "group-hover:bg-accent/75 group-hover:border-accent/75",
                     isActive && "bg-accent/15 border-accent text-accent shadow-[0_0_12px_rgba(59,130,246,0.35)]",
@@ -114,7 +114,7 @@ export default function StepIndicator({
                 </div>
                 <span
                   className={clsx(
-                    "text-[10px] font-medium whitespace-nowrap transition-colors",
+                    "text-2xs font-medium whitespace-nowrap transition-colors",
                     isActive && "text-accent",
                     isCompleted && "text-text-secondary",
                     isCompleted && clickable && "group-hover:text-text-primary",
@@ -172,7 +172,7 @@ export default function StepIndicator({
             );
           })}
         </div>
-        <span className="text-text-tertiary text-xs">
+        <span className="text-text-tertiary text-sm">
           {t("pages:wizard.stepOf", { current: position + 1, total: steps.length })}
           {" "}—{" "}
           <span className="text-text-secondary">{t(STEP_LABELS[currentStep - 1])}</span>

@@ -58,7 +58,7 @@ function Tooltip({ text, children }: { text: string; children: React.ReactNode }
         visible={visible}
         placement="top"
         className="w-56 rounded-lg bg-bg-surface border border-border shadow-xl px-3 py-2"
-        style={{ fontSize: 11 }}
+        style={{ fontSize: "var(--fs-xs)" }}
       >
         <p className="text-text-secondary leading-snug whitespace-pre-line">{text}</p>
       </PortalTooltip>
@@ -118,7 +118,7 @@ function Ring({
           {label}
         </span>
         {sublabel && (
-          <span className="text-text-tertiary font-mono leading-none mt-1" style={{ fontSize: size < 60 ? 8 : 10 }}>
+          <span className="text-text-tertiary font-mono leading-none mt-1" style={{ fontSize: "var(--fs-2xs)" }}>
             {sublabel}
           </span>
         )}
@@ -207,7 +207,7 @@ export default function HealthScoreWidget() {
     <div className="card space-y-4">
       {/* Header: title + mode toggle */}
       <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex items-center gap-2 text-text-tertiary text-xs flex-1">
+        <div className="flex items-center gap-2 text-text-tertiary text-sm flex-1">
           <Activity className="w-3.5 h-3.5" />
           {t("pages:ui.budget_gesundheit")}
         </div>
@@ -242,7 +242,7 @@ export default function HealthScoreWidget() {
             sublabel={String(Math.round(score))}
             labelClass={clsx("text-2xl", GRADE_COLOR[grade] ?? "text-text-primary")}
           />
-          <span className="text-[10px] text-text-tertiary">{t("pages:health.total")}</span>
+          <span className="text-2xs text-text-tertiary">{t("pages:health.total")}</span>
         </div>
 
         {/* Divider */}
@@ -268,14 +268,14 @@ export default function HealthScoreWidget() {
                     strokeWidth={5}
                     color={scoreStroke(c.score)}
                     label={String(Math.round(c.score))}
-                    labelClass="text-base"
+                    labelClass="text-lg"
                   />
                   <span
-                    className="text-xs text-text-tertiary text-center leading-tight max-w-[72px]"
+                    className="text-sm text-text-tertiary text-center leading-tight max-w-[72px]"
                   >
                     {cName}
                   </span>
-                  <span className="text-[10px] text-text-disabled text-center leading-tight max-w-[72px] truncate" title={cDetail}>
+                  <span className="text-2xs text-text-disabled text-center leading-tight max-w-[72px] truncate" title={cDetail}>
                     {cDetail}
                   </span>
                 </div>
@@ -291,7 +291,7 @@ export default function HealthScoreWidget() {
           <button
             type="button"
             onClick={() => setShowLevers((v) => !v)}
-            className="flex items-center gap-1 text-[11px] text-text-tertiary hover:text-text-secondary transition-colors w-full"
+            className="flex items-center gap-1 text-xs text-text-tertiary hover:text-text-secondary transition-colors w-full"
           >
             <GraphUp className="w-3 h-3 text-accent" />
             <span className="flex-1 text-left">{t("pages:ui.verbesserungspotenzial")}</span>
@@ -302,8 +302,8 @@ export default function HealthScoreWidget() {
             <div className="mt-2 space-y-1 animate-fade-in">
               {top_levers.map((lever, i) => (
                 <div key={i} className="bg-accent/5 border border-accent/15 rounded-lg px-2 py-1">
-                  <p className="text-[11px] font-medium text-text-secondary">{lever.title_key ? t(`pages:health.${lever.title_key}`) : lever.title}</p>
-                  <p className="text-[10px] text-text-tertiary mt-1">{lever.body_key ? t(`pages:health.${lever.body_key}`, lever.body_params ?? {}) : lever.body}</p>
+                  <p className="text-xs font-medium text-text-secondary">{lever.title_key ? t(`pages:health.${lever.title_key}`) : lever.title}</p>
+                  <p className="text-2xs text-text-tertiary mt-1">{lever.body_key ? t(`pages:health.${lever.body_key}`, lever.body_params ?? {}) : lever.body}</p>
                 </div>
               ))}
             </div>

@@ -88,14 +88,14 @@ export default function Login() {
                 autoComplete="current-password"
               />
               <div className="text-right mt-1">
-                <Link to="/forgot-password" className="text-accent hover:text-accent-light text-xs">
+                <Link to="/forgot-password" className="text-accent hover:text-accent-light text-sm">
                   {t("login.forgot")}
                 </Link>
               </div>
             </div>
 
             {error && (
-              <p className="text-loss text-sm bg-loss-muted border border-loss/30 rounded-lg px-3 py-2">
+              <p className="text-loss text-base bg-loss-muted border border-loss/30 rounded-lg px-3 py-2">
                 {error}
               </p>
             )}
@@ -109,7 +109,7 @@ export default function Login() {
             <>
               <div className="flex items-center gap-3 my-4">
                 <div className="h-px flex-1 bg-border" />
-                <span className="text-text-tertiary text-xs">{t("login.or")}</span>
+                <span className="text-text-tertiary text-sm">{t("login.or")}</span>
                 <div className="h-px flex-1 bg-border" />
               </div>
               <button
@@ -124,7 +124,7 @@ export default function Login() {
             </>
           )}
 
-          <p className="text-text-tertiary text-sm mt-4 text-center">
+          <p className="text-text-tertiary text-base mt-4 text-center">
             {t("login.noAccount")}{" "}
             <Link to="/register" className="text-accent hover:text-accent-light">
               {t("login.registerLink")}

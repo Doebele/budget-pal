@@ -359,7 +359,7 @@ export default function Finanzplan() {
     return (
       <div className="flex flex-col items-center gap-3 py-16 text-center">
         <WarningCircle className="w-8 h-8 text-loss" />
-        <p className="text-text-secondary text-sm">{t("pages:finanzplan.loadError")}</p>
+        <p className="text-text-secondary text-base">{t("pages:finanzplan.loadError")}</p>
       </div>
     );
   }
@@ -372,13 +372,13 @@ export default function Finanzplan() {
         </div>
         <div>
           <h1 className="text-xl font-light text-text-primary mb-2">Kein Finanzplan vorhanden</h1>
-          <p className="text-text-secondary text-sm leading-relaxed">
+          <p className="text-text-secondary text-base leading-relaxed">
             {t("pages:ui.erstelle_deinen_persoenlichen_finanzplan_mit")}
           </p>
         </div>
         <Link
           to="/wizard"
-          className="btn-primary flex items-center gap-2 text-sm"
+          className="btn-primary flex items-center gap-2 text-base"
         >
           <MagicWand className="w-4 h-4" />
           Finanzplan erstellen
@@ -394,28 +394,28 @@ export default function Finanzplan() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-xl font-light text-text-primary mb-1">Finanzplan</h1>
-          <p className="text-text-secondary text-sm">
+          <p className="text-text-secondary text-base">
             {t("pages:ui.empirische_angaben_monatliche_uebersicht")}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Link
             to="/wizard"
-            className="btn-secondary flex items-center gap-1 text-xs py-1 px-3"
+            className="btn-secondary flex items-center gap-1 text-sm py-1 px-3"
           >
             <MagicWand className="w-3.5 h-3.5" />
             Wizard
           </Link>
           <Link
             to="/budget"
-            className="btn-secondary flex items-center gap-1 text-xs py-1 px-3"
+            className="btn-secondary flex items-center gap-1 text-sm py-1 px-3"
           >
             <PiggyBank className="w-3.5 h-3.5" />
             Budgetanalyse
           </Link>
           <Link
             to="/projections"
-            className="btn-primary flex items-center gap-1 text-xs py-1 px-3"
+            className="btn-primary flex items-center gap-1 text-sm py-1 px-3"
           >
             <GraphUp className="w-3.5 h-3.5" />
             Rentenprognose
@@ -426,26 +426,26 @@ export default function Finanzplan() {
       {/* ── Cashflow-Karten ───────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-bg-surface2 rounded-xl border border-border/40 px-4 py-3">
-          <p className="text-text-tertiary text-[11px] font-semibold mb-1">{t("pages:finanzplan.expensesPerMonth")}</p>
+          <p className="text-text-tertiary text-xs font-semibold mb-1">{t("pages:finanzplan.expensesPerMonth")}</p>
           <p className="text-text-primary font-mono font-light text-xl">{fmtCHF(totalExpenses)}</p>
-          <p className="text-text-tertiary text-xs mt-1">{wizardBudgets.length} Budgetposten</p>
+          <p className="text-text-tertiary text-sm mt-1">{wizardBudgets.length} Budgetposten</p>
         </div>
         <div className="bg-bg-surface2 rounded-xl border border-border/40 px-4 py-3">
-          <p className="text-text-tertiary text-[11px] font-semibold mb-1">{t("pages:finanzplan.netWorth")}</p>
+          <p className="text-text-tertiary text-xs font-semibold mb-1">{t("pages:finanzplan.netWorth")}</p>
           <p className="font-mono font-light text-xl" style={{ color: "#10b981" }}>{fmtCHF(totalAssets)}</p>
-          <p className="text-text-tertiary text-xs mt-1">{assets.length} Positionen</p>
+          <p className="text-text-tertiary text-sm mt-1">{assets.length} Positionen</p>
         </div>
         <div className="bg-bg-surface2 rounded-xl border border-border/40 px-4 py-3">
-          <p className="text-text-tertiary text-[11px] font-semibold mb-1">Vorsorgekapital</p>
+          <p className="text-text-tertiary text-xs font-semibold mb-1">Vorsorgekapital</p>
           <p className="font-mono font-light text-xl" style={{ color: "#a78bfa" }}>{fmtCHF(totalPension)}</p>
-          <p className="text-text-tertiary text-xs mt-1">{t("pages:ui.entriesCount", { count: pension.length })}</p>
+          <p className="text-text-tertiary text-sm mt-1">{t("pages:ui.entriesCount", { count: pension.length })}</p>
         </div>
         <div className="bg-bg-surface2 rounded-xl border border-border/40 px-4 py-3">
-          <p className="text-text-tertiary text-[11px] font-semibold mb-1">{t("pages:finanzplan.liabilities")}</p>
+          <p className="text-text-tertiary text-xs font-semibold mb-1">{t("pages:finanzplan.liabilities")}</p>
           <p className="font-mono font-light text-xl" style={{ color: totalLiabilities > 0 ? "#f87171" : "#94a3b8" }}>
             {fmtCHF(totalLiabilities)}
           </p>
-          <p className="text-text-tertiary text-xs mt-1">
+          <p className="text-text-tertiary text-sm mt-1">
             {mortgageTrancheCount > 0
               ? `${mortgageTrancheCount} Hypothek${mortgageTrancheCount !== 1 ? "en" : ""}`
               : "Keine Schulden"}
@@ -457,8 +457,8 @@ export default function Finanzplan() {
       {wizardBudgets.length > 0 && (
         <section className="bg-bg-surface2 rounded-xl border border-border/40 overflow-hidden">
           <div className="px-5 py-4 border-b border-border/40 flex items-center justify-between">
-            <h2 className="text-text-primary font-semibold text-sm">{t("pages:finanzplan.monthlyBudgetPlan")}</h2>
-            <span className="text-text-tertiary text-xs font-mono">{fmtCHF(totalExpenses)} / Mo</span>
+            <h2 className="text-text-primary font-semibold text-base">{t("pages:finanzplan.monthlyBudgetPlan")}</h2>
+            <span className="text-text-tertiary text-sm font-mono">{fmtCHF(totalExpenses)} / Mo</span>
           </div>
           <div className="divide-y divide-border/30">
             {categoryGroups.map((group) => {
@@ -473,9 +473,9 @@ export default function Finanzplan() {
                     >
                       <Icon className="w-3.5 h-3.5" style={{ color: group.color }} />
                     </span>
-                    <span className="text-text-primary text-sm font-medium flex-1">{group.label}</span>
-                    <span className="text-text-secondary font-mono text-sm font-semibold">{fmtCHF(group.total)}</span>
-                    <span className="text-text-tertiary text-xs w-10 text-right">{pct.toFixed(0)}%</span>
+                    <span className="text-text-primary text-base font-medium flex-1">{group.label}</span>
+                    <span className="text-text-secondary font-mono text-base font-semibold">{fmtCHF(group.total)}</span>
+                    <span className="text-text-tertiary text-sm w-10 text-right">{pct.toFixed(0)}%</span>
                   </div>
                   {/* Progress bar */}
                   <ProgressBar
@@ -491,8 +491,8 @@ export default function Finanzplan() {
                     <div className="mt-2 ml-9 space-y-1">
                       {group.items.map((item) => (
                         <div key={item.id} className="flex items-center justify-between">
-                          <span className="text-text-tertiary text-[11px]">{item.notes}</span>
-                          <span className="text-text-tertiary font-mono text-[11px]">{fmtCHF(item.amount)}</span>
+                          <span className="text-text-tertiary text-xs">{item.notes}</span>
+                          <span className="text-text-tertiary font-mono text-xs">{fmtCHF(item.amount)}</span>
                         </div>
                       ))}
                     </div>
@@ -508,8 +508,8 @@ export default function Finanzplan() {
       {assets.length > 0 && (
         <section className="bg-bg-surface2 rounded-xl border border-border/40 overflow-hidden">
           <div className="px-5 py-4 border-b border-border/40 flex items-center justify-between">
-            <h2 className="text-text-primary font-semibold text-sm">{t("pages:wizard.w105")}</h2>
-            <span className="text-text-tertiary text-xs font-mono">{fmtCHF(totalAssets)}</span>
+            <h2 className="text-text-primary font-semibold text-base">{t("pages:wizard.w105")}</h2>
+            <span className="text-text-tertiary text-sm font-mono">{fmtCHF(totalAssets)}</span>
           </div>
           <div className="divide-y divide-border/30">
             {assetsByType.map(([type, value]) => {
@@ -520,9 +520,9 @@ export default function Finanzplan() {
                 <div key={type} className="px-5 py-3">
                   <div className="flex items-center gap-3 mb-1">
                     <Coins className="w-4 h-4 flex-shrink-0" style={{ color }} />
-                    <span className="text-text-primary text-sm flex-1">{label}</span>
-                    <span className="text-text-secondary font-mono text-sm">{fmtCHF(value)}</span>
-                    <span className="text-text-tertiary text-xs w-10 text-right">{pct.toFixed(0)}%</span>
+                    <span className="text-text-primary text-base flex-1">{label}</span>
+                    <span className="text-text-secondary font-mono text-base">{fmtCHF(value)}</span>
+                    <span className="text-text-tertiary text-sm w-10 text-right">{pct.toFixed(0)}%</span>
                   </div>
                   <div className="h-1.5 rounded-full bg-bg-elevated overflow-hidden ml-7">
                     <div
@@ -541,8 +541,8 @@ export default function Finanzplan() {
       {pension.length > 0 && (
         <section className="bg-bg-surface2 rounded-xl border border-border/40 overflow-hidden">
           <div className="px-5 py-4 border-b border-border/40 flex items-center justify-between">
-            <h2 className="text-text-primary font-semibold text-sm">{t("pages:ui.vorsorge")}</h2>
-            <span className="text-text-tertiary text-xs font-mono">{fmtCHF(totalPension)} Kapital</span>
+            <h2 className="text-text-primary font-semibold text-base">{t("pages:ui.vorsorge")}</h2>
+            <span className="text-text-tertiary text-sm font-mono">{fmtCHF(totalPension)} Kapital</span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-border/30">
             {(["1", "2", "3a", "3b"] as const).map((pillar) => {
@@ -569,28 +569,28 @@ export default function Finanzplan() {
                 <div key={pillar} className="px-5 py-4">
                   <div className="flex items-center gap-2 mb-3">
                     <ShieldCheck className="w-4 h-4 flex-shrink-0" style={{ color }} />
-                    <span className="text-text-secondary text-xs font-medium">{PILLAR_LABEL[pillar] ? t(PILLAR_LABEL[pillar]) : pillar}</span>
+                    <span className="text-text-secondary text-sm font-medium">{PILLAR_LABEL[pillar] ? t(PILLAR_LABEL[pillar]) : pillar}</span>
                   </div>
                   {entries.length === 0 ? (
-                    <p className="text-text-tertiary text-xs">Nicht erfasst</p>
+                    <p className="text-text-tertiary text-sm">Nicht erfasst</p>
                   ) : (
                     <div className="space-y-1">
                       {/* Säule 1: estimated monthly pension */}
                       {ahvMonthlyEst !== null && (
                         <>
                           <div className="flex justify-between">
-                            <span className="text-text-tertiary text-xs">{t("pages:finanzplan.estimatedPension")}</span>
-                            <span className="font-mono text-xs font-semibold" style={{ color }}>{fmtCHF(ahvMonthlyEst)}/Mo</span>
+                            <span className="text-text-tertiary text-sm">{t("pages:finanzplan.estimatedPension")}</span>
+                            <span className="font-mono text-sm font-semibold" style={{ color }}>{fmtCHF(ahvMonthlyEst)}/Mo</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-text-tertiary text-xs">Beitragsjahre</span>
-                            <span className="font-mono text-xs text-text-secondary">
+                            <span className="text-text-tertiary text-sm">Beitragsjahre</span>
+                            <span className="font-mono text-sm text-text-secondary">
                               {entries[0]?.contribution_years ?? "—"} / 44
                             </span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-text-tertiary text-xs">{t("pages:ui.jahreslohn")}</span>
-                            <span className="font-mono text-xs text-text-secondary">
+                            <span className="text-text-tertiary text-sm">{t("pages:ui.jahreslohn")}</span>
+                            <span className="font-mono text-sm text-text-secondary">
                               {entries[0]?.average_insured_salary ? fmtCHF(entries[0].average_insured_salary) : "—"}
                             </span>
                           </div>
@@ -601,17 +601,17 @@ export default function Finanzplan() {
                       {bvgMonthlyEst !== null && (
                         <>
                           <div className="flex justify-between">
-                            <span className="text-text-tertiary text-xs">Kapital</span>
-                            <span className="font-mono text-xs text-text-primary">{fmtCHF(totalBalance)}</span>
+                            <span className="text-text-tertiary text-sm">Kapital</span>
+                            <span className="font-mono text-sm text-text-primary">{fmtCHF(totalBalance)}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-text-tertiary text-xs">{t("pages:ui.gesch_rente")}</span>
-                            <span className="font-mono text-xs font-semibold" style={{ color }}>{fmtCHF(bvgMonthlyEst)}/Mo</span>
+                            <span className="text-text-tertiary text-sm">{t("pages:ui.gesch_rente")}</span>
+                            <span className="font-mono text-sm font-semibold" style={{ color }}>{fmtCHF(bvgMonthlyEst)}/Mo</span>
                           </div>
                           {totalContrib > 0 && (
                             <div className="flex justify-between">
-                              <span className="text-text-tertiary text-xs">{t("pages:ui.jahresbeitrag")}</span>
-                              <span className="font-mono text-xs text-text-secondary">{fmtCHF(totalContrib)}</span>
+                              <span className="text-text-tertiary text-sm">{t("pages:ui.jahresbeitrag")}</span>
+                              <span className="font-mono text-sm text-text-secondary">{fmtCHF(totalContrib)}</span>
                             </div>
                           )}
                         </>
@@ -621,21 +621,21 @@ export default function Finanzplan() {
                       {ahvMonthlyEst === null && bvgMonthlyEst === null && (
                         <>
                           <div className="flex justify-between">
-                            <span className="text-text-tertiary text-xs">Kapital</span>
-                            <span className="font-mono text-xs text-text-primary">{fmtCHF(totalBalance)}</span>
+                            <span className="text-text-tertiary text-sm">Kapital</span>
+                            <span className="font-mono text-sm text-text-primary">{fmtCHF(totalBalance)}</span>
                           </div>
                           {totalContrib > 0 && (
                             <div className="flex justify-between">
-                              <span className="text-text-tertiary text-xs">{t("pages:ui.jahresbeitrag")}</span>
-                              <span className="font-mono text-xs text-text-secondary">{fmtCHF(totalContrib)}</span>
+                              <span className="text-text-tertiary text-sm">{t("pages:ui.jahresbeitrag")}</span>
+                              <span className="font-mono text-sm text-text-secondary">{fmtCHF(totalContrib)}</span>
                             </div>
                           )}
                           {totalBalance > 0 && capitalNetEst !== undefined && (
                             <div className="flex justify-between">
-                              <span className="text-text-tertiary text-xs">
+                              <span className="text-text-tertiary text-sm">
                                 {t(pillar === "3a" ? "pages:plan.p3aCard" : "pages:plan.p3bCard")}
                               </span>
-                              <span className="font-mono text-xs" style={{ color }}>
+                              <span className="font-mono text-sm" style={{ color }}>
                                 {fmtCHF(Math.round(capitalNetEst))}
                               </span>
                             </div>
@@ -653,12 +653,12 @@ export default function Finanzplan() {
           {estimate && estimate.total_monthly > 0 && (
             <div className="px-5 py-3 border-t border-border/40 bg-bg-elevated/40">
               <div className="flex items-center justify-between">
-                <span className="text-text-tertiary text-xs">{t("pages:finanzplan.estimatedTotalPension")}</span>
-                <span className="font-mono text-sm font-bold text-accent">
+                <span className="text-text-tertiary text-sm">{t("pages:finanzplan.estimatedTotalPension")}</span>
+                <span className="font-mono text-base font-bold text-accent">
                   {fmtCHF(Math.round(estimate.total_monthly))} / Monat
                 </span>
               </div>
-              <p className="text-text-tertiary text-[11px] mt-1">
+              <p className="text-text-tertiary text-xs mt-1">
                 {t("pages:finanzplan.estimateNote", {
                   age: estimate.retirement_age,
                   ahvAge: estimate.ahv_start_age,
@@ -684,17 +684,17 @@ export default function Finanzplan() {
           <div className="px-5 py-4 border-b border-border/40 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <WarningTriangle className="w-4 h-4 text-loss" />
-              <h2 className="text-text-primary font-semibold text-sm">{t("pages:finanzplan.liabilitiesAndDebt")}</h2>
+              <h2 className="text-text-primary font-semibold text-base">{t("pages:finanzplan.liabilitiesAndDebt")}</h2>
             </div>
-            <span className="text-loss text-xs font-mono font-semibold">{fmtCHF(totalLiabilities)}</span>
+            <span className="text-loss text-sm font-mono font-semibold">{fmtCHF(totalLiabilities)}</span>
           </div>
 
           {/* Summary table header */}
           <div className="px-5 py-2 grid grid-cols-4 gap-2 border-b border-border/20 bg-bg-elevated/40">
-            <span className="text-text-tertiary text-[10px] font-semibold">Position</span>
-            <span className="text-text-tertiary text-[10px] font-semibold text-right">{t("pages:ui.marktwert")}</span>
-            <span className="text-text-tertiary text-[10px] font-semibold text-right">Eigenkapital</span>
-            <span className="text-text-tertiary text-[10px] font-semibold text-right">{t("pages:ui.hypothek")}</span>
+            <span className="text-text-tertiary text-2xs font-semibold">Position</span>
+            <span className="text-text-tertiary text-2xs font-semibold text-right">{t("pages:ui.marktwert")}</span>
+            <span className="text-text-tertiary text-2xs font-semibold text-right">Eigenkapital</span>
+            <span className="text-text-tertiary text-2xs font-semibold text-right">{t("pages:ui.hypothek")}</span>
           </div>
 
           <div className="divide-y divide-border/30">
@@ -705,21 +705,21 @@ export default function Finanzplan() {
                   <div className="grid grid-cols-4 gap-2 mb-3">
                     <div className="flex items-center gap-2 min-w-0">
                       <Building className="w-4 h-4 text-text-tertiary flex-shrink-0" />
-                      <span className="text-text-primary text-sm font-medium truncate" title={pos.label}>
+                      <span className="text-text-primary text-base font-medium truncate" title={pos.label}>
                         {pos.label}
                       </span>
                     </div>
-                    <span className="text-text-secondary font-mono text-sm text-right">
+                    <span className="text-text-secondary font-mono text-base text-right">
                       {pos.grossValue > 0 ? fmtCHF(pos.grossValue) : "—"}
                     </span>
-                    <span className="font-mono text-sm font-semibold text-right" style={{ color: "#10b981" }}>
+                    <span className="font-mono text-base font-semibold text-right" style={{ color: "#10b981" }}>
                       {pos.equity > 0 ? fmtCHF(pos.equity) : "—"}
                     </span>
-                    <span className="text-loss font-mono text-sm font-semibold text-right">−{fmtCHF(pos.debt)}</span>
+                    <span className="text-loss font-mono text-base font-semibold text-right">−{fmtCHF(pos.debt)}</span>
                   </div>
                   {pos.showLtv && pos.grossValue > 0 && (
                     <div className="ml-6">
-                      <div className="flex justify-between text-[10px] text-text-tertiary mb-1">
+                      <div className="flex justify-between text-2xs text-text-tertiary mb-1">
                         <span>Belehnungsgrad (LTV)</span>
                         <span className={ltvRatio > 80 ? "text-loss font-semibold" : ltvRatio > 65 ? "txt-warning" : "text-gain"}>
                           {ltvRatio.toFixed(1)}%
@@ -734,7 +734,7 @@ export default function Finanzplan() {
                           }}
                         />
                       </div>
-                      <div className="flex justify-between text-[9px] text-text-tertiary mt-1">
+                      <div className="flex justify-between text-2xs text-text-tertiary mt-1">
                         <span>FINMA-Richtwert ≤ 65%</span>
                         <span>Max. Tragbarkeit ≤ 80%</span>
                       </div>
@@ -747,21 +747,21 @@ export default function Finanzplan() {
 
           {/* Totals row */}
           <div className="px-5 py-3 border-t border-border/40 bg-bg-elevated/40 grid grid-cols-4 gap-2">
-            <span className="text-text-secondary text-xs font-semibold">Total</span>
-            <span className="text-text-secondary font-mono text-xs text-right">
+            <span className="text-text-secondary text-sm font-semibold">Total</span>
+            <span className="text-text-secondary font-mono text-sm text-right">
               {fmtCHF(liabilityPositions.reduce((s, p) => s + p.grossValue, 0))}
             </span>
-            <span className="font-mono text-xs font-semibold text-right" style={{ color: "#10b981" }}>
+            <span className="font-mono text-sm font-semibold text-right" style={{ color: "#10b981" }}>
               {fmtCHF(liabilityPositions.reduce((s, p) => s + p.equity, 0))}
             </span>
-            <span className="text-loss font-mono text-xs font-semibold text-right">
+            <span className="text-loss font-mono text-sm font-semibold text-right">
               −{fmtCHF(totalLiabilities)}
             </span>
           </div>
 
           {/* Info note */}
           <div className="px-5 py-3 border-t border-border/20">
-            <p className="text-text-tertiary text-[11px]">
+            <p className="text-text-tertiary text-xs">
               {t("pages:ui.ltvExplain")}
               {t("pages:hints.amortisationDuty")}
             </p>
@@ -780,8 +780,8 @@ export default function Finanzplan() {
               <GraphUp className="w-4.5 h-4.5 text-accent" />
             </div>
             <div>
-              <p className="text-text-primary text-sm font-medium">Rentenprognose</p>
-              <p className="text-text-tertiary text-xs">Monte-Carlo-Simulation</p>
+              <p className="text-text-primary text-base font-medium">Rentenprognose</p>
+              <p className="text-text-tertiary text-sm">Monte-Carlo-Simulation</p>
             </div>
           </div>
           <ArrowRight className="w-4 h-4 text-text-tertiary group-hover:text-accent transition-colors" />
@@ -796,8 +796,8 @@ export default function Finanzplan() {
               <PiggyBank className="w-4.5 h-4.5 text-gain" />
             </div>
             <div>
-              <p className="text-text-primary text-sm font-medium">Budgetanalyse</p>
-              <p className="text-text-tertiary text-xs">Ist vs. Soll Vergleich</p>
+              <p className="text-text-primary text-base font-medium">Budgetanalyse</p>
+              <p className="text-text-tertiary text-sm">Ist vs. Soll Vergleich</p>
             </div>
           </div>
           <ArrowRight className="w-4 h-4 text-text-tertiary group-hover:text-accent transition-colors" />
