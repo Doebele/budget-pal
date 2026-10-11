@@ -333,14 +333,15 @@ export default function Projections() {
             <p className="text-text-secondary text-sm font-semibold">
               {t("pages:hints.pensionAtRetirement", { year: projection.years[retIdx] })}
             </p>
-            <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+            {/* Alle Saeulen in einer Zeile (3 oder 4 Kacheln), auf dem Handy untereinander */}
+            <div className="grid grid-cols-1 sm:grid-flow-col sm:auto-cols-fr gap-3">
               {[
                 { label: t("pages:ui.ahv_saeule_1"), annual: ahvAtRet, color: PILLAR_COLORS.ahv },
                 { label: t("pages:ui.bvg_saeule_2"), annual: bvgAtRet, color: PILLAR_COLORS.bvg },
               ].map(({ label, annual, color }) => (
-                <div key={label} className="bg-bg-elevated rounded-lg px-4 py-3 border border-border/30">
+                <div key={label} className="bg-bg-surface2 rounded-lg p-box border border-border/30 min-w-0">
                   <p className="text-text-tertiary text-xs mb-1">{label}</p>
-                  <p className="font-mono font-bold text-lg" style={{ color }}>
+                  <p className="font-mono font-light text-xl" style={{ color }}>
                     {formatCHF(annual / 12)}
                   </p>
                   <p className="text-text-tertiary text-2xs mt-1">{t("pages:ui.monat_real_chf")}</p>
@@ -348,18 +349,18 @@ export default function Projections() {
                 </div>
               ))}
               {/* 3a: keine Rente, sondern Kapital (netto nach Steuer) */}
-              <div className="bg-bg-elevated rounded-lg px-4 py-3 border border-border/30">
+              <div className="bg-bg-surface2 rounded-lg p-box border border-border/30 min-w-0">
                 <p className="text-text-tertiary text-xs mb-1">{t("pages:ui.saeule_3a")}</p>
-                <p className="font-mono font-bold text-lg" style={{ color: PILLAR_COLORS["3a"] }}>
+                <p className="font-mono font-light text-xl" style={{ color: PILLAR_COLORS["3a"] }}>
                   {formatCHF(p3aNet)}
                 </p>
                 <p className="text-text-tertiary text-2xs mt-1">{t("pages:plan.p3aCard")}</p>
               </div>
               {/* Lebensversicherung: am Ablauf, steuerfrei */}
               {p3bNet > 0 && (
-                <div className="bg-bg-elevated rounded-lg px-4 py-3 border border-border/30">
+                <div className="bg-bg-surface2 rounded-lg p-box border border-border/30 min-w-0">
                   <p className="text-text-tertiary text-xs mb-1">{t("pages:ui.saeule_3b_lv")}</p>
-                  <p className="font-mono font-bold text-lg" style={{ color: PILLAR_COLORS["3b"] }}>
+                  <p className="font-mono font-light text-xl" style={{ color: PILLAR_COLORS["3b"] }}>
                     {formatCHF(p3bNet)}
                   </p>
                   <p className="text-text-tertiary text-2xs mt-1">{t("pages:plan.p3bCard")}</p>

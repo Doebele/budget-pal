@@ -203,15 +203,10 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Net income + Health Score row */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="md:col-span-1">
-          <NetIncomeCard compact />
-        </div>
-        <div className="md:col-span-3">
-          <HealthScoreWidget />
-        </div>
-      </div>
+      {/* Health Score ueber die volle Breite, Nettoeinkommen darunter
+          (die Karte blendet sich ohne Wizard-Daten aus) */}
+      <HealthScoreWidget />
+      <NetIncomeCard compact />
 
       {/* Cashflow — Reale vs. Empirische nebeneinander */}
       <div className="card">
