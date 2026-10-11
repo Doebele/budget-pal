@@ -81,7 +81,7 @@ export default function SuperCategoryBar({
           </span>
           {isOverBudget && (
             <span
-              className="shrink-0 flex items-center gap-0.5 text-xs text-loss bg-loss/10 px-1.5 py-0.5 rounded-full border border-loss/25"
+              className="shrink-0 flex items-center gap-1 text-xs text-loss bg-loss/10 px-1 py-1 rounded-full border border-loss/25"
               title={`${overPct}% über Budget`}
             >
               <WarningTriangle className="w-3 h-3" />
@@ -123,7 +123,7 @@ export default function SuperCategoryBar({
 
       {/* Sub-items summary */}
       {subItems && subItems.length > 1 && (
-        <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5">
+        <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
           {subItems.slice(0, 4).map((sub) => (
             <span key={sub.label} className="flex items-baseline gap-1 text-xs">
               <span className="text-text-disabled truncate max-w-[120px]">{translateCategory(sub.label)}</span>

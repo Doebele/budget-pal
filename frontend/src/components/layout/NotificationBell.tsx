@@ -188,7 +188,7 @@ export default function NotificationBell() {
               <div className="px-4 py-8 text-center">
                 <Bell className="w-6 h-6 text-text-tertiary mx-auto mb-2" />
                 <p className="text-text-tertiary text-xs">{t("notifications.empty")}</p>
-                <p className="text-text-tertiary text-[10px] mt-0.5">{t("notifications.allGood")}</p>
+                <p className="text-text-tertiary text-[10px] mt-1">{t("notifications.allGood")}</p>
               </div>
             )}
             {!isLoading && findings.map((f, i) => {
@@ -208,11 +208,11 @@ export default function NotificationBell() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-1">
                       <p className="text-text-primary text-xs font-medium leading-tight">{f.title}</p>
-                      <span className={clsx("text-[9px] font-semibold uppercase tracking-wide shrink-0", meta.color)}>
+                      <span className={clsx("text-[9px] font-semibold   shrink-0", meta.color)}>
                         {t(`notifications.${meta.labelKey}`)}
                       </span>
                     </div>
-                    <p className="text-text-tertiary text-[11px] mt-0.5 leading-snug">{f.body}</p>
+                    <p className="text-text-tertiary text-[11px] mt-1 leading-snug">{f.body}</p>
                   </div>
                 </div>
               );
@@ -220,7 +220,7 @@ export default function NotificationBell() {
           </div>
 
           {findings.length > 0 && (
-            <div className="px-4 py-2.5 border-t border-border bg-bg-surface2/50">
+            <div className="px-4 py-2 border-t border-border bg-bg-surface2/50">
               <p className="text-[10px] text-text-tertiary">
                 {t("pages:ui.basierend_auf_deinen_letzten_90_tagen_aktual")}
               </p>

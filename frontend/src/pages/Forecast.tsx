@@ -435,11 +435,11 @@ export default function Forecast() {
       {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-display text-text-primary flex items-center gap-2">
+          <h1 className="text-xl font-light text-text-primary flex items-center gap-2">
             <Brain className="w-6 h-6 text-accent" />
             Budgetprognose
           </h1>
-          <p className="text-text-tertiary text-sm mt-0.5">
+          <p className="text-text-tertiary text-sm mt-1">
             {t("pages:ui.ki_gestuetzte_vorhersage_historische_analyse")}
           </p>
         </div>
@@ -456,7 +456,7 @@ export default function Forecast() {
             <button
               onClick={() => scenarioName && saveMutation.mutate(scenarioName)}
               disabled={!scenarioName || saveMutation.isPending}
-              className="btn-secondary flex items-center gap-1.5 text-sm"
+              className="btn-secondary flex items-center gap-1 text-sm"
             >
               <FloppyDisk className="w-3.5 h-3.5" />
             </button>
@@ -574,7 +574,7 @@ export default function Forecast() {
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${
               tab === key
                 ? "border-accent text-accent"
                 : "border-transparent text-text-secondary hover:text-text-primary"
@@ -644,7 +644,7 @@ export default function Forecast() {
               ].map(({ label, value, color }) => (
                 <div key={label} className="card py-3">
                   <p className="text-text-tertiary text-[11px] mb-1">{t(label)}</p>
-                  <p className={`text-2xl font-mono font-semibold ${color}`}>{value}</p>
+                  <p className={`text-2xl font-mono font-light ${color}`}>{value}</p>
                 </div>
               ))}
             </div>
@@ -710,7 +710,7 @@ export default function Forecast() {
                             key={cat}
                             className="flex items-center justify-between p-2 bg-bg-surface2 rounded-lg text-xs"
                           >
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1">
                               <div
                                 className="w-2 h-2 rounded-full flex-shrink-0"
                                 style={{ background: categoryColor(cat) }}
@@ -762,7 +762,7 @@ export default function Forecast() {
               {categoryNames.map((cat) => (
                 <tr key={cat} className="border-b border-border/30 hover:bg-bg-surface2">
                   <td className="py-2 pr-4">
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1">
                       <div
                         className="w-2 h-2 rounded-full flex-shrink-0"
                         style={{ background: categoryColor(cat) }}

@@ -262,7 +262,7 @@ export default function SankeyChart({
         textStyle: {
           color: colors.textPrimary,
           fontSize: 12,
-          fontFamily: "Syne, system-ui, sans-serif",
+          fontFamily: "Fira Sans, system-ui, sans-serif",
         },
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         formatter: (params: any) => {
@@ -334,7 +334,7 @@ export default function SankeyChart({
             show: true,
             position: "right",
             fontSize: 11,
-            fontFamily: "Syne, system-ui, sans-serif",
+            fontFamily: "Fira Sans, system-ui, sans-serif",
             color: colors.textSecondary,
             formatter: (p: { name: string }) => displayName(p.name),
           },

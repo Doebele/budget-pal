@@ -37,7 +37,7 @@ export default function OnboardingProgress() {
   return (
     <div className="card p-4">
       <div className="flex items-center justify-between gap-3 mb-3">
-        <p className="text-text-secondary text-xs font-medium uppercase tracking-wide">
+        <p className="text-text-secondary text-xs font-medium">
           {t("pages:onboarding.progressTitle")}
         </p>
         <span className="text-text-tertiary text-xs tabular-nums">
@@ -51,12 +51,12 @@ export default function OnboardingProgress() {
         className="mb-3"
       />
 
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
         {steps.map((step) => (
           <span
             key={step.label}
             className={clsx(
-              "flex items-center gap-1.5 text-xs",
+              "flex items-center gap-1 text-xs",
               step.done ? "text-gain" : "text-text-tertiary",
             )}
           >

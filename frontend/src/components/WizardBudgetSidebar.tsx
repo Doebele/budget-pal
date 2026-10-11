@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { budgetsApi } from "@/lib/api";
 import { formatCHF } from "@/lib/theme";
 import { clsx } from "clsx";
-import { Dollar, FloppyDisk, NavArrowDown, WarningCircle, Xmark } from "@/lib/icons";
+import { Dollar, FloppyDisk, WarningCircle, Xmark } from "@/lib/icons";
 import { useTaxonomy, type SuperCategory } from "@/lib/categories";
 import { deduplicateWizardBatch } from "@/lib/wizardUtils";
 import { useTranslation } from "react-i18next";
@@ -148,13 +148,13 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-text-primary font-semibold text-base">Empirische Budgets bearbeiten</h2>
-              <p className="text-text-tertiary text-xs mt-0.5">
+              <p className="text-text-tertiary text-xs mt-1">
                 {periodLabel} · {visibleBudgets.length} von {latestBatch.length} Positionen
               </p>
             </div>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-bg-elevated transition-colors"
+              className="p-1 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-bg-elevated transition-colors"
             >
               <Xmark className="w-5 h-5" />
             </button>
@@ -162,7 +162,7 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
 
           {/* Category filter dropdown */}
           <div className="mt-3 relative">
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1">
               {activeSCObj && (
                 <span
                   className="w-7 h-7 rounded-md flex items-center justify-center shrink-0"
@@ -174,7 +174,7 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
               <select
                 value={activeSc}
                 onChange={(e) => setActiveSc(e.target.value)}
-                className="flex-1 bg-bg-elevated border border-border-strong rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent appearance-none cursor-pointer pr-8"
+                className="input flex-1 text-sm cursor-pointer"
               >
                 <option value="">Alle Kategorien ({latestBatch.length})</option>
                 {availableScs.map((sc) => {
@@ -188,7 +188,6 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
                   );
                 })}
               </select>
-              <NavArrowDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary pointer-events-none" />
             </div>
           </div>
 
@@ -234,12 +233,12 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         {isSaved && (
-                          <span className="text-xs text-gain bg-gain/10 px-2 py-0.5 rounded-full border border-gain/30">
+                          <span className="text-xs text-gain bg-gain/10 px-2 py-1 rounded-full border border-gain/30">
                             Gespeichert
                           </span>
                         )}
                         {isDirty && !isSaved && (
-                          <span className="text-xs text-warning bg-warning/10 px-2 py-0.5 rounded-full border border-warning/30">
+                          <span className="text-xs text-warning bg-warning/10 px-2 py-1 rounded-full border border-warning/30">
                             {t("pages:ui.geaendert")}
                           </span>
                         )}
@@ -321,7 +320,7 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
               type="button"
               onClick={handleSaveAll}
               disabled={dirtyIds.size === 0 || saveMutation.isPending}
-              className="w-full flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium hover:bg-accent/90 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
+              className="w-full flex items-center justify-center gap-1 px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium hover:bg-accent/90 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
             >
               {saveMutation.isPending ? (
                 <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />

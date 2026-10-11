@@ -40,7 +40,7 @@ function StatCard({
   return (
     <div className="card flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <span className="text-text-tertiary text-xs uppercase tracking-wide">{label}</span>
+        <span className="text-text-tertiary text-xs">{label}</span>
         <div className="w-8 h-8 rounded-lg bg-bg-surface2 flex items-center justify-center">
           <Icon className="w-4 h-4 text-text-tertiary" />
         </div>
@@ -51,7 +51,7 @@ function StatCard({
         </p>
       )}
       <div>
-        <p className={clsx("text-2xl font-mono font-semibold", colorClass)}>{value}</p>
+        <p className={clsx("text-2xl font-mono font-light", colorClass)}>{value}</p>
         {delta !== undefined && (
           <p className={clsx("text-xs mt-1 flex items-center gap-1", delta >= 0 ? "text-gain" : "text-loss")}>
             {delta >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
@@ -144,8 +144,8 @@ export default function Dashboard() {
       {/* Header */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h1 className="text-2xl font-display text-text-primary">Dashboard</h1>
-          <p className="text-text-tertiary text-sm mt-0.5">{range.label}</p>
+          <h1 className="text-xl font-light text-text-primary">Dashboard</h1>
+          <p className="text-text-tertiary text-sm mt-1">{range.label}</p>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center lg:justify-end">
           <GranularityNavigator
@@ -218,7 +218,7 @@ export default function Dashboard() {
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h2 className="text-text-primary font-semibold text-sm">Cashflow</h2>
-            <p className="text-text-tertiary text-xs mt-0.5">{range.label}</p>
+            <p className="text-text-tertiary text-xs mt-1">{range.label}</p>
           </div>
           <div className="toggle-group shrink-0" role="group" aria-label="Sankey-Sortierung">
             <button
@@ -240,7 +240,7 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 xl:gap-8">
           <div className="min-w-0">
-            <h3 className="text-text-secondary text-xs font-semibold uppercase tracking-wide mb-3">
+            <h3 className="text-text-secondary text-xs font-semibold mb-3">
               {t("pages:ui.reale_angaben")}
             </h3>
             {sankeyDataReal.links.length > 0 ? (
@@ -267,7 +267,7 @@ export default function Dashboard() {
           </div>
 
           <div className="min-w-0">
-            <h3 className="text-text-secondary text-xs font-semibold uppercase tracking-wide mb-3">
+            <h3 className="text-text-secondary text-xs font-semibold mb-3">
               {t("pages:ui.empirische_angaben")}
             </h3>
             {wizardLoading ? (
@@ -319,7 +319,7 @@ export default function Dashboard() {
                 return (
                   <div key={cat.category}>
                     <div className="flex items-center justify-between mb-1">
-                      <span className="flex items-center gap-1.5 text-text-secondary text-xs">
+                      <span className="flex items-center gap-1 text-text-secondary text-xs">
                         <span
                           className="w-4 h-4 rounded flex items-center justify-center shrink-0"
                           style={{ backgroundColor: sc.color + "22" }}
@@ -358,7 +358,7 @@ export default function Dashboard() {
               const sc = resolveSuperCategory(txn.category || "");
               if (!sc) return null;
               return (
-                <div key={txn.id} className="flex items-center justify-between py-1.5">
+                <div key={txn.id} className="flex items-center justify-between py-1">
                   <div className="flex items-center gap-3 min-w-0">
                     <div
                       className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
@@ -421,7 +421,7 @@ export default function Dashboard() {
                     color={color}
                     opacity={1}
                     trackClassName="bg-bg-surface"
-                    className="mb-1.5"
+                    className="mb-1"
                     label={g.name}
                   />
                   <div className="flex justify-between text-[10px] text-text-tertiary">
@@ -453,7 +453,7 @@ export default function Dashboard() {
           >
             <Icon className="w-7 h-7 mb-2 text-accent" />
             <p className="text-text-primary text-sm font-semibold group-hover:text-accent transition-colors">{label}</p>
-            <p className="text-text-tertiary text-xs mt-0.5">{desc}</p>
+            <p className="text-text-tertiary text-xs mt-1">{desc}</p>
           </Link>
         ))}
       </div>

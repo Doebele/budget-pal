@@ -39,7 +39,7 @@ export function DeletedTransactionsView({
           <Archive className="w-5 h-5 text-text-tertiary" />
         </div>
         <div>
-          <h2 className="text-text-primary font-semibold text-xl">{t("pages:misc.r14")}</h2>
+          <h2 className="text-text-primary font-light text-xl">{t("pages:misc.r14")}</h2>
           <p className="text-text-tertiary text-sm">
             {t("pages:ui.weich_geloeschte_buchungen_wiederherstellen_")}
           </p>
@@ -49,7 +49,7 @@ export function DeletedTransactionsView({
       <div className="card p-0 overflow-hidden border border-border">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-bg-surface2 text-text-tertiary text-xs uppercase tracking-wide">
+            <thead className="bg-bg-surface2 text-text-tertiary text-xs">
               <tr>
                 <th className="text-left px-4 py-3 font-medium">{t("table.date")}</th>
                 <th className="text-left px-4 py-3 font-medium">{t("table.account")}</th>
@@ -103,7 +103,7 @@ export function DeletedTransactionsView({
                         type="button"
                         disabled={busyId === txn.id}
                         onClick={() => onRestore(txn.id)}
-                        className="inline-flex items-center gap-1.5 bg-emerald-600/90 hover:bg-emerald-600 disabled:opacity-50 text-white rounded-md px-3 py-1.5 font-medium text-xs transition-colors"
+                        className="inline-flex items-center gap-1 bg-emerald-600/90 hover:bg-emerald-600 disabled:opacity-50 text-white rounded-md px-3 py-1 font-medium text-xs transition-colors"
                       >
                         <Undo className="w-3.5 h-3.5" />
                         Wiederherstellen
@@ -112,7 +112,7 @@ export function DeletedTransactionsView({
                         type="button"
                         disabled={busyId === txn.id}
                         onClick={() => onDeletePermanently(txn.id)}
-                        className="inline-flex items-center gap-1.5 bg-red-600/90 hover:bg-red-600 disabled:opacity-50 text-white rounded-md px-3 py-1.5 font-medium text-xs transition-colors"
+                        className="inline-flex items-center gap-1 bg-red-600/90 hover:bg-red-600 disabled:opacity-50 text-white rounded-md px-3 py-1 font-medium text-xs transition-colors"
                       >
                         <Trash className="w-3.5 h-3.5" />
                         {t("pages:ui.endgueltig_loeschen")}

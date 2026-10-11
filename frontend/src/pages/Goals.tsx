@@ -126,8 +126,8 @@ export default function Goals() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-display text-text-primary">Sparziele</h1>
-          <p className="text-text-tertiary text-sm mt-0.5">
+          <h1 className="text-xl font-light text-text-primary">Sparziele</h1>
+          <p className="text-text-tertiary text-sm mt-1">
             {activeGoals.length} aktive Ziele
           </p>
         </div>
@@ -191,7 +191,7 @@ export default function Goals() {
                 type="number"
                 min="0"
                 step="0.01"
-                className="input w-full font-mono"
+                className="input input-amount w-full font-mono"
                 placeholder="10000"
                 value={form.target_amount}
                 onChange={(e) => setForm((f) => ({ ...f, target_amount: e.target.value }))}
@@ -203,7 +203,7 @@ export default function Goals() {
                 type="number"
                 min="0"
                 step="0.01"
-                className="input w-full font-mono"
+                className="input input-amount w-full font-mono"
                 value={form.current_amount}
                 onChange={(e) => setForm((f) => ({ ...f, current_amount: e.target.value }))}
               />
@@ -214,7 +214,7 @@ export default function Goals() {
                 type="number"
                 min="0"
                 step="0.01"
-                className="input w-full font-mono"
+                className="input input-amount w-full font-mono"
                 placeholder="500"
                 value={form.monthly_contribution}
                 onChange={(e) => setForm((f) => ({ ...f, monthly_contribution: e.target.value }))}
@@ -292,7 +292,7 @@ export default function Goals() {
       {/* Achieved goals */}
       {achievedGoals.length > 0 && (
         <div>
-          <h2 className="text-text-tertiary text-xs uppercase tracking-widest font-medium mb-3 flex items-center gap-2">
+          <h2 className="text-text-tertiary text-xs font-medium mb-3 flex items-center gap-2">
             <Trophy className="w-3.5 h-3.5 text-warning" />
             Erreichte Ziele
           </h2>
@@ -353,7 +353,7 @@ function GoalCard({ goal, onEdit, onDelete, confirmDelete, onCancelDelete, onCon
           </button>
           {confirmDelete ? (
             <>
-              <button onClick={onConfirmDelete} className="text-[10px] px-1.5 py-0.5 rounded bg-loss/20 text-loss border border-loss/30 hover:bg-loss/40 whitespace-nowrap">
+              <button onClick={onConfirmDelete} className="text-[10px] px-1 py-1 rounded bg-loss/20 text-loss border border-loss/30 hover:bg-loss/40 whitespace-nowrap">
                 {t("pages:ui.loeschen")}
               </button>
               <button onClick={onCancelDelete} className="text-text-tertiary hover:text-text-secondary p-1">
@@ -370,7 +370,7 @@ function GoalCard({ goal, onEdit, onDelete, confirmDelete, onCancelDelete, onCon
 
       {/* Progress bar */}
       <div>
-        <div className="flex justify-between text-xs mb-1.5">
+        <div className="flex justify-between text-xs mb-1">
           <span className="font-mono font-medium text-text-primary">
             {formatAmount(goal.current_amount, "CHF")}
           </span>
@@ -390,25 +390,25 @@ function GoalCard({ goal, onEdit, onDelete, confirmDelete, onCancelDelete, onCon
       {/* Meta row */}
       <div className="flex flex-wrap gap-2 text-[11px]">
         {goal.monthly_contribution > 0 && (
-          <span className="flex items-center gap-1 px-2 py-0.5 bg-bg-surface2 rounded-full text-text-secondary">
+          <span className="flex items-center gap-1 px-2 py-1 bg-bg-surface2 rounded-full text-text-secondary">
             <GraphUp className="w-2.5 h-2.5" />
             {formatAmount(goal.monthly_contribution, "CHF")}/Mt.
           </span>
         )}
         {goal.months_to_target != null && goal.months_to_target > 0 && (
-          <span className="flex items-center gap-1 px-2 py-0.5 bg-bg-surface2 rounded-full text-text-secondary">
+          <span className="flex items-center gap-1 px-2 py-1 bg-bg-surface2 rounded-full text-text-secondary">
             <Calendar className="w-2.5 h-2.5" />
             {goal.months_to_target} Monate
           </span>
         )}
         {goal.deadline && (
-          <span className="flex items-center gap-1 px-2 py-0.5 bg-bg-surface2 rounded-full text-text-secondary">
+          <span className="flex items-center gap-1 px-2 py-1 bg-bg-surface2 rounded-full text-text-secondary">
             <Calendar className="w-2.5 h-2.5" />
             bis {format(parseISO(goal.deadline), "MM.yyyy", { locale: de })}
           </span>
         )}
         {goal.linked_account_name && (
-          <span className="flex items-center gap-1 px-2 py-0.5 bg-bg-surface2 rounded-full text-text-secondary">
+          <span className="flex items-center gap-1 px-2 py-1 bg-bg-surface2 rounded-full text-text-secondary">
             <Wallet className="w-2.5 h-2.5" />
             {goal.linked_account_name}
           </span>
@@ -416,7 +416,7 @@ function GoalCard({ goal, onEdit, onDelete, confirmDelete, onCancelDelete, onCon
       </div>
 
       {goal.is_achieved && (
-        <div className="flex items-center gap-1.5 text-xs text-gain bg-gain/10 rounded-lg px-2 py-1.5">
+        <div className="flex items-center gap-1 text-xs text-gain bg-gain/10 rounded-lg px-2 py-1">
           <Trophy className="w-3 h-3" />
           Ziel erreicht!
         </div>

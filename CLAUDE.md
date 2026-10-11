@@ -225,6 +225,21 @@ components/
   layout/         # LoadingScreen, navigation shell
 ```
 
+### Design rules (shared with Pension-Pal, see its `DESIGN.md`)
+- **Font:** only Fira Sans, self-hosted via `@fontsource/fira-sans` (100/300/400/700, imported
+  in `main.tsx`), no Google Fonts. `font-mono` keeps its name but means Fira Sans with
+  tabular figures; `font-display` is Light. Large type goes lighter (`text-xl`+ → `font-light`),
+  small type bolder.
+- **Case:** sentence case everywhere. Never use `uppercase` or `tracking-wide*` (the canton
+  input is the only exception).
+- **Spacing:** padding, margin and gap sit on the 4 px grid, so no `*-0.5/1.5/2.5/3.5`.
+  Radii are small and bound to tokens (`rounded` 3 px, `-md` 4, `-lg` 6, `-xl` 8).
+- **Fields:** `.input` (alias `.input-field`) is the ledger line: a bottom hairline plus a
+  gradient well that turns accent on focus. `select.input` draws its own chevron. Amounts
+  add `.input-amount` (right-aligned, tabular). Don't restyle fields inline.
+- **Surfaces:** three neutral tones, `bg` → `surface` (card) → `surface-2` (box in a card).
+  Tints are for status or selection only. Shadows are dark and offset, never a white halo.
+
 ### Shared taxonomy (`shared/taxonomy.json`)
 Central definition of all 11 supercategories (wohnen, essen, mobilitaet, versicherungen, freizeit, abos, shopping, bildung, steuern, sparen, sonstiges). Both backend and frontend import this directly. The backend mounts it at `/shared/taxonomy.json` inside the container. Per-user label overrides are stored as JSON in `User.taxonomy_hidden_json`.
 

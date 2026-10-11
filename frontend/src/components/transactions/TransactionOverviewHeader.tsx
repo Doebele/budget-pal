@@ -130,7 +130,7 @@ export function TransactionOverviewHeader({
                   <button
                     type="button"
                     onClick={() => refetchPreview()}
-                    className="text-sm font-medium text-text-primary bg-bg-elevated hover:bg-bg-surface2 px-3 py-1.5 rounded-md"
+                    className="text-sm font-medium text-text-primary bg-bg-elevated hover:bg-bg-surface2 px-3 py-1 rounded-md"
                   >
                     Erneut versuchen
                   </button>
@@ -185,7 +185,7 @@ export function TransactionOverviewHeader({
                   type="button"
                   disabled={cancelDisabled}
                   onClick={closeModal}
-                  className="px-4 py-2.5 rounded-lg border border-border-strong text-text-secondary hover:bg-bg-surface2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 rounded-lg border border-border-strong text-text-secondary hover:bg-bg-surface2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {t("pages:ui.abbrechen")}
                 </button>
@@ -194,7 +194,7 @@ export function TransactionOverviewHeader({
                   disabled={!canArchive}
                   onClick={submitArchive}
                   className={clsx(
-                    "px-4 py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2",
+                    "px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2",
                     !canArchive
                       ? "bg-bg-elevated text-text-disabled cursor-not-allowed"
                       : "bg-sky-600 hover:bg-sky-500 text-white"
@@ -208,7 +208,7 @@ export function TransactionOverviewHeader({
                   disabled={!canHardDelete}
                   onClick={submitHardDelete}
                   className={clsx(
-                    "px-4 py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2",
+                    "px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2",
                     !canHardDelete
                       ? "bg-bg-elevated text-text-disabled cursor-not-allowed"
                       : "bg-red-600 hover:bg-red-500 text-white"

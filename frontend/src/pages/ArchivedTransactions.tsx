@@ -91,8 +91,8 @@ export default function ArchivedTransactions() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-display text-text-primary">Archiv</h1>
-          <p className="text-text-tertiary text-sm mt-0.5">{t("pages:misc.r22")}</p>
+          <h1 className="text-xl font-light text-text-primary">Archiv</h1>
+          <p className="text-text-tertiary text-sm mt-1">{t("pages:misc.r22")}</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-4 sm:items-end">
           <div className="flex flex-col gap-1">

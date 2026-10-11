@@ -27,7 +27,7 @@ export default function ScenarioMatrixCard({ data }: { data: RetirementScenarios
     <div className="card space-y-4">
       <div>
         <h2 className="text-text-primary font-semibold text-sm">{t("pages:scenarios.title")}</h2>
-        <p className="text-text-tertiary text-xs mt-0.5">{t("pages:scenarios.subtitle")}</p>
+        <p className="text-text-tertiary text-xs mt-1">{t("pages:scenarios.subtitle")}</p>
       </div>
 
       <div className="overflow-x-auto">
@@ -70,8 +70,8 @@ export default function ScenarioMatrixCard({ data }: { data: RetirementScenarios
       </div>
 
       {data.hints.length > 0 && (
-        <div className="space-y-1.5">
-          <p className="text-text-secondary text-xs font-semibold uppercase tracking-wide">{t("pages:scenarios.hintsTitle")}</p>
+        <div className="space-y-1">
+          <p className="text-text-secondary text-xs font-semibold">{t("pages:scenarios.hintsTitle")}</p>
           <ul className="list-disc pl-5 space-y-1 text-xs text-text-secondary">
             {data.hints.map((h, i) => <li key={`${h.key}-${i}`}>{hintText(h)}</li>)}
           </ul>

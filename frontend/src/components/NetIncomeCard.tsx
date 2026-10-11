@@ -84,11 +84,11 @@ export default function NetIncomeCard({ compact = false }: Props) {
     const netto = wizardState.estimated_netto_monthly;
     return (
       <div className="card">
-        <div className="flex items-center gap-2 text-text-tertiary text-xs uppercase tracking-widest mb-2">
+        <div className="flex items-center gap-2 text-text-tertiary text-xs mb-2">
           <Wallet className="w-3.5 h-3.5" />
           {t("pages:ui.netto_einkommen_ist")}
         </div>
-        <p className="text-2xl font-mono font-bold text-gain">
+        <p className="text-2xl font-mono font-light text-gain">
           {formatAmount(netto, "CHF")}
           <span className="text-text-tertiary text-sm font-normal ml-1">/Mt.</span>
         </p>
@@ -102,11 +102,11 @@ export default function NetIncomeCard({ compact = false }: Props) {
   if (compact) {
     return (
       <div className="card">
-        <div className="flex items-center gap-2 text-text-tertiary text-[10px] uppercase tracking-widest mb-2">
+        <div className="flex items-center gap-2 text-text-tertiary text-[10px] mb-2">
           <Wallet className="w-3.5 h-3.5" />
           {t("pages:ui.netto_einkommen_mt")}
         </div>
-        <p className="text-xl font-mono font-bold text-gain">{formatAmount(netto, "CHF")}</p>
+        <p className="text-xl font-mono font-light text-gain">{formatAmount(netto, "CHF")}</p>
         <p className="text-text-tertiary text-[11px] mt-1">
           {t("pages:ui.grossMinusDeductions", { gross: formatAmount(brutto, "CHF"), deductions: formatAmount(socialTotal + steuern, "CHF") })}
         </p>
@@ -118,7 +118,7 @@ export default function NetIncomeCard({ compact = false }: Props) {
     <div className="card">
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2 text-text-tertiary text-xs uppercase tracking-widest">
+        <div className="flex items-center gap-2 text-text-tertiary text-xs">
           <Wallet className="w-3.5 h-3.5" />
           {t("pages:ui.netto_einkommen_monat")}
         </div>
@@ -132,7 +132,7 @@ export default function NetIncomeCard({ compact = false }: Props) {
       </div>
 
       {/* Main number */}
-      <p className="text-2xl font-mono font-bold text-gain mb-3">
+      <p className="text-2xl font-mono font-light text-gain mb-3">
         {formatAmount(netto, "CHF")}
         <span className="text-text-tertiary text-sm font-normal ml-1">/Mt.</span>
       </p>
@@ -151,12 +151,12 @@ export default function NetIncomeCard({ compact = false }: Props) {
 
       {/* Breakdown */}
       {showBreakdown && (
-        <div className="border-t border-border/50 pt-3 space-y-1.5 animate-fade-in">
+        <div className="border-t border-border/50 pt-3 space-y-1 animate-fade-in">
           <Row label={t("pages:ui.brutto")} value={brutto} sign="+" />
           <Row label="AHV (5.3%)" value={computeNetIncome(wizardState).ahv} sign="-" />
           <Row label="IV/EO/ALV (2.05%)" value={computeNetIncome(wizardState).iv + computeNetIncome(wizardState).eo + computeNetIncome(wizardState).alv} sign="-" />
           <Row label={t("pages:ui.direkte_steuern")} value={steuern} sign="-" />
-          <div className="flex justify-between items-center pt-1.5 border-t border-border/40">
+          <div className="flex justify-between items-center pt-1 border-t border-border/40">
             <span className="text-xs font-semibold text-text-primary">{t("pages:ui.netto")}</span>
             <span className="text-xs font-mono font-bold text-gain">{formatAmount(netto, "CHF")}</span>
           </div>

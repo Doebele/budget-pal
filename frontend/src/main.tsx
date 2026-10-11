@@ -5,6 +5,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { registerSW } from "virtual:pwa-register";
 
+// Fira Sans selbst gehostet, nur die vier Schnitte Thin, Light, Normal, Bold
+import "@fontsource/fira-sans/100.css";
+import "@fontsource/fira-sans/300.css";
+import "@fontsource/fira-sans/400.css";
+import "@fontsource/fira-sans/700.css";
 import App from "./App";
 import "./index.css";
 import "./i18n";

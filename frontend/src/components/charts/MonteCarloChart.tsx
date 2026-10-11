@@ -90,7 +90,7 @@ function CustomTooltip({ active, payload, label }: {
       }}
     >
       <p className="font-semibold mb-1">{label}</p>
-      <div className="space-y-0.5 text-xs font-mono">
+      <div className="space-y-1 text-xs font-mono">
         <p style={{ color: colors.textSecondary }}>p90: {formatCHF(row.p90 * 1000, true)}</p>
         <p style={{ color: colors.textSecondary }}>p75: {formatCHF(row.p75 * 1000, true)}</p>
         <p style={{ color: colors.accent }}>p50: <strong>{formatCHF(row.p50 * 1000, true)}</strong></p>

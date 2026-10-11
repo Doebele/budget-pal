@@ -33,7 +33,7 @@ export default function WithdrawalPlan({
 
   return (
     <div className="space-y-2">
-      <p className="text-text-secondary text-xs font-semibold uppercase tracking-wide">
+      <p className="text-text-secondary text-xs font-semibold">
         {t("pages:plan.title")}
       </p>
       <div className="overflow-x-auto">

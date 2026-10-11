@@ -447,7 +447,7 @@ function Section({ title, children, className }: { title?: string; children: Rea
   return (
     <div className={clsx("space-y-4", className)}>
       {title && (
-        <h3 className="text-text-secondary text-xs font-semibold uppercase tracking-widest">{title}</h3>
+        <h3 className="text-text-secondary text-xs font-semibold">{title}</h3>
       )}
       {children}
     </div>
@@ -458,7 +458,7 @@ function Section({ title, children, className }: { title?: string; children: Rea
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1">
       <label className="label">{label}</label>
       {children}
       {hint && <p className="text-text-tertiary text-xs">{hint}</p>}
@@ -484,7 +484,7 @@ function ChfInput({
       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary text-sm">CHF</span>
       <input
         type="number"
-        className="input pl-12"
+        className="input input-amount pl-12"
         value={value || ""}
         placeholder={placeholder}
         onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
@@ -623,7 +623,7 @@ function Slider({
 function SummaryCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="card-elevated flex flex-col gap-1">
-      <p className="text-text-tertiary text-xs uppercase tracking-wide">{label}</p>
+      <p className="text-text-tertiary text-xs">{label}</p>
       <p className="text-text-primary font-mono font-semibold text-lg">{value}</p>
       {sub && <p className="text-text-tertiary text-xs">{sub}</p>}
     </div>
@@ -654,10 +654,10 @@ function Step1({ data, update }: { data: WizardData; update: (p: Partial<WizardD
           <Reports className="w-8 h-8 text-accent" />
         </div>
         <div>
-          <h1 className="text-2xl font-display font-semibold text-text-primary">
+          <h1 className="text-xl font-light text-text-primary">
             {t("pages:wizard.w183")}<span className="text-accent">Pal</span>
           </h1>
-          <p className="text-text-secondary text-sm mt-1.5 max-w-sm mx-auto leading-relaxed">
+          <p className="text-text-secondary text-sm mt-1 max-w-sm mx-auto leading-relaxed">
             {t("pages:wizard.w184")}
           </p>
         </div>
@@ -808,8 +808,8 @@ function Step2({ data, update }: { data: WizardData; update: (p: Partial<WizardD
         <div className="card border-gain/20 bg-gain/5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-text-tertiary text-xs uppercase tracking-wide">{t("pages:wizard.w00")}</p>
-              <p className="text-gain font-mono font-semibold text-2xl mt-0.5">{chf(netto)}</p>
+              <p className="text-text-tertiary text-xs">{t("pages:wizard.w00")}</p>
+              <p className="text-gain font-mono font-light text-2xl mt-1">{chf(netto)}</p>
               <p className="text-text-tertiary text-xs mt-1">
                 {t("pages:ui.pro_monat_nach_ahv_alv_abzuegen_und_steuersc")}
               </p>
@@ -997,7 +997,7 @@ function Step4({ data, update }: { data: WizardData; update: (p: Partial<WizardD
                   />
                   <button
                     type="button"
-                    className="text-text-tertiary hover:text-loss disabled:opacity-30 disabled:hover:text-text-tertiary p-1.5"
+                    className="text-text-tertiary hover:text-loss disabled:opacity-30 disabled:hover:text-text-tertiary p-1"
                     title={t("pages:wizard.w151")}
                     disabled={healthPremiums(data).length <= 1}
                     onClick={() =>
@@ -1045,7 +1045,7 @@ function Step4({ data, update }: { data: WizardData; update: (p: Partial<WizardD
           <Field label={t("pages:wizard.w132")}>
             <ChfInput value={data.hausrat} onChange={(v) => update({ hausrat: v })} />
           </Field>
-          <div className="space-y-1.5">
+          <div className="space-y-1">
             <label className="label">{t("pages:wizard.w116")}</label>
             <div className="flex items-center gap-3">
               <button
@@ -1057,14 +1057,14 @@ function Step4({ data, update }: { data: WizardData; update: (p: Partial<WizardD
                 onClick={() => update({ hasAutoInsurance: !data.hasAutoInsurance })}
               >
                 <div className={clsx(
-                  "w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ml-0.5",
+                  "w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ml-1",
                   data.hasAutoInsurance ? "translate-x-3" : "translate-x-0"
                 )} />
               </button>
               <span className="text-text-secondary text-sm">{data.hasAutoInsurance ? "Ja" : "Nein"}</span>
             </div>
             {data.hasAutoInsurance && (
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 <Segmented
                   value={data.autoversicherungPeriod}
                   options={[
@@ -1141,7 +1141,7 @@ function Step5({ data, update }: { data: WizardData; update: (p: Partial<WizardD
               key={opt.value}
               type="button"
               className={clsx(
-                "rounded border py-2.5 text-xs font-medium transition-all flex items-center justify-center gap-1.5",
+                "rounded border py-2 text-xs font-medium transition-all flex items-center justify-center gap-1",
                 data.transportMode === opt.value
                   ? "border-accent/50 bg-accent/10 text-accent"
                   : "border-white/8 text-text-secondary hover:border-white/15"
@@ -1155,7 +1155,7 @@ function Step5({ data, update }: { data: WizardData; update: (p: Partial<WizardD
 
         {(data.transportMode === "ov" || data.transportMode === "both") && (
           <div className="space-y-2">
-            <p className="text-text-tertiary text-xs font-medium uppercase tracking-wide mt-3">{t("pages:wizard.w02")}</p>
+            <p className="text-text-tertiary text-xs font-medium mt-3">{t("pages:wizard.w02")}</p>
             <div className="flex gap-2 flex-wrap">
               {[
                 { key: "hasSbbHalbtax" as const, label: "SBB Halbtax", price: 19 },
@@ -1198,10 +1198,10 @@ function Step5({ data, update }: { data: WizardData; update: (p: Partial<WizardD
         <div className="card-elevated space-y-4">
           {Object.entries(byCategory).map(([category, subs]) => (
             <div key={category}>
-              <p className="text-text-tertiary text-[10px] font-semibold uppercase tracking-widest mb-2">
+              <p className="text-text-tertiary text-[10px] font-semibold mb-2">
                 {CATEGORY_LABELS[category] ?? category}
               </p>
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 {subs.map((sub) => {
                   const isSelected = selectedSet.has(sub.name);
                   return (
@@ -1331,7 +1331,7 @@ function Step6({ data, update }: { data: WizardData; update: (p: Partial<WizardD
           <Field label={t("pages:wizard.w106")}>
             <ChfInput value={data.stocksValue} onChange={(v) => update({ stocksValue: v })} />
           </Field>
-          <p className="text-text-tertiary text-xs flex items-center gap-1.5 mt-1">
+          <p className="text-text-tertiary text-xs flex items-center gap-1 mt-1">
             <GraphUp className="w-3.5 h-3.5 text-accent" />
             {t("pages:ui.tipp_du_kannst_spaeter_daten_aus_portfolio_t")}
           </p>
@@ -1390,7 +1390,7 @@ function Step6({ data, update }: { data: WizardData; update: (p: Partial<WizardD
                           key={kind}
                           type="button"
                           className={clsx(
-                            "flex-1 py-1.5 px-2 text-xs font-medium transition-all",
+                            "flex-1 py-1 px-2 text-xs font-medium transition-all",
                             entry.mortgageType === kind
                               ? "bg-accent/15 text-accent"
                               : "text-text-secondary hover:bg-white/5",
@@ -1432,7 +1432,7 @@ function Step6({ data, update }: { data: WizardData; update: (p: Partial<WizardD
                             type="number"
                             min={0}
                             step={0.01}
-                            className="input py-1.5 pr-7 text-sm"
+                            className="input input-amount py-1 pr-7 text-sm"
                             value={entry.mortgageRate || ""}
                             onChange={(e) =>
                               updateMortgageEntry(idx, { mortgageRate: parseFloat(e.target.value) || 0 })
@@ -1448,7 +1448,7 @@ function Step6({ data, update }: { data: WizardData; update: (p: Partial<WizardD
                             readOnly
                             tabIndex={-1}
                             aria-readonly="true"
-                            className="input py-1.5 pr-7 text-sm font-mono bg-white/5 text-text-primary cursor-default pointer-events-none"
+                            className="input py-1 pr-7 text-sm font-mono bg-white/5 text-text-primary cursor-default pointer-events-none"
                             value={saronRefPct.toFixed(2)}
                           />
                           <span className="absolute right-2 top-1/2 -translate-y-1/2 text-text-tertiary text-xs">%</span>
@@ -1460,14 +1460,14 @@ function Step6({ data, update }: { data: WizardData; update: (p: Partial<WizardD
                   <div className="flex-1 min-w-[10rem]">
                     <label className="label text-[10px] leading-tight">{t("pages:wizard.w136")}</label>
                     <ChfInput
-                      className="[&_input]:py-1.5 [&_input]:text-sm"
+                      className="[&_input]:py-1 [&_input]:text-sm"
                       value={entry.debtValue}
                       onChange={(v) => updateMortgageEntry(idx, { debtValue: v })}
                     />
                   </div>
 
                   {mortgageEntries.length > 1 && (
-                    <div className="flex justify-end sm:justify-start shrink-0 pb-0.5">
+                    <div className="flex justify-end sm:justify-start shrink-0 pb-1">
                       <button
                         type="button"
                         title={t("pages:wizard.w134")}
@@ -1545,8 +1545,8 @@ function Step6({ data, update }: { data: WizardData; update: (p: Partial<WizardD
 
       {totalAssets > 0 && (
         <div className="card border-accent/15">
-          <p className="text-text-tertiary text-xs uppercase tracking-wide">{t("pages:wizard.w04")}</p>
-          <p className="text-text-primary font-mono font-bold text-2xl mt-1">{chf(totalAssets)}</p>
+          <p className="text-text-tertiary text-xs">{t("pages:wizard.w04")}</p>
+          <p className="text-text-primary font-mono font-light text-2xl mt-1">{chf(totalAssets)}</p>
         </div>
       )}
     </div>
@@ -1626,8 +1626,8 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
           <div className="bg-white/3 rounded-md p-3 flex items-center justify-between">
             <div>
               <p className="text-text-tertiary text-xs">{t("pages:wizard.w07")}</p>
-              <p className="text-text-primary font-mono font-semibold text-xl mt-0.5">{chf(ahvRente)}</p>
-              <p className="text-text-tertiary text-xs mt-0.5">
+              <p className="text-text-primary font-mono font-light text-xl mt-1">{chf(ahvRente)}</p>
+              <p className="text-text-tertiary text-xs mt-1">
                 {t("pages:wizard.ahvFromAge", { age: estimate?.ahv_start_age ?? data.zielRentenalter })}
               </p>
             </div>
@@ -1691,11 +1691,11 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
           <div className="bg-white/3 rounded-md p-3 grid grid-cols-2 gap-4">
             <div>
               <p className="text-text-tertiary text-xs">Kapital bei {estimate?.bvg_start_age ?? data.zielRentenalter}</p>
-              <p className="text-accent font-mono font-semibold text-lg mt-0.5">{chf(bvgKapital)}</p>
+              <p className="text-accent font-mono font-semibold text-lg mt-1">{chf(bvgKapital)}</p>
             </div>
             <div>
               <p className="text-text-tertiary text-xs">{t("pages:wizard.w11")}</p>
-              <p className="text-text-primary font-mono font-semibold text-lg mt-0.5">{chf(bvgRente)}/Mo</p>
+              <p className="text-text-primary font-mono font-semibold text-lg mt-1">{chf(bvgRente)}/Mo</p>
               <p className="text-text-tertiary text-xs">
                 {t("pages:wizard.bvgConversionUsed", { rate: umwandlungssatz.toFixed(1) })}
               </p>
@@ -1806,7 +1806,7 @@ function Step7({ data, update }: { data: WizardData; update: (p: Partial<WizardD
           )}
 
           <div className="flex items-start gap-2 p-3 rounded-md bg-gain/5 border border-gain/15">
-            <ShieldCheck className="w-4 h-4 text-gain shrink-0 mt-0.5" />
+            <ShieldCheck className="w-4 h-4 text-gain shrink-0 mt-1" />
             <p className="text-text-secondary text-xs leading-relaxed">
               <strong className="text-gain">{t("pages:wizard.w158")}</strong> Gestaffelte Bezüge auf mehrere 3a-Konten
               empfohlen — spart erhebliche Kapitalleistungssteuer. Verteile auf 3–5 Konten.
@@ -1932,7 +1932,7 @@ function Step8({ data, update }: { data: WizardData; update: (p: Partial<WizardD
       </Section>
 
       <Section title={t("pages:wizard.w160")}>
-        <div className="space-y-2.5">
+        <div className="space-y-2">
           {SCENARIOS.map((sc) => (
             <button
               key={sc.key}
@@ -1946,17 +1946,17 @@ function Step8({ data, update }: { data: WizardData; update: (p: Partial<WizardD
               onClick={() => update({ [sc.key]: !data[sc.key] })}
             >
               <div className="flex items-start gap-3">
-                <div className={clsx("w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5", data[sc.key] ? "bg-accent/15 text-accent" : "bg-white/5 text-text-tertiary")}>
+                <div className={clsx("w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-1", data[sc.key] ? "bg-accent/15 text-accent" : "bg-white/5 text-text-tertiary")}>
                   {sc.icon}
                 </div>
                 <div className="flex-1">
                   <p className={clsx("text-sm font-medium", data[sc.key] ? "text-accent" : "text-text-primary")}>
                     {sc.label}
                   </p>
-                  <p className="text-text-tertiary text-xs mt-0.5">{sc.sub}</p>
+                  <p className="text-text-tertiary text-xs mt-1">{sc.sub}</p>
                 </div>
                 <div className={clsx(
-                  "w-5 h-5 rounded border-2 shrink-0 flex items-center justify-center mt-0.5",
+                  "w-5 h-5 rounded border-2 shrink-0 flex items-center justify-center mt-1",
                   data[sc.key] ? "bg-accent border-accent" : "border-white/25"
                 )}>
                   {data[sc.key] && <Check className="w-3 h-3 text-white" />}
@@ -2027,7 +2027,7 @@ function ReviewScreen({ data, budgetOnly = false }: { data: WizardData; budgetOn
         <div className="w-14 h-14 rounded-lg bg-gain/15 border border-gain/30 flex items-center justify-center mx-auto">
           <Check className="w-7 h-7 text-gain" />
         </div>
-        <h2 className="text-text-primary font-semibold text-xl">
+        <h2 className="text-text-primary font-light text-xl">
           {data.vorname ? t("pages:wizard.almostDone", { name: data.vorname }) : t("pages:wizard.summary")}
         </h2>
         <p className="text-text-secondary text-sm max-w-sm mx-auto">
@@ -2403,7 +2403,7 @@ export default function Wizard() {
           {(isReview || currentStep > 1) && (
             <button
               type="button"
-              className="btn-secondary flex items-center gap-1.5 shrink-0"
+              className="btn-secondary flex items-center gap-1 shrink-0"
               onClick={goBack}
               disabled={animating || isSubmitting}
             >
@@ -2434,7 +2434,7 @@ export default function Wizard() {
             <button
               type="button"
               className={clsx(
-                "btn-primary flex items-center gap-1.5 shrink-0",
+                "btn-primary flex items-center gap-1 shrink-0",
                 !canGoNext() && "opacity-50 cursor-not-allowed"
               )}
               onClick={goNext}
@@ -2453,7 +2453,7 @@ export default function Wizard() {
           ) : (
             <button
               type="button"
-              className="btn-primary flex items-center gap-1.5 shrink-0"
+              className="btn-primary flex items-center gap-1 shrink-0"
               onClick={handleSubmit}
               disabled={isSubmitting}
             >

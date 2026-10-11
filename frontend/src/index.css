@@ -44,28 +44,37 @@
   --purple:       #a78bfa;
   --purple-light: #c4b5fd;
 
-  /* Shadows — white halo on dark surfaces (design system spec) */
-  --shadow-modal: 0 32px 80px rgba(255,255,255,0.30);
-  --shadow-card:  0 4px 24px rgba(255,255,255,0.18);
+  /* Shadows — dunkel und versetzt, nie ein weisser Halo (Lamplight Rule,
+     wie Pension-Pal DESIGN.md) */
+  --shadow-modal: 0 24px 64px rgba(0,0,0,0.55);
+  --shadow-card:  0 1px 2px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.32);
+
+  /* Ledger-Linie: Verlauf, der sich an der Grundlinie eines Feldes sammelt */
+  --well:      rgba(0,0,0,0.35);
+  --well-soft: rgba(0,0,0,0.18);
+
+  /* Gezeichneter Dropdown-Pfeil (Dusk, passt in beide Themes) */
+  --chevron: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%238896a8' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
 
   /* Radius */
-  --r-xs:  4px;
-  --r-sm:  5px;
-  --r-md:  8px;
-  --r-lg:  10px;
-  --r-xl:  12px;
-  --r-2xl: 18px;
+  --r-xs:  2px;
+  --r-sm:  3px;
+  --r-md:  4px;
+  --r-lg:  6px;
+  --r-xl:  8px;
+  --r-2xl: 10px;
   --r-pill:999px;
 
   /* Spacing */
-  --sp-1: 4px;  --sp-2: 6px;  --sp-3: 8px;  --sp-4: 10px;
-  --sp-5: 12px; --sp-6: 14px; --sp-7: 16px; --sp-8: 20px;
-  --sp-9: 24px; --sp-10:28px;
+  /* 4-px-Raster: jedes Padding, jeder Abstand ein Vielfaches von 4 */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 20px; --sp-6: 24px; --sp-7: 28px; --sp-8: 32px;
 
-  /* Typography — budget-pal Brand-Fonts */
-  --font-sans:  'Syne', system-ui, sans-serif;
-  --font-mono:  'JetBrains Mono', 'Fira Code', monospace;
-  --font-display: 'DM Serif Display', Georgia, serif;
+  /* Typografie wie Pension-Pal: nur Fira Sans (selbst gehostet, Thin/Light/
+     Normal/Bold). Zahlen stehen in Tabellenziffern statt in einer Mono-Schrift. */
+  --font-sans:  'Fira Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono:  var(--font-sans);
+  --font-display: var(--font-sans);
 
   /* RGB-Triplets für Tailwind <alpha-value> Plumbing */
   --bg-rgb:        13 14 18;
@@ -113,9 +122,11 @@
 
 /* Light theme */
 [data-theme="light"] {
-  --bg:        #f7f7f5;
-  --surface:   #ffffff;
-  --surface-2: #f3f3f0;
+  /* Drei Tonstufen leicht grau statt reinweiss: Felder sammeln sich hier in
+     einem weissen Verlauf (--well), der auf Weiss unsichtbar waere. */
+  --bg:        #e9e9e6;
+  --surface:   #f3f3f0;
+  --surface-2: #e9e9e5;
   --surface-3: rgba(0,0,0,0.04);
   --bg-elevated: #ececea;
 
@@ -142,10 +153,13 @@
 
   --shadow-modal: 0 24px 64px rgba(15,17,22,0.16);
   --shadow-card:  0 1px 2px rgba(15,17,22,0.04), 0 4px 12px rgba(15,17,22,0.04);
+  /* Im Hellen laeuft der Verlauf auf Weiss statt auf Schwarz */
+  --well:      rgba(255,255,255,0.95);
+  --well-soft: rgba(255,255,255,0.75);
 
-  --bg-rgb:        247 247 245;
-  --surface-rgb:   255 255 255;
-  --surface-2-rgb: 243 243 240;
+  --bg-rgb:        233 233 230;
+  --surface-rgb:   243 243 240;
+  --surface-2-rgb: 233 233 229;
   --elevated-rgb:  236 236 234;
   --fg-1-rgb: 21 23 28;
   --fg-2-rgb: 69 80 93;
@@ -181,8 +195,8 @@
 [data-accent="rose"]    { --accent:#f43f5e; --accent-08:rgba(244,63,94,.08);   --accent-15:rgba(244,63,94,.15);   --accent-35:rgba(244,63,94,.35); --accent-rgb:244 63 94;   --accent-light:#fb7185; --accent-dark:#e11d48; }
 
 /* Density — low = mehr Weissraum, high = mehr Information */
-[data-density="low"]  { --pad-card:18px; --pad-row:14px; --gap-stack:14px; }
-[data-density="high"] { --pad-card:12px; --pad-row:10px; --gap-stack:8px; }
+[data-density="low"]  { --pad-card:16px; --pad-row:12px; --gap-stack:12px; }
+[data-density="high"] { --pad-card:12px; --pad-row:8px;  --gap-stack:8px; }
 
 /* Low density: zoomt die gesamte UI.
    ACHTUNG: `zoom` skaliert vh-Einheiten NICHT mit. Ein Element mit 95vh wird
@@ -254,12 +268,12 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
 @layer components {
   .card {
     @apply bg-bg-surface border border-border-subtle rounded-lg shadow-card;
-    padding: var(--pad-card, 16px);
+    padding: var(--pad-card, 12px);
   }
 
   .card-elevated {
     @apply bg-bg-surface2 border border-border-subtle rounded-lg;
-    padding: var(--pad-card, 16px);
+    padding: var(--pad-card, 12px);
   }
 
   /* ── Meldungsboxen ──────────────────────────────────────────
@@ -269,10 +283,10 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
      Nicht `text-green-300` o.ä. verwenden — feste Tailwind-Stufen sind
      themeblind und fallen im Lightmode auf ~1.3:1 zurück. */
   .msg {
-    @apply flex items-start gap-2 px-4 py-2.5 rounded-lg text-xs border;
+    @apply flex items-start gap-2 px-3 py-2 rounded-lg text-xs border;
   }
   .msg > svg {
-    @apply w-3.5 h-3.5 mt-0.5 flex-shrink-0;
+    @apply w-3.5 h-3.5 mt-px flex-shrink-0;
   }
   .msg-success {
     color: var(--msg-success-fg);
@@ -306,7 +320,7 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
      aber nie definiert — Tailwinds Preflight setzt `svg { display: block }`,
      das Icon rutschte deshalb ueber den Text. */
   .btn {
-    @apply inline-flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .btn-primary {
@@ -321,12 +335,90 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
     @apply hover:bg-bg-surface2 text-text-secondary hover:text-text-primary px-3 py-2 rounded transition-colors duration-150 text-sm;
   }
 
-  .input {
-    @apply bg-bg-surface2 border border-border text-text-primary placeholder-text-tertiary rounded px-3 py-2 text-sm w-full focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/30 transition-colors duration-150;
+  /* Die Ledger-Linie (wie Pension-Pal): jedes Feld traegt nur eine
+     Haarlinie unten und einen Verlauf, der sich an der Grundlinie sammelt;
+     beim Fokus wird er zum Akzent. `input-field` ist ein Alias. Betraege
+     tragen zusaetzlich `input-amount` (rechtsbuendig, Tabellenziffern). */
+  .input,
+  .input-field {
+    width: 100%;
+    border: none;
+    border-bottom: 1px solid var(--border-bp);
+    border-radius: var(--r-md) var(--r-md) 0 0;
+    background-color: transparent;
+    background-image: linear-gradient(to bottom, transparent 0%, var(--well) 100%);
+    color: var(--fg-1);
+    padding: 8px;
+    font-size: 14px;
+    line-height: 1.2;
+    outline: none;
+    transition:
+      border-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
+      box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .input::placeholder,
+  .input-field::placeholder {
+    color: var(--fg-3);
+  }
+  .input:hover,
+  .input-field:hover {
+    border-bottom-color: var(--border-bp-strong);
+  }
+  .input:focus,
+  .input-field:focus {
+    border-bottom-color: var(--accent);
+    background-image: linear-gradient(to bottom, transparent 0%, var(--accent-08) 100%);
+    box-shadow: 0 1px 0 0 var(--accent-35);
+  }
+  .input:disabled,
+  .input-field:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+  .input-amount {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
   }
 
+  /* Drop-Downs tragen die Ledger-Linie auch: native Optik weg, ein
+     gezeichneter Pfeil in der reservierten rechten Spur. */
+  select.input,
+  select.input-field {
+    padding: 8px 20px 8px 8px;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: var(--chevron), linear-gradient(to bottom, transparent 0%, var(--well-soft) 100%);
+    background-repeat: no-repeat, no-repeat;
+    background-position: right 5px center, 0 0;
+    cursor: pointer;
+  }
+  select.input:focus,
+  select.input-field:focus {
+    background-image: var(--chevron), linear-gradient(to bottom, transparent 0%, var(--accent-08) 100%);
+  }
+  select.input option,
+  select.input-field option {
+    background: var(--surface-2);
+    color: var(--fg-1);
+  }
+  textarea.input,
+  textarea.input-field {
+    line-height: 1.45;
+  }
+
+  /* Satzschreibung statt Versalien (Sentence-Case Rule) */
   .label {
-    @apply text-text-secondary text-xs font-medium uppercase tracking-wide mb-1 block;
+    @apply text-text-secondary text-[11px] font-normal mb-1 block;
+  }
+
+  /* Zahlen in Tabellenziffern (ersetzt die fruehere Mono-Schrift) */
+  .font-mono,
+  .mono {
+    font-variant-numeric: tabular-nums;
+  }
+  /* Grosse Schrift wird leichter, kleine fetter (Instrument-Typografie) */
+  .font-display {
+    font-weight: 300;
   }
 
   .mono {
@@ -346,7 +438,7 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
   }
 
   .badge {
-    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-xs font-medium;
+    @apply inline-flex items-center gap-1 px-2 py-px rounded-sm text-xs font-medium;
   }
 
   .skeleton {
@@ -358,21 +450,21 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
     display: inline-flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 3px;
-    padding: 2px;
+    gap: 4px;
+    padding: 4px;
     background: var(--surface-2);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--r-md);
   }
   .toggle-btn {
     flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 5px;
-    padding: 5px 10px;
+    gap: 4px;
+    padding: 4px 8px;
     border: none;
-    border-radius: 6px;
+    border-radius: var(--r-sm);
     background: transparent;
     color: var(--fg-3);
     font-family: inherit;
@@ -388,7 +480,11 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
   .toggle-btn.active {
     background: var(--surface);
     color: var(--fg-1);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+    /* versetzter dunkler Schatten + Haarlinie, kein Leuchten */
+    box-shadow: 0 1px 4px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.12);
+  }
+  [data-theme="light"] .toggle-btn.active {
+    box-shadow: 0 1px 3px rgba(15,17,22,0.18);
   }
 }
 
@@ -443,7 +539,7 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 10px;
+  padding: 0 8px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -453,7 +549,7 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
   justify-content: center;
   width: 28px;
   height: 28px;
-  border-radius: 7px;
+  border-radius: var(--r-md);
   border: none;
   background: transparent;
   color: var(--fg-3);
@@ -470,20 +566,18 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 8px 6px;
+  padding: 8px 4px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 0;
 }
 .rail-body::-webkit-scrollbar { width: 3px; }
 
 .rail-section-label {
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 400;
   color: var(--fg-3);
-  padding: 4px 10px 2px;
+  padding: 4px 8px 4px;
   white-space: nowrap;
   overflow: hidden;
 }
@@ -491,11 +585,11 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
 .rail-btn {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   width: 100%;
-  padding: 5px 10px;
+  padding: 4px 8px;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   background: transparent;
   color: var(--fg-2);
   font-family: var(--font-sans);
@@ -547,7 +641,7 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
 .rail-divider {
   height: 1px;
   background: var(--border-2);
-  margin: 6px 4px;
+  margin: 4px;
   flex-shrink: 0;
 }
 
@@ -555,10 +649,10 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
 .rail-footer {
   flex-shrink: 0;
   border-top: 1px solid var(--border);
-  padding: 8px 6px;
+  padding: 4px 8px 8px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
 /* Segmented-Rows — fintools-Stil: Track + aktives Surface-Pill */
@@ -566,11 +660,11 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
 .rail-lang-row,
 .rail-theme-row {
   display: flex;
-  gap: 3px;
-  padding: 2px;
+  gap: 4px;
+  padding: 4px;
   background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--r-md);
 }
 
 .rail-density-btn {
@@ -578,10 +672,10 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  padding: 5px 8px;
+  gap: 4px;
+  padding: 4px 8px;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   background: transparent;
   color: var(--fg-3);
   font-family: var(--font-sans);
@@ -598,18 +692,22 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
 .rail-density-btn.active {
   background: var(--surface);
   color: var(--fg-1);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.12);
+}
+[data-theme="light"] .rail-density-btn.active,
+[data-theme="light"] .seg-btn.active {
+  box-shadow: 0 1px 3px rgba(15,17,22,0.18);
 }
 
 /* Gleiche Segmented-Optik wie die Rail-Toggles, nur grösser — für Formulare */
 .seg-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 3px;
-  padding: 3px;
+  gap: 4px;
+  padding: 4px;
   background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--r-md);
 }
 
 .seg-btn {
@@ -619,10 +717,10 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  padding: 9px 10px;
+  gap: 8px;
+  padding: 8px 12px;
   border: none;
-  border-radius: 7px;
+  border-radius: var(--r-sm);
   background: transparent;
   color: var(--fg-3);
   font-family: var(--font-sans);
@@ -639,15 +737,15 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
 .seg-btn.active {
   background: var(--surface);
   color: var(--fg-1);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.12);
 }
 
 .rail-user {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px;
-  border-radius: 6px;
+  padding: 4px;
+  border-radius: var(--r-md);
   overflow: hidden;
 }
 .rail-user:hover { background: var(--accent-08); }
@@ -656,8 +754,8 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
 .rail-tooltip {
   position: fixed;
   z-index: 60;
-  padding: 4px 9px;
-  border-radius: 6px;
+  padding: 4px 8px;
+  border-radius: var(--r-md);
   background: var(--surface-2);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-card);
@@ -667,4 +765,12 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
   white-space: nowrap;
   pointer-events: none;
 }
+}
+
+/* 4-px-Raster auch fuer Recharts-Inline-Abstaende (Standard 10 px) */
+.recharts-default-tooltip {
+  padding: 8px 12px !important;
+}
+.recharts-legend-item {
+  margin-right: 12px !important;
 }

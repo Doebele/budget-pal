@@ -939,7 +939,7 @@ export default function BudgetStackedBarChart({
   const hasData = activeMonths.length > 0;
 
   const modeToggle = embedded ? null : (
-    <div className="flex items-center gap-1 p-0.5 rounded-lg bg-bg-surface2 border border-border">
+    <div className="flex items-center gap-1 p-1 rounded-lg bg-bg-surface2 border border-border">
       <button
         type="button"
         onClick={() => setMode("historical")}
@@ -1023,7 +1023,7 @@ export default function BudgetStackedBarChart({
           <h2 className="text-text-primary font-semibold text-sm">
             {t("pages:ui.ausgaben_nach_kategorie")}
           </h2>
-          <p className="text-text-tertiary text-[11px] mt-0.5">{sourceLabel}</p>
+          <p className="text-text-tertiary text-[11px] mt-1">{sourceLabel}</p>
         </div>
         {modeToggle}
       </div>

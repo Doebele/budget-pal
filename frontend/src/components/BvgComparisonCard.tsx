@@ -53,7 +53,7 @@ export default function BvgComparisonCard({ data }: { data: BvgComparison }) {
     <div className="card space-y-4">
       <div>
         <h2 className="text-text-primary font-semibold text-sm">{t("pages:bvgCompare.title")}</h2>
-        <p className="text-text-tertiary text-xs mt-0.5">{t("pages:bvgCompare.subtitle")}</p>
+        <p className="text-text-tertiary text-xs mt-1">{t("pages:bvgCompare.subtitle")}</p>
       </div>
 
       <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer">
