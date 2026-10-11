@@ -271,11 +271,11 @@ export default function HealthScoreWidget() {
                     labelClass="text-lg"
                   />
                   <span
-                    className="text-sm text-text-tertiary text-center leading-tight max-w-[72px]"
+                    className="text-sm text-text-tertiary text-center leading-tight max-w-[160px]"
                   >
                     {cName}
                   </span>
-                  <span className="text-2xs text-text-disabled text-center leading-tight max-w-[72px] truncate" title={cDetail}>
+                  <span className="text-2xs text-text-disabled text-center leading-tight max-w-[160px] line-clamp-2" title={cDetail}>
                     {cDetail}
                   </span>
                 </div>
