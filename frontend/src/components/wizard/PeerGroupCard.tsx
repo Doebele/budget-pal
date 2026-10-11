@@ -85,14 +85,14 @@ function BarRow({
 
   return (
     <div className="flex items-center gap-3">
-      <span className="text-text-secondary text-xs w-20 shrink-0">{label}</span>
+      <span className="text-text-secondary text-sm w-20 shrink-0">{label}</span>
       <div className="flex-1 h-1.5 bg-white/8 rounded-full overflow-hidden">
         <div
           className="h-full bg-accent rounded-full transition-all duration-700 ease-out"
           style={{ width: `${width}%` }}
         />
       </div>
-      <span className="text-text-primary text-xs font-mono w-20 text-right">
+      <span className="text-text-primary text-sm font-mono w-20 text-right">
         {formatCHF(peerValue)}
       </span>
     </div>
@@ -128,31 +128,31 @@ function IncomeComparison({
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-3">
-        <span className="text-text-tertiary text-xs w-24 shrink-0">{t("pages:misc.r17")}</span>
+        <span className="text-text-tertiary text-sm w-24 shrink-0">{t("pages:misc.r17")}</span>
         <div className="flex-1 h-2.5 bg-white/8 rounded-full overflow-hidden">
           <div
             className="h-full bg-accent rounded-full transition-all duration-700 ease-out"
             style={{ width: `${userWidth}%` }}
           />
         </div>
-        <span className="text-accent text-xs font-mono w-24 text-right font-semibold">
+        <span className="text-accent text-sm font-mono w-24 text-right font-semibold">
           {formatCHF(userIncome)}
         </span>
       </div>
       <div className="flex items-center gap-3">
-        <span className="text-text-tertiary text-xs w-24 shrink-0">{t("pages:ui.peer_median")}</span>
+        <span className="text-text-tertiary text-sm w-24 shrink-0">{t("pages:ui.peer_median")}</span>
         <div className="flex-1 h-2.5 bg-white/8 rounded-full overflow-hidden">
           <div
             className="h-full bg-white/30 rounded-full transition-all duration-700 ease-out"
             style={{ width: `${peerWidth}%` }}
           />
         </div>
-        <span className="text-text-secondary text-xs font-mono w-24 text-right">
+        <span className="text-text-secondary text-sm font-mono w-24 text-right">
           {formatCHF(peerMedian)}
         </span>
       </div>
       {userIncome > 0 && (
-        <p className={clsx("text-xs", above ? "text-gain" : "text-loss")}>
+        <p className={clsx("text-sm", above ? "text-gain" : "text-loss")}>
           {above ? "+" : ""}{deltaPercent}% {above ? "über" : "unter"} dem Peer-Median
         </p>
       )}
@@ -223,10 +223,10 @@ export default function PeerGroupCard({
               <Group className="w-5 h-5 text-accent" />
             </div>
             <div>
-              <h3 className="text-text-primary font-semibold text-sm leading-tight">
+              <h3 className="text-text-primary font-semibold text-base leading-tight">
                 {defaults.peerLabel}
               </h3>
-              <p className="text-text-tertiary text-xs mt-1">{defaults.sampleSize}</p>
+              <p className="text-text-tertiary text-sm mt-1">{defaults.sampleSize}</p>
             </div>
           </div>
           <span className={clsx("badge shrink-0", confidenceColor)}>
@@ -235,7 +235,7 @@ export default function PeerGroupCard({
           </span>
         </div>
 
-        <p className="text-text-tertiary text-xs mt-3 leading-relaxed">
+        <p className="text-text-tertiary text-sm mt-3 leading-relaxed">
           {defaults.confidenceNote}
         </p>
       </div>
@@ -244,7 +244,7 @@ export default function PeerGroupCard({
       <div className="card">
         <div className="flex items-center gap-2 mb-4">
           <GraphUp className="w-4 h-4 text-accent" />
-          <h4 className="text-text-primary text-sm font-medium">Einkommensvergleich</h4>
+          <h4 className="text-text-primary text-base font-medium">Einkommensvergleich</h4>
         </div>
         <IncomeComparison
           userIncome={userIncomeMonthly}
@@ -254,7 +254,7 @@ export default function PeerGroupCard({
 
       {/* ── Expense breakdown ────────────────────────────── */}
       <div className="card">
-        <h4 className="text-text-primary text-sm font-medium mb-4">{t("pages:misc.r18")}</h4>
+        <h4 className="text-text-primary text-base font-medium mb-4">{t("pages:misc.r18")}</h4>
         <div className="space-y-2">
           {DISPLAY_CATEGORIES.filter(c => c.key !== "savings_rate").map((cat, i) => (
             <BarRow
@@ -270,8 +270,8 @@ export default function PeerGroupCard({
 
       {/* ── Editable defaults ────────────────────────────── */}
       <div className="card">
-        <h4 className="text-text-primary text-sm font-medium mb-1">Vorgeschlagene Budgetwerte</h4>
-        <p className="text-text-tertiary text-xs mb-4">
+        <h4 className="text-text-primary text-base font-medium mb-1">Vorgeschlagene Budgetwerte</h4>
+        <p className="text-text-tertiary text-sm mb-4">
           {t("pages:ui.basierend_auf_bfs_daten_fuer_dein_profil_kli")}
         </p>
 
@@ -285,7 +285,7 @@ export default function PeerGroupCard({
               <div
                 key={cat.key}
                 className={clsx(
-                  "rounded-md p-3 border transition-all duration-300",
+                  "rounded-md p-box border transition-all duration-300",
                   "opacity-0 animate-[fadeSlideUp_0.4s_ease-out_forwards]",
                   "border-white/8 bg-white/3 hover:border-white/15 hover:bg-white/5 cursor-pointer"
                 )}
@@ -293,8 +293,8 @@ export default function PeerGroupCard({
                 onClick={() => !isEditing && startEdit(cat.key)}
               >
                 <div className="flex items-center gap-1 mb-1">
-                  <span className="text-base leading-none">{cat.icon}</span>
-                  <span className="text-text-tertiary text-[10px] font-medium">
+                  <span className="text-lg leading-none">{cat.icon}</span>
+                  <span className="text-text-tertiary text-2xs font-medium">
                     {cat.label}
                   </span>
                 </div>
@@ -303,7 +303,7 @@ export default function PeerGroupCard({
                   <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                     <input
                       type="number"
-                      className="input input-amount py-1 px-2 text-xs w-full"
+                      className="input input-amount py-1 px-2 text-sm w-full"
                       value={editValue}
                       onChange={(e) => setEditValue(e.target.value)}
                       onKeyDown={(e) => {
@@ -313,7 +313,7 @@ export default function PeerGroupCard({
                       autoFocus
                     />
                     <button
-                      className="text-accent text-xs px-1 py-1 rounded hover:bg-accent/10 shrink-0"
+                      className="text-accent text-sm px-1 py-1 rounded hover:bg-accent/10 shrink-0"
                       onClick={() => handleEditSave(cat.key)}
                     >
                       OK
@@ -321,7 +321,7 @@ export default function PeerGroupCard({
                   </div>
                 ) : (
                   <div className="flex items-center justify-between">
-                    <p className="text-text-primary font-mono font-semibold text-sm">
+                    <p className="text-text-primary font-mono font-semibold text-base">
                       <AnimatedNumber value={rawValue as number} delay={i * 60 + 200} isSavings={isSavings} />
                     </p>
                     <NavArrowRight className="w-3 h-3 text-text-tertiary opacity-50" />
@@ -335,7 +335,7 @@ export default function PeerGroupCard({
 
       {/* ── CTA ──────────────────────────────────────────── */}
       <button
-        className="btn-primary w-full py-3 text-base font-semibold"
+        className="btn-primary w-full py-3 text-lg font-semibold"
         onClick={onAccept}
       >
         {t("pages:ui.diese_defaults_uebernehmen")}

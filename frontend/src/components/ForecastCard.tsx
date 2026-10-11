@@ -57,7 +57,7 @@ export default function ForecastCard({ data, isSelected, onClick }: Props) {
     >
       {/* Month header */}
       <div className="flex items-start justify-between mb-3">
-        <p className="text-text-secondary text-xs font-medium">{formatMonthFull(data.month)}</p>
+        <p className="text-text-secondary text-sm font-medium">{formatMonthFull(data.month)}</p>
         <div className="flex items-center gap-1">
           {data.peer_calibrated && (
             <span title="Peer-Gruppe kalibriert">
@@ -74,13 +74,13 @@ export default function ForecastCard({ data, isSelected, onClick }: Props) {
       </p>
 
       {/* Confidence range */}
-      <p className="text-text-tertiary text-[11px] mb-3">
+      <p className="text-text-tertiary text-xs mb-3">
         90%-Band: {formatCHF(data.confidence_low)} – {formatCHF(data.confidence_high)}
       </p>
 
       {/* Income / Expense bar */}
       <div className="space-y-1">
-        <div className="flex justify-between text-[11px]">
+        <div className="flex justify-between text-xs">
           <span className="text-gain">↑ {formatCHF(data.predicted_income)}</span>
           <span className="text-loss">↓ {formatCHF(data.predicted_expense)}</span>
         </div>
@@ -103,7 +103,7 @@ export default function ForecastCard({ data, isSelected, onClick }: Props) {
 
       {/* Uncertainty level */}
       {uncertainty > 20 && (
-        <p className="text-[10px] txt-warning mt-2 flex items-center gap-1">
+        <p className="text-2xs txt-warning mt-2 flex items-center gap-1">
           <span>⚠</span> Hohe Unsicherheit ({Math.round(uncertainty)}%)
         </p>
       )}

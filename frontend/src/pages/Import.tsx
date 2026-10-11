@@ -481,12 +481,12 @@ export default function Import() {
     <div className="space-y-6 animate-fade-in">
       <div>
         <h1 className="text-xl font-light text-text-primary">{t("pages:import.i19")}</h1>
-        <p className="text-text-tertiary text-sm mt-1">{t("pages:import.i12")}</p>
+        <p className="text-text-tertiary text-base mt-1">{t("pages:import.i12")}</p>
       </div>
 
       {/* Config */}
       <div className="card">
-        <h2 className="text-text-primary font-semibold text-sm mb-4">{t("pages:import.i22")}</h2>
+        <h2 className="text-text-primary font-semibold text-base mb-4">{t("pages:import.i22")}</h2>
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="label">{t("pages:import.i44")}</label>
@@ -519,8 +519,8 @@ export default function Import() {
           onClick={() => selectedAccount && csvRef.current?.click()}
         >
           <Upload className="w-8 h-8 text-text-tertiary mx-auto mb-3" />
-          <p className="text-text-primary font-medium text-sm">{t("pages:import.i11")}</p>
-          <p className="text-text-tertiary text-xs mt-1">{t("pages:import.i45")}</p>
+          <p className="text-text-primary font-medium text-base">{t("pages:import.i11")}</p>
+          <p className="text-text-tertiary text-sm mt-1">{t("pages:import.i45")}</p>
           <input ref={csvRef} type="file" accept=".csv" className="hidden" onChange={handleCsvPreview} />
         </div>
 
@@ -532,8 +532,8 @@ export default function Import() {
           onClick={() => selectedAccount && pdfRef.current?.click()}
         >
           <Page className="w-8 h-8 text-text-tertiary mx-auto mb-3" />
-          <p className="text-text-primary font-medium text-sm">{t("pages:import.i36")}</p>
-          <p className="text-text-tertiary text-xs mt-1">{t("pages:import.i34")}</p>
+          <p className="text-text-primary font-medium text-base">{t("pages:import.i36")}</p>
+          <p className="text-text-tertiary text-sm mt-1">{t("pages:import.i34")}</p>
           <input ref={pdfRef} type="file" accept=".pdf" className="hidden" onChange={handlePdfChange} />
         </div>
       </div>
@@ -543,17 +543,17 @@ export default function Import() {
         <div className="card flex items-center gap-4">
           <div className="w-8 h-8 border-2 border-accent/30 border-t-accent rounded-full animate-spin shrink-0" />
           <div className="min-w-0">
-            <p className="text-text-primary text-sm font-medium flex items-center gap-2">
+            <p className="text-text-primary text-base font-medium flex items-center gap-2">
               {previewMutation.isPending || pdfPreviewMutation.isPending
                 ? "Vorschau wird erstellt…"
                 : "Import läuft…"}
               {elapsed > 0 && (
-                <span className="text-text-tertiary text-xs font-normal tabular-nums">
+                <span className="text-text-tertiary text-sm font-normal tabular-nums">
                   {formatElapsed(elapsed)}
                 </span>
               )}
             </p>
-            <p className="text-text-tertiary text-xs">
+            <p className="text-text-tertiary text-sm">
               {previewMutation.isPending
                 ? "CSV wird analysiert"
                 : startPdfJob.isPending
@@ -579,7 +579,7 @@ export default function Import() {
             )}
 
             {pdfJobRunning && elapsed >= 10 && (
-              <p className="text-text-disabled text-[11px] mt-1 leading-relaxed">
+              <p className="text-text-disabled text-xs mt-1 leading-relaxed">
                 Das Format ist offenbar unbekannt — {activeModel ? (
                   <>
                     <span className="font-mono text-text-tertiary">{activeModel}</span>{" "}
@@ -594,7 +594,7 @@ export default function Import() {
             )}
 
             {job?.status === "failed" && (
-              <p className="text-loss text-[11px] mt-1">
+              <p className="text-loss text-xs mt-1">
                 Auswertung fehlgeschlagen: {job.error_message}
               </p>
             )}
@@ -616,7 +616,7 @@ export default function Import() {
               <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-shrink-0">
                 <div>
                   <h3 className="text-text-primary font-semibold">{t("pages:import.i35")}</h3>
-                  <p className="text-text-tertiary text-xs">
+                  <p className="text-text-tertiary text-sm">
                     {pdfPreview.filename} · {pdfPreview.total_rows} Zeilen · {pdfPreview.parsed_rows} erkannt
                   </p>
                 </div>
@@ -627,7 +627,7 @@ export default function Import() {
 
               {/* ── Stats row ── */}
               <div className="px-5 pt-4 pb-3 flex-shrink-0">
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-sm">
                   <div className="rounded-lg bg-bg-surface2 px-3 py-2 text-text-secondary">
                     Bank: <span className="text-text-primary font-semibold">{pdfPreview.bank.toUpperCase()}</span>
                   </div>
@@ -646,11 +646,11 @@ export default function Import() {
                 </div>
                 {pdfPreview.total_rows === 0 && (
                   <div className="mt-3 rounded-lg bg-bg-surface2 border border-border px-4 py-3">
-                    <p className="text-text-primary text-xs font-semibold flex items-center gap-1">
+                    <p className="text-text-primary text-sm font-semibold flex items-center gap-1">
                       <WarningCircle className="w-3.5 h-3.5 shrink-0" />
                       Keine Buchungen gefunden
                     </p>
-                    <p className="text-text-secondary text-[11px] mt-1 leading-relaxed">
+                    <p className="text-text-secondary text-xs mt-1 leading-relaxed">
                       {pdfPreview.ai_attempted ? (
                         <>
                           Das Format wurde nicht erkannt, deshalb hat das KI-Modell den
@@ -672,7 +672,7 @@ export default function Import() {
                   </div>
                 )}
                 {pdfPreview.ai_truncated && (
-                  <p className="text-loss text-[11px] mt-2 flex items-start gap-1">
+                  <p className="text-loss text-xs mt-2 flex items-start gap-1">
                     <WarningCircle className="w-3.5 h-3.5 shrink-0 mt-px" />
                     <span>
                       <strong>{t("pages:import.i40")}</strong> Das Dokument ist länger, als in
@@ -683,7 +683,7 @@ export default function Import() {
                   </p>
                 )}
                 {pdfPreview.ai_extracted && (
-                  <p className="txt-warning text-[11px] mt-2 flex items-start gap-1">
+                  <p className="txt-warning text-xs mt-2 flex items-start gap-1">
                     <WarningCircle className="w-3.5 h-3.5 shrink-0 mt-px" />
                     <span>
                       Unbekanntes PDF-Format — diese Zeilen wurden per KI aus dem Text
@@ -701,7 +701,7 @@ export default function Import() {
                   </p>
                 )}
                 {hasDuplicates && (
-                  <p className="text-text-disabled text-[11px] mt-2">
+                  <p className="text-text-disabled text-xs mt-2">
                     {t("pages:ui.konto_duplikate_ueberschreiben_behalten_oder")}
                   </p>
                 )}
@@ -709,7 +709,7 @@ export default function Import() {
 
               {/* ── Table ── */}
               <div className="overlay-body px-5 pb-2">
-                <table className="w-full text-xs border-collapse">
+                <table className="w-full text-sm border-collapse">
                   <thead className="sticky top-0 z-10 bg-bg-surface2">
                     <tr>
                       {/* Status badges column */}
@@ -746,22 +746,22 @@ export default function Import() {
                           <td className="px-2 py-2 align-middle">
                             <div className="flex flex-col gap-1">
                               {row.duplicate_kind === "database" && (
-                                <span className="inline-flex rounded px-1 py-1 msg-warning text-[10px] font-medium leading-tight">
+                                <span className="inline-flex rounded px-1 py-1 msg-warning text-2xs font-medium leading-tight">
                                   {t("pages:ui.konto")}
                                 </span>
                               )}
                               {row.duplicate_kind === "pdf" && (
-                                <span className="inline-flex rounded px-1 py-1 bg-bg-elevated text-text-secondary text-[10px] font-medium leading-tight">
+                                <span className="inline-flex rounded px-1 py-1 bg-bg-elevated text-text-secondary text-2xs font-medium leading-tight">
                                   PDF-Dup
                                 </span>
                               )}
                               {recurring && (
-                                <span className={clsx("inline-flex items-center gap-1 rounded px-1 py-1 text-[10px] font-medium leading-tight", getFrequencyBadgeStyle(row.periodicity))} title={row.periodicity ? PERIODICITY_LABELS[row.periodicity] : "Wiederkehrend"}>
+                                <span className={clsx("inline-flex items-center gap-1 rounded px-1 py-1 text-2xs font-medium leading-tight", getFrequencyBadgeStyle(row.periodicity))} title={row.periodicity ? PERIODICITY_LABELS[row.periodicity] : "Wiederkehrend"}>
                                   ↻ {row.periodicity ? PERIODICITY_LABELS[row.periodicity] : "Abo"}
                                 </span>
                               )}
                               {row.duplicate_kind === "none" && !recurring && (
-                                <span className="text-text-disabled text-[10px]">—</span>
+                                <span className="text-text-disabled text-2xs">—</span>
                               )}
                             </div>
                           </td>
@@ -776,7 +776,7 @@ export default function Import() {
                                 next[idx] = { ...next[idx], original_date: e.target.value };
                                 return { ...prev, rows: next };
                               })}
-                              className="bg-bg-surface2 border border-border rounded px-2 py-1 text-text-primary w-[100px] text-xs"
+                              className="bg-bg-surface2 border border-border rounded px-2 py-1 text-text-primary w-[100px] text-sm"
                             />
                           </td>
 
@@ -790,7 +790,7 @@ export default function Import() {
                                 next[idx] = { ...next[idx], description: e.target.value };
                                 return { ...prev, rows: next };
                               })}
-                              className="bg-bg-surface2 border border-border rounded px-2 py-1 text-text-primary w-full min-w-[200px] text-xs"
+                              className="bg-bg-surface2 border border-border rounded px-2 py-1 text-text-primary w-full min-w-[200px] text-sm"
                               title={row.description}
                             />
                           </td>
@@ -808,7 +808,7 @@ export default function Import() {
                                 return { ...prev, rows: next };
                               })}
                               className={clsx(
-                                "bg-bg-surface2 border rounded px-2 py-1 text-right w-full font-mono font-semibold text-xs",
+                                "bg-bg-surface2 border rounded px-2 py-1 text-right w-full font-mono font-semibold text-sm",
                                 isExpense
                                   ? "border-red-800/50 txt-error"
                                   : "border-green-800/50 txt-success"
@@ -823,7 +823,7 @@ export default function Import() {
                               <select
                                 value={row.category ?? ""}
                                 onChange={(e) => handleCategoryChange(row.id, idx, e.target.value)}
-                                className="input flex-1 min-w-0 text-[11px]"
+                                className="input flex-1 min-w-0 text-xs"
                               >
                                 <option value="">{t("pages:misc.r29")}</option>
                                 {pdfCategoryOptions.map((name) => (
@@ -842,7 +842,7 @@ export default function Import() {
                                   })
                                 }
                                 className={clsx(
-                                  "w-[130px] flex-shrink-0 rounded border px-1 py-1 text-[11px] focus:outline-none",
+                                  "w-[130px] flex-shrink-0 rounded border px-1 py-1 text-xs focus:outline-none",
                                   getFrequencyStyle(row.periodicity)
                                 )}
                               >
@@ -861,7 +861,7 @@ export default function Import() {
                             <td className="px-2 py-2 align-middle">
                               {row.duplicate_kind === "database" ? (
                                 <select
-                                  className="input text-[11px] w-full"
+                                  className="input text-xs w-full"
                                   value={row.merge_action}
                                   onChange={(e) =>
                                     setPdfPreview((prev) => {
@@ -879,7 +879,7 @@ export default function Import() {
                                 </select>
                               ) : row.duplicate_kind === "pdf" ? (
                                 <select
-                                  className="input text-[11px] w-full"
+                                  className="input text-xs w-full"
                                   value={row.merge_action === "import" ? "import" : "skip"}
                                   onChange={(e) =>
                                     setPdfPreview((prev) => {
@@ -894,7 +894,7 @@ export default function Import() {
                                   <option value="import">{t("pages:import.i24")}</option>
                                 </select>
                               ) : (
-                                <span className="text-text-disabled text-[10px]">{t("pages:import.i19")}</span>
+                                <span className="text-text-disabled text-2xs">{t("pages:import.i19")}</span>
                               )}
                             </td>
                           )}
@@ -907,15 +907,15 @@ export default function Import() {
 
               {/* ── Footer ── */}
               <div className="flex items-center justify-between gap-3 px-5 py-4 border-t border-border flex-shrink-0">
-                <p className="text-text-disabled text-xs">
+                <p className="text-text-disabled text-sm">
                   {pdfPreview.rows.filter((r) => r.merge_action !== "skip" && r.merge_action !== "keep_existing" && r.merge_action !== "delete_both").length} Transaktionen werden importiert
                 </p>
                 <div className="flex gap-3">
-                  <button onClick={() => setPdfPreview(null)} className="btn-secondary text-sm">{t("pages:import.i00")}</button>
+                  <button onClick={() => setPdfPreview(null)} className="btn-secondary text-base">{t("pages:import.i00")}</button>
                   <button
                     onClick={() => pdfConfirmMutation.mutate()}
                     disabled={pdfConfirmMutation.isPending || pdfPreview.rows.length === 0}
-                    className="btn-primary text-sm"
+                    className="btn-primary text-base"
                   >
                     {pdfConfirmMutation.isPending ? "Importiere…" : "Transaktionen importieren"}
                   </button>
@@ -935,8 +935,8 @@ export default function Import() {
                 <Eye className="w-5 h-5 text-accent" />
               </div>
               <div>
-                <p className="text-text-primary font-semibold text-sm">Import-Vorschau: {previewData.total_rows} Zeilen</p>
-                <div className="flex items-center gap-2 text-xs">
+                <p className="text-text-primary font-semibold text-base">Import-Vorschau: {previewData.total_rows} Zeilen</p>
+                <div className="flex items-center gap-2 text-sm">
                   <span className="text-text-tertiary">
                     Bank: <span className="text-text-primary">{previewData.bank.toUpperCase()}</span>
                   </span>
@@ -961,7 +961,7 @@ export default function Import() {
               <button
                 onClick={() => setShowColumnMapping(!showColumnMapping)}
                 className={clsx(
-                  "px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors",
+                  "px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1 transition-colors",
                   showColumnMapping
                     ? "bg-accent/20 text-accent border border-accent/30"
                     : "bg-bg-surface2 text-text-secondary hover:bg-bg-elevated border border-border"
@@ -991,14 +991,14 @@ export default function Import() {
               <div className="bg-bg-surface2 px-4 py-3 border-b border-border flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Table className="w-4 h-4 text-accent" />
-                  <span className="text-text-primary font-medium text-sm">{t("pages:import.i13")}</span>
+                  <span className="text-text-primary font-medium text-base">{t("pages:import.i13")}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-text-tertiary">
+                  <span className="text-sm text-text-tertiary">
                     {mappedColumnsCount} von {availableColumns.length} Spalten zugewiesen
                   </span>
                   {mappingWarnings.length === 0 && (
-                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gain/20 text-gain text-xs">
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gain/20 text-gain text-sm">
                       <Check className="w-3 h-3" />
                       OK
                     </span>
@@ -1009,12 +1009,12 @@ export default function Import() {
               <div className="p-4 space-y-4">
                 {/* CSV Columns Overview Table */}
                 <div className="overflow-auto max-h-48 border border-border rounded-lg">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-base">
                     <thead className="bg-bg-elevated text-text-secondary">
                       <tr>
-                        <th className="text-left px-3 py-2 text-xs font-medium">{t("pages:import.i10")}</th>
-                        <th className="text-left px-3 py-2 text-xs font-medium">{t("pages:import.i43")}</th>
-                        <th className="text-left px-3 py-2 text-xs font-medium">{t("pages:import.i04")}</th>
+                        <th className="text-left px-3 py-2 text-sm font-medium">{t("pages:import.i10")}</th>
+                        <th className="text-left px-3 py-2 text-sm font-medium">{t("pages:import.i43")}</th>
+                        <th className="text-left px-3 py-2 text-sm font-medium">{t("pages:import.i04")}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
@@ -1039,15 +1039,15 @@ export default function Import() {
                             </td>
                             <td className="px-3 py-2">
                               {isMapped ? (
-                                <span className="inline-flex items-center px-2 py-1 rounded bg-accent/20 text-accent text-xs">
+                                <span className="inline-flex items-center px-2 py-1 rounded bg-accent/20 text-accent text-sm">
                                   <MapPin className="w-3 h-3 mr-1" />
                                   {label}
                                 </span>
                               ) : (
-                                <span className="text-text-disabled text-xs italic">{t("pages:import.i32")}</span>
+                                <span className="text-text-disabled text-sm italic">{t("pages:import.i32")}</span>
                               )}
                             </td>
-                            <td className="px-3 py-2 text-text-tertiary text-xs font-mono truncate max-w-[150px]">
+                            <td className="px-3 py-2 text-text-tertiary text-sm font-mono truncate max-w-[150px]">
                               {getExampleValue(col)}
                             </td>
                           </tr>
@@ -1059,17 +1059,17 @@ export default function Import() {
 
                 {/* Manual Field Assignment */}
                 <div className="border-t border-border pt-4">
-                  <p className="text-text-secondary text-xs font-medium mb-3 flex items-center gap-2">
+                  <p className="text-text-secondary text-sm font-medium mb-3 flex items-center gap-2">
                     <Database className="w-3.5 h-3.5 text-text-tertiary" />
                     Manuelle Feld-Zuweisung
                   </p>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     <div>
-                      <label className="label text-xs flex items-center gap-1">
+                      <label className="label text-sm flex items-center gap-1">
                         <span className="text-red-400">*</span> {t("pages:ui.datum")}
                       </label>
                       <select
-                        className="input text-xs"
+                        className="input text-sm"
                         value={manualMapping.date_col || ""}
                         onChange={(e) => setManualMapping({ ...manualMapping, date_col: e.target.value })}
                       >
@@ -1080,11 +1080,11 @@ export default function Import() {
                       </select>
                     </div>
                     <div>
-                      <label className="label text-xs flex items-center gap-1">
+                      <label className="label text-sm flex items-center gap-1">
                         <span className="text-red-400">*</span> Beschreibung
                       </label>
                       <select
-                        className="input text-xs"
+                        className="input text-sm"
                         value={manualMapping.description_col || ""}
                         onChange={(e) => setManualMapping({ ...manualMapping, description_col: e.target.value })}
                       >
@@ -1095,9 +1095,9 @@ export default function Import() {
                       </select>
                     </div>
                     <div>
-                      <label className="label text-xs">{t("pages:import.i09")}</label>
+                      <label className="label text-sm">{t("pages:import.i09")}</label>
                       <select
-                        className="input text-xs"
+                        className="input text-sm"
                         value={manualMapping.amount_col || ""}
                         onChange={(e) => setManualMapping({ ...manualMapping, amount_col: e.target.value })}
                       >
@@ -1108,9 +1108,9 @@ export default function Import() {
                       </select>
                     </div>
                     <div>
-                      <label className="label text-xs">{t("pages:import.i05")}</label>
+                      <label className="label text-sm">{t("pages:import.i05")}</label>
                       <select
-                        className="input text-xs"
+                        className="input text-sm"
                         value={manualMapping.debit_col || ""}
                         onChange={(e) => setManualMapping({ ...manualMapping, debit_col: e.target.value })}
                       >
@@ -1121,9 +1121,9 @@ export default function Import() {
                       </select>
                     </div>
                     <div>
-                      <label className="label text-xs">{t("pages:import.i17")}</label>
+                      <label className="label text-sm">{t("pages:import.i17")}</label>
                       <select
-                        className="input text-xs"
+                        className="input text-sm"
                         value={manualMapping.credit_col || ""}
                         onChange={(e) => setManualMapping({ ...manualMapping, credit_col: e.target.value })}
                       >
@@ -1134,9 +1134,9 @@ export default function Import() {
                       </select>
                     </div>
                     <div>
-                      <label className="label text-xs">{t("pages:import.i37")}</label>
+                      <label className="label text-sm">{t("pages:import.i37")}</label>
                       <select
-                        className="input text-xs"
+                        className="input text-sm"
                         value={manualMapping.balance_col || ""}
                         onChange={(e) => setManualMapping({ ...manualMapping, balance_col: e.target.value })}
                       >
@@ -1154,11 +1154,11 @@ export default function Import() {
                   <div className="msg msg-error flex-col gap-0 p-3">
                     <div className="flex items-center gap-2 mb-2">
                       <WarningTriangle className="w-4 h-4" />
-                      <span className="font-medium text-sm">{t("pages:import.i46")}</span>
+                      <span className="font-medium text-base">{t("pages:import.i46")}</span>
                     </div>
                     <ul className="space-y-1">
                       {mappingWarnings.map((warn, idx) => (
-                        <li key={idx} className="text-xs flex items-start gap-2">
+                        <li key={idx} className="text-sm flex items-start gap-2">
                           <span>•</span>
                           {warn}
                         </li>
@@ -1168,7 +1168,7 @@ export default function Import() {
                 )}
 
                 {/* Tips */}
-                <div className="bg-bg-elevated/30 rounded p-3 text-xs text-text-tertiary">
+                <div className="bg-bg-elevated/30 rounded p-3 text-sm text-text-tertiary">
                   <p className="flex items-start gap-2">
                     <span className="text-accent">💡</span>
                     <span>
@@ -1183,7 +1183,7 @@ export default function Import() {
 
           {/* Preview Table */}
           <div className="overflow-auto max-h-80 border border-border rounded-lg">
-            <table className="w-full text-xs">
+            <table className="w-full text-sm">
               <thead className="bg-bg-surface2 sticky top-0">
                 <tr>
                   <th className="text-left px-3 py-2 text-text-tertiary font-medium">#</th>
@@ -1201,7 +1201,7 @@ export default function Import() {
                     row.parsed && "bg-green-500/5"
                   )}>
                     <td className="px-3 py-2 text-text-disabled">{row.row_index + 1}</td>
-                    <td className="px-3 py-2 text-text-primary font-mono text-xs">{row.date || "-"}</td>
+                    <td className="px-3 py-2 text-text-primary font-mono text-sm">{row.date || "-"}</td>
                     <td className="px-3 py-2 text-text-primary max-w-xs truncate" title={row.description || ""}>
                       {row.description || "-"}
                     </td>
@@ -1213,12 +1213,12 @@ export default function Import() {
                     </td>
                     <td className="px-3 py-2 text-center">
                       {row.parsed ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gain/20 text-gain text-xs">
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gain/20 text-gain text-sm">
                           <Check className="w-3 h-3" />
                           OK
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border msg-error text-xs" title={row.errors.join(", ")}>
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border msg-error text-sm" title={row.errors.join(", ")}>
                           <WarningTriangle className="w-3 h-3" />
                           {t("pages:ui.fehler")}
                         </span>
@@ -1232,12 +1232,12 @@ export default function Import() {
 
           {/* Raw Data Sample */}
           {previewData.sample_raw?.length > 0 && (
-            <details className="text-xs">
+            <details className="text-sm">
               <summary className="text-text-tertiary cursor-pointer hover:text-text-secondary">
                 Rohdaten (erste {previewData.sample_raw.length} Zeilen)
               </summary>
               <div className="mt-2 bg-bg-surface2/50 rounded p-2 overflow-auto max-h-40">
-                <pre className="text-text-tertiary text-xs">
+                <pre className="text-text-tertiary text-sm">
                   {JSON.stringify(previewData.sample_raw, null, 2)}
                 </pre>
               </div>
@@ -1252,7 +1252,7 @@ export default function Import() {
                 setSelectedFile(null);
                 setShowColumnMapping(false);
               }}
-              className="px-4 py-2 rounded-lg bg-bg-elevated text-text-secondary hover:bg-bg-elevated transition-colors text-sm"
+              className="px-4 py-2 rounded-lg bg-bg-elevated text-text-secondary hover:bg-bg-elevated transition-colors text-base"
             >
               {t("pages:ui.abbrechen")}
             </button>
@@ -1260,7 +1260,7 @@ export default function Import() {
               onClick={handleCsvImport}
               disabled={previewData.parsed_rows === 0 || mappingWarnings.some(w => w.includes("erforderlich"))}
               className={clsx(
-                "px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all",
+                "px-4 py-2 rounded-lg text-base font-medium flex items-center gap-2 transition-all",
                 previewData.parsed_rows > 0 && !mappingWarnings.some(w => w.includes("erforderlich"))
                   ? "bg-accent text-white hover:bg-accent-light"
                   : "bg-bg-elevated text-text-disabled cursor-not-allowed"
@@ -1280,8 +1280,8 @@ export default function Import() {
           <div className="flex items-center gap-3 mb-4">
             <CheckCircle className="w-5 h-5 text-gain" />
             <div>
-              <p className="text-text-primary font-semibold text-sm">{t("pages:import.i20")}</p>
-              <p className="text-text-tertiary text-xs">
+              <p className="text-text-primary font-semibold text-base">{t("pages:import.i20")}</p>
+              <p className="text-text-tertiary text-sm">
                 {importResult.rows_imported} importiert · {importResult.rows_skipped} Duplikate übersprungen · Bank: {importResult.bank.toUpperCase()}
               </p>
             </div>
@@ -1290,10 +1290,10 @@ export default function Import() {
             {importResult.preview?.map((p, i) => (
               <div key={i} className={clsx("flex items-center justify-between py-1 px-2 rounded", p.is_duplicate ? "opacity-40" : "")}>
                 <div>
-                  <p className="text-text-primary text-xs">{p.description.slice(0, 50)}</p>
-                  <p className="text-text-tertiary text-xs">{p.date} · {p.category || "?"}</p>
+                  <p className="text-text-primary text-sm">{p.description.slice(0, 50)}</p>
+                  <p className="text-text-tertiary text-sm">{p.date} · {p.category || "?"}</p>
                 </div>
-                <span className={clsx("text-xs font-mono", p.amount >= 0 ? "text-gain" : "text-loss")}>
+                <span className={clsx("text-sm font-mono", p.amount >= 0 ? "text-gain" : "text-loss")}>
                   {formatCHF(p.amount)}
                 </span>
               </div>
@@ -1305,7 +1305,7 @@ export default function Import() {
       {/* History */}
       <div className="card">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-text-primary font-semibold text-sm">{t("pages:import.i23")}</h2>
+          <h2 className="text-text-primary font-semibold text-base">{t("pages:import.i23")}</h2>
           {/* Delete Last Import Button */}
           {lastImport && lastImport.status === "completed" && (
             <button
@@ -1313,7 +1313,7 @@ export default function Import() {
                 setImportToDelete(lastImport.id);
                 setShowDeleteConfirm(true);
               }}
-              className="text-text-tertiary hover:text-loss text-xs flex items-center gap-1 transition-colors"
+              className="text-text-tertiary hover:text-loss text-sm flex items-center gap-1 transition-colors"
               title={t("pages:import.i28")}
             >
               <Trash className="w-3.5 h-3.5" />
@@ -1335,8 +1335,8 @@ export default function Import() {
                   : <Clock className="w-3.5 h-3.5 text-warning" />}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-text-primary text-xs font-medium truncate">{log.filename}</p>
-                <p className="text-text-tertiary text-xs">
+                <p className="text-text-primary text-sm font-medium truncate">{log.filename}</p>
+                <p className="text-text-tertiary text-sm">
                   {log.bank?.toUpperCase()} · {t("pages:ui.entriesCount", { count: log.rows_imported })} · {format(new Date(log.created_at), "dd.MM.yyyy HH:mm")}
                 </p>
               </div>
@@ -1361,7 +1361,7 @@ export default function Import() {
             </div>
           ))}
           {(!history || history.length === 0) && (
-            <p className="text-text-tertiary text-sm text-center py-6">{t("pages:import.i33")}</p>
+            <p className="text-text-tertiary text-base text-center py-6">{t("pages:import.i33")}</p>
           )}
         </div>
       </div>
@@ -1395,7 +1395,7 @@ export default function Import() {
                   </strong>{" "}
                   aus diesem Import werden gelöscht.
                 </p>
-                <p className="text-sm text-text-disabled">
+                <p className="text-base text-text-disabled">
                   {t("pages:ui.diese_aktion_kann_nicht_rueckgaengig_gemacht")}
                 </p>
               </>

@@ -919,14 +919,14 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
         {/* Header */}
         <div>
           <h2 className="text-text-primary font-semibold text-lg">{t("pages:step5.s00")}</h2>
-          <p className="text-text-secondary text-sm mt-1">
+          <p className="text-text-secondary text-base mt-1">
             {t("pages:ui.waehle_deine_anbieter_aus_klicke_auf_eine_ze")}
           </p>
         </div>
 
         {/* Summary bar */}
         <div className="flex items-center justify-between rounded-lg bg-bg-surface2 border border-border/50 px-4 py-2">
-          <div className="flex items-center gap-2 text-text-secondary text-sm">
+          <div className="flex items-center gap-2 text-text-secondary text-base">
             <Check className="w-3.5 h-3.5 text-gain" />
             <span>{totalCount} Positionen ausgewählt</span>
           </div>
@@ -951,11 +951,11 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
               >
                 <cat.Icon className="w-5 h-5 text-text-secondary flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <div className="text-text-primary text-sm font-medium">{catalogText(cat.label)}</div>
-                  <div className="text-text-tertiary text-xs">{catalogText(cat.description)}</div>
+                  <div className="text-text-primary text-base font-medium">{catalogText(cat.label)}</div>
+                  <div className="text-text-tertiary text-sm">{catalogText(cat.description)}</div>
                 </div>
                 {selCount > 0 && (
-                  <span className="bg-accent/20 text-accent text-[11px] font-semibold px-2 py-1 rounded-full flex-shrink-0">
+                  <span className="bg-accent/20 text-accent text-xs font-semibold px-2 py-1 rounded-full flex-shrink-0">
                     {selCount}
                   </span>
                 )}
@@ -1003,23 +1003,23 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
 
                         {/* Name + tagline */}
                         <div className="flex-1 min-w-0">
-                          <div className="text-text-primary text-sm font-medium leading-tight">{prov.name}</div>
-                          <div className="text-text-tertiary text-[11px] truncate mt-1">{catalogText(prov.tagline)}</div>
+                          <div className="text-text-primary text-base font-medium leading-tight">{prov.name}</div>
+                          <div className="text-text-tertiary text-xs truncate mt-1">{catalogText(prov.tagline)}</div>
                         </div>
 
                         {/* Price + peer */}
                         <div className="text-right flex-shrink-0">
                           <div className={clsx(
-                            "font-mono text-xs",
+                            "font-mono text-sm",
                             isSelected ? "text-accent font-semibold" : "text-text-tertiary"
                           )}>
                             {entry
                               ? fchf(getEffectiveMonthly(entry, cat.providers))
                               : fchf(activeVariant?.price ?? 0)}
-                            {(activeVariant?.price ?? 0) > 0 && <span className="text-[10px] font-normal opacity-70">/Mo</span>}
+                            {(activeVariant?.price ?? 0) > 0 && <span className="text-2xs font-normal opacity-70">/Mo</span>}
                           </div>
                           {prov.peerPopularity && (
-                            <div className="flex items-center gap-1 justify-end mt-1 text-[10px] text-text-tertiary">
+                            <div className="flex items-center gap-1 justify-end mt-1 text-2xs text-text-tertiary">
                               <Activity className="w-2.5 h-2.5" />
                               {prov.peerPopularity}%
                             </div>
@@ -1051,10 +1051,10 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
                           </div>
                           <EditPencil className="w-4 h-4 text-text-tertiary flex-shrink-0" />
                           <div className="flex-1 min-w-0">
-                            <div className="text-text-primary text-sm font-medium">{custom.name}</div>
-                            <div className="text-text-tertiary text-[11px]">{t("pages:step5.s03")}</div>
+                            <div className="text-text-primary text-base font-medium">{custom.name}</div>
+                            <div className="text-text-tertiary text-xs">{t("pages:step5.s03")}</div>
                           </div>
-                          <span className="font-mono text-xs text-warning">{fchf(getEffectiveMonthlyCustom(custom))}/Mo</span>
+                          <span className="font-mono text-sm text-warning">{fchf(getEffectiveMonthlyCustom(custom))}/Mo</span>
                           {isFocusedCustom && <NavArrowRight className="w-3.5 h-3.5 text-accent flex-shrink-0" />}
                         </div>
                       );
@@ -1067,7 +1067,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
                         <Search className="w-3.5 h-3.5 text-text-tertiary flex-shrink-0" />
                         <input
                           type="text"
-                          className="input flex-1 text-sm py-1"
+                          className="input flex-1 text-base py-1"
                           placeholder={t("pages:step5.s01")}
                           value={searchQuery}
                           onChange={e => setSearchQuery(e.target.value)}
@@ -1099,10 +1099,10 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
                               >
                                 <ProviderBrandIcon providerId={provider.id} size={16} />
                                 <div className="flex-1 min-w-0">
-                                  <span className="text-text-primary text-xs font-medium">{provider.name}</span>
-                                  <span className="text-text-tertiary text-[10px] ml-2">{catalogText(resCat.label)}</span>
+                                  <span className="text-text-primary text-sm font-medium">{provider.name}</span>
+                                  <span className="text-text-tertiary text-2xs ml-2">{catalogText(resCat.label)}</span>
                                 </div>
-                                <span className="text-text-tertiary font-mono text-[10px] flex-shrink-0">
+                                <span className="text-text-tertiary font-mono text-2xs flex-shrink-0">
                                   CHF {provider.variants.find(v => v.popular)?.price ?? provider.variants[0]?.price}/Mo
                                 </span>
                                 {selectedMap[provider.id] && <Check className="w-3 h-3 text-accent flex-shrink-0" />}
@@ -1116,7 +1116,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
                               className="w-full flex items-center gap-2 px-2 py-2 rounded-md hover:bg-accent/8 text-accent text-left transition-colors border border-dashed border-accent/30 mt-1"
                             >
                               <Plus className="w-3.5 h-3.5 flex-shrink-0" />
-                              <span className="text-xs font-medium">
+                              <span className="text-sm font-medium">
                                 {results.length === 0
                                   ? `"${searchQuery}" als eigenen Anbieter anlegen`
                                   : "Eigenen Anbieter anlegen"}
@@ -1134,7 +1134,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
                           className="w-full flex items-center gap-2 px-2 py-2 rounded-md hover:bg-accent/8 text-accent text-left transition-colors border border-dashed border-accent/30"
                         >
                           <Plus className="w-3.5 h-3.5 flex-shrink-0" />
-                          <span className="text-xs font-medium">{t("pages:step5.s02")}</span>
+                          <span className="text-sm font-medium">{t("pages:step5.s02")}</span>
                         </button>
                       )}
                     </div>
@@ -1148,7 +1148,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
                         setCustomSidebarState(null);
                         closeSidebarProvider();
                       }}
-                      className="w-full flex items-center gap-2 px-4 py-2 text-text-tertiary hover:text-text-secondary hover:bg-white/[0.02] text-xs transition-colors border-t border-border/40"
+                      className="w-full flex items-center gap-2 px-4 py-2 text-text-tertiary hover:text-text-secondary hover:bg-white/[0.02] text-sm transition-colors border-t border-border/40"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       {t("pages:ui.anbieter_hinzufuegen")}

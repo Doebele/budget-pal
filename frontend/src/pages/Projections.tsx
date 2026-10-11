@@ -182,7 +182,7 @@ export default function Projections() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-light text-text-primary">Finanzprognosen</h1>
-          <p className="text-text-tertiary text-sm mt-1">{t("pages:ui.monte_carlo_simulation_schweizer_rente_ahv_b")}</p>
+          <p className="text-text-tertiary text-base mt-1">{t("pages:ui.monte_carlo_simulation_schweizer_rente_ahv_b")}</p>
         </div>
         <button onClick={() => refetch()} className="btn-secondary flex items-center gap-2" disabled={isLoading}>
           <Refresh className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
@@ -224,14 +224,14 @@ export default function Projections() {
             ))}
           </select>
           {scenarioId !== null && (
-            <span className="text-text-tertiary text-xs">{t("pages:ui.scenarioHint")}</span>
+            <span className="text-text-tertiary text-sm">{t("pages:ui.scenarioHint")}</span>
           )}
         </div>
       )}
 
       {/* Parameters */}
       <div className="card">
-        <h2 className="text-text-primary font-semibold text-sm mb-4">{t("pages:ui.simulationParams")}</h2>
+        <h2 className="text-text-primary font-semibold text-base mb-4">{t("pages:ui.simulationParams")}</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
             <label className="label">{t("pages:misc.r30")}</label>
@@ -297,7 +297,7 @@ export default function Projections() {
               placeholder={projection?.retirement_spending ? String(Math.round(projection.retirement_spending / 12)) : ""}
               onChange={(e) => setSpendingMonthly(e.target.value === "" ? null : Math.max(0, +e.target.value))}
             />
-            <p className="text-text-tertiary text-[10px] mt-1">{t("pages:ui.retirementSpendingHint")}</p>
+            <p className="text-text-tertiary text-2xs mt-1">{t("pages:ui.retirementSpendingHint")}</p>
           </div>
         </div>
       </div>
@@ -306,8 +306,8 @@ export default function Projections() {
       <div className="card">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-text-primary font-semibold text-sm">{t("pages:misc.r34")}</h2>
-            <p className="text-text-tertiary text-xs mt-1">
+            <h2 className="text-text-primary font-semibold text-base">{t("pages:misc.r34")}</h2>
+            <p className="text-text-tertiary text-sm mt-1">
               {t("pages:ui.ahv_saeule_1_bvg_pensionskasse_saeule_2_saeu")}
             </p>
           </div>
@@ -319,7 +319,7 @@ export default function Projections() {
         {/* ── Monthly pension KPIs at retirement ── */}
         {projection && retirementInHorizon && retIdx != null && (
           <div className="mt-4 pt-4 border-t border-border/50 space-y-3">
-            <p className="text-text-secondary text-xs">
+            <p className="text-text-secondary text-sm">
               {projection.depletion_age != null
                 ? t("pages:ui.wealthDepletes", { age: projection.depletion_age })
                 : t("pages:ui.wealthHolds", { age: currentAge + projection.years.length - 1 })}
@@ -330,7 +330,7 @@ export default function Projections() {
                 amount: formatCHF((projection.retirement_spending ?? 0) / 12),
               })}
             </p>
-            <p className="text-text-secondary text-xs font-semibold">
+            <p className="text-text-secondary text-sm font-semibold">
               {t("pages:hints.pensionAtRetirement", { year: projection.years[retIdx] })}
             </p>
             <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
@@ -339,46 +339,46 @@ export default function Projections() {
                 { label: t("pages:ui.bvg_saeule_2"), annual: bvgAtRet, color: PILLAR_COLORS.bvg },
               ].map(({ label, annual, color }) => (
                 <div key={label} className="bg-bg-elevated rounded-lg px-4 py-3 border border-border/30">
-                  <p className="text-text-tertiary text-[11px] mb-1">{label}</p>
+                  <p className="text-text-tertiary text-xs mb-1">{label}</p>
                   <p className="font-mono font-bold text-lg" style={{ color }}>
                     {formatCHF(annual / 12)}
                   </p>
-                  <p className="text-text-tertiary text-[10px] mt-1">{t("pages:ui.monat_real_chf")}</p>
-                  <p className="text-text-tertiary text-[10px]">{formatCHF(annual)} / Jahr</p>
+                  <p className="text-text-tertiary text-2xs mt-1">{t("pages:ui.monat_real_chf")}</p>
+                  <p className="text-text-tertiary text-2xs">{formatCHF(annual)} / Jahr</p>
                 </div>
               ))}
               {/* 3a: keine Rente, sondern Kapital (netto nach Steuer) */}
               <div className="bg-bg-elevated rounded-lg px-4 py-3 border border-border/30">
-                <p className="text-text-tertiary text-[11px] mb-1">{t("pages:ui.saeule_3a")}</p>
+                <p className="text-text-tertiary text-xs mb-1">{t("pages:ui.saeule_3a")}</p>
                 <p className="font-mono font-bold text-lg" style={{ color: PILLAR_COLORS["3a"] }}>
                   {formatCHF(p3aNet)}
                 </p>
-                <p className="text-text-tertiary text-[10px] mt-1">{t("pages:plan.p3aCard")}</p>
+                <p className="text-text-tertiary text-2xs mt-1">{t("pages:plan.p3aCard")}</p>
               </div>
               {/* Lebensversicherung: am Ablauf, steuerfrei */}
               {p3bNet > 0 && (
                 <div className="bg-bg-elevated rounded-lg px-4 py-3 border border-border/30">
-                  <p className="text-text-tertiary text-[11px] mb-1">{t("pages:ui.saeule_3b_lv")}</p>
+                  <p className="text-text-tertiary text-xs mb-1">{t("pages:ui.saeule_3b_lv")}</p>
                   <p className="font-mono font-bold text-lg" style={{ color: PILLAR_COLORS["3b"] }}>
                     {formatCHF(p3bNet)}
                   </p>
-                  <p className="text-text-tertiary text-[10px] mt-1">{t("pages:plan.p3bCard")}</p>
+                  <p className="text-text-tertiary text-2xs mt-1">{t("pages:plan.p3bCard")}</p>
                 </div>
               )}
             </div>
             {/* Total */}
             <div className="flex items-center justify-between bg-accent/8 border border-accent/20 rounded-lg px-4 py-3">
               <div>
-                <p className="text-text-secondary text-xs font-semibold">{t("pages:misc.r31")}</p>
-                <p className="text-text-tertiary text-[10px] mt-1">{t("pages:misc.r36")}</p>
+                <p className="text-text-secondary text-sm font-semibold">{t("pages:misc.r31")}</p>
+                <p className="text-text-tertiary text-2xs mt-1">{t("pages:misc.r36")}</p>
               </div>
               <div className="text-right">
                 <p className="font-mono font-light text-xl text-accent">{formatCHF(totalPensionAnnual / 12)}</p>
-                <p className="text-text-tertiary text-[10px]">pro Monat · {formatCHF(totalPensionAnnual)} / Jahr</p>
+                <p className="text-text-tertiary text-2xs">pro Monat · {formatCHF(totalPensionAnnual)} / Jahr</p>
               </div>
             </div>
             {projection.peer_pensions?.bvg_monthly && (
-              <p className="text-text-tertiary text-[11px]">
+              <p className="text-text-tertiary text-xs">
                 {t("pages:peer.pensions", {
                   menMonthly: formatCHF(projection.peer_pensions.bvg_monthly.men),
                   womenMonthly: formatCHF(projection.peer_pensions.bvg_monthly.women),
@@ -388,7 +388,7 @@ export default function Projections() {
               </p>
             )}
             {drawdownAtRet > 0 && (
-              <p className="text-gain text-xs">
+              <p className="text-gain text-sm">
                 {t("pages:overview.drawdownTotal", {
                   age: projection.drawdown_until_age ?? 90,
                   amount: formatCHF((totalPensionAnnual + drawdownAtRet) / 12),
@@ -402,7 +402,7 @@ export default function Projections() {
           </div>
         )}
         {projection && !retirementInHorizon && (
-          <p className="text-text-tertiary text-xs mt-3">
+          <p className="text-text-tertiary text-sm mt-3">
             {t("pages:hints.horizonTooShort", { year: retirementYear, years: selectedHorizon.years })}
           </p>
         )}
@@ -415,9 +415,9 @@ export default function Projections() {
             { label: t("pages:ui.saeule_3a"), value: `max. CHF 7'258/Jahr`, desc: t("pages:ui.beitragsgrenze_lohnabhaengige_2024"), color: PILLAR_COLORS["3a"] },
           ].map(({ label, value, desc, color }) => (
             <div key={label} className="card-elevated">
-              <p className="text-text-tertiary text-xs">{label}</p>
-              <p className="text-sm font-semibold mt-1 font-mono" style={{ color }}>{value}</p>
-              <p className="text-text-tertiary text-xs mt-1">{desc}</p>
+              <p className="text-text-tertiary text-sm">{label}</p>
+              <p className="text-base font-semibold mt-1 font-mono" style={{ color }}>{value}</p>
+              <p className="text-text-tertiary text-sm mt-1">{desc}</p>
             </div>
           ))}
         </div>
@@ -433,14 +433,14 @@ export default function Projections() {
       <div className="card">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-text-primary font-semibold text-sm">{t("pages:misc.r33")}</h2>
-            <p className="text-text-tertiary text-xs mt-1">
+            <h2 className="text-text-primary font-semibold text-base">{t("pages:misc.r33")}</h2>
+            <p className="text-text-tertiary text-sm mt-1">
               {(10000).toLocaleString()} Monte Carlo Simulationen · Reale CHF (inflationsbereinigt)
             </p>
           </div>
           {projection && (
             <div className="text-right">
-              <p className="text-text-tertiary text-xs">Median in {selectedHorizon.years} Jahren</p>
+              <p className="text-text-tertiary text-sm">Median in {selectedHorizon.years} Jahren</p>
               <p className="text-text-primary font-mono font-semibold text-lg">
                 {formatCHF(projection.p50?.[projection.p50.length - 1] || 0)}
               </p>
@@ -451,7 +451,7 @@ export default function Projections() {
           <div className="h-80 flex items-center justify-center">
             <div className="flex items-center gap-3 text-text-tertiary">
               <Refresh className="w-5 h-5 animate-spin" />
-              <span className="text-sm">{t("pages:misc.r35")}</span>
+              <span className="text-base">{t("pages:misc.r35")}</span>
             </div>
           </div>
         ) : projection ? (

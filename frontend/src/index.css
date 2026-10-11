@@ -194,25 +194,27 @@
 [data-accent="amber"]   { --accent:#f59e0b; --accent-08:rgba(245,158,11,.08);  --accent-15:rgba(245,158,11,.15);  --accent-35:rgba(245,158,11,.35); --accent-rgb:245 158 11;  --accent-light:#fbbf24; --accent-dark:#d97706; }
 [data-accent="rose"]    { --accent:#f43f5e; --accent-08:rgba(244,63,94,.08);   --accent-15:rgba(244,63,94,.15);   --accent-35:rgba(244,63,94,.35); --accent-rgb:244 63 94;   --accent-light:#fb7185; --accent-dark:#e11d48; }
 
-/* Density — low = mehr Weissraum, high = mehr Information */
-[data-density="low"]  { --pad-card:16px; --pad-row:12px; --gap-stack:12px; }
-[data-density="high"] { --pad-card:12px; --pad-row:8px;  --gap-stack:8px; }
+/* Dichte wie Pension-Pal (DESIGN.md, «Density»): alle Schriftgroessen und
+   Innenabstaende kommen aus diesen Tokens; Tailwind text-* und p-section /
+   p-box / p-box-sm zeigen darauf. Komfort (low, Standard) = Kompakt + 2 px
+   Schrift, nie unter 12 px; Kompakt (high) spart 4 px Innenabstand.
+   Kein zoom mehr — Dichte ist ein Layout-Modus, kein Zoom. */
+:root {
+  --fs-2xs: 12px;  --fs-xs: 13px;  --fs-sm: 14px;  --fs-base: 16px;
+  --fs-lg: 18px;   --fs-xl: 22px;  --fs-2xl: 26px; --fs-3xl: 30px;
+  --pad-section: 12px; --pad-box: 12px; --pad-box-sm: 8px;
+}
+[data-density="high"] {
+  --fs-2xs: 10px;  --fs-xs: 11px;  --fs-sm: 12px;  --fs-base: 14px;
+  --fs-lg: 16px;   --fs-xl: 20px;  --fs-2xl: 24px; --fs-3xl: 28px;
+  --pad-section: 8px;  --pad-box: 8px;  --pad-box-sm: 4px;
+}
 
-/* Low density: zoomt die gesamte UI.
-   ACHTUNG: `zoom` skaliert vh-Einheiten NICHT mit. Ein Element mit 95vh wird
-   dadurch faktisch 95 × 1.12 = 106 % der Fensterhöhe hoch und ragt oben und
-   unten heraus (gemessen: je 35 px bei 1103 px Fensterhöhe). Jede
-   vh-Angabe muss deshalb durch --ui-zoom geteilt werden — dafür gibt es die
-   Klassen .overlay-panel und .overlay-sheet weiter unten. */
-:root { --ui-zoom: 1; }
-body[data-density="low"] { zoom: 1.12; --ui-zoom: 1.12; }
-body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
-
-/* Overlays: zoom-korrigierte Höhen. Der Innenraum muss zusätzlich
+/* Overlays: feste Höhen. Der Innenraum muss zusätzlich
    min-height:0 erlauben, sonst wächst ein flex-Kind über die Maximalhöhe
    hinaus und der Fussbereich mit den Buttons rutscht aus dem Bild. */
 .overlay-panel {
-  max-height: calc(92vh / var(--ui-zoom));
+  max-height: calc(92vh);
   display: flex;
   flex-direction: column;
 }
@@ -221,8 +223,8 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
   min-height: 0;
   overflow: auto;
 }
-.overlay-sheet { max-height: calc(88vh / var(--ui-zoom)); }
-.overlay-pane  { max-height: calc(55vh / var(--ui-zoom)); }
+.overlay-sheet { max-height: calc(88vh); }
+.overlay-pane  { max-height: calc(55vh); }
 
 @layer base {
   * {
@@ -235,7 +237,12 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
 
   body {
     @apply bg-bg text-text-primary font-sans antialiased;
-    font-size: 14px;
+    font-size: var(--fs-base);
+  }
+
+  /* <small> nicht relativ verkleinern (Browser: 80 %), sondern kleinste Stufe */
+  small {
+    font-size: var(--fs-2xs);
   }
 
   /* Custom scrollbar */
@@ -268,12 +275,12 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
 @layer components {
   .card {
     @apply bg-bg-surface border border-border-subtle rounded-lg shadow-card;
-    padding: var(--pad-card, 12px);
+    padding: var(--pad-section);
   }
 
   .card-elevated {
     @apply bg-bg-surface2 border border-border-subtle rounded-lg;
-    padding: var(--pad-card, 12px);
+    padding: var(--pad-section);
   }
 
   /* ── Meldungsboxen ──────────────────────────────────────────
@@ -283,7 +290,7 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
      Nicht `text-green-300` o.ä. verwenden — feste Tailwind-Stufen sind
      themeblind und fallen im Lightmode auf ~1.3:1 zurück. */
   .msg {
-    @apply flex items-start gap-2 px-3 py-2 rounded-lg text-xs border;
+    @apply flex items-start gap-2 px-3 py-2 rounded-lg text-sm border;
   }
   .msg > svg {
     @apply w-3.5 h-3.5 mt-px flex-shrink-0;
@@ -324,15 +331,15 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
   }
 
   .btn-primary {
-    @apply bg-accent hover:bg-accent-dark text-white font-medium px-4 py-2 rounded transition-colors duration-150 text-sm;
+    @apply bg-accent hover:bg-accent-dark text-white font-medium px-4 py-2 rounded transition-colors duration-150 text-base;
   }
 
   .btn-secondary {
-    @apply bg-bg-surface2 hover:bg-bg-elevated border border-border text-text-primary font-medium px-4 py-2 rounded transition-colors duration-150 text-sm;
+    @apply bg-bg-surface2 hover:bg-bg-elevated border border-border text-text-primary font-medium px-4 py-2 rounded transition-colors duration-150 text-base;
   }
 
   .btn-ghost {
-    @apply hover:bg-bg-surface2 text-text-secondary hover:text-text-primary px-3 py-2 rounded transition-colors duration-150 text-sm;
+    @apply hover:bg-bg-surface2 text-text-secondary hover:text-text-primary px-3 py-2 rounded transition-colors duration-150 text-base;
   }
 
   /* Die Ledger-Linie (wie Pension-Pal): jedes Feld traegt nur eine
@@ -348,8 +355,8 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
     background-color: transparent;
     background-image: linear-gradient(to bottom, transparent 0%, var(--well) 100%);
     color: var(--fg-1);
-    padding: 8px;
-    font-size: 14px;
+    padding: 8px 12px;
+    font-size: var(--fs-sm);
     line-height: 1.2;
     outline: none;
     transition:
@@ -392,6 +399,13 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
     background-position: right 5px center, 0 0;
     cursor: pointer;
   }
+  /* Kompakt: 4 px weniger Innenabstand bei Feldern und Knoepfen */
+  [data-density="high"] .input,
+  [data-density="high"] .input-field { padding: 4px 8px; }
+  [data-density="high"] select.input,
+  [data-density="high"] select.input-field { padding: 4px 20px 4px 8px; }
+  [data-density="high"] :is(.btn-primary, .btn-secondary) { padding: 4px 12px; }
+  [data-density="high"] .btn-ghost { padding: 4px 8px; }
   select.input:focus,
   select.input-field:focus {
     background-image: var(--chevron), linear-gradient(to bottom, transparent 0%, var(--accent-08) 100%);
@@ -408,7 +422,7 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
 
   /* Satzschreibung statt Versalien (Sentence-Case Rule) */
   .label {
-    @apply text-text-secondary text-[11px] font-normal mb-1 block;
+    @apply text-text-secondary text-xs font-normal mb-1 block;
   }
 
   /* Zahlen in Tabellenziffern (ersetzt die fruehere Mono-Schrift) */
@@ -438,7 +452,7 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
   }
 
   .badge {
-    @apply inline-flex items-center gap-1 px-2 py-px rounded-sm text-xs font-medium;
+    @apply inline-flex items-center gap-1 px-2 py-px rounded-sm text-sm font-medium;
   }
 
   .skeleton {
@@ -468,7 +482,7 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
     background: transparent;
     color: var(--fg-3);
     font-family: inherit;
-    font-size: 11px;
+    font-size: var(--fs-xs);
     font-weight: 600;
     white-space: nowrap;
     cursor: pointer;
@@ -574,7 +588,7 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
 .rail-body::-webkit-scrollbar { width: 3px; }
 
 .rail-section-label {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 400;
   color: var(--fg-3);
   padding: 4px 8px 4px;
@@ -593,7 +607,7 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
   background: transparent;
   color: var(--fg-2);
   font-family: var(--font-sans);
-  font-size: 12.5px;
+  font-size: var(--fs-sm);
   font-weight: 500;
   text-align: left;
   text-decoration: none;
@@ -633,7 +647,7 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
 .rail-badge {
   margin-left: auto;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   font-weight: 600;
   color: var(--fg-3);
 }
@@ -679,7 +693,7 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
   background: transparent;
   color: var(--fg-3);
   font-family: var(--font-sans);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
@@ -724,7 +738,7 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
   background: transparent;
   color: var(--fg-3);
   font-family: var(--font-sans);
-  font-size: 12.5px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   line-height: 1.25;
   text-align: center;
@@ -760,7 +774,7 @@ body[data-density="low"] .app-shell { height: calc(100vh / var(--ui-zoom)); }
   border: 1px solid var(--border);
   box-shadow: var(--shadow-card);
   color: var(--fg-1);
-  font-size: 11.5px;
+  font-size: var(--fs-xs);
   font-weight: 500;
   white-space: nowrap;
   pointer-events: none;

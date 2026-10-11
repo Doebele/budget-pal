@@ -57,7 +57,7 @@ export default function OnboardingReview() {
 
   if (done) {
     return (
-      <div className="card p-5 flex items-center gap-2 text-gain text-sm">
+      <div className="card flex items-center gap-2 text-gain text-base">
         <Check className="w-4 h-4" />
         {t("pages:onboarding.reviewDone")}
       </div>
@@ -77,11 +77,11 @@ export default function OnboardingReview() {
   }
 
   return (
-    <div className="card p-5">
-      <h2 className="text-text-primary font-semibold text-sm mb-1">
+    <div className="card">
+      <h2 className="text-text-primary font-semibold text-base mb-1">
         {t("pages:onboarding.reviewTitle")}
       </h2>
-      <p className="text-text-secondary text-xs mb-4">
+      <p className="text-text-secondary text-sm mb-4">
         {t("pages:onboarding.reviewBody")}
       </p>
 
@@ -89,8 +89,8 @@ export default function OnboardingReview() {
         {groups.map((group) => (
           <div key={group.merchant} className="flex items-center gap-3 py-2">
             <div className="min-w-0 flex-1">
-              <p className="text-text-primary text-sm truncate">{group.merchant}</p>
-              <p className="text-text-tertiary text-[11px]">
+              <p className="text-text-primary text-base truncate">{group.merchant}</p>
+              <p className="text-text-tertiary text-xs">
                 {t("pages:onboarding.reviewCount", { count: group.count })} ·{" "}
                 {formatAmount(Math.abs(group.total), refCcy)}
               </p>
@@ -101,7 +101,7 @@ export default function OnboardingReview() {
                 setPicked((prev) => ({ ...prev, [group.merchant]: e.target.value }))
               }
               aria-label={group.merchant}
-              className="input text-xs max-w-[12rem]"
+              className="input text-sm max-w-[12rem]"
             >
               <option value="">{t("pages:onboarding.reviewNoCategory")}</option>
               {options.map((c) => (
@@ -117,7 +117,7 @@ export default function OnboardingReview() {
           type="button"
           onClick={submit}
           disabled={confirmMut.isPending}
-          className="px-3 py-1 rounded-lg bg-accent hover:bg-accent/90 text-white text-xs font-medium transition-colors disabled:opacity-50"
+          className="px-3 py-1 rounded-lg bg-accent hover:bg-accent/90 text-white text-sm font-medium transition-colors disabled:opacity-50"
         >
           {confirmMut.isPending
             ? t("pages:onboarding.reviewSaving")
@@ -126,7 +126,7 @@ export default function OnboardingReview() {
         <button
           type="button"
           onClick={() => setDone(true)}
-          className="text-text-tertiary text-xs hover:text-text-primary transition-colors"
+          className="text-text-tertiary text-sm hover:text-text-primary transition-colors"
         >
           {t("pages:onboarding.reviewSkip")}
         </button>

@@ -127,7 +127,7 @@ export default function Goals() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-xl font-light text-text-primary">Sparziele</h1>
-          <p className="text-text-tertiary text-sm mt-1">
+          <p className="text-text-tertiary text-base mt-1">
             {activeGoals.length} aktive Ziele
           </p>
         </div>
@@ -144,7 +144,7 @@ export default function Goals() {
       {showForm && (
         <div className="card border-accent/30 animate-fade-in">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-text-primary font-semibold text-sm flex items-center gap-2">
+            <h2 className="text-text-primary font-semibold text-base flex items-center gap-2">
               <Position className="w-4 h-4 text-accent" />
               {editingGoal ? "Ziel bearbeiten" : "Neues Ziel"}
             </h2>
@@ -154,7 +154,7 @@ export default function Goals() {
           </div>
           <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
-              <label className="block text-xs text-text-tertiary mb-1">Bezeichnung *</label>
+              <label className="block text-sm text-text-tertiary mb-1">Bezeichnung *</label>
               <input
                 required
                 className="input w-full"
@@ -164,7 +164,7 @@ export default function Goals() {
               />
             </div>
             <div>
-              <label className="block text-xs text-text-tertiary mb-1">Typ</label>
+              <label className="block text-sm text-text-tertiary mb-1">Typ</label>
               <select
                 className="input w-full"
                 value={form.goal_type}
@@ -176,7 +176,7 @@ export default function Goals() {
               </select>
             </div>
             <div>
-              <label className="block text-xs text-text-tertiary mb-1">Zieltermin</label>
+              <label className="block text-sm text-text-tertiary mb-1">Zieltermin</label>
               <input
                 type="date"
                 className="input w-full"
@@ -185,7 +185,7 @@ export default function Goals() {
               />
             </div>
             <div>
-              <label className="block text-xs text-text-tertiary mb-1">Zielbetrag (CHF) *</label>
+              <label className="block text-sm text-text-tertiary mb-1">Zielbetrag (CHF) *</label>
               <input
                 required
                 type="number"
@@ -198,7 +198,7 @@ export default function Goals() {
               />
             </div>
             <div>
-              <label className="block text-xs text-text-tertiary mb-1">Aktueller Stand (CHF)</label>
+              <label className="block text-sm text-text-tertiary mb-1">Aktueller Stand (CHF)</label>
               <input
                 type="number"
                 min="0"
@@ -209,7 +209,7 @@ export default function Goals() {
               />
             </div>
             <div>
-              <label className="block text-xs text-text-tertiary mb-1">{t("pages:ui.monatliche_einlage_chf")}</label>
+              <label className="block text-sm text-text-tertiary mb-1">{t("pages:ui.monatliche_einlage_chf")}</label>
               <input
                 type="number"
                 min="0"
@@ -221,7 +221,7 @@ export default function Goals() {
               />
             </div>
             <div>
-              <label className="block text-xs text-text-tertiary mb-1">Notizen</label>
+              <label className="block text-sm text-text-tertiary mb-1">Notizen</label>
               <input
                 className="input w-full"
                 placeholder="Optional"
@@ -280,7 +280,7 @@ export default function Goals() {
         <div className="card flex flex-col items-center justify-center py-16 text-center">
           <Position className="w-12 h-12 text-text-tertiary mb-3" />
           <p className="text-text-primary font-medium mb-1">{t("pages:misc.r27")}</p>
-          <p className="text-text-tertiary text-sm mb-4">
+          <p className="text-text-tertiary text-base mb-4">
             {t("pages:ui.erstelle_dein_erstes_sparziel_und_verfolge_d")}
           </p>
           <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
@@ -292,7 +292,7 @@ export default function Goals() {
       {/* Achieved goals */}
       {achievedGoals.length > 0 && (
         <div>
-          <h2 className="text-text-tertiary text-xs font-medium mb-3 flex items-center gap-2">
+          <h2 className="text-text-tertiary text-sm font-medium mb-3 flex items-center gap-2">
             <Trophy className="w-3.5 h-3.5 text-warning" />
             Erreichte Ziele
           </h2>
@@ -343,8 +343,8 @@ function GoalCard({ goal, onEdit, onDelete, confirmDelete, onCancelDelete, onCon
             {goal.is_achieved ? "🏆" : meta.emoji}
           </span>
           <div className="min-w-0">
-            <p className="text-text-primary text-sm font-semibold truncate">{goal.name}</p>
-            <p className="text-text-tertiary text-xs">{meta.label}</p>
+            <p className="text-text-primary text-base font-semibold truncate">{goal.name}</p>
+            <p className="text-text-tertiary text-sm">{meta.label}</p>
           </div>
         </div>
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
@@ -353,7 +353,7 @@ function GoalCard({ goal, onEdit, onDelete, confirmDelete, onCancelDelete, onCon
           </button>
           {confirmDelete ? (
             <>
-              <button onClick={onConfirmDelete} className="text-[10px] px-1 py-1 rounded bg-loss/20 text-loss border border-loss/30 hover:bg-loss/40 whitespace-nowrap">
+              <button onClick={onConfirmDelete} className="text-2xs px-1 py-1 rounded bg-loss/20 text-loss border border-loss/30 hover:bg-loss/40 whitespace-nowrap">
                 {t("pages:ui.loeschen")}
               </button>
               <button onClick={onCancelDelete} className="text-text-tertiary hover:text-text-secondary p-1">
@@ -370,7 +370,7 @@ function GoalCard({ goal, onEdit, onDelete, confirmDelete, onCancelDelete, onCon
 
       {/* Progress bar */}
       <div>
-        <div className="flex justify-between text-xs mb-1">
+        <div className="flex justify-between text-sm mb-1">
           <span className="font-mono font-medium text-text-primary">
             {formatAmount(goal.current_amount, "CHF")}
           </span>
@@ -379,7 +379,7 @@ function GoalCard({ goal, onEdit, onDelete, confirmDelete, onCancelDelete, onCon
           </span>
         </div>
         <ProgressBar value={goal.progress_pct} color={barColor} opacity={1} size="md" label={goal.name} />
-        <div className="flex justify-between mt-1 text-[10px] text-text-tertiary">
+        <div className="flex justify-between mt-1 text-2xs text-text-tertiary">
           <span>{goal.progress_pct.toFixed(1)}% erreicht</span>
           {!goal.is_achieved && (
             <span>noch {formatAmount(goal.remaining, "CHF")}</span>
@@ -388,7 +388,7 @@ function GoalCard({ goal, onEdit, onDelete, confirmDelete, onCancelDelete, onCon
       </div>
 
       {/* Meta row */}
-      <div className="flex flex-wrap gap-2 text-[11px]">
+      <div className="flex flex-wrap gap-2 text-xs">
         {goal.monthly_contribution > 0 && (
           <span className="flex items-center gap-1 px-2 py-1 bg-bg-surface2 rounded-full text-text-secondary">
             <GraphUp className="w-2.5 h-2.5" />
@@ -416,7 +416,7 @@ function GoalCard({ goal, onEdit, onDelete, confirmDelete, onCancelDelete, onCon
       </div>
 
       {goal.is_achieved && (
-        <div className="flex items-center gap-1 text-xs text-gain bg-gain/10 rounded-lg px-2 py-1">
+        <div className="flex items-center gap-1 text-sm text-gain bg-gain/10 rounded-lg px-2 py-1">
           <Trophy className="w-3 h-3" />
           Ziel erreicht!
         </div>

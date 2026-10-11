@@ -96,8 +96,8 @@ export default function ExpenseDetailPanel({
         <div className="shrink-0 px-5 py-4 border-b border-border bg-bg-surface2/90">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <h2 className="text-text-primary font-semibold text-base">{t("pages:misc.r07")}</h2>
-              <p className="text-text-tertiary text-xs mt-1">{periodLabel}</p>
+              <h2 className="text-text-primary font-semibold text-lg">{t("pages:misc.r07")}</h2>
+              <p className="text-text-tertiary text-sm mt-1">{periodLabel}</p>
             </div>
             <button
               onClick={onClose}
@@ -113,7 +113,7 @@ export default function ExpenseDetailPanel({
               {formatCHF(grandTotal)}
             </span>
             {excludeTransfers && (
-              <span className="txt-warning text-xs">{t("pages:misc.r08")}</span>
+              <span className="txt-warning text-sm">{t("pages:misc.r08")}</span>
             )}
           </div>
 
@@ -131,7 +131,7 @@ export default function ExpenseDetailPanel({
         {/* ── Body ─────────────────────────────── */}
         <div className="flex-1 overflow-y-auto divide-y divide-border-subtle">
           {groups.length === 0 && (
-            <p className="text-text-tertiary text-sm text-center py-12">
+            <p className="text-text-tertiary text-base text-center py-12">
               {t("pages:ui.keine_ausgaben_im_gewaehlten_zeitraum")}
             </p>
           )}
@@ -149,16 +149,16 @@ export default function ExpenseDetailPanel({
                     >
                       <sc.icon className="w-3.5 h-3.5" style={{ color: sc.color }} />
                     </span>
-                    <span className="text-text-primary text-sm font-medium truncate">
+                    <span className="text-text-primary text-base font-medium truncate">
                       {sc.label}
                     </span>
                     {isSavings && (
-                      <span className="text-xs px-1 py-1 rounded-full border msg-warning shrink-0">
+                      <span className="text-sm px-1 py-1 rounded-full border msg-warning shrink-0">
                         {t("pages:ui.kontouebertrag_sparen")}
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 shrink-0 text-xs font-mono">
+                  <div className="flex items-center gap-2 shrink-0 text-sm font-mono">
                     <span className="text-text-tertiary tabular-nums">{pct.toFixed(1)}%</span>
                     <span className="text-text-primary font-semibold">{formatCHF(total)}</span>
                   </div>
@@ -178,7 +178,7 @@ export default function ExpenseDetailPanel({
                     const subPct = total > 0 ? (sub.total / total) * 100 : 0;
                     return (
                       <div key={sub.label} className="flex items-center gap-3">
-                        <span className="text-text-tertiary text-xs truncate flex-1 min-w-0">
+                        <span className="text-text-tertiary text-sm truncate flex-1 min-w-0">
                           {translateCategory(sub.label)}
                         </span>
                         <div className="flex items-center gap-2 shrink-0">
@@ -189,7 +189,7 @@ export default function ExpenseDetailPanel({
                               style={{ width: `${subPct}%`, backgroundColor: sc.color, opacity: 0.6 }}
                             />
                           </div>
-                          <span className="text-text-secondary text-xs font-mono w-24 text-right tabular-nums">
+                          <span className="text-text-secondary text-sm font-mono w-24 text-right tabular-nums">
                             {formatCHF(sub.total)}
                           </span>
                         </div>
@@ -197,7 +197,7 @@ export default function ExpenseDetailPanel({
                     );
                   })}
                   {subs.length > 10 && (
-                    <p className="text-text-disabled text-xs pl-0 mt-1">
+                    <p className="text-text-disabled text-sm pl-0 mt-1">
                       +{subs.length - 10} weitere Kategorien
                     </p>
                   )}
@@ -209,12 +209,12 @@ export default function ExpenseDetailPanel({
 
         {/* ── Footer total ─────────────────────── */}
         <div className="shrink-0 border-t border-border bg-bg-surface2 px-5 py-3">
-          <div className="flex items-center justify-between text-sm font-semibold">
+          <div className="flex items-center justify-between text-base font-semibold">
             <span className="text-text-secondary">{t("pages:misc.r09")}</span>
             <span className="text-text-primary font-mono">{formatCHF(grandTotal)}</span>
           </div>
           {groups.some((g) => g.isSavings) && !excludeTransfers && (
-            <p className="txt-warning text-xs mt-1">
+            <p className="txt-warning text-sm mt-1">
               {t("pages:hints.transfersIncluded", { amount: formatCHF(groups.find((g) => g.isSavings)!.total) })}
             </p>
           )}

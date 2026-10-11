@@ -22,7 +22,7 @@ import ReactECharts from "echarts-for-react";
 import type { SuperCategory } from "@/lib/categories";
 import { resolveSuperCategoryFromList, useTaxonomySuperCategories } from "@/lib/categories";
 import { formatCHF, themePalettes, type ThemePalette } from "@/lib/theme";
-import { useThemeColors } from "@/hooks/useThemeColors";
+import { useThemeColors, type FontScale } from "@/hooks/useThemeColors";
 import { useTranslation } from "react-i18next";
 import i18n from "@/i18n";
 
@@ -444,6 +444,7 @@ function buildOption(
   subsByMonth: SubCatDetail,
   firstForecastIdx = -1,
   theme: ThemePalette = themePalettes.dark,
+  fs: FontScale = { "2xs": 12, xs: 13, sm: 14, base: 16 },
 ) {
   const { keys, labels, colors, data, singleScMode, subCatColors, orderedSc } = layers;
   const axisColor = "#64748b";
@@ -476,7 +477,7 @@ function buildOption(
         silent: true,
         symbol: ["none", "none"],
         lineStyle: { color: "#475569", type: "dashed", width: 1.5 },
-        label: { show: true, position: "insideStartTop", color: "#64748b", fontSize: 10, formatter: "Prognose →" },
+        label: { show: true, position: "insideStartTop", color: "#64748b", fontSize: fs["2xs"], formatter: "Prognose →" },
         data: [{ xAxis: firstForecastIdx - 0.5 }],
       };
     }
@@ -560,23 +561,23 @@ function buildOption(
       backgroundColor: theme.bgElevated,
       borderColor: theme.border,
       borderWidth: 1,
-      textStyle: { color: theme.textPrimary, fontSize: 12 },
+      textStyle: { color: theme.textPrimary, fontSize: fs.sm },
       formatter: tooltipFormatter,
     },
-    legend: { bottom: 0, textStyle: { color: labelColor, fontSize: 11 }, data: legendData },
+    legend: { bottom: 0, textStyle: { color: labelColor, fontSize: fs.xs }, data: legendData },
     grid: { top: 12, left: 16, right: 16, bottom: legendBottom, containLabel: true },
     xAxis: {
       type: "category" as const,
       data: months.map(fmtMonth),
       axisLine: { lineStyle: { color: axisColor } },
       axisTick: { show: false },
-      axisLabel: { color: labelColor, fontSize: 11, interval: "auto" },
+      axisLabel: { color: labelColor, fontSize: fs.xs, interval: "auto" },
     },
     yAxis: {
       type: "value" as const,
       axisLabel: {
         color: labelColor,
-        fontSize: 11,
+        fontSize: fs.xs,
         formatter: (v: number) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v),
       },
       splitLine: { lineStyle: { color: gridColor } },
@@ -776,7 +777,7 @@ export default function BudgetStackedBarChart({
   const activeMode = embedded ? "historical" : mode;
   const hasBudgetPlan = (budgetPlanMonths?.length ?? 0) > 0 && budgetPlanByMonth != null;
   const superCategories = useTaxonomySuperCategories();
-  const { colors: themeColors } = useThemeColors();
+  const { colors: themeColors, fs } = useThemeColors();
   const chartSc = useMemo(
     () =>
       CHART_SC_ORDER
@@ -899,8 +900,8 @@ export default function BudgetStackedBarChart({
   );
 
   const option = useMemo(
-    () => buildOption(activeMonths, layers, activeSubs, activeFirstForecastIdx, themeColors),
-    [activeMonths, layers, activeSubs, activeFirstForecastIdx, themeColors],
+    () => buildOption(activeMonths, layers, activeSubs, activeFirstForecastIdx, themeColors, fs),
+    [activeMonths, layers, activeSubs, activeFirstForecastIdx, themeColors, fs],
   );
 
   // ── Ribbon polygon injection ───────────────────────────────────
@@ -943,7 +944,7 @@ export default function BudgetStackedBarChart({
       <button
         type="button"
         onClick={() => setMode("historical")}
-        className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+        className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
           mode === "historical"
             ? "bg-accent text-white shadow-sm"
             : "text-text-secondary hover:text-text-primary"
@@ -954,7 +955,7 @@ export default function BudgetStackedBarChart({
       <button
         type="button"
         onClick={() => setMode("forecast")}
-        className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+        className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
           mode === "forecast"
             ? "bg-accent text-white shadow-sm"
             : "text-text-secondary hover:text-text-primary"
@@ -966,7 +967,7 @@ export default function BudgetStackedBarChart({
         <button
           type="button"
           onClick={() => setMode("budgetplan")}
-          className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+          className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
             mode === "budgetplan"
               ? "bg-accent text-white shadow-sm"
               : "text-text-secondary hover:text-text-primary"
@@ -982,7 +983,7 @@ export default function BudgetStackedBarChart({
     <>
       {!hasData ? (
         <div
-          className="flex items-center justify-center text-text-tertiary text-sm"
+          className="flex items-center justify-center text-text-tertiary text-base"
           style={{ height }}
         >
           {activeMode === "historical"
@@ -1007,7 +1008,7 @@ export default function BudgetStackedBarChart({
     return (
       <div>
         <div className="px-4 pt-2 pb-1">
-          <p className="text-text-tertiary text-[11px]">{sourceLabel}</p>
+          <p className="text-text-tertiary text-xs">{sourceLabel}</p>
         </div>
         <div className="px-2 pb-2">
           {chartBody}
@@ -1020,10 +1021,10 @@ export default function BudgetStackedBarChart({
     <div className="card">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-text-primary font-semibold text-sm">
+          <h2 className="text-text-primary font-semibold text-base">
             {t("pages:ui.ausgaben_nach_kategorie")}
           </h2>
-          <p className="text-text-tertiary text-[11px] mt-1">{sourceLabel}</p>
+          <p className="text-text-tertiary text-xs mt-1">{sourceLabel}</p>
         </div>
         {modeToggle}
       </div>

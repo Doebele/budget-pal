@@ -92,11 +92,11 @@ export default function ArchivedTransactions() {
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
           <h1 className="text-xl font-light text-text-primary">Archiv</h1>
-          <p className="text-text-tertiary text-sm mt-1">{t("pages:misc.r22")}</p>
+          <p className="text-text-tertiary text-base mt-1">{t("pages:misc.r22")}</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-4 sm:items-end">
           <div className="flex flex-col gap-1">
-            <label className="label text-xs text-text-tertiary">{t("pages:misc.r21")}</label>
+            <label className="label text-sm text-text-tertiary">{t("pages:misc.r21")}</label>
             <select
               className="input w-full sm:w-64"
               value={accountFilter}
@@ -111,7 +111,7 @@ export default function ArchivedTransactions() {
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="label text-xs text-text-tertiary">Wiederkehrend</label>
+            <label className="label text-sm text-text-tertiary">Wiederkehrend</label>
             <select
               className="input w-full sm:w-64"
               value={recurrenceFilter}
@@ -131,9 +131,9 @@ export default function ArchivedTransactions() {
       </div>
 
       {isLoading && (
-        <div className="card flex items-center gap-3 p-6">
+        <div className="card flex items-center gap-3">
           <div className="w-8 h-8 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
-          <span className="text-text-secondary text-sm">{t("pages:misc.r19")}</span>
+          <span className="text-text-secondary text-base">{t("pages:misc.r19")}</span>
         </div>
       )}
 
@@ -155,7 +155,7 @@ export default function ArchivedTransactions() {
               </div>
               <div>
                 <h3 className="text-text-primary font-semibold">{t("pages:misc.r20")}</h3>
-                <p className="text-text-tertiary text-sm mt-1">
+                <p className="text-text-tertiary text-base mt-1">
                   {t("pages:hints.permanentDeleteNote")}
                 </p>
               </div>

@@ -439,7 +439,7 @@ export default function Forecast() {
             <Brain className="w-6 h-6 text-accent" />
             Budgetprognose
           </h1>
-          <p className="text-text-tertiary text-sm mt-1">
+          <p className="text-text-tertiary text-base mt-1">
             {t("pages:ui.ki_gestuetzte_vorhersage_historische_analyse")}
           </p>
         </div>
@@ -451,12 +451,12 @@ export default function Forecast() {
               placeholder="Szenario speichern…"
               value={scenarioName}
               onChange={(e) => setScenarioName(e.target.value)}
-              className="input-field text-sm w-44"
+              className="input-field text-base w-44"
             />
             <button
               onClick={() => scenarioName && saveMutation.mutate(scenarioName)}
               disabled={!scenarioName || saveMutation.isPending}
-              className="btn-secondary flex items-center gap-1 text-sm"
+              className="btn-secondary flex items-center gap-1 text-base"
             >
               <FloppyDisk className="w-3.5 h-3.5" />
             </button>
@@ -464,7 +464,7 @@ export default function Forecast() {
           <button
             onClick={() => refetch()}
             disabled={isRunning}
-            className="btn-secondary flex items-center gap-2 text-sm"
+            className="btn-secondary flex items-center gap-2 text-base"
           >
             <Refresh className={`w-4 h-4 ${isRunning ? "animate-spin" : ""}`} />
             Neu
@@ -474,7 +474,7 @@ export default function Forecast() {
 
       {/* ── Horizon selector ── */}
       <div className="flex flex-wrap gap-2 items-center">
-        <span className="text-text-tertiary text-xs font-medium mr-1">Zeithorizont:</span>
+        <span className="text-text-tertiary text-sm font-medium mr-1">Zeithorizont:</span>
         {HORIZONS.map((h) => (
           <button
             key={h.key}
@@ -505,7 +505,7 @@ export default function Forecast() {
       {/* ── Peer-group settings (collapsible) ── */}
       <div className="card py-3">
         <button
-          className="flex items-center justify-between w-full text-sm text-text-secondary hover:text-text-primary"
+          className="flex items-center justify-between w-full text-base text-text-secondary hover:text-text-primary"
           onClick={() => setShowPeerSettings(!showPeerSettings)}
         >
           <span className="font-medium">Peer-Gruppe Kalibrierung</span>
@@ -514,53 +514,53 @@ export default function Forecast() {
         {showPeerSettings && (
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-4">
             <div>
-              <label className="text-text-tertiary text-[11px] mb-1 block">Altersgruppe</label>
+              <label className="text-text-tertiary text-xs mb-1 block">Altersgruppe</label>
               <select
                 value={peerProfile.age_group}
                 onChange={(e) => setPeerProfile((p) => ({ ...p, age_group: e.target.value }))}
-                className="input-field text-sm w-full"
+                className="input-field text-base w-full"
               >
                 {AGE_GROUPS.map((g) => <option key={g} value={g}>{g}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-text-tertiary text-[11px] mb-1 block">{t("pages:ui.haushalt")}</label>
+              <label className="text-text-tertiary text-xs mb-1 block">{t("pages:ui.haushalt")}</label>
               <select
                 value={peerProfile.household_type}
                 onChange={(e) => setPeerProfile((p) => ({ ...p, household_type: e.target.value }))}
-                className="input-field text-sm w-full"
+                className="input-field text-base w-full"
               >
                 {HOUSEHOLD_TYPES.map((h) => <option key={h.value} value={h.value}>{t(h.label)}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-text-tertiary text-[11px] mb-1 block">{t("pages:misc.r25")}</label>
+              <label className="text-text-tertiary text-xs mb-1 block">{t("pages:misc.r25")}</label>
               <select
                 value={peerProfile.employment_status}
                 onChange={(e) => setPeerProfile((p) => ({ ...p, employment_status: e.target.value }))}
-                className="input-field text-sm w-full"
+                className="input-field text-base w-full"
               >
                 {EMPLOYMENT.map((e) => <option key={e.value} value={e.value}>{t(e.label)}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-text-tertiary text-[11px] mb-1 block">Einkommen</label>
+              <label className="text-text-tertiary text-xs mb-1 block">Einkommen</label>
               <select
                 value={peerProfile.income_level}
                 onChange={(e) => setPeerProfile((p) => ({ ...p, income_level: e.target.value }))}
-                className="input-field text-sm w-full"
+                className="input-field text-base w-full"
               >
                 {INCOME_LEVELS.map((l) => <option key={l.value} value={l.value}>{t(l.label)}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-text-tertiary text-[11px] mb-1 block">Kanton</label>
+              <label className="text-text-tertiary text-xs mb-1 block">Kanton</label>
               <input
                 type="text"
                 maxLength={2}
                 value={peerProfile.canton}
                 onChange={(e) => setPeerProfile((p) => ({ ...p, canton: e.target.value.toUpperCase() }))}
-                className="input-field text-sm w-full uppercase"
+                className="input-field text-base w-full uppercase"
                 placeholder="ZH"
               />
             </div>
@@ -574,7 +574,7 @@ export default function Forecast() {
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${
+            className={`flex items-center gap-2 px-4 py-2 text-base font-medium border-b-2 transition-colors -mb-px ${
               tab === key
                 ? "border-accent text-accent"
                 : "border-transparent text-text-secondary hover:text-text-primary"
@@ -591,8 +591,8 @@ export default function Forecast() {
         <div className="card h-72 flex items-center justify-center animate-pulse">
           <div className="text-center space-y-2">
             <Brain className="w-8 h-8 text-accent mx-auto animate-pulse" />
-            <p className="text-text-secondary text-sm">{t("pages:misc.r26")}</p>
-            <p className="text-text-tertiary text-xs">
+            <p className="text-text-secondary text-base">{t("pages:misc.r26")}</p>
+            <p className="text-text-tertiary text-sm">
               {t("pages:ui.zeitreihen_analyse_saisonalitaet_peer_kalibr")}
             </p>
           </div>
@@ -643,7 +643,7 @@ export default function Forecast() {
                 },
               ].map(({ label, value, color }) => (
                 <div key={label} className="card py-3">
-                  <p className="text-text-tertiary text-[11px] mb-1">{t(label)}</p>
+                  <p className="text-text-tertiary text-xs mb-1">{t(label)}</p>
                   <p className={`text-2xl font-mono font-light ${color}`}>{value}</p>
                 </div>
               ))}
@@ -652,11 +652,11 @@ export default function Forecast() {
 
           {/* Main chart */}
           <div className="card">
-            <h2 className="text-text-primary font-semibold text-sm mb-4">
+            <h2 className="text-text-primary font-semibold text-base mb-4">
               {t("pages:ui.historisch_vs_prognose_netto_cashflow")}
             </h2>
             {historicalPoints.length === 0 && forecastPoints.length === 0 ? (
-              <div className="h-64 flex items-center justify-center text-text-tertiary text-sm">
+              <div className="h-64 flex items-center justify-center text-text-tertiary text-base">
                 {t("pages:ui.keine_daten_importiere_zuerst_kontoauszuege")}
               </div>
             ) : (
@@ -689,7 +689,7 @@ export default function Forecast() {
       {!isRunning && tab === "monthly" && (
         <div className="space-y-4">
           {(forecast?.forecast ?? []).length === 0 ? (
-            <div className="card text-center py-12 text-text-tertiary text-sm">
+            <div className="card text-center py-12 text-text-tertiary text-base">
               Keine Prognosedaten
             </div>
           ) : (
@@ -699,7 +699,7 @@ export default function Forecast() {
                 if (!detail) return null;
                 return (
                   <div className="card">
-                    <h3 className="text-text-primary font-semibold text-sm mb-3">
+                    <h3 className="text-text-primary font-semibold text-base mb-3">
                       Detailansicht: {formatMonthShort(selectedMonth)}
                     </h3>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -708,7 +708,7 @@ export default function Forecast() {
                         .map(([cat, vals]) => (
                           <div
                             key={cat}
-                            className="flex items-center justify-between p-2 bg-bg-surface2 rounded-lg text-xs"
+                            className="flex items-center justify-between p-box-sm bg-bg-surface2 rounded-lg text-sm"
                           >
                             <div className="flex items-center gap-1">
                               <div
@@ -747,7 +747,7 @@ export default function Forecast() {
       {/* ── Tab: Kategorien ── */}
       {!isRunning && tab === "categories" && (
         <div className="card overflow-x-auto">
-          <table className="w-full text-xs">
+          <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border">
                 <th className="text-left py-2 pr-4 text-text-tertiary font-medium">{t("table.category")}</th>
@@ -803,7 +803,7 @@ export default function Forecast() {
             </tfoot>
           </table>
           {(forecast?.forecast?.length ?? 0) > 12 && (
-            <p className="text-text-tertiary text-[11px] mt-3">
+            <p className="text-text-tertiary text-xs mt-3">
               {t("pages:hints.first12Months", { count: forecast!.forecast.length })}
             </p>
           )}

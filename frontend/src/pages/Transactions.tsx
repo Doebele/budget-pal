@@ -284,7 +284,7 @@ export default function Transactions() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-light text-text-primary">{t("pages:transactions.title")}</h1>
-          <p className="text-text-tertiary text-sm mt-1">
+          <p className="text-text-tertiary text-base mt-1">
             {range.label} · {t("pages:ui.entriesCount", { count: transactions?.length || 0 })}
           </p>
         </div>
@@ -319,7 +319,7 @@ export default function Transactions() {
                   ? t("filters.allAccounts")
                   : selectedAccount?.name || "Konto"}
               </h2>
-              <p className="text-text-tertiary text-xs">
+              <p className="text-text-tertiary text-sm">
                 {viewMode === "all"
                   ? `${accounts?.length || 0} Konten aggregiert`
                   : "Einzelkonto-Ansicht"}
@@ -336,7 +336,7 @@ export default function Transactions() {
             <button
               onClick={() => setShowBudgetAnalysis(!showBudgetAnalysis)}
               className={clsx(
-                "flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors",
+                "flex items-center gap-2 px-3 py-2 rounded-md text-base transition-colors",
                 showBudgetAnalysis
                   ? "bg-accent/20 text-accent border border-accent/30"
                   : "text-text-tertiary hover:text-text-primary hover:bg-bg-surface2 border border-transparent"
@@ -345,13 +345,13 @@ export default function Transactions() {
               <PercentageCircle className="w-4 h-4" />
               <span className="hidden sm:inline">Budget-Analyse</span>
             </button>
-            <span className="text-text-tertiary text-sm hidden sm:inline">{t("filters.overview")}</span>
+            <span className="text-text-tertiary text-base hidden sm:inline">{t("filters.overview")}</span>
 
             {/* Custom Account Dropdown with Logos */}
             <div className="relative">
               <button
                 onClick={() => setShowAccountDropdown(!showAccountDropdown)}
-                className="flex items-center gap-2 bg-bg-surface2 text-text-primary px-3 py-2 pr-8 rounded-md border border-border-strong text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent cursor-pointer min-w-[180px] hover:bg-bg-elevated transition-colors"
+                className="flex items-center gap-2 bg-bg-surface2 text-text-primary px-3 py-2 pr-8 rounded-md border border-border-strong text-base focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent cursor-pointer min-w-[180px] hover:bg-bg-elevated transition-colors"
               >
                 {viewMode === "all" ? (
                   <>
@@ -403,7 +403,7 @@ export default function Transactions() {
                         setShowAccountDropdown(false);
                       }}
                       className={clsx(
-                        "w-full flex items-center gap-3 px-3 py-2 text-left text-sm hover:bg-bg-elevated transition-colors",
+                        "w-full flex items-center gap-3 px-3 py-2 text-left text-base hover:bg-bg-elevated transition-colors",
                         viewMode === "all" && "bg-bg-elevated/80"
                       )}
                     >
@@ -429,7 +429,7 @@ export default function Transactions() {
                             setShowAccountDropdown(false);
                           }}
                           className={clsx(
-                            "w-full flex items-center gap-3 px-3 py-2 text-left text-sm hover:bg-bg-elevated transition-colors",
+                            "w-full flex items-center gap-3 px-3 py-2 text-left text-base hover:bg-bg-elevated transition-colors",
                             String(viewMode) === String(acc.id) && "bg-bg-elevated/80"
                           )}
                         >
@@ -451,7 +451,7 @@ export default function Transactions() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-text-primary truncate">{acc.name}</p>
-                            <p className="text-text-disabled text-xs truncate">{acc.bank}</p>
+                            <p className="text-text-disabled text-sm truncate">{acc.bank}</p>
                           </div>
                           {String(viewMode) === String(acc.id) && (
                             <Check className="w-4 h-4 text-accent flex-shrink-0" />
@@ -469,36 +469,36 @@ export default function Transactions() {
 
       {/* Budget Analysis Panel */}
       {showBudgetAnalysis && budgetAnalysis && (
-        <div className="bg-bg-surface2/50 border border-border rounded-lg p-4 space-y-4 animate-fade-in">
+        <div className="bg-bg-surface2/50 border border-border rounded-lg p-box space-y-4 animate-fade-in">
           <div className="flex items-center gap-2 text-accent mb-2">
             <Wallet className="w-5 h-5" />
             <h3 className="font-medium">Budget-Analyse: {range.label}</h3>
           </div>
           {/* Summary Cards — Beträge in Referenzwährung */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="bg-bg-surface rounded-lg p-3">
-              <p className="text-text-tertiary text-xs mb-1">{t("pages:transactions.monthlyIncome")}</p>
+            <div className="bg-bg-surface rounded-lg p-box">
+              <p className="text-text-tertiary text-sm mb-1">{t("pages:transactions.monthlyIncome")}</p>
               <p className="text-gain font-mono text-lg">
                 +{formatAmount(budgetAnalysis.total_monthly_income, budgetAnalysis.reference_currency || refCcy)}
               </p>
             </div>
-            <div className="bg-bg-surface rounded-lg p-3">
-              <p className="text-text-tertiary text-xs mb-1">Fixe Kosten</p>
+            <div className="bg-bg-surface rounded-lg p-box">
+              <p className="text-text-tertiary text-sm mb-1">Fixe Kosten</p>
               <p className="text-loss font-mono text-lg">
                 −{formatAmount(budgetAnalysis.fixed_recurring_costs, budgetAnalysis.reference_currency || refCcy)}
               </p>
             </div>
-            <div className="bg-bg-surface rounded-lg p-3">
-              <p className="text-text-tertiary text-xs mb-1">Variable Kosten</p>
+            <div className="bg-bg-surface rounded-lg p-box">
+              <p className="text-text-tertiary text-sm mb-1">Variable Kosten</p>
               <p className="text-loss font-mono text-lg">
                 −{formatAmount(budgetAnalysis.variable_costs, budgetAnalysis.reference_currency || refCcy)}
               </p>
             </div>
             <div className={clsx(
-              "rounded-lg p-3",
+              "rounded-lg p-box",
               budgetAnalysis.variance >= 0 ? "bg-gain/10" : "bg-loss/10"
             )}>
-              <p className="text-text-tertiary text-xs mb-1">Verbleibend</p>
+              <p className="text-text-tertiary text-sm mb-1">Verbleibend</p>
               <p className={clsx(
                 "font-mono text-lg",
                 budgetAnalysis.variance >= 0 ? "text-gain" : "text-loss"
@@ -512,13 +512,13 @@ export default function Transactions() {
           {/* Recurring Items List */}
           {budgetAnalysis.recurring_items.length > 0 && (
             <div className="mt-4">
-              <h4 className="text-sm text-text-secondary mb-2 flex items-center gap-2">
+              <h4 className="text-base text-text-secondary mb-2 flex items-center gap-2">
                 <Repeat className="w-4 h-4 text-accent" />
                 Wiederkehrende Zahlungen
               </h4>
               <div className="bg-bg-surface rounded-lg overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-bg-surface2 text-text-tertiary text-xs">
+                <table className="w-full text-base">
+                  <thead className="bg-bg-surface2 text-text-tertiary text-sm">
                     <tr>
                       <th className="text-left px-3 py-2">Beschreibung</th>
                       <th className="text-left px-3 py-2">Periode</th>
@@ -531,7 +531,7 @@ export default function Transactions() {
                       <tr key={idx} className="hover:bg-bg-surface2/50">
                         <td className="px-3 py-2 text-text-secondary">{item.description}</td>
                         <td className="px-3 py-2">
-                          <span className={clsx("inline-flex items-center px-2 py-1 rounded text-xs", getFrequencyBadgeStyle(item.periodicity))}>
+                          <span className={clsx("inline-flex items-center px-2 py-1 rounded text-sm", getFrequencyBadgeStyle(item.periodicity))}>
                             {PERIODICITY_LABELS[item.periodicity] ?? item.periodicity}
                           </span>
                         </td>
@@ -551,7 +551,7 @@ export default function Transactions() {
 
           {/* Progress Bar */}
           <div className="mt-4">
-            <div className="flex justify-between text-xs text-text-tertiary mb-1">
+            <div className="flex justify-between text-sm text-text-tertiary mb-1">
               <span>Budget-Auslastung</span>
               <span>
                 {budgetAnalysis.monthly_budget_limit > 0
@@ -577,7 +577,7 @@ export default function Transactions() {
                 title="Variable Kosten"
               />
             </div>
-            <div className="flex gap-4 mt-2 text-xs">
+            <div className="flex gap-4 mt-2 text-sm">
               <span className="flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-loss opacity-70" />
                 <span className="text-text-tertiary">Fix</span>
@@ -660,7 +660,7 @@ export default function Transactions() {
                   <th
                     key={h || "actions"}
                     className={clsx(
-                      "text-text-tertiary text-xs   px-4 py-3 font-medium",
+                      "text-text-tertiary text-sm   px-4 py-3 font-medium",
                       // Betrag (5) und Referenz (6): rechts wie die Zahlen in den Zellen
                       colIdx === 5 || colIdx === 6 ? "text-right" : "text-left",
                     )}
@@ -684,7 +684,7 @@ export default function Transactions() {
               {!isLoading &&
                 (transactions || []).map((txn: Transaction) => (
                   <tr key={txn.id} className="group border-b border-border/30 hover:bg-bg-surface2/50 transition-colors">
-                    <td className="px-4 py-3 text-text-tertiary text-xs font-mono whitespace-nowrap">
+                    <td className="px-4 py-3 text-text-tertiary text-sm font-mono whitespace-nowrap">
                       {format(new Date(txn.date), "dd.MM.yyyy")}
                     </td>
                     <td
@@ -699,30 +699,30 @@ export default function Transactions() {
                     >
                       <div className="flex items-center gap-1 flex-wrap">
                         <p
-                          className="text-text-primary text-sm truncate"
+                          className="text-text-primary text-base truncate"
                           title={txn.merchant_normalized || txn.description || undefined}
                         >
                           {txn.merchant_normalized || txn.description}
                         </p>
                         {txn.is_split && (
-                          <span className="inline-flex items-center gap-1 px-1 py-1 rounded text-[10px] font-medium bg-accent/15 text-accent border border-accent/25 shrink-0">
+                          <span className="inline-flex items-center gap-1 px-1 py-1 rounded text-2xs font-medium bg-accent/15 text-accent border border-accent/25 shrink-0">
                             <Scissor className="w-2.5 h-2.5" />
                             {txn.split_count ?? ""}
                           </span>
                         )}
                         {txn.parent_id && (
-                          <span className="inline-flex items-center gap-1 px-1 py-1 rounded text-[10px] font-medium bg-text-tertiary/10 text-text-tertiary border border-border/40 shrink-0">
+                          <span className="inline-flex items-center gap-1 px-1 py-1 rounded text-2xs font-medium bg-text-tertiary/10 text-text-tertiary border border-border/40 shrink-0">
                             Teil
                           </span>
                         )}
                       </div>
                       {txn.merchant_normalized && txn.description !== txn.merchant_normalized && (
-                        <p className="text-text-tertiary text-xs truncate" title={txn.description}>
+                        <p className="text-text-tertiary text-sm truncate" title={txn.description}>
                           {txn.description}
                         </p>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-text-tertiary text-xs whitespace-nowrap">
+                    <td className="px-4 py-3 text-text-tertiary text-sm whitespace-nowrap">
                       {txn.account_name}
                     </td>
                     <td className="px-4 py-3">
@@ -739,7 +739,7 @@ export default function Transactions() {
                             }}
                             onBlur={() => setEditingId(null)}
                             onKeyDown={(e) => e.key === "Escape" && setEditingId(null)}
-                            className="input py-1 pr-6 text-xs text-text-primary"
+                            className="input py-1 pr-6 text-sm text-text-primary"
                           >
                             {/* Keep current value selectable even if not in canonical list */}
                             {editCategory && !ALL_CAT_GROUPS.some((g) =>
@@ -768,7 +768,7 @@ export default function Transactions() {
                             const sc = resolveSuperCategory(txn.category || "");
                             return (
                               <span
-                                className="badge text-xs flex items-center gap-1"
+                                className="badge text-sm flex items-center gap-1"
                                 style={{
                                   backgroundColor: sc.color + "22",
                                   color: sc.color,
@@ -781,7 +781,7 @@ export default function Transactions() {
                             );
                           })()}
                           {!txn.user_verified && txn.confidence_score !== undefined && (
-                            <span className="text-warning text-xs opacity-70">
+                            <span className="text-warning text-sm opacity-70">
                               {Math.round((txn.confidence_score || 0) * 100)}%
                             </span>
                           )}
@@ -790,7 +790,7 @@ export default function Transactions() {
                     </td>
                     <td className="px-4 py-3">
                       <div className={clsx(
-                        "inline-flex items-center gap-1 rounded text-xs transition-colors",
+                        "inline-flex items-center gap-1 rounded text-sm transition-colors",
                         txn.is_recurring
                           ? getFrequencyBadgeStyle(txn.periodicity)
                           : "text-text-disabled"
@@ -799,7 +799,7 @@ export default function Transactions() {
                         <select
                           value={txn.is_recurring ? (txn.periodicity ?? "monthly") : ""}
                           onChange={(e) => handleRecurringChange(txn, e.target.value)}
-                          className="bg-transparent border-none outline-none cursor-pointer text-xs appearance-none"
+                          className="bg-transparent border-none outline-none cursor-pointer text-sm appearance-none"
                         >
                           <option value="">—</option>
                           <option value="weekly">{t("periodicity.weekly")}</option>
@@ -811,7 +811,7 @@ export default function Transactions() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className={clsx("text-sm font-mono", txn.amount >= 0 ? "text-gain" : "text-loss")}>
+                      <span className={clsx("text-base font-mono", txn.amount >= 0 ? "text-gain" : "text-loss")}>
                         {txn.amount >= 0 ? "+" : ""}
                         {formatAmount(txn.amount, txn.currency || txn.account_currency || "CHF")}
                       </span>
@@ -819,7 +819,7 @@ export default function Transactions() {
                     <td className="px-4 py-3 text-right">
                       <span
                         className={clsx(
-                          "text-sm font-mono",
+                          "text-base font-mono",
                           txn.amount_reference >= 0 ? "text-gain" : "text-loss",
                         )}
                       >
@@ -836,7 +836,7 @@ export default function Transactions() {
                           <button
                             onClick={() => deleteMutation.mutate(txn.id)}
                             disabled={deleteMutation.isPending}
-                            className="text-[10px] font-medium px-1 py-1 rounded bg-loss/20 text-loss border border-loss/30 hover:bg-loss/40 transition-colors whitespace-nowrap"
+                            className="text-2xs font-medium px-1 py-1 rounded bg-loss/20 text-loss border border-loss/30 hover:bg-loss/40 transition-colors whitespace-nowrap"
                           >
                             {t("pages:ui.loeschen")}
                           </button>
@@ -872,7 +872,7 @@ export default function Transactions() {
                 ))}
               {!isLoading && (!transactions || transactions.length === 0) && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-text-tertiary text-sm">
+                  <td colSpan={8} className="px-4 py-12 text-center text-text-tertiary text-base">
                     Keine Transaktionen für {range.label} gefunden.{" "}
                     <Link to="/import" className="text-accent hover:text-accent-light">
                       {t("pages:ui.csv_importieren")}
@@ -888,7 +888,7 @@ export default function Transactions() {
       {/* Infinite-scroll sentinel */}
       <div ref={sentinelRef} className="h-4" />
       {isFetchingNextPage && (
-        <div className="flex justify-center py-4 text-text-tertiary text-sm animate-pulse">
+        <div className="flex justify-center py-4 text-text-tertiary text-base animate-pulse">
           {t("pages:ui.weitere_transaktionen_laden")}
         </div>
       )}

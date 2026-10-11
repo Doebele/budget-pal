@@ -33,11 +33,11 @@ export default function WithdrawalPlan({
 
   return (
     <div className="space-y-2">
-      <p className="text-text-secondary text-xs font-semibold">
+      <p className="text-text-secondary text-sm font-semibold">
         {t("pages:plan.title")}
       </p>
       <div className="overflow-x-auto">
-        <table className="w-full text-xs">
+        <table className="w-full text-sm">
           <thead>
             <tr className="text-text-tertiary text-left">
               <th className="py-1 pr-3 font-medium">{t("pages:plan.when")}</th>
@@ -73,9 +73,9 @@ export default function WithdrawalPlan({
         </table>
       </div>
       {saving >= 1 && (
-        <p className="text-gain text-xs">{t("pages:plan.saving", { amount: formatCHF(saving) })}</p>
+        <p className="text-gain text-sm">{t("pages:plan.saving", { amount: formatCHF(saving) })}</p>
       )}
-      <p className="text-text-tertiary text-[11px] leading-relaxed">
+      <p className="text-text-tertiary text-xs leading-relaxed">
         {t("pages:plan.rules")} {t("pages:plan.rulesExtra")}
       </p>
     </div>

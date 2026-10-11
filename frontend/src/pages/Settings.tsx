@@ -452,7 +452,7 @@ export default function Settings() {
         <input
           autoFocus
           type="text"
-          className="input-field text-[11px] flex-1 py-1 min-w-0"
+          className="input-field text-xs flex-1 py-1 min-w-0"
           placeholder={placeholder}
           value={taxoAdd.value}
           onChange={(e) => setTaxoAdd((a) => (a ? { ...a, value: e.target.value } : null))}
@@ -495,12 +495,12 @@ export default function Settings() {
     <div className="space-y-6 animate-fade-in max-w-4xl">
       <div>
         <h1 className="text-xl font-light text-text-primary">{t("pages:settings2.g08")}</h1>
-        <p className="text-text-tertiary text-sm mt-1">{t("pages:settings2.g34")}</p>
+        <p className="text-text-tertiary text-base mt-1">{t("pages:settings2.g34")}</p>
       </div>
 
       {/* Profile */}
       <div className="card">
-        <h2 className="text-text-primary font-semibold text-sm mb-4">{t("pages:settings2.g33")}</h2>
+        <h2 className="text-text-primary font-semibold text-base mb-4">{t("pages:settings2.g33")}</h2>
         <div className="space-y-4">
           <div>
             <label className="label">{t("pages:settings2.g25")}</label>
@@ -514,7 +514,7 @@ export default function Settings() {
           <div>
             <label className="label">
               {t("pages:ui.referenzwaehrung")}
-              <span className="text-text-tertiary font-normal ml-1 text-xs">
+              <span className="text-text-tertiary font-normal ml-1 text-sm">
                 {t("pages:ui.aggregationen_in_budgetanalyse_reale_angaben")}
               </span>
             </label>
@@ -532,7 +532,7 @@ export default function Settings() {
           <div>
             <label className="label">
               {t("pages:ui.saron_referenzzins_jaehrlich_p_a")}
-              <span className="text-text-tertiary font-normal ml-1 text-xs">
+              <span className="text-text-tertiary font-normal ml-1 text-sm">
                 {t("pages:ui.fuer_hypothekenangaben_im_wizard")}
               </span>
             </label>
@@ -546,9 +546,9 @@ export default function Settings() {
                 value={saronReferenceAnnualPct}
                 onChange={(e) => setSaronReferenceAnnualPct(parseFloat(e.target.value) || 0)}
               />
-              <span className="text-text-tertiary text-xs">% p.a.</span>
+              <span className="text-text-tertiary text-sm">% p.a.</span>
             </div>
-            <p className="text-text-tertiary text-xs mt-2 leading-relaxed">
+            <p className="text-text-tertiary text-sm mt-2 leading-relaxed">
               {t("pages:hints.saronHint")}{" "}
               <a
                 href={SARON_INDEX_URL}
@@ -566,7 +566,7 @@ export default function Settings() {
           <div>
             <label className="label">
               {t("pages:hints.birthdate")}
-              <span className="text-text-tertiary font-normal ml-1 text-xs">{t("pages:misc.r38")}</span>
+              <span className="text-text-tertiary font-normal ml-1 text-sm">{t("pages:misc.r38")}</span>
             </label>
             <div className="flex items-center gap-3">
               <input
@@ -577,7 +577,7 @@ export default function Settings() {
                 max={new Date().toISOString().split("T")[0]}
               />
               {age !== null && (
-                <span className="text-text-secondary text-sm">
+                <span className="text-text-secondary text-base">
                   → <span className="text-text-primary font-medium">{t("pages:hints.yearsOld", { age })}</span>
                   {retirementYear && (
                     <span className="text-text-tertiary ml-2">{t("pages:hints.pensionAround", { year: retirementYear })}</span>
@@ -590,7 +590,7 @@ export default function Settings() {
           <div>
             <label className="label">
               {t("pages:hints.retirementAge")}
-              <span className="text-text-tertiary font-normal ml-1 text-xs">{t("pages:hints.target")}</span>
+              <span className="text-text-tertiary font-normal ml-1 text-sm">{t("pages:hints.target")}</span>
             </label>
             <div className="flex items-center gap-4">
               <input
@@ -622,11 +622,11 @@ export default function Settings() {
             <MagicWand className="w-4 h-4 text-accent" />
           </div>
           <div className="flex-1">
-            <h2 className="text-text-primary font-semibold text-sm">{t("pages:settings2.g10")}</h2>
-            <p className="text-text-tertiary text-xs mt-1 mb-3">
+            <h2 className="text-text-primary font-semibold text-base">{t("pages:settings2.g10")}</h2>
+            <p className="text-text-tertiary text-sm mt-1 mb-3">
               {t("pages:ui.aktualisiere_deine_basisdaten_peer_gruppe_vo")}
             </p>
-            <Link to="/wizard" className="btn-primary inline-flex items-center gap-2 text-sm py-2">
+            <Link to="/wizard" className="btn-primary inline-flex items-center gap-2 text-base py-2">
               <MagicWand className="w-3.5 h-3.5" />
               {t("pages:ui.zu_empirischen_angaben")}
             </Link>
@@ -637,12 +637,12 @@ export default function Settings() {
       {/* Supercategory taxonomy */}
       <div className="card">
         <div className="mb-4">
-          <h2 className="text-text-primary font-semibold text-sm">{t("pages:settings2.g40")}</h2>
-          <p className="text-text-tertiary text-xs mt-1">
+          <h2 className="text-text-primary font-semibold text-base">{t("pages:settings2.g40")}</h2>
+          <p className="text-text-tertiary text-sm mt-1">
             {t("pages:hints.taxonomyOverview")}
           </p>
           {peerConfig?.peerLabel && (
-            <div className="mt-2 flex items-center gap-1 text-xs text-text-tertiary">
+            <div className="mt-2 flex items-center gap-1 text-sm text-text-tertiary">
               <Group className="w-3 h-3 text-accent shrink-0" />
               <span>{t("pages:hints.peerGroupLabel")} <span className="text-text-secondary font-medium">{peerConfig.peerLabel}</span></span>
               <span className="text-text-disabled">·</span>
@@ -653,7 +653,7 @@ export default function Settings() {
 
         {/* Übersicht: Superkategorie ↔ empirische vs. reale Kategorien (farbkodiert) */}
         <div className="rounded-xl border border-border/50 overflow-hidden mb-4">
-          <p className="text-[11px] text-text-tertiary px-3 py-2 bg-bg-surface2/40 border-b border-border/30">
+          <p className="text-xs text-text-tertiary px-3 py-2 bg-bg-surface2/40 border-b border-border/30">
             <Trans
               i18nKey="pages:hints.taxonomyMapping"
               values={{ empirical: t("pages:misc.r39"), actual: t("pages:misc.r40") }}
@@ -664,9 +664,9 @@ export default function Settings() {
             />
           </p>
           <div className="overflow-x-auto">
-            <table className="w-full text-xs min-w-[640px]">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
-                <tr className="text-text-tertiary text-[11px] border-b border-border/30">
+                <tr className="text-text-tertiary text-xs border-b border-border/30">
                   <th className="text-left py-2 px-3 w-[22%]">{t("pages:settings2.g39")}</th>
                   <th className="text-left py-2 px-3 w-[39%]">{t("pages:settings2.g09")}</th>
                   <th className="text-left py-2 px-3 w-[39%]">{t("pages:settings2.g35")}</th>
@@ -705,7 +705,7 @@ export default function Settings() {
                                 {canonicalWl.map((l) => (
                                   <span
                                     key={l}
-                                    className="px-1 py-1 rounded text-[11px] text-text-secondary"
+                                    className="px-1 py-1 rounded text-xs text-text-secondary"
                                     style={{ backgroundColor: sc.color + "24", border: `1px solid ${sc.color}44` }}
                                   >
                                     {l}
@@ -714,7 +714,7 @@ export default function Settings() {
                                 {ownWl.map((c) => (
                                   <span
                                     key={c.id}
-                                    className="px-1 py-1 rounded text-[11px] text-text-secondary border"
+                                    className="px-1 py-1 rounded text-xs text-text-secondary border"
                                     style={{ backgroundColor: sc.color + "18", borderColor: sc.color + "55" }}
                                   >
                                     {c.name}
@@ -750,7 +750,7 @@ export default function Settings() {
                                 {canonicalTxn.map((c) => (
                                   <span
                                     key={c}
-                                    className="px-1 py-1 rounded text-[11px] text-text-secondary"
+                                    className="px-1 py-1 rounded text-xs text-text-secondary"
                                     style={{ backgroundColor: sc.color + "18" }}
                                   >
                                     {c}
@@ -759,7 +759,7 @@ export default function Settings() {
                                 {ownTxn.map((cat) => (
                                   <span
                                     key={cat.id}
-                                    className="px-1 py-1 rounded text-[11px] text-text-secondary border"
+                                    className="px-1 py-1 rounded text-xs text-text-secondary border"
                                     style={{ backgroundColor: sc.color + "14", borderColor: sc.color + "44" }}
                                   >
                                     {cat.name}
@@ -788,7 +788,7 @@ export default function Settings() {
           </div>
         </div>
 
-        <p className="text-xs text-text-tertiary font-medium mt-6 mb-2">
+        <p className="text-sm text-text-tertiary font-medium mt-6 mb-2">
           {t("pages:ui.details_peer_ergaenzungen_und_bearbeitung_pr")}
         </p>
         <div className="space-y-1">
@@ -809,7 +809,7 @@ export default function Settings() {
                     >
                       <sc.icon className="w-4 h-4" style={{ color: sc.color }} />
                     </span>
-                    <span className="text-text-primary text-sm font-medium">{sc.label}</span>
+                    <span className="text-text-primary text-base font-medium">{sc.label}</span>
                     <span
                       className="w-2.5 h-2.5 rounded-full shrink-0"
                       style={{ backgroundColor: sc.color }}
@@ -818,7 +818,7 @@ export default function Settings() {
                   <div className="flex items-center gap-3 shrink-0">
                     {peer != null && peer > 0 && (
                       <span
-                        className="flex items-center gap-1 text-[11px] font-mono px-2 py-1 rounded-full"
+                        className="flex items-center gap-1 text-xs font-mono px-2 py-1 rounded-full"
                         style={{ backgroundColor: sc.color + "18", color: sc.color }}
                       >
                         <Group className="w-2.5 h-2.5" />
@@ -831,7 +831,7 @@ export default function Settings() {
                   </div>
                 </button>
                 {isOpen && (
-                  <div className="px-4 pb-3 pt-2 border-t border-border/30 space-y-3 text-xs">
+                  <div className="px-4 pb-3 pt-2 border-t border-border/30 space-y-3 text-sm">
                     {/* Peer-Gruppe Detail */}
                     {peerConfig && peer != null && (
                       <div>
@@ -897,7 +897,7 @@ export default function Settings() {
                       {/* ── Empirische Labels (Wizard) ── */}
                       <div>
                         <div className="flex items-center justify-between mb-1">
-                          <p className="text-text-tertiary font-semibold text-[11px]">
+                          <p className="text-text-tertiary font-semibold text-xs">
                             Empirische Labels (Wizard)
                           </p>
                           <button
@@ -911,12 +911,12 @@ export default function Settings() {
                         </div>
                         <div className="flex flex-wrap gap-1">
                           {sc.wizardLabels.filter((l) => !isLabelHidden(sc.id, l, "wl") && !ownCats.some((oc) => oc.icon === "wl:" + sc.id && oc.name.toLowerCase() === l.toLowerCase())).length === 0 && ownCats.filter((cat) => cat.icon === "wl:" + sc.id).length === 0 ? (
-                            <span className="text-text-disabled italic text-[11px]">{t("pages:settings2.g21")}</span>
+                            <span className="text-text-disabled italic text-xs">{t("pages:settings2.g21")}</span>
                           ) : (
                             <>
                               {sc.wizardLabels.filter((l) => !isLabelHidden(sc.id, l, "wl") && !ownCats.some((oc) => oc.icon === "wl:" + sc.id && oc.name.toLowerCase() === l.toLowerCase())).map((l) => (
                                 taxoDelete?.label === l && taxoDelete.scId === sc.id && taxoDelete.type === "wizard" ? (
-                                  <div key={l} className="w-full mt-1 p-2 rounded-lg border border-loss/30 bg-loss/5 space-y-1 text-[11px]">
+                                  <div key={l} className="w-full mt-1 p-box-sm rounded-lg border border-loss/30 bg-loss/5 space-y-1 text-xs">
                                     <p className="text-text-secondary">
                                       <span className="font-semibold text-loss">«{l}»</span> ausblenden?
                                       {taxoDelete.txnCount > 0 && (
@@ -927,7 +927,7 @@ export default function Settings() {
                                     </p>
                                     {taxoDelete.txnCount > 0 && (
                                       <select
-                                        className="input-field text-[11px] w-full"
+                                        className="input-field text-xs w-full"
                                         value={taxoDeleteTarget}
                                         onChange={(e) => setTaxoDeleteTarget(e.target.value)}
                                       >
@@ -950,7 +950,7 @@ export default function Settings() {
                                 ) : (
                                 <span
                                   key={l}
-                                  className="group flex items-center gap-1 px-1 py-1 rounded text-text-secondary text-[11px]"
+                                  className="group flex items-center gap-1 px-1 py-1 rounded text-text-secondary text-xs"
                                   style={{ backgroundColor: sc.color + "18" }}
                                 >
                                   {l}
@@ -969,7 +969,7 @@ export default function Settings() {
                               {ownCats.filter((cat) => cat.icon === "wl:" + sc.id).map((cat) => (
                                 <span
                                   key={cat.id}
-                                  className="group flex items-center gap-1 px-1 py-1 rounded border text-text-secondary text-[11px]"
+                                  className="group flex items-center gap-1 px-1 py-1 rounded border text-text-secondary text-xs"
                                   style={{ backgroundColor: sc.color + "18", borderColor: sc.color + "44" }}
                                 >
                                   {cat.name}
@@ -991,7 +991,7 @@ export default function Settings() {
                       {/* ── Transaktionskategorien ── */}
                       <div>
                         <div className="flex items-center justify-between mb-1">
-                          <p className="text-text-tertiary font-semibold text-[11px]">
+                          <p className="text-text-tertiary font-semibold text-xs">
                             {t("pages:ui.transaktionskategorien_reale_angaben")}
                           </p>
                           <button
@@ -1008,7 +1008,7 @@ export default function Settings() {
                           {sc.txnCategories.filter((c) => !isLabelHidden(sc.id, c, "txn") && !ownCats.some((oc) => oc.icon === sc.id && oc.name.toLowerCase() === c.toLowerCase())).map((c) => (
                             taxoDelete?.label === c && taxoDelete.scId === sc.id && taxoDelete.type === "txn" ? (
                               /* Delete confirmation inline */
-                              <div key={c} className="w-full mt-1 p-2 rounded-lg border border-loss/30 bg-loss/5 space-y-1 text-[11px]">
+                              <div key={c} className="w-full mt-1 p-box-sm rounded-lg border border-loss/30 bg-loss/5 space-y-1 text-xs">
                                 <p className="text-text-secondary">
                                   <span className="font-semibold text-loss">«{c}»</span> entfernen?
                                   {taxoDelete.txnCount > 0 && (
@@ -1019,7 +1019,7 @@ export default function Settings() {
                                 </p>
                                 {taxoDelete.txnCount > 0 && (
                                   <select
-                                    className="input-field text-[11px] w-full"
+                                    className="input-field text-xs w-full"
                                     value={taxoDeleteTarget}
                                     onChange={(e) => setTaxoDeleteTarget(e.target.value)}
                                   >
@@ -1081,7 +1081,7 @@ export default function Settings() {
                             </span>
                           ))}
                           {sc.txnCategories.filter((c) => !ownCats.some((oc) => oc.icon === sc.id && oc.name.toLowerCase() === c.toLowerCase())).length === 0 && ownCats.filter((cat) => cat.icon === sc.id).length === 0 && (
-                            <span className="text-text-disabled italic text-[11px]">{t("pages:settings2.g22")}</span>
+                            <span className="text-text-disabled italic text-xs">{t("pages:settings2.g22")}</span>
                           )}
                         </div>
                         {renderTaxonomyAddForm(sc, "txn")}
@@ -1096,7 +1096,7 @@ export default function Settings() {
                       if (hiddenTxn.length === 0 && hiddenWl.length === 0) return null;
                       return (
                         <div className="pt-2 border-t border-border/20">
-                          <p className="text-text-disabled text-[10px] mb-1 flex items-center gap-1">
+                          <p className="text-text-disabled text-2xs mb-1 flex items-center gap-1">
                             <Eye className="w-2.5 h-2.5" />
                             {t("pages:ui.ausgeblendete_labels_klicken_zum_einblenden")}
                           </p>
@@ -1107,10 +1107,10 @@ export default function Settings() {
                                 type="button"
                                 title={t("pages:settings2.g45")}
                                 onClick={() => unhideLabelMutation.mutate({ sc_id: sc.id, label: l, label_type: "txn" })}
-                                className="px-1 py-1 rounded text-[11px] text-text-disabled border border-dashed border-border/40 hover:border-text-tertiary hover:text-text-secondary transition-colors"
+                                className="px-1 py-1 rounded text-xs text-text-disabled border border-dashed border-border/40 hover:border-text-tertiary hover:text-text-secondary transition-colors"
                               >
                                 {l}
-                                <span className="ml-1 text-[10px] opacity-60">{t("pages:settings2.g18")}</span>
+                                <span className="ml-1 text-2xs opacity-60">{t("pages:settings2.g18")}</span>
                               </button>
                             ))}
                             {hiddenWl.map((l) => (
@@ -1119,10 +1119,10 @@ export default function Settings() {
                                 type="button"
                                 title={t("pages:settings2.g46")}
                                 onClick={() => unhideLabelMutation.mutate({ sc_id: sc.id, label: l, label_type: "wl" })}
-                                className="px-1 py-1 rounded text-[11px] text-text-disabled border border-dashed border-border/40 hover:border-text-tertiary hover:text-text-secondary transition-colors"
+                                className="px-1 py-1 rounded text-xs text-text-disabled border border-dashed border-border/40 hover:border-text-tertiary hover:text-text-secondary transition-colors"
                               >
                                 {l}
-                                <span className="ml-1 text-[10px] opacity-60">Emp</span>
+                                <span className="ml-1 text-2xs opacity-60">Emp</span>
                               </button>
                             ))}
                           </div>
@@ -1141,8 +1141,8 @@ export default function Settings() {
       <div className="card">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-text-primary font-semibold text-sm">{t("pages:settings2.g19")}</h2>
-            <p className="text-text-tertiary text-xs mt-1">
+            <h2 className="text-text-primary font-semibold text-base">{t("pages:settings2.g19")}</h2>
+            <p className="text-text-tertiary text-sm mt-1">
               {t("pages:hints.mappingNote")}
             </p>
           </div>
@@ -1150,7 +1150,7 @@ export default function Settings() {
             type="button"
             onClick={() => resetMappingsMutation.mutate()}
             disabled={resetMappingsMutation.isPending}
-            className="flex items-center gap-1 px-3 py-1 rounded-lg border border-border/60 text-text-secondary text-xs hover:bg-bg-surface2 transition-colors disabled:opacity-40"
+            className="flex items-center gap-1 px-3 py-1 rounded-lg border border-border/60 text-text-secondary text-sm hover:bg-bg-surface2 transition-colors disabled:opacity-40"
             title={t("pages:settings2.g02")}
           >
             <Undo className="w-3 h-3" />
@@ -1159,17 +1159,17 @@ export default function Settings() {
         </div>
 
         {mappingsLoading ? (
-          <p className="text-text-tertiary text-sm py-4">{t("pages:settings2.g47")}</p>
+          <p className="text-text-tertiary text-base py-4">{t("pages:settings2.g47")}</p>
         ) : !mappingsData?.wizard_labels?.length ? (
-          <p className="text-text-tertiary text-sm py-4">
+          <p className="text-text-tertiary text-base py-4">
             {t("pages:ui.keine_budgets_aus_empirischen_angaben_gefund")}
           </p>
         ) : (
           <>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-base">
                 <thead>
-                  <tr className="border-b border-border/50 text-text-tertiary text-xs">
+                  <tr className="border-b border-border/50 text-text-tertiary text-sm">
                     <th className="text-left py-2 pr-4">{t("pages:settings2.g23")}</th>
                     <th className="text-left py-2">{t("pages:settings2.g39")}</th>
                   </tr>
@@ -1203,7 +1203,7 @@ export default function Settings() {
             </div>
 
             {saveMappingsMutation.isError && (
-              <div className="flex items-center gap-2 text-loss text-xs bg-loss/10 border border-loss/30 rounded-lg px-3 py-2 mt-3">
+              <div className="flex items-center gap-2 text-loss text-sm bg-loss/10 border border-loss/30 rounded-lg px-3 py-2 mt-3">
                 <WarningCircle className="w-4 h-4 shrink-0" />
                 {t("pages:ui.fehler_beim_speichern")}
               </div>
@@ -1220,7 +1220,7 @@ export default function Settings() {
                 {mappingSaved ? t("pages:settings2.saved") : saveMappingsMutation.isPending ? t("pages:settings2.saving") : t("pages:settings2.saveMappings")}
               </button>
               {mappingDirty && (
-                <span className="text-xs text-warning">{t("pages:settings2.g44")}</span>
+                <span className="text-sm text-warning">{t("pages:settings2.g44")}</span>
               )}
             </div>
           </>
@@ -1231,18 +1231,18 @@ export default function Settings() {
       <div className="card">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-text-primary font-semibold text-sm flex items-center gap-2">
+            <h2 className="text-text-primary font-semibold text-base flex items-center gap-2">
               <Label className="w-4 h-4 text-accent" />
               {t("pages:ui.eigene_kategorien")}
             </h2>
-            <p className="text-text-tertiary text-xs mt-1">
+            <p className="text-text-tertiary text-sm mt-1">
               {t("pages:ui.benutzerdefinierte_kategorien_fuer_transakti")}
             </p>
           </div>
           <button
             type="button"
             onClick={() => setCatAddForm({ name: "", super_id: "sonstiges", color: "#94a3b8" })}
-            className="flex items-center gap-1 px-3 py-1 rounded-lg bg-accent/10 border border-accent/30 text-accent text-xs font-medium hover:bg-accent/20 transition-colors"
+            className="flex items-center gap-1 px-3 py-1 rounded-lg bg-accent/10 border border-accent/30 text-accent text-sm font-medium hover:bg-accent/20 transition-colors"
           >
             <Plus className="w-3 h-3" />
             {t("pages:ui.neue_kategorie")}
@@ -1251,15 +1251,15 @@ export default function Settings() {
 
         {/* Add form */}
         {catAddForm && (
-          <div className="mb-4 p-3 rounded-lg border border-border bg-bg-surface2 space-y-3">
-            <p className="text-text-primary text-xs font-semibold">{t("pages:settings2.g26")}</p>
+          <div className="mb-4 p-box rounded-lg border border-border bg-bg-surface2 space-y-3">
+            <p className="text-text-primary text-sm font-semibold">{t("pages:settings2.g26")}</p>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-text-tertiary text-[11px] mb-1 block">{t("pages:settings2.g25")}</label>
+                <label className="text-text-tertiary text-xs mb-1 block">{t("pages:settings2.g25")}</label>
                 <input
                   type="text"
                   autoFocus
-                  className="input-field text-sm w-full"
+                  className="input-field text-base w-full"
                   value={catAddForm.name}
                   onChange={(e) => setCatAddForm((f) => f ? { ...f, name: e.target.value } : null)}
                   placeholder={t("pages:settings2.g48")}
@@ -1270,9 +1270,9 @@ export default function Settings() {
                 />
               </div>
               <div>
-                <label className="text-text-tertiary text-[11px] mb-1 block">{t("pages:settings2.g39")}</label>
+                <label className="text-text-tertiary text-xs mb-1 block">{t("pages:settings2.g39")}</label>
                 <select
-                  className="input-field text-sm w-full"
+                  className="input-field text-base w-full"
                   value={catAddForm.super_id}
                   onChange={(e) => setCatAddForm((f) => f ? { ...f, super_id: e.target.value } : null)}
                 >
@@ -1283,7 +1283,7 @@ export default function Settings() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <label className="text-text-tertiary text-[11px]">{t("pages:settings2.g14")}</label>
+              <label className="text-text-tertiary text-xs">{t("pages:settings2.g14")}</label>
               <input
                 type="color"
                 value={catAddForm.color}
@@ -1295,7 +1295,7 @@ export default function Settings() {
                 type="button"
                 onClick={() => createCatMutation.mutate(catAddForm)}
                 disabled={!catAddForm.name.trim() || createCatMutation.isPending}
-                className="btn-primary text-xs flex items-center gap-1 disabled:opacity-40"
+                className="btn-primary text-sm flex items-center gap-1 disabled:opacity-40"
               >
                 <Check className="w-3 h-3" />
                 Erstellen
@@ -1309,17 +1309,17 @@ export default function Settings() {
               </button>
             </div>
             {createCatMutation.isError && (
-              <p className="text-loss text-xs">{t("pages:settings2.g15")}</p>
+              <p className="text-loss text-sm">{t("pages:settings2.g15")}</p>
             )}
           </div>
         )}
 
         {catsLoading && (
-          <p className="text-text-tertiary text-sm py-4">{t("pages:settings2.g47")}</p>
+          <p className="text-text-tertiary text-base py-4">{t("pages:settings2.g47")}</p>
         )}
 
         {!catsLoading && ownCats.length === 0 && !catAddForm && (
-          <p className="text-text-tertiary text-sm py-4 text-center">
+          <p className="text-text-tertiary text-base py-4 text-center">
             {t("pages:ui.noch_keine_eigenen_kategorien_klicke_auf_neu")}
           </p>
         )}
@@ -1339,8 +1339,8 @@ export default function Settings() {
                   >
                     <sc.icon className="w-3.5 h-3.5" style={{ color: sc.color }} />
                   </span>
-                  <span className="text-text-secondary text-xs font-semibold">{sc.label}</span>
-                  <span className="text-text-disabled text-[11px] ml-auto">{cats.length} Kategorie{cats.length !== 1 ? "n" : ""}</span>
+                  <span className="text-text-secondary text-sm font-semibold">{sc.label}</span>
+                  <span className="text-text-disabled text-xs ml-auto">{cats.length} Kategorie{cats.length !== 1 ? "n" : ""}</span>
                 </div>
                 <div className="divide-y divide-border/20">
                   {cats.map((cat) => (
@@ -1348,7 +1348,7 @@ export default function Settings() {
                       {catDeleteId === cat.id ? (
                         /* Delete confirmation */
                         <div className="space-y-2">
-                          <p className="text-xs text-text-secondary">
+                          <p className="text-sm text-text-secondary">
                             <span className="text-loss font-semibold">«{cat.name}»</span> löschen?
                             {cat.txn_count > 0 && (
                               <span className="ml-1 text-text-tertiary">
@@ -1358,11 +1358,11 @@ export default function Settings() {
                           </p>
                           {cat.txn_count > 0 && (
                             <div>
-                              <label className="text-text-tertiary text-[11px] mb-1 block">
+                              <label className="text-text-tertiary text-xs mb-1 block">
                                 Neu zuweisen zu (optional):
                               </label>
                               <select
-                                className="input-field text-xs w-full max-w-xs"
+                                className="input-field text-sm w-full max-w-xs"
                                 value={catReassignTo}
                                 onChange={(e) => setCatReassignTo(e.target.value ? Number(e.target.value) : "")}
                               >
@@ -1380,14 +1380,14 @@ export default function Settings() {
                               type="button"
                               onClick={() => deleteCatMutation.mutate({ id: cat.id, reassignTo: catReassignTo })}
                               disabled={deleteCatMutation.isPending}
-                              className="text-[11px] px-2 py-1 rounded bg-loss/20 text-loss border border-loss/30 hover:bg-loss/30 transition-colors disabled:opacity-40"
+                              className="text-xs px-2 py-1 rounded bg-loss/20 text-loss border border-loss/30 hover:bg-loss/30 transition-colors disabled:opacity-40"
                             >
                               {t("pages:ui.endgueltig_loeschen")}
                             </button>
                             <button
                               type="button"
                               onClick={() => { setCatDeleteId(null); setCatReassignTo(""); }}
-                              className="text-[11px] text-text-tertiary hover:text-text-primary"
+                              className="text-xs text-text-tertiary hover:text-text-primary"
                             >
                               {t("pages:ui.abbrechen")}
                             </button>
@@ -1399,7 +1399,7 @@ export default function Settings() {
                           <input
                             autoFocus
                             type="text"
-                            className="input-field text-sm flex-1"
+                            className="input-field text-base flex-1"
                             value={catEditName}
                             onChange={(e) => setCatEditName(e.target.value)}
                             onKeyDown={(e) => {
@@ -1432,9 +1432,9 @@ export default function Settings() {
                             className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                             style={{ backgroundColor: cat.color ?? sc.color }}
                           />
-                          <span className="text-text-primary text-sm flex-1">{cat.name}</span>
+                          <span className="text-text-primary text-base flex-1">{cat.name}</span>
                           {cat.txn_count > 0 && (
-                            <span className="text-[11px] text-text-tertiary font-mono bg-bg-surface2 px-1 py-1 rounded">
+                            <span className="text-xs text-text-tertiary font-mono bg-bg-surface2 px-1 py-1 rounded">
                               {cat.txn_count} Txn
                             </span>
                           )}
@@ -1475,7 +1475,7 @@ export default function Settings() {
       {/* Info */}
       {/* Darstellung / Display preferences */}
       <div className="card">
-        <h2 className="text-text-primary font-semibold text-sm mb-4">{t("pages:settings2.g05")}</h2>
+        <h2 className="text-text-primary font-semibold text-base mb-4">{t("pages:settings2.g05")}</h2>
         <div className="space-y-4">
           <div>
             <label className="label mb-2 block">{t("pages:settings2.g38")}</label>
@@ -1501,7 +1501,7 @@ export default function Settings() {
                 Gauge-Ansicht
               </button>
             </div>
-            <p className="text-text-disabled text-xs mt-1">
+            <p className="text-text-disabled text-sm mt-1">
               {t("pages:ui.wird_beim_oeffnen_der_budgetanalyse_als_stan")}
             </p>
           </div>
@@ -1510,19 +1510,19 @@ export default function Settings() {
 
       {/* ── Datensicherung ──────────────────────────────────────── */}
       <div className="card space-y-5">
-        <h2 className="text-text-primary font-semibold text-sm flex items-center gap-2">
+        <h2 className="text-text-primary font-semibold text-base flex items-center gap-2">
           <ShieldCheck className="w-4 h-4 text-accent" />
           {t("settings:backup.title")}
         </h2>
 
         {/* Export */}
         <div className="space-y-2">
-          <h3 className="text-text-secondary text-xs font-medium">{t("pages:settings2.g13")}</h3>
-          <p className="text-text-tertiary text-xs">
+          <h3 className="text-text-secondary text-sm font-medium">{t("pages:settings2.g13")}</h3>
+          <p className="text-text-tertiary text-sm">
             {t("pages:hints.exportNote")}
           </p>
 
-          <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer w-fit">
+          <label className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer w-fit">
             <input
               type="checkbox"
               checked={includeKeys}
@@ -1538,20 +1538,20 @@ export default function Settings() {
 
           {includeKeys && (
             <div className="space-y-2">
-              <p className="msg msg-warning text-xs flex items-start gap-1">
+              <p className="msg msg-warning text-sm flex items-start gap-1">
                 <WarningCircle className="w-3.5 h-3.5 shrink-0 mt-px" />
                 {t("settings:backup.keysWarn")}
               </p>
               <input
                 type="password"
-                className="input text-sm max-w-xs"
+                className="input text-base max-w-xs"
                 value={exportPassword}
                 onChange={(e) => setExportPassword(e.target.value)}
                 placeholder={t("settings:backup.password")}
                 aria-label={t("settings:backup.password")}
                 autoComplete="current-password"
               />
-              <p className="text-text-disabled text-[11px]">{t("settings:backup.passwordHint")}</p>
+              <p className="text-text-disabled text-xs">{t("settings:backup.passwordHint")}</p>
             </div>
           )}
 
@@ -1559,7 +1559,7 @@ export default function Settings() {
             type="button"
             onClick={handleExport}
             disabled={backupExporting || (includeKeys && !exportPassword)}
-            className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent/90 disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent/90 disabled:opacity-60 text-white text-base font-medium rounded-lg transition-colors"
           >
             <Download className="w-4 h-4" />
             {backupExporting
@@ -1569,7 +1569,7 @@ export default function Settings() {
                 : t("settings:backup.exportButton")}
           </button>
           {backupExportError && (
-            <p className="text-loss text-xs flex items-center gap-1" role="alert">
+            <p className="text-loss text-sm flex items-center gap-1" role="alert">
               <WarningCircle className="w-3.5 h-3.5" /> {backupExportError}
             </p>
           )}
@@ -1579,14 +1579,14 @@ export default function Settings() {
 
         {/* Import */}
         <div className="space-y-3">
-          <h3 className="text-text-secondary text-xs font-medium">{t("pages:settings2.g17")}</h3>
-          <p className="text-text-tertiary text-xs">
+          <h3 className="text-text-secondary text-sm font-medium">{t("pages:settings2.g17")}</h3>
+          <p className="text-text-tertiary text-sm">
             {t("pages:hints.restoreNote")}
           </p>
 
           {/* File picker */}
           <label className="flex items-center gap-2 cursor-pointer w-fit">
-            <span className="flex items-center gap-2 px-3 py-2 bg-bg-surface2 hover:bg-bg-surface border border-border text-text-secondary hover:text-text-primary rounded-lg text-sm transition-colors">
+            <span className="flex items-center gap-2 px-3 py-2 bg-bg-surface2 hover:bg-bg-surface border border-border text-text-secondary hover:text-text-primary rounded-lg text-base transition-colors">
               <Upload className="w-4 h-4" />
               {importFile ? importFile.name : t("settings:backup.chooseFile")}
             </span>
@@ -1600,7 +1600,7 @@ export default function Settings() {
 
           {/* Options */}
           {importFile && (
-            <div className="space-y-2 text-xs text-text-secondary">
+            <div className="space-y-2 text-sm text-text-secondary">
               <p className="text-text-tertiary font-medium">{t("pages:settings2.g31")}</p>
               {([
                 ["import_transactions", "optTransactions"],
@@ -1624,7 +1624,7 @@ export default function Settings() {
                 type="button"
                 onClick={handleImport}
                 disabled={importPending}
-                className="mt-2 flex items-center gap-2 px-4 py-2 bg-gain/80 hover:bg-gain disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
+                className="mt-2 flex items-center gap-2 px-4 py-2 bg-gain/80 hover:bg-gain disabled:opacity-60 text-white text-base font-medium rounded-lg transition-colors"
               >
                 <Upload className="w-4 h-4" />
                 {importPending ? t("settings:backup.importing") : t("settings:backup.importButton")}
@@ -1634,7 +1634,7 @@ export default function Settings() {
 
           {/* Result */}
           {importResult && (
-            <div className="p-3 rounded-xl bg-gain/10 border border-gain/30 text-xs space-y-1 text-gain" role="status">
+            <div className="p-box rounded-xl bg-gain/10 border border-gain/30 text-sm space-y-1 text-gain" role="status">
               <p className="font-medium flex items-center gap-1"><Check className="w-3.5 h-3.5" /> {t("settings:backup.importDone")}</p>
               <p>
                 {t("settings:backup.resultData", {
@@ -1659,7 +1659,7 @@ export default function Settings() {
             </div>
           )}
           {importError && (
-            <p className="text-loss text-xs flex items-center gap-1" role="alert">
+            <p className="text-loss text-sm flex items-center gap-1" role="alert">
               <WarningCircle className="w-3.5 h-3.5" /> {importError}
             </p>
           )}
@@ -1667,8 +1667,8 @@ export default function Settings() {
       </div>
 
       <div className="card">
-        <h2 className="text-text-primary font-semibold text-sm mb-4">{t("pages:settings2.g01")}</h2>
-        <div className="space-y-3 text-sm text-text-secondary">
+        <h2 className="text-text-primary font-semibold text-base mb-4">{t("pages:settings2.g01")}</h2>
+        <div className="space-y-3 text-base text-text-secondary">
           <p>{t("pages:settings2.g04")}</p>
           <p>{t("pages:settings2.g37")}</p>
           <p className="flex items-center gap-2">
@@ -1739,7 +1739,7 @@ function ChangePassword() {
   return (
     <form onSubmit={submit}>
       <label className="label mb-2 block">{t("security.passwordTitle")}</label>
-      <p className="text-text-disabled text-[11px] mb-2">{t("security.passwordHint")}</p>
+      <p className="text-text-disabled text-xs mb-2">{t("security.passwordHint")}</p>
       <div className="grid gap-2 sm:grid-cols-3">
         <input
           type="password"
@@ -1777,9 +1777,9 @@ function ChangePassword() {
         <button type="submit" className="btn btn-primary" disabled={change.isPending}>
           {change.isPending ? t("security.passwordSaving") : t("security.passwordSave")}
         </button>
-        {error && <span className="text-loss text-xs">{error}</span>}
+        {error && <span className="text-loss text-sm">{error}</span>}
         {done && (
-          <span className="text-gain text-xs flex items-center gap-1">
+          <span className="text-gain text-sm flex items-center gap-1">
             <CheckCircle className="w-3.5 h-3.5" /> {t("security.passwordDone")}
           </span>
         )}
@@ -1852,10 +1852,10 @@ function SecuritySection() {
 
   return (
     <div className="card">
-      <h2 className="text-text-primary font-semibold text-sm mb-1 flex items-center gap-2">
+      <h2 className="text-text-primary font-semibold text-base mb-1 flex items-center gap-2">
         <ShieldCheck className="w-4 h-4 text-accent" /> {t("security.title")}
       </h2>
-      <p className="text-text-disabled text-xs mb-4">{t("security.subtitle")}</p>
+      <p className="text-text-disabled text-sm mb-4">{t("security.subtitle")}</p>
 
       <div className="space-y-5">
         <ChangePassword />
@@ -1871,19 +1871,19 @@ function SecuritySection() {
               <option key={v} value={v}>{SESSION_TIMEOUT_LABELS[v]}</option>
             ))}
           </select>
-          <p className="text-text-disabled text-[11px] mt-1">
+          <p className="text-text-disabled text-xs mt-1">
             {t("security.sessionDurationHint")}
           </p>
         </div>
 
         <div>
           <label className="label mb-2 block">{t("security.passkeys")}</label>
-          <p className="text-text-disabled text-[11px] mb-2">
+          <p className="text-text-disabled text-xs mb-2">
             {t("security.passkeysHint")}
           </p>
 
           {!supported ? (
-            <p className="text-text-tertiary text-xs">{t("security.passkeyUnsupported")}</p>
+            <p className="text-text-tertiary text-sm">{t("security.passkeyUnsupported")}</p>
           ) : (
             <>
               <div className="flex flex-wrap items-center gap-2">
@@ -1914,7 +1914,7 @@ function SecuritySection() {
                 </button>
               </div>
               {error && (
-                <p className="text-loss text-[11px] mt-1 flex items-center gap-1">
+                <p className="text-loss text-xs mt-1 flex items-center gap-1">
                   <WarningCircle className="w-3.5 h-3.5" /> {error}
                 </p>
               )}
@@ -1926,10 +1926,10 @@ function SecuritySection() {
                     className="flex items-center gap-3 rounded-lg bg-bg-surface2 px-3 py-2"
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="text-text-primary text-xs font-medium truncate">
+                      <p className="text-text-primary text-sm font-medium truncate">
                         {k.device_name || t("security.unknownDevice")}
                       </p>
-                      <p className="text-text-tertiary text-[11px]">
+                      <p className="text-text-tertiary text-xs">
                         {t("security.addedOn", {
                           date: new Date(k.created_at).toLocaleDateString("de-CH"),
                         })}
@@ -1950,7 +1950,7 @@ function SecuritySection() {
                   </div>
                 ))}
                 {passkeys.length === 0 && (
-                  <p className="text-text-tertiary text-xs">{t("security.noPasskeys")}</p>
+                  <p className="text-text-tertiary text-sm">{t("security.noPasskeys")}</p>
                 )}
               </div>
             </>
@@ -2099,17 +2099,17 @@ function AiModelSection() {
 
   return (
     <div className="card">
-      <h2 className="text-text-primary font-semibold text-sm mb-1 flex items-center gap-2">
+      <h2 className="text-text-primary font-semibold text-base mb-1 flex items-center gap-2">
         <Sparks className="w-4 h-4 text-accent" /> {t("ai.title")}
       </h2>
-      <p className="text-text-disabled text-xs mb-4">{t("ai.subtitle")}</p>
+      <p className="text-text-disabled text-sm mb-4">{t("ai.subtitle")}</p>
 
       <div className="space-y-4">
         <div>
           <label className="label mb-2 block" htmlFor="ai-provider">{t("ai.provider")}</label>
           <select
             id="ai-provider"
-            className="input text-sm"
+            className="input text-base"
             value={provider}
             onChange={(e) => switchProvider(e.target.value)}
           >
@@ -2125,11 +2125,11 @@ function AiModelSection() {
             </optgroup>
             <option value="none">{t("ai.providerNone")}</option>
           </select>
-          <p className="text-text-disabled text-[11px] mt-1">{t("ai.legend")}</p>
+          <p className="text-text-disabled text-xs mt-1">{t("ai.legend")}</p>
         </div>
 
         {provider === "none" && (
-          <p className="text-text-disabled text-xs">{t("ai.providerNoneHint")}</p>
+          <p className="text-text-disabled text-sm">{t("ai.providerNoneHint")}</p>
         )}
 
         {info && (
@@ -2138,13 +2138,13 @@ function AiModelSection() {
               <label className="label mb-2 block" htmlFor="ai-endpoint">{t("ai.endpoint")}</label>
               <input
                 id="ai-endpoint"
-                className="input font-mono text-xs"
+                className="input font-mono text-sm"
                 value={endpoint}
                 onChange={(e) => patchDraft({ endpoint: e.target.value })}
                 placeholder={info.url}
                 spellCheck={false}
               />
-              <p className="text-text-disabled text-[11px] mt-1">
+              <p className="text-text-disabled text-xs mt-1">
                 {info.local ? t("ai.endpointHintLocal") : t("ai.endpointHintCloud")}
               </p>
             </div>
@@ -2157,7 +2157,7 @@ function AiModelSection() {
                     href={info.key_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-accent text-[11px] font-medium hover:underline inline-flex items-center gap-1"
+                    className="text-accent text-xs font-medium hover:underline inline-flex items-center gap-1"
                   >
                     {t("ai.getKey")} <OpenNewWindow className="w-3 h-3" />
                   </a>
@@ -2166,7 +2166,7 @@ function AiModelSection() {
                   <input
                     id="ai-key"
                     type={showKey ? "text" : "password"}
-                    className="input font-mono text-xs flex-1"
+                    className="input font-mono text-sm flex-1"
                     value={draft.key ?? ""}
                     onChange={(e) => patchDraft({ key: e.target.value })}
                     placeholder={hasStoredKey ? "••••••••" : info.placeholder || t("ai.apiKey")}
@@ -2175,17 +2175,17 @@ function AiModelSection() {
                   />
                   <button
                     type="button"
-                    className="btn btn-ghost shrink-0 text-xs"
+                    className="btn btn-ghost shrink-0 text-sm"
                     onClick={() => setShowKey((s) => !s)}
                   >
                     {showKey ? t("ai.hide") : t("ai.show")}
                   </button>
                 </div>
                 {keyMustBeRetyped && (
-                  <p className="txt-warning text-[11px] mt-1">{t("ai.keyRetype")}</p>
+                  <p className="txt-warning text-xs mt-1">{t("ai.keyRetype")}</p>
                 )}
                 {hasStoredKey && (
-                  <p className="text-text-disabled text-[11px] mt-1 flex items-center gap-2">
+                  <p className="text-text-disabled text-xs mt-1 flex items-center gap-2">
                     {t("ai.apiKeySaved")}
                     <button
                       type="button"
@@ -2197,7 +2197,7 @@ function AiModelSection() {
                   </p>
                 )}
                 {info.note && (
-                  <p className="msg msg-warning text-[11px] mt-2 flex items-start gap-1">
+                  <p className="msg msg-warning text-xs mt-2 flex items-start gap-1">
                     <WarningCircle className="w-3.5 h-3.5 shrink-0 mt-px" />
                     {t(info.note)}
                   </p>
@@ -2210,7 +2210,7 @@ function AiModelSection() {
               {models.length > 0 ? (
                 <select
                   id="ai-model"
-                  className="input font-mono text-xs"
+                  className="input font-mono text-sm"
                   value={model}
                   onChange={(e) => patchDraft({ model: e.target.value })}
                 >
@@ -2224,14 +2224,14 @@ function AiModelSection() {
               ) : (
                 <input
                   id="ai-model"
-                  className="input font-mono text-xs"
+                  className="input font-mono text-sm"
                   value={model}
                   onChange={(e) => patchDraft({ model: e.target.value })}
                   placeholder={t("ai.modelPlaceholder")}
                   spellCheck={false}
                 />
               )}
-              <p className="text-text-disabled text-[11px] mt-1">
+              <p className="text-text-disabled text-xs mt-1">
                 {models.length > 0
                   ? t("ai.modelsFound", { count: models.length })
                   : t("ai.modelHint")}
@@ -2250,7 +2250,7 @@ function AiModelSection() {
               </button>
               {testState && testState !== "testing" && (
                 testState.ok ? (
-                  <span className="text-gain text-xs flex items-center gap-1" role="status">
+                  <span className="text-gain text-sm flex items-center gap-1" role="status">
                     <CheckCircle className="w-3.5 h-3.5" />
                     {t("ai.connOk")}
                     {testState.models && <> — {t("ai.modelsFound", { count: testState.models.length })}</>}
@@ -2262,7 +2262,7 @@ function AiModelSection() {
                     )}
                   </span>
                 ) : (
-                  <span className="text-loss text-xs flex items-center gap-1 break-all" role="alert">
+                  <span className="text-loss text-sm flex items-center gap-1 break-all" role="alert">
                     <WarningCircle className="w-3.5 h-3.5 shrink-0" />
                     {testState.error || t("ai.testFailed")}
                   </span>
@@ -2286,13 +2286,13 @@ function AiModelSection() {
                 onChange={(e) => { setSaved(false); setContextDraft(Number(e.target.value)); }}
                 className="flex-1 accent-accent cursor-pointer"
               />
-              <span className="text-text-secondary text-xs font-mono w-28 text-right tabular-nums">
+              <span className="text-text-secondary text-sm font-mono w-28 text-right tabular-nums">
                 {contextOverride > 0
                   ? `${contextOverride.toLocaleString(displayLocale())} Z.`
                   : t("ai.contextAuto")}
               </span>
             </div>
-            <p className="text-text-disabled text-[11px] mt-1 leading-relaxed">
+            <p className="text-text-disabled text-xs mt-1 leading-relaxed">
               {settings?.detected_context_tokens ? (
                 <>
                   {t("ai.contextDetected", {
@@ -2320,12 +2320,12 @@ function AiModelSection() {
             {save.isPending ? t("ai.saving") : t("ai.save")}
           </button>
           {saved && (
-            <span className="text-gain text-xs flex items-center gap-1">
+            <span className="text-gain text-sm flex items-center gap-1">
               <Check className="w-3.5 h-3.5" /> {t("ai.saved")}
             </span>
           )}
           {save.isError && (
-            <span className="text-loss text-xs flex items-center gap-1">
+            <span className="text-loss text-sm flex items-center gap-1">
               <WarningCircle className="w-3.5 h-3.5" /> {t("ai.saveError")}
             </span>
           )}
@@ -2363,8 +2363,8 @@ function AppearanceSection() {
 
   return (
     <div className="card">
-      <h2 className="text-text-primary font-semibold text-sm mb-1">{t("appearance.title")}</h2>
-      <p className="text-text-disabled text-xs mb-4">{t("appearance.subtitle")}</p>
+      <h2 className="text-text-primary font-semibold text-base mb-1">{t("appearance.title")}</h2>
+      <p className="text-text-disabled text-sm mb-4">{t("appearance.subtitle")}</p>
       <div className="space-y-4">
         <div>
           <label className="label mb-2 block">{t("appearance.theme")}</label>

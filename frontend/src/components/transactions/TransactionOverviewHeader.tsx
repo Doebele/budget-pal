@@ -61,7 +61,7 @@ export function TransactionOverviewHeader({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium bg-amber-600/90 hover:bg-amber-600 text-white shadow-md transition-colors"
+        className="flex items-center gap-2 px-3 py-2 rounded-md text-base font-medium bg-amber-600/90 hover:bg-amber-600 text-white shadow-md transition-colors"
         title={t("pages:misc.r15")}
       >
         <span className="relative inline-flex">
@@ -93,7 +93,7 @@ export function TransactionOverviewHeader({
                   <h3 className="text-lg font-semibold text-text-primary">
                     {t("pages:ui.alle_transaktionen_dieses_kontos_archivieren")}
                   </h3>
-                  <p className="text-text-tertiary text-sm mt-1">
+                  <p className="text-text-tertiary text-base mt-1">
                     {t("pages:ui.konto_2")} <span className="text-text-primary font-medium">{accountName}</span>
                   </p>
                 </div>
@@ -112,25 +112,25 @@ export function TransactionOverviewHeader({
 
             <div className="p-5 space-y-4">
               {!accountIdValid && (
-                <p className="text-warning text-sm rounded-lg border border-amber-500/30 bg-warning-muted p-3">
+                <p className="text-warning text-base rounded-lg border border-amber-500/30 bg-warning-muted p-box">
                   {t("pages:ui.ungueltige_konto_id_bitte_konto_erneut_auswa")}
                 </p>
               )}
 
               {showPreviewSpinner && (
-                <div className="flex items-center gap-3 text-text-tertiary text-sm">
+                <div className="flex items-center gap-3 text-text-tertiary text-base">
                   <div className="w-5 h-5 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
                   {t("pages:ui.vorschau_wird_geladen")}
                 </div>
               )}
 
               {previewError && (
-                <div className="rounded-lg border border-red-500/40 bg-loss-muted p-4 space-y-3">
-                  <p className="text-loss text-sm">{previewErrorMessage}</p>
+                <div className="rounded-lg border border-red-500/40 bg-loss-muted p-box space-y-3">
+                  <p className="text-loss text-base">{previewErrorMessage}</p>
                   <button
                     type="button"
                     onClick={() => refetchPreview()}
-                    className="text-sm font-medium text-text-primary bg-bg-elevated hover:bg-bg-surface2 px-3 py-1 rounded-md"
+                    className="text-base font-medium text-text-primary bg-bg-elevated hover:bg-bg-surface2 px-3 py-1 rounded-md"
                   >
                     Erneut versuchen
                   </button>
@@ -138,38 +138,38 @@ export function TransactionOverviewHeader({
               )}
 
               {preview && (
-                <div className="rounded-lg bg-bg-surface2/80 border border-border p-4 space-y-2">
+                <div className="rounded-lg bg-bg-surface2/80 border border-border p-box space-y-2">
                   <p className="text-text-primary font-medium">{count} Transaktionen betroffen</p>
-                  <p className="text-text-tertiary text-sm">
+                  <p className="text-text-tertiary text-base">
                     {t("pages:hints.archiveNote")}
                   </p>
                   {count > 0 && preview.date_range.from && preview.date_range.to && (
-                    <p className="text-xs text-text-disabled">
+                    <p className="text-sm text-text-disabled">
                       Zeitraum:{" "}
                       {format(new Date(preview.date_range.from), "dd.MM.yyyy", { locale: de })} –{" "}
                       {format(new Date(preview.date_range.to), "dd.MM.yyyy", { locale: de })}
                     </p>
                   )}
                   {count === 0 && (
-                    <p className="txt-warning text-sm pt-1">
+                    <p className="txt-warning text-base pt-1">
                       {t("pages:hints.noActiveTxns")}
                     </p>
                   )}
-                  <p className="text-sm text-text-secondary font-mono">
+                  <p className="text-base text-text-secondary font-mono">
                     Summe Beträge (Saldo-Vektor): {formatCHF(preview.total_amount)}
                   </p>
                 </div>
               )}
 
               <div className="msg msg-error flex-col gap-0 p-4 space-y-3">
-                <p className="text-sm font-medium flex items-center gap-2">
+                <p className="text-base font-medium flex items-center gap-2">
                   <Trash className="w-4 h-4" />
                   {t("pages:ui.loeschen_ohne_archivierung_hard_delete")}
                 </p>
-                <p className="text-xs">
+                <p className="text-sm">
                   {t("pages:hints.hardDeleteWarning")}
                 </p>
-                <label className="flex items-center gap-2 cursor-pointer text-sm text-text-secondary">
+                <label className="flex items-center gap-2 cursor-pointer text-base text-text-secondary">
                   <input
                     type="checkbox"
                     checked={confirmHard}
@@ -185,7 +185,7 @@ export function TransactionOverviewHeader({
                   type="button"
                   disabled={cancelDisabled}
                   onClick={closeModal}
-                  className="px-4 py-2 rounded-lg border border-border-strong text-text-secondary hover:bg-bg-surface2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 rounded-lg border border-border-strong text-text-secondary hover:bg-bg-surface2 text-base font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {t("pages:ui.abbrechen")}
                 </button>
@@ -194,7 +194,7 @@ export function TransactionOverviewHeader({
                   disabled={!canArchive}
                   onClick={submitArchive}
                   className={clsx(
-                    "px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2",
+                    "px-4 py-2 rounded-lg text-base font-medium flex items-center justify-center gap-2",
                     !canArchive
                       ? "bg-bg-elevated text-text-disabled cursor-not-allowed"
                       : "bg-sky-600 hover:bg-sky-500 text-white"
@@ -208,7 +208,7 @@ export function TransactionOverviewHeader({
                   disabled={!canHardDelete}
                   onClick={submitHardDelete}
                   className={clsx(
-                    "px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2",
+                    "px-4 py-2 rounded-lg text-base font-medium flex items-center justify-center gap-2",
                     !canHardDelete
                       ? "bg-bg-elevated text-text-disabled cursor-not-allowed"
                       : "bg-red-600 hover:bg-red-500 text-white"

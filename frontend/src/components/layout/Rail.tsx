@@ -61,7 +61,7 @@ function RailTooltip({
           border: "1px solid var(--border)",
           borderRadius: 6,
           padding: "5px 10px",
-          fontSize: 12,
+          fontSize: "var(--fs-sm)",
           fontWeight: 600,
           color: "var(--fg-1)",
           whiteSpace: "nowrap",
@@ -178,7 +178,7 @@ export default function Rail() {
             </div>
             <div
               className="font-display"
-              style={{ overflow: "hidden", whiteSpace: "nowrap", fontSize: 15, fontWeight: 600 }}
+              style={{ overflow: "hidden", whiteSpace: "nowrap", fontSize: "var(--fs-base)", fontWeight: 600 }}
             >
               <span style={{ color: "var(--fg-1)" }}>Budget</span>
               <span style={{ color: "var(--accent)" }}>Pal</span>
@@ -328,7 +328,7 @@ export default function Rail() {
             }}
           >
             {railOpen && (
-              <div style={{ fontSize: 11, color: "var(--fg-2)", lineHeight: 1.4, marginBottom: 8 }}>
+              <div style={{ fontSize: "var(--fs-xs)", color: "var(--fg-2)", lineHeight: 1.4, marginBottom: 8 }}>
                 {t("user.confirmLogout")}
               </div>
             )}
@@ -344,7 +344,7 @@ export default function Rail() {
                   color: "#fff",
                   cursor: "pointer",
                   fontFamily: "var(--font-sans)",
-                  fontSize: 11,
+                  fontSize: "var(--fs-xs)",
                   fontWeight: 600,
                 }}
                 title={t("user.logout")}
@@ -362,7 +362,7 @@ export default function Rail() {
                   color: "var(--fg-2)",
                   cursor: "pointer",
                   fontFamily: "var(--font-sans)",
-                  fontSize: 11,
+                  fontSize: "var(--fs-xs)",
                   fontWeight: 500,
                 }}
                 title={t("buttons.cancel")}
@@ -388,7 +388,7 @@ export default function Rail() {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontSize: 11,
+                fontSize: "var(--fs-xs)",
                 fontWeight: 700,
                 color: "#fff",
               }}
@@ -400,7 +400,7 @@ export default function Rail() {
                 <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
                   <div
                     style={{
-                      fontSize: 12,
+                      fontSize: "var(--fs-sm)",
                       fontWeight: 600,
                       color: "var(--fg-1)",
                       whiteSpace: "nowrap",
@@ -412,7 +412,7 @@ export default function Rail() {
                   </div>
                   <div
                     style={{
-                      fontSize: 10,
+                      fontSize: "var(--fs-2xs)",
                       color: "var(--fg-3)",
                       whiteSpace: "nowrap",
                       overflow: "hidden",

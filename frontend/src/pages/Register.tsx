@@ -61,7 +61,7 @@ export default function Register() {
             </div>
 
             {error && (
-              <p className="text-loss text-sm bg-loss-muted border border-loss/30 rounded-lg px-3 py-2">{error}</p>
+              <p className="text-loss text-base bg-loss-muted border border-loss/30 rounded-lg px-3 py-2">{error}</p>
             )}
 
             <button type="submit" className="btn-primary w-full py-2" disabled={loading}>
@@ -69,7 +69,7 @@ export default function Register() {
             </button>
           </form>
 
-          <p className="text-text-tertiary text-sm mt-4 text-center">
+          <p className="text-text-tertiary text-base mt-4 text-center">
             {t("register.hasAccount")}{" "}
             <Link to="/login" className="text-accent hover:text-accent-light">{t("register.loginLink")}</Link>
           </p>

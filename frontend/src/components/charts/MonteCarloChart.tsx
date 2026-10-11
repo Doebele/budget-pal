@@ -75,7 +75,7 @@ function CustomTooltip({ active, payload, label }: {
   payload?: Array<{ name: string; value: number; payload: ChartRow }>;
   label?: string;
 }) {
-  const { colors } = useThemeColors();
+  const { colors, fs } = useThemeColors();
   if (!active || !payload?.length) return null;
   const row = payload[0].payload;
   return (
@@ -85,12 +85,12 @@ function CustomTooltip({ active, payload, label }: {
         border: `1px solid ${colors.border}`,
         borderRadius: 6,
         color: colors.textPrimary,
-        fontSize: 12,
+        fontSize: fs.sm,
         padding: "8px 12px",
       }}
     >
       <p className="font-semibold mb-1">{label}</p>
-      <div className="space-y-1 text-xs font-mono">
+      <div className="space-y-1 text-sm font-mono">
         <p style={{ color: colors.textSecondary }}>p90: {formatCHF(row.p90 * 1000, true)}</p>
         <p style={{ color: colors.textSecondary }}>p75: {formatCHF(row.p75 * 1000, true)}</p>
         <p style={{ color: colors.accent }}>p50: <strong>{formatCHF(row.p50 * 1000, true)}</strong></p>
@@ -111,11 +111,11 @@ export default function MonteCarloChart({
   retirementYear,
 }: MonteCarloChartProps) {
   const { t } = useTranslation();
-  const { colors } = useThemeColors();
+  const { colors, fs } = useThemeColors();
   const [showPeer, setShowPeer] = useState(false);
   if (!data?.years?.length) {
     return (
-      <div style={{ height }} className="flex items-center justify-center text-text-tertiary text-sm">
+      <div style={{ height }} className="flex items-center justify-center text-text-tertiary text-base">
         {t("pages:ui.keine_daten_verfuegbar")}
       </div>
     );
@@ -153,13 +153,13 @@ export default function MonteCarloChart({
         <CartesianGrid strokeDasharray="3 3" stroke={colors.borderSubtle} vertical={false} />
         <XAxis
           dataKey="year"
-          tick={{ fill: colors.textTertiary, fontSize: 11 }}
+          tick={{ fill: colors.textTertiary, fontSize: fs.xs }}
           axisLine={false}
           tickLine={false}
           interval="preserveStartEnd"
         />
         <YAxis
-          tick={{ fill: colors.textTertiary, fontSize: 11 }}
+          tick={{ fill: colors.textTertiary, fontSize: fs.xs }}
           axisLine={false}
           tickLine={false}
           tickFormatter={(v) => `${v}k`}
@@ -174,7 +174,7 @@ export default function MonteCarloChart({
             stroke={colors.warning}
             strokeDasharray="4 4"
             strokeWidth={1.5}
-            label={{ value: "Rente", fill: colors.warning, fontSize: 10, position: "top" }}
+            label={{ value: "Rente", fill: colors.warning, fontSize: fs["2xs"], position: "top" }}
           />
         )}
 

@@ -45,14 +45,14 @@ export default function ImportJobIndicator() {
       )}
 
       <div className="min-w-0">
-        <p className="text-text-primary text-xs font-medium truncate">
+        <p className="text-text-primary text-sm font-medium truncate">
           {running
             ? "Import wird ausgewertet…"
             : failed
               ? "Import fehlgeschlagen"
               : "Import bereit zur Prüfung"}
         </p>
-        <p className="text-text-tertiary text-[11px] truncate">
+        <p className="text-text-tertiary text-xs truncate">
           {job.filename}
           {running && (
             <>

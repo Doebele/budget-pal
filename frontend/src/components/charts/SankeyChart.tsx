@@ -90,7 +90,7 @@ export default function SankeyChart({
 }: SankeyChartProps) {
   const { t } = useTranslation();
   const { getCategoryColor, superCategories } = useTaxonomy();
-  const { colors } = useThemeColors();
+  const { colors, fs } = useThemeColors();
   const option = useMemo(() => {
     const scById = new Map(superCategories.map((s) => [s.id, s] as const));
     function flowColor(link: SankeyLink, idx: number): string {
@@ -161,7 +161,7 @@ export default function SankeyChart({
         position: "left",
         color: colors.textPrimary,
         fontWeight: "bold",
-        fontSize: 12,
+        fontSize: fs.sm,
         formatter: () => translateCategory("Einnahmen"),
       },
     });
@@ -175,7 +175,7 @@ export default function SankeyChart({
           label: {
             position: "right",
             color: colors.textSecondary,
-            fontSize: 11,
+            fontSize: fs.xs,
             formatter: (x: { name: string }) => displayName(x.name),
           },
         });
@@ -195,7 +195,7 @@ export default function SankeyChart({
           label: {
             position: "left",
             color: colors.textTertiary,
-            fontSize: 10,
+            fontSize: fs["2xs"],
             formatter: (x: { name: string }) => displayName(x.name),
           },
         });
@@ -213,7 +213,7 @@ export default function SankeyChart({
             label: {
               position: "right",
               color: colors.textSecondary,
-              fontSize: 10,
+              fontSize: fs["2xs"],
               formatter: (x: { name: string }) => displayName(x.name),
             },
           });
@@ -261,7 +261,7 @@ export default function SankeyChart({
         padding: [8, 12],
         textStyle: {
           color: colors.textPrimary,
-          fontSize: 12,
+          fontSize: fs.sm,
           fontFamily: "Fira Sans, system-ui, sans-serif",
         },
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -333,7 +333,7 @@ export default function SankeyChart({
           label: {
             show: true,
             position: "right",
-            fontSize: 11,
+            fontSize: fs.xs,
             fontFamily: "Fira Sans, system-ui, sans-serif",
             color: colors.textSecondary,
             formatter: (p: { name: string }) => displayName(p.name),
@@ -351,13 +351,13 @@ export default function SankeyChart({
         },
       ],
     };
-  }, [data, flowOrder, getCategoryColor, superCategoryOrder, superCategories, colors]);
+  }, [data, flowOrder, getCategoryColor, superCategoryOrder, superCategories, colors, fs]);
 
   if (!option) {
     return (
       <div
         style={{ height }}
-        className="flex items-center justify-center text-text-tertiary text-sm"
+        className="flex items-center justify-center text-text-tertiary text-base"
       >
         {t("pages:ui.keine_daten_verfuegbar")}
       </div>

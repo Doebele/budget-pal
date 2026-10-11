@@ -237,6 +237,11 @@ components/
 - **Fields:** `.input` (alias `.input-field`) is the ledger line: a bottom hairline plus a
   gradient well that turns accent on focus. `select.input` draws its own chevron. Amounts
   add `.input-amount` (right-aligned, tabular). Don't restyle fields inline.
+- **Density** (`data-density` on `<body>`: `low` = Komfort, default; `high` = Kompakt): every
+  font size and the card/box padding come from `--fs-*` / `--pad-*` tokens in `index.css`.
+  Tailwind `text-2xs…3xl` and `p-section` / `p-box` / `p-box-sm` map to them. Komfort is
+  Kompakt + 2 px type, never below 12 px. Kompakt has 4 px less padding and a 10 px floor. No
+  `zoom` and no fixed `text-[Npx]`. SVG/ECharts text takes `fs` from `useThemeColors()`.
 - **Surfaces:** three neutral tones, `bg` → `surface` (card) → `surface-2` (box in a card).
   Tints are for status or selection only. Shadows are dark and offset, never a white halo.
 

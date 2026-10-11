@@ -26,12 +26,12 @@ export default function ScenarioMatrixCard({ data }: { data: RetirementScenarios
   return (
     <div className="card space-y-4">
       <div>
-        <h2 className="text-text-primary font-semibold text-sm">{t("pages:scenarios.title")}</h2>
-        <p className="text-text-tertiary text-xs mt-1">{t("pages:scenarios.subtitle")}</p>
+        <h2 className="text-text-primary font-semibold text-base">{t("pages:scenarios.title")}</h2>
+        <p className="text-text-tertiary text-sm mt-1">{t("pages:scenarios.subtitle")}</p>
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-xs">
+        <table className="w-full text-sm">
           <thead>
             <tr className="text-text-tertiary text-left">
               <th className="py-1 pr-3 font-medium">{t("pages:scenarios.age")}</th>
@@ -54,12 +54,12 @@ export default function ScenarioMatrixCard({ data }: { data: RetirementScenarios
                         {formatCHF(c.net_start)}
                       </p>
                       {c.net_75 != null && (
-                        <p className="text-text-tertiary text-[10px]">{t("pages:scenarios.at75", { amount: formatCHF(c.net_75) })}</p>
+                        <p className="text-text-tertiary text-2xs">{t("pages:scenarios.at75", { amount: formatCHF(c.net_75) })}</p>
                       )}
-                      <p className={clsx("text-[10px]", c.success_rate >= 0.8 ? "text-text-tertiary" : "text-loss")}>
+                      <p className={clsx("text-2xs", c.success_rate >= 0.8 ? "text-text-tertiary" : "text-loss")}>
                         {t("pages:scenarios.success", { pct: Math.round(c.success_rate * 100) })}
                       </p>
-                      {yours && <p className="text-accent text-[10px]">{t("pages:scenarios.yours")}</p>}
+                      {yours && <p className="text-accent text-2xs">{t("pages:scenarios.yours")}</p>}
                     </td>
                   );
                 })}
@@ -71,13 +71,13 @@ export default function ScenarioMatrixCard({ data }: { data: RetirementScenarios
 
       {data.hints.length > 0 && (
         <div className="space-y-1">
-          <p className="text-text-secondary text-xs font-semibold">{t("pages:scenarios.hintsTitle")}</p>
-          <ul className="list-disc pl-5 space-y-1 text-xs text-text-secondary">
+          <p className="text-text-secondary text-sm font-semibold">{t("pages:scenarios.hintsTitle")}</p>
+          <ul className="list-disc pl-5 space-y-1 text-sm text-text-secondary">
             {data.hints.map((h, i) => <li key={`${h.key}-${i}`}>{hintText(h)}</li>)}
           </ul>
         </div>
       )}
-      <p className="text-text-tertiary text-[11px]">{t("pages:scenarios.disclaimer")}</p>
+      <p className="text-text-tertiary text-xs">{t("pages:scenarios.disclaimer")}</p>
     </div>
   );
 }

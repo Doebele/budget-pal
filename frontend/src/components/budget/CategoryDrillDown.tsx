@@ -93,10 +93,10 @@ export default function CategoryDrillDown({
                 <superCategory.icon className="w-5 h-5" style={{ color: superCategory.color }} />
               </span>
               <div className="min-w-0">
-                <h2 className="text-text-primary font-semibold text-base truncate">
+                <h2 className="text-text-primary font-semibold text-lg truncate">
                   {superCategory.label}
                 </h2>
-                <p className="text-text-tertiary text-xs mt-1">
+                <p className="text-text-tertiary text-sm mt-1">
                   {months > 1 ? `${months} Monate` : "Aktueller Monat"}
                 </p>
               </div>
@@ -117,7 +117,7 @@ export default function CategoryDrillDown({
           <div className="px-5 py-4 border-b border-border-subtle">
             <div className="grid grid-cols-2 gap-3 mb-3">
               <div className="bg-bg-surface2 rounded-xl px-3 py-2">
-                <p className="text-text-tertiary text-xs mb-1">IST (Historisch)</p>
+                <p className="text-text-tertiary text-sm mb-1">IST (Historisch)</p>
                 <p
                   className={clsx(
                     "text-lg font-mono font-semibold",
@@ -128,7 +128,7 @@ export default function CategoryDrillDown({
                 </p>
               </div>
               <div className="bg-bg-surface2 rounded-xl px-3 py-2">
-                <p className="text-text-tertiary text-xs mb-1">SOLL (Empirisch)</p>
+                <p className="text-text-tertiary text-sm mb-1">SOLL (Empirisch)</p>
                 <p className="text-lg font-mono font-semibold text-text-secondary">
                   {hasPlanned ? formatCHF(planned!) : "—"}
                 </p>
@@ -149,7 +149,7 @@ export default function CategoryDrillDown({
 
             {delta !== undefined && deltaPct !== undefined && (
               <div className={clsx(
-                "flex items-center gap-1 text-sm font-medium",
+                "flex items-center gap-1 text-base font-medium",
                 isOver ? "text-loss" : "text-gain",
               )}>
                 {isOver
@@ -159,14 +159,14 @@ export default function CategoryDrillDown({
                     : <Minus className="w-4 h-4" />}
                 {isOver ? "+" : ""}
                 {formatCHF(delta)} ({isOver ? "+" : ""}{deltaPct.toFixed(1)}%)
-                <span className="text-text-tertiary text-xs font-normal">
+                <span className="text-text-tertiary text-sm font-normal">
                   {isOver ? "über Budget" : "unter Budget"}
                 </span>
               </div>
             )}
 
             {months > 1 && (hasActual || hasPlanned) && (
-              <p className="text-text-disabled text-xs mt-1">
+              <p className="text-text-disabled text-sm mt-1">
                 Ø {hasActual ? formatCHF(actual! / months) : "—"} / Monat (Ist)
                 {hasPlanned && ` · ${formatCHF(planned! / months)} / Monat (Soll)`}
               </p>
@@ -178,10 +178,10 @@ export default function CategoryDrillDown({
             <div className="px-5 py-4 border-b border-border-subtle">
               {/* Header + view toggle */}
               <div className="flex items-center justify-between mb-3 gap-2">
-                <h3 className="text-text-secondary text-xs font-semibold">
+                <h3 className="text-text-secondary text-sm font-semibold">
                   Ausgabenverteilung
                 </h3>
-                <div className="flex items-center rounded-lg border border-border overflow-hidden text-xs shrink-0">
+                <div className="flex items-center rounded-lg border border-border overflow-hidden text-sm shrink-0">
                   {(["hist", "emp", "both"] as SubView[]).map((mode) => (
                     <button
                       key={mode}
@@ -210,7 +210,7 @@ export default function CategoryDrillDown({
 
                 if (visible.length === 0) {
                   return (
-                    <p className="text-text-disabled text-xs text-center py-4">
+                    <p className="text-text-disabled text-sm text-center py-4">
                       {subView === "hist"
                         ? "Keine historischen Angaben vorhanden."
                         : subView === "emp"
@@ -250,8 +250,8 @@ export default function CategoryDrillDown({
                       return (
                         <div key={sub.label}>
                           <div className="flex items-center justify-between mb-1 gap-2">
-                            <span className="text-text-secondary text-xs truncate flex-1">{translateCategory(sub.label)}</span>
-                            <div className="flex items-center gap-2 shrink-0 text-xs font-mono">
+                            <span className="text-text-secondary text-sm truncate flex-1">{translateCategory(sub.label)}</span>
+                            <div className="flex items-center gap-2 shrink-0 text-sm font-mono">
                               {sharePct !== null && (
                                 <span className="text-text-disabled tabular-nums">{sharePct}%</span>
                               )}
@@ -305,7 +305,7 @@ export default function CategoryDrillDown({
           {/* ── Recent transactions ──────────────── */}
           {transactions && transactions.length > 0 && (
             <div className="px-5 py-4">
-              <h3 className="text-text-secondary text-xs font-semibold mb-3">
+              <h3 className="text-text-secondary text-sm font-semibold mb-3">
                 {t("pages:ui.transaktionen")}
               </h3>
               <div className="space-y-2">
@@ -315,17 +315,17 @@ export default function CategoryDrillDown({
                     className="flex items-center justify-between py-1 border-b border-border-subtle last:border-0"
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="text-text-primary text-xs font-medium truncate">
+                      <p className="text-text-primary text-sm font-medium truncate">
                         {txn.merchant_normalized || txn.description}
                       </p>
-                      <p className="text-text-tertiary text-xs">
+                      <p className="text-text-tertiary text-sm">
                         {format(new Date(txn.date), "dd.MM.yyyy")}
                         {txn.category && ` · ${txn.category}`}
                       </p>
                     </div>
                     <span
                       className={clsx(
-                        "text-xs font-mono shrink-0 ml-3",
+                        "text-sm font-mono shrink-0 ml-3",
                         txn.amount >= 0 ? "text-gain" : "text-loss",
                       )}
                     >
@@ -338,7 +338,7 @@ export default function CategoryDrillDown({
           )}
 
           {(!transactions || transactions.length === 0) && (
-            <p className="text-text-tertiary text-sm text-center py-10 px-5">
+            <p className="text-text-tertiary text-base text-center py-10 px-5">
               Keine Transaktionen in diesem Zeitraum für {superCategory.label}.
             </p>
           )}
@@ -350,7 +350,7 @@ export default function CategoryDrillDown({
             <button
               type="button"
               onClick={onEditTransactions}
-              className="flex-1 btn-secondary text-xs"
+              className="flex-1 btn-secondary text-sm"
             >
               {t("pages:ui.reale_angaben_bearbeiten")}
             </button>
@@ -359,7 +359,7 @@ export default function CategoryDrillDown({
             <button
               type="button"
               onClick={onEditWizard}
-              className="flex-1 btn-secondary text-xs"
+              className="flex-1 btn-secondary text-sm"
             >
               {t("pages:ui.empirische_angaben_bearbeiten")}
             </button>

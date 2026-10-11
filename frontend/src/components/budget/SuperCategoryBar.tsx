@@ -76,12 +76,12 @@ export default function SuperCategoryBar({
           >
             <superCategory.icon className="w-3.5 h-3.5" style={{ color: superCategory.color }} />
           </span>
-          <span className="text-text-primary text-sm font-medium truncate">
+          <span className="text-text-primary text-base font-medium truncate">
             {superCategory.label}
           </span>
           {isOverBudget && (
             <span
-              className="shrink-0 flex items-center gap-1 text-xs text-loss bg-loss/10 px-1 py-1 rounded-full border border-loss/25"
+              className="shrink-0 flex items-center gap-1 text-sm text-loss bg-loss/10 px-1 py-1 rounded-full border border-loss/25"
               title={`${overPct}% über Budget`}
             >
               <WarningTriangle className="w-3 h-3" />
@@ -90,7 +90,7 @@ export default function SuperCategoryBar({
           )}
         </div>
 
-        <div className="flex items-center gap-3 shrink-0 text-xs font-mono">
+        <div className="flex items-center gap-3 shrink-0 text-sm font-mono">
           {hasActual && (
             <span className={clsx(isOverBudget ? "text-loss" : "text-text-primary")}>
               {formatCHF(actual!)}
@@ -125,7 +125,7 @@ export default function SuperCategoryBar({
       {subItems && subItems.length > 1 && (
         <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
           {subItems.slice(0, 4).map((sub) => (
-            <span key={sub.label} className="flex items-baseline gap-1 text-xs">
+            <span key={sub.label} className="flex items-baseline gap-1 text-sm">
               <span className="text-text-disabled truncate max-w-[120px]">{translateCategory(sub.label)}</span>
               {sub.actual !== undefined && sub.actual > 0 && (
                 <span className="text-text-disabled/60 font-mono tabular-nums shrink-0">
@@ -135,7 +135,7 @@ export default function SuperCategoryBar({
             </span>
           ))}
           {subItems.length > 4 && (
-            <span className="text-text-disabled text-xs">+{subItems.length - 4} weitere</span>
+            <span className="text-text-disabled text-sm">+{subItems.length - 4} weitere</span>
           )}
         </div>
       )}

@@ -13,7 +13,7 @@
 import ReactECharts from "echarts-for-react";
 import { useMemo } from "react";
 import { formatCHF, type ThemePalette } from "@/lib/theme";
-import { useThemeColors } from "@/hooks/useThemeColors";
+import { useThemeColors, type FontScale } from "@/hooks/useThemeColors";
 import type { SuperCategory } from "@/lib/categories";
 import { EyeClosed } from "@/lib/icons";
 import { useTranslation } from "react-i18next";
@@ -55,7 +55,7 @@ function fmtCompact(v: number): string {
 
 // ── Gauge option factory ───────────────────────────────────────
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function makeOption(row: GaugeRow, hasPeer: boolean, colors: ThemePalette): any {
+function makeOption(row: GaugeRow, hasPeer: boolean, colors: ThemePalette, fs: FontScale): any {
   const { sc, actual, planned, peer } = row;
   const hasPeerVal = hasPeer && (peer ?? 0) > 0;
 
@@ -106,7 +106,7 @@ function makeOption(row: GaugeRow, hasPeer: boolean, colors: ThemePalette): any 
     detail: {
       show: true,
       offsetCenter: [0, actualOffset],
-      fontSize: 14,
+      fontSize: fs.base,
       fontWeight: 700,
       fontFamily: "Fira Sans, system-ui, sans-serif",
       color: isOverPeer ? "#f87171" : isOverPlan ? "#fbbf24" : sc.color,
@@ -133,7 +133,7 @@ function makeOption(row: GaugeRow, hasPeer: boolean, colors: ThemePalette): any 
       detail: {
         show: true,
         offsetCenter: [0, peerOffset],
-        fontSize: 11,
+        fontSize: fs.xs,
         fontWeight: 400,
         fontFamily: "Fira Sans, system-ui, sans-serif",
         color: "#64748b",
@@ -161,7 +161,7 @@ function makeOption(row: GaugeRow, hasPeer: boolean, colors: ThemePalette): any 
       detail: {
         show: true,
         offsetCenter: [0, plannedOffset],
-        fontSize: 11,
+        fontSize: fs.xs,
         fontWeight: 400,
         fontFamily: "Fira Sans, system-ui, sans-serif",
         color: sc.color + "bb",
@@ -185,7 +185,7 @@ function makeOption(row: GaugeRow, hasPeer: boolean, colors: ThemePalette): any 
       padding: [6, 10],
       textStyle: {
         color: colors.textPrimary,
-        fontSize: 12,
+        fontSize: fs.sm,
         fontFamily: "Fira Sans, system-ui, sans-serif",
       },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -211,7 +211,7 @@ function makeOption(row: GaugeRow, hasPeer: boolean, colors: ThemePalette): any 
 // ── Component ──────────────────────────────────────────────────
 export default function CategoryGaugeChart({ rows, hasPeer, onToggleHide }: CategoryGaugeChartProps) {
   const { t } = useTranslation();
-  const { colors } = useThemeColors();
+  const { colors, fs } = useThemeColors();
   const visibleRows = useMemo(
     () => rows.filter((r) => !r.hidden),
     [rows],
@@ -223,7 +223,7 @@ export default function CategoryGaugeChart({ rows, hasPeer, onToggleHide }: Cate
 
   if (visibleRows.length === 0 && hiddenRows.length === 0) {
     return (
-      <div className="py-10 text-center text-text-tertiary text-sm">
+      <div className="py-10 text-center text-text-tertiary text-base">
         {t("pages:ui.keine_daten_verfuegbar")}
       </div>
     );
@@ -232,7 +232,7 @@ export default function CategoryGaugeChart({ rows, hasPeer, onToggleHide }: Cate
   return (
     <div className="px-4 py-4">
       {/* Legend */}
-      <div className="flex flex-wrap gap-x-5 gap-y-2 mb-4 text-[13px] leading-relaxed text-text-tertiary">
+      <div className="flex flex-wrap gap-x-5 gap-y-2 mb-4 text-sm leading-relaxed text-text-tertiary">
         <span className="flex items-center gap-1">
           <span className="w-3 h-3 rounded-full inline-block bg-accent/80" />
           Historisch (Ist)
@@ -253,7 +253,7 @@ export default function CategoryGaugeChart({ rows, hasPeer, onToggleHide }: Cate
       {visibleRows.length > 0 ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
           {visibleRows.map((row) => {
-            const option = makeOption(row, hasPeer, colors);
+            const option = makeOption(row, hasPeer, colors, fs);
             const isOver = hasPeer && (row.peer ?? 0) > 0 && row.actual > (row.peer ?? 0);
 
             return (
@@ -286,7 +286,7 @@ export default function CategoryGaugeChart({ rows, hasPeer, onToggleHide }: Cate
                   >
                     <row.sc.icon className="w-3 h-3" style={{ color: row.sc.color }} />
                   </span>
-                  <span className="text-[13px] leading-snug font-medium text-text-secondary truncate max-w-[90px]">
+                  <span className="text-sm leading-snug font-medium text-text-secondary truncate max-w-[90px]">
                     {row.sc.label}
                   </span>
                 </div>
@@ -294,7 +294,7 @@ export default function CategoryGaugeChart({ rows, hasPeer, onToggleHide }: Cate
                 {/* Peer comparison hint */}
                 {hasPeer && (row.peer ?? 0) > 0 && (
                   <p
-                    className="text-[11px] mt-1 leading-relaxed font-mono"
+                    className="text-xs mt-1 leading-relaxed font-mono"
                     style={{ color: isOver ? "#f87171" : colors.textTertiary }}
                   >
                     {pctLabel(row.actual, row.peer!)}
@@ -305,7 +305,7 @@ export default function CategoryGaugeChart({ rows, hasPeer, onToggleHide }: Cate
           })}
         </div>
       ) : (
-        <p className="text-center text-text-tertiary text-sm py-6">
+        <p className="text-center text-text-tertiary text-base py-6">
           {t("pages:ui.alle_kategorien_ausgeblendet_nutze_die_filte")}
         </p>
       )}

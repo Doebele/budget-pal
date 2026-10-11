@@ -60,7 +60,7 @@ export default function GranularityNavigator({ granularity, anchor, onChange }: 
           </button>
         )}
 
-        <span className="text-sm font-medium text-text-primary min-w-[110px] text-center select-none">
+        <span className="text-base font-medium text-text-primary min-w-[110px] text-center select-none">
           {range.label}
         </span>
 

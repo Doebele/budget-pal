@@ -23,8 +23,8 @@ export default function EmptyState({ title, hint, icon: Icon, className }: Empty
       className={clsx("flex flex-col items-center gap-2 py-10 px-4 text-center", className)}
     >
       {Icon && <Icon className="w-8 h-8 text-text-disabled" />}
-      <p className="text-text-secondary text-sm">{title}</p>
-      {hint && <p className="text-text-tertiary text-xs max-w-sm">{hint}</p>}
+      <p className="text-text-secondary text-base">{title}</p>
+      {hint && <p className="text-text-tertiary text-sm max-w-sm">{hint}</p>}
     </div>
   );
 }
