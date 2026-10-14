@@ -27,6 +27,7 @@ from app.models.models import Transaction, Account, User, Category
 from app.services import ai_client
 from app.services.categorization import CategorizationService
 from app.services.audit_log import record_activity
+from app.services.transfer_matching import match_transfers, unlink_pair
 from app.services.currency_service import (
     currency_service,
     normalize_reference_currency,
@@ -34,6 +35,14 @@ from app.services.currency_service import (
 )
 
 router = APIRouter()
+
+# Was eine Buchung in der Antwort braucht: Konto, Splits und die Gegenbuchung
+# eines Kontoübertrags samt deren Konto (Name in der Liste)
+_TXN_LOAD = (
+    selectinload(Transaction.account),
+    selectinload(Transaction.split_children),
+    selectinload(Transaction.transfer_pair).selectinload(Transaction.account),
+)
 categorization_service = CategorizationService()
 
 
@@ -96,6 +105,9 @@ class TransactionResponse(BaseModel):
     user_verified: bool
     notes: Optional[str]
     is_transfer: bool
+    # Kontoübertrag: die Gegenbuchung und ihr Konto
+    transfer_pair_id: Optional[int] = None
+    transfer_account_name: Optional[str] = None
     is_recurring: bool
     periodicity: Optional[str] = None
     created_at: datetime
@@ -267,6 +279,8 @@ def _transaction_to_response(txn: Transaction, user: User, rates: Dict[str, floa
         user_verified=txn.user_verified,
         notes=txn.notes,
         is_transfer=txn.is_transfer,
+        transfer_pair_id=txn.transfer_pair_id,
+        transfer_account_name=_transfer_account_name(txn),
         is_recurring=txn.is_recurring,
         periodicity=txn.periodicity,
         created_at=txn.created_at,
@@ -274,6 +288,15 @@ def _transaction_to_response(txn: Transaction, user: User, rates: Dict[str, floa
         is_split=txn.is_split,
         split_count=_split_count(txn),
     )
+
+
+def _transfer_account_name(txn: Transaction) -> Optional[str]:
+    if not txn.transfer_pair_id or "transfer_pair" in sa_inspect(txn).unloaded:
+        return None
+    pair = txn.transfer_pair
+    if pair is None or "account" in sa_inspect(pair).unloaded or pair.account is None:
+        return None
+    return pair.account.name
 
 
 def _split_count(txn: Transaction) -> int:
@@ -302,7 +325,7 @@ async def get_user_transaction(
         select(Transaction)
         .join(Account)
         .where(and_(*filters))
-        .options(selectinload(Transaction.account), selectinload(Transaction.split_children))
+        .options(*_TXN_LOAD)
     )
     txn = result.scalar_one_or_none()
     if not txn:
@@ -324,7 +347,7 @@ async def get_user_archived_transaction(
             Account.user_id == current_user.id,
             Transaction.is_deleted.is_(True),
         )
-        .options(selectinload(Transaction.account), selectinload(Transaction.split_children))
+        .options(*_TXN_LOAD)
     )
     txn = result.scalar_one_or_none()
     if not txn:
@@ -352,6 +375,19 @@ def _to_archived_response(t: Transaction) -> ArchivedTransactionResponse:
 
 
 # ── Routes (specific paths before `/{id}`) ────────────────────
+
+@router.post("/match-transfers")
+async def match_transfers_route(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Kontoüberträge zwischen eigenen Konten erkennen (läuft auch nach jedem
+    Import). Gibt die Zahl der neu verbundenen Paare zurück."""
+    rates = await currency_service.get_rates("EUR")
+    pairs = await match_transfers(db, current_user.id, rates)
+    await db.commit()
+    return {"pairs": pairs}
+
 
 @router.get("/archived", response_model=List[ArchivedTransactionResponse])
 async def list_archived_transactions(
@@ -543,7 +579,7 @@ async def list_transactions(
             select(Transaction)
             .join(Account)
             .where(and_(*filters))
-            .options(selectinload(Transaction.account), selectinload(Transaction.split_children))
+            .options(*_TXN_LOAD)
             .order_by(desc(Transaction.date), desc(Transaction.id))
             .limit(limit)
         )
@@ -552,7 +588,7 @@ async def list_transactions(
             select(Transaction)
             .join(Account)
             .where(and_(*filters))
-            .options(selectinload(Transaction.account), selectinload(Transaction.split_children))
+            .options(*_TXN_LOAD)
             .order_by(desc(Transaction.date), desc(Transaction.id))
             .limit(limit)
             .offset(offset)
@@ -638,6 +674,15 @@ async def update_transaction(
 
     update_data = payload.model_dump(exclude_unset=True)
     if "category" in update_data and update_data["category"] is not None:
+        update_data.setdefault("user_verified", True)
+
+    # Ein erkanntes Paar auflösen: beide Seiten zählen wieder, und der
+    # Abgleich verbindet sie nicht noch einmal
+    if update_data.get("is_transfer") is False:
+        if txn.transfer_pair_id:
+            unlink_pair(txn, txn.transfer_pair)
+        txn.transfer_rejected = True
+    if "is_transfer" in update_data:
         update_data.setdefault("user_verified", True)
 
     for field, value in update_data.items():
@@ -1163,7 +1208,7 @@ async def split_transaction(
     result = await db.execute(
         select(Transaction)
         .join(Account, Transaction.account_id == Account.id)
-        .options(selectinload(Transaction.account), selectinload(Transaction.split_children))
+        .options(*_TXN_LOAD)
         .where(
             Transaction.id == transaction_id,
             Account.user_id == current_user.id,
@@ -1233,7 +1278,7 @@ async def split_transaction(
     ids = [t.id for t in all_txns]
     rows = (await db.execute(
         select(Transaction)
-        .options(selectinload(Transaction.account), selectinload(Transaction.split_children))
+        .options(*_TXN_LOAD)
         .where(Transaction.id.in_(ids))
     )).scalars().all()
     rows.sort(key=lambda t: (0 if t.id == parent.id else 1))
@@ -1282,7 +1327,7 @@ async def get_split_children(
     children = (await db.execute(
         select(Transaction)
         .join(Account, Transaction.account_id == Account.id)
-        .options(selectinload(Transaction.account), selectinload(Transaction.split_children))
+        .options(*_TXN_LOAD)
         .where(
             Transaction.parent_id == transaction_id,
             Account.user_id == current_user.id,

@@ -442,6 +442,9 @@ async def import_backup(
                 import_hash=imp_hash,
                 notes=txn_data.get("notes"),
                 is_transfer=txn_data.get("is_transfer", False),
+                # Paar-Verbindungen nicht übernehmen (andere IDs); der nächste
+                # Abgleich verbindet neu, aufgelöste Paare bleiben aufgelöst
+                transfer_rejected=txn_data.get("transfer_rejected", False),
                 is_recurring=txn_data.get("is_recurring", False),
                 periodicity=txn_data.get("periodicity"),
                 is_deleted=txn_data.get("is_deleted", False),

@@ -58,7 +58,16 @@
     "more": "Mehr"
   },
   "txn": {
-    "uncategorized": "Unkategorisiert"
+    "uncategorized": "Unkategorisiert",
+    "transfer": "Kontoübertrag",
+    "transferTo": "Übertrag an {{account}}",
+    "transferFrom": "Übertrag von {{account}}",
+    "unlinkTransfer": "kein Übertrag",
+    "unlinkTransferHint": "Verbindung lösen: beide Buchungen zählen wieder als Ein- bzw. Ausgabe",
+    "matchTransfers": "Überträge erkennen",
+    "transfersMatched_one": "1 Übertrag verbunden",
+    "transfersMatched_other": "{{count}} Überträge verbunden",
+    "matchTransfersHint": "Sucht Abgänge und Eingänge mit gleichem Betrag auf Ihren eigenen Konten (auch in anderer Währung) und zählt sie als Kontoübertrag statt als Ausgabe und Einnahme. Läuft auch nach jedem Import."
   },
   "periodicity": {
     "weekly": "Wöchentlich",

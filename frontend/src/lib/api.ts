@@ -102,6 +102,8 @@ export const accountsApi = {
 // Transactions
 export const transactionsApi = {
   list: (params?: Record<string, unknown>) => api.get("/transactions", { params }),
+  /** Kontoüberträge zwischen eigenen Konten verbinden; { pairs: neue Paare } */
+  matchTransfers: () => api.post<{ pairs: number }>("/transactions/match-transfers"),
   listPage: (params?: Record<string, unknown>, cursor?: string) =>
     api.get("/transactions", { params: { ...params, cursor, limit: 100 } }),
   /**

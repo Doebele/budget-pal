@@ -12,7 +12,7 @@ import { useAuth } from "@/lib/auth";
 import { useTaxonomy, useTaxonomySuperCategories } from "@/lib/categories";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
-import { Building, Check, Download, GraphUp, NavArrowDown, PercentageCircle, Repeat, Scissor, Search, Trash, Upload, ViewGrid, Wallet, Xmark } from "@/lib/icons";
+import { Building, Check, DataTransferBoth, Download, GraphUp, NavArrowDown, PercentageCircle, Repeat, Scissor, Search, Trash, Upload, ViewGrid, Wallet, Xmark } from "@/lib/icons";
 import GranularityNavigator from "@/components/GranularityNavigator";
 import { computeDateRange, TimeGranularity } from "@/lib/granularity";
 import { Link } from "react-router-dom";
@@ -46,6 +46,9 @@ interface Transaction {
   confidence_score?: number;
   user_verified: boolean;
   notes?: string;
+  is_transfer?: boolean;
+  transfer_pair_id?: number | null;
+  transfer_account_name?: string | null;
   is_recurring?: boolean;
   periodicity?: RecurrenceType;
   parent_id?: number | null;
@@ -234,6 +237,12 @@ export default function Transactions() {
     },
   });
 
+  // Kontoüberträge zwischen eigenen Konten erkennen (läuft auch nach jedem Import)
+  const matchTransfersMutation = useMutation({
+    mutationFn: () => transactionsApi.matchTransfers().then((r) => r.data.pairs),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["transactions"] }),
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (id: number) => transactionsApi.delete(id),
     onSuccess: () => {
@@ -344,6 +353,20 @@ export default function Transactions() {
             >
               <PercentageCircle className="w-4 h-4" />
               <span className="hidden sm:inline">Budget-Analyse</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => matchTransfersMutation.mutate()}
+              disabled={matchTransfersMutation.isPending}
+              title={t("txn.matchTransfersHint")}
+              className="flex items-center gap-2 px-3 py-2 rounded-md text-base text-text-tertiary hover:text-text-primary hover:bg-bg-surface2 border border-transparent transition-colors disabled:opacity-50"
+            >
+              <DataTransferBoth className="w-4 h-4" />
+              <span className="hidden sm:inline">
+                {matchTransfersMutation.isSuccess
+                  ? t("txn.transfersMatched", { count: matchTransfersMutation.data })
+                  : t("txn.matchTransfers")}
+              </span>
             </button>
             <span className="text-text-tertiary text-base hidden sm:inline">{t("filters.overview")}</span>
 
@@ -719,6 +742,24 @@ export default function Transactions() {
                       {txn.merchant_normalized && txn.description !== txn.merchant_normalized && (
                         <p className="text-text-tertiary text-sm truncate" title={txn.description}>
                           {txn.description}
+                        </p>
+                      )}
+                      {txn.is_transfer && (
+                        <p className="flex items-center gap-1 text-text-tertiary text-sm">
+                          <DataTransferBoth className="w-3 h-3 shrink-0" />
+                          {txn.transfer_account_name
+                            ? t(txn.amount < 0 ? "txn.transferTo" : "txn.transferFrom", { account: txn.transfer_account_name })
+                            : t("txn.transfer")}
+                          {txn.transfer_pair_id && (
+                            <button
+                              type="button"
+                              onClick={() => updateMutation.mutate({ id: txn.id, data: { is_transfer: false } })}
+                              title={t("txn.unlinkTransferHint")}
+                              className="ml-1 underline hover:text-text-primary"
+                            >
+                              {t("txn.unlinkTransfer")}
+                            </button>
+                          )}
                         </p>
                       )}
                     </td>
