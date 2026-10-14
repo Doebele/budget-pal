@@ -94,7 +94,9 @@
     "deletingLong": "Wird gelöscht...",
     "confirmDelete": "Ja, löschen",
     "balanceFromStatement": "Stand laut Auszug vom {{date}}",
-    "balanceManual": "Stand von Hand erfasst"
+    "balanceManual": "Stand von Hand erfasst",
+    "showTransactions": "Transaktionen",
+    "showTransactionsOf": "Transaktionen von {{name}} anzeigen"
   },
   "budgetplan": {
     "noCategory": "Keine Kategorie",

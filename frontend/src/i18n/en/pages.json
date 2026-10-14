@@ -94,7 +94,9 @@
     "deletingLong": "Deleting...",
     "confirmDelete": "Yes, delete",
     "balanceFromStatement": "Balance per statement of {{date}}",
-    "balanceManual": "Balance entered by hand"
+    "balanceManual": "Balance entered by hand",
+    "showTransactions": "Transactions",
+    "showTransactionsOf": "Show transactions of {{name}}"
   },
   "budgetplan": {
     "noCategory": "No category",

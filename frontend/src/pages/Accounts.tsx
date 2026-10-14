@@ -3,7 +3,8 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { accountsApi } from "@/lib/api";
 import { formatCHF } from "@/lib/theme";
-import { Check, EditPencil, Plus, Search, Trash, WarningTriangle } from "@/lib/icons";
+import { ArrowRight, Check, EditPencil, Plus, Search, Trash, WarningTriangle } from "@/lib/icons";
+import { Link } from "react-router-dom";
 import { clsx } from "clsx";
 import {
   BANKS_WITH_LOGOS,
@@ -540,7 +541,8 @@ export default function Accounts() {
             <div
               key={account.id}
               className={clsx(
-                "card hover:border-accent/30 transition-colors",
+                // relative: Anker fuer den Link, der die ganze Karte abdeckt
+                "card relative hover:border-accent/30 transition-colors",
                 editingAccountId === account.id && "border-accent ring-1 ring-accent"
               )}
             >
@@ -567,7 +569,7 @@ export default function Accounts() {
                     </p>
                   </div>
                 </div>
-                <div className="flex gap-1">
+                <div className="relative z-10 flex gap-1">
                   <button
                     onClick={() => handleEditClick(account)}
                     className={clsx(
@@ -582,6 +584,18 @@ export default function Accounts() {
                   </button>
                 </div>
               </div>
+              <div className="flex items-end justify-between gap-3">
+              {/* Klick auf die Karte → Reale Angaben, auf dieses Konto gefiltert.
+                  after:inset-0 spannt die Klickflaeche ueber die ganze Karte;
+                  der Bearbeiten-Knopf liegt mit z-10 darueber. */}
+              <Link
+                to={`/transactions?account=${account.id}`}
+                aria-label={t("pages:accounts.showTransactionsOf", { name: account.name })}
+                className="flex items-center gap-1 text-sm text-text-tertiary hover:text-accent transition-colors after:absolute after:inset-0 after:rounded-[inherit]"
+              >
+                {t("pages:accounts.showTransactions")}
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
               {/* Balance Display: Primary (CHF) + Secondary (Original Currency) */}
               <div className="flex flex-col items-end">
                 {/* Primary Amount: CHF Converted */}
@@ -610,6 +624,7 @@ export default function Accounts() {
                       })
                     : t("pages:accounts.balanceManual")}
                 </p>
+              </div>
               </div>
             </div>
           )
