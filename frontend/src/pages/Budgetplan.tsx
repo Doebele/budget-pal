@@ -682,7 +682,7 @@ function BudgetplanCategoryPicker({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center gap-2 bg-bg-surface2 border border-border rounded-lg px-3 py-2 text-base text-text-primary text-left focus:outline-none focus:ring-1 focus:ring-accent"
+        className="input flex items-center gap-2 text-base text-left"
       >
         {selectedCat && SelectedIcon ? (
           <>
@@ -1764,7 +1764,7 @@ export default function Budgetplan() {
               onChange={(e) => setBulkPct(e.target.value)}
               placeholder={t("pages:budgetplan.percentPlaceholder")}
               aria-label={t("pages:budgetplan.percentLabel")}
-              className="w-20 bg-bg-surface2 border border-border rounded-lg px-2 py-1 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-accent"
+              className="input input-amount w-20 text-sm"
             />
             <span className="text-text-tertiary text-sm">%</span>
             <button
@@ -2286,7 +2286,7 @@ export default function Budgetplan() {
                 <label className="block text-sm text-text-tertiary mb-1">Bezeichnung</label>
                 <input
                   type="text"
-                  className="w-full bg-bg-surface2 border border-border rounded-lg px-3 py-2 text-base text-text-primary placeholder-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent"
+                  className="input text-base"
                   placeholder={t("pages:ui.z_b_miete_lohn_netflix")}
                   value={form.description}
                   onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
@@ -2348,7 +2348,7 @@ export default function Budgetplan() {
                     type="number"
                     min="0"
                     step="0.01"
-                    className="flex-1 min-w-0 bg-bg-surface2 border border-border rounded-lg px-3 py-2 text-base text-text-primary placeholder-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent"
+                    className="input input-amount flex-1 min-w-0 text-base"
                     placeholder="0.00"
                     value={form.amountAbs}
                     onChange={(e) => setForm((f) => ({ ...f, amountAbs: e.target.value }))}
@@ -2363,7 +2363,7 @@ export default function Budgetplan() {
                     ))}
                   </select>
                   <select
-                    className="input text-sm shrink-0"
+                    className="input text-sm shrink-0 w-auto"
                     value={form.periodicity}
                     onChange={(e) => setForm((f) => ({ ...f, periodicity: e.target.value }))}
                   >
@@ -2380,7 +2380,7 @@ export default function Budgetplan() {
                   <label className="block text-sm text-text-tertiary mb-1">Startdatum</label>
                   <input
                     type="date"
-                    className="w-full bg-bg-surface2 border border-border rounded-lg px-3 py-2 text-base text-text-primary focus:outline-none focus:ring-1 focus:ring-accent"
+                    className="input text-base"
                     value={form.start_date}
                     onChange={(e) => setForm((f) => ({ ...f, start_date: e.target.value }))}
                   />
@@ -2389,7 +2389,7 @@ export default function Budgetplan() {
                   <label className="block text-sm text-text-tertiary mb-1">Enddatum (optional)</label>
                   <input
                     type="date"
-                    className="w-full bg-bg-surface2 border border-border rounded-lg px-3 py-2 text-base text-text-primary focus:outline-none focus:ring-1 focus:ring-accent"
+                    className="input text-base"
                     value={form.end_date}
                     onChange={(e) => setForm((f) => ({ ...f, end_date: e.target.value }))}
                   />

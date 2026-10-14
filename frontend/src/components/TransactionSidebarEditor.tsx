@@ -210,7 +210,7 @@ export default function TransactionSidebarEditor({ transactions, periodLabel, on
               placeholder={t("pages:misc.r05")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="flex-1 bg-bg-elevated/60 border border-border-strong rounded-lg px-3 py-1 text-base text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent/50"
+              className="input flex-1 text-base"
             />
             <select
               value={categoryFilter}
@@ -398,7 +398,7 @@ export default function TransactionSidebarEditor({ transactions, periodLabel, on
                   step="0.01"
                   value={draft.amount ?? ""}
                   onChange={(e) => updateDraft({ amount: parseFloat(e.target.value) || 0 })}
-                  className="w-full bg-bg-elevated border border-border-strong rounded-lg px-3 py-2 text-base text-text-primary font-mono focus:outline-none focus:border-accent"
+                  className="input input-amount font-mono text-base"
                 />
                 {draft.amount !== selected.amount && (
                   <p className="text-sm text-text-tertiary mt-1">

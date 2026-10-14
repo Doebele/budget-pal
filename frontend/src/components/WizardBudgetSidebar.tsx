@@ -257,7 +257,7 @@ export default function WizardBudgetSidebar({ periodLabel, months, initialScId, 
                           min="0"
                           value={drafts[b.id] ?? b.amount}
                           onChange={(e) => updateDraft(b.id, e.target.value)}
-                          className="w-full bg-bg-elevated border border-border-strong rounded-lg px-3 py-2 text-base text-text-primary font-mono focus:outline-none focus:border-accent"
+                          className="input input-amount font-mono text-base"
                         />
                       </div>
 
