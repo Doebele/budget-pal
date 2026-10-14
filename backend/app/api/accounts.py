@@ -1,6 +1,6 @@
 """Accounts API — CRUD for bank accounts."""
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import List, Optional
 
 from app.core.database import get_db
@@ -40,6 +40,25 @@ class AccountResponse(BaseModel):
     is_active: bool
     color: Optional[str]
     notes: Optional[str]
+    # Stand laut dem jüngsten importierten Kontoauszug; None = von Hand gesetzt
+    balance_date: Optional[date] = None
+
+
+def _to_response(a: Account) -> AccountResponse:
+    return AccountResponse(
+        id=a.id,
+        name=a.name,
+        bank=a.bank,
+        account_number=a.account_number,
+        iban=a.iban,
+        currency=a.currency,
+        balance=a.balance,
+        account_type=a.account_type.value,
+        is_active=a.is_active,
+        color=a.color,
+        notes=a.notes,
+        balance_date=a.balance_date,
+    )
 
 
 @router.get("", response_model=List[AccountResponse])
@@ -53,22 +72,7 @@ async def list_accounts(
         )
     )
     accounts = result.scalars().all()
-    return [
-        AccountResponse(
-            id=a.id,
-            name=a.name,
-            bank=a.bank,
-            account_number=a.account_number,
-            iban=a.iban,
-            currency=a.currency,
-            balance=a.balance,
-            account_type=a.account_type.value,
-            is_active=a.is_active,
-            color=a.color,
-            notes=a.notes,
-        )
-        for a in accounts
-    ]
+    return [_to_response(a) for a in accounts]
 
 
 @router.post("", response_model=AccountResponse, status_code=status.HTTP_201_CREATED)
@@ -82,19 +86,7 @@ async def create_account(
     await db.flush()
     await db.commit()
     await db.refresh(account)
-    return AccountResponse(
-        id=account.id,
-        name=account.name,
-        bank=account.bank,
-        account_number=account.account_number,
-        iban=account.iban,
-        currency=account.currency,
-        balance=account.balance,
-        account_type=account.account_type.value,
-        is_active=account.is_active,
-        color=account.color,
-        notes=account.notes,
-    )
+    return _to_response(account)
 
 
 @router.put("/{account_id}", response_model=AccountResponse)
@@ -112,24 +104,17 @@ async def update_account(
     account = result.scalar_one_or_none()
     if not account:
         raise HTTPException(status_code=404, detail="Account not found.")
+    # Von Hand geändert: der Stand gilt nicht mehr als «laut Auszug», der
+    # nächste importierte Auszug übernimmt wieder
+    if payload.balance != account.balance:
+        account.balance_date = None
+        account.statement_balances = None
     for k, v in payload.model_dump().items():
         setattr(account, k, v)
     await db.flush()
     await db.commit()
     await db.refresh(account)
-    return AccountResponse(
-        id=account.id,
-        name=account.name,
-        bank=account.bank,
-        account_number=account.account_number,
-        iban=account.iban,
-        currency=account.currency,
-        balance=account.balance,
-        account_type=account.account_type.value,
-        is_active=account.is_active,
-        color=account.color,
-        notes=account.notes,
-    )
+    return _to_response(account)
 
 
 @router.delete("/{account_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -92,7 +92,9 @@
     "saving": "Speichern...",
     "deleting": "Löschen...",
     "deletingLong": "Wird gelöscht...",
-    "confirmDelete": "Ja, löschen"
+    "confirmDelete": "Ja, löschen",
+    "balanceFromStatement": "Stand laut Auszug vom {{date}}",
+    "balanceManual": "Stand von Hand erfasst"
   },
   "budgetplan": {
     "noCategory": "Keine Kategorie",
@@ -424,7 +426,8 @@
     "i45": "Zuerst Vorschau, dann Import",
     "i46": "Zuweisungs-Probleme",
     "i47": "Überschreiben",
-    "i48": "Überspringen"
+    "i48": "Überspringen",
+    "statementBalance": "Kontostand laut Auszug: {{amount}} {{currency}} per {{date}}. Wird übernommen, wenn kein neuerer Auszug importiert ist."
   },
   "settings2": {
     "g00": "Abbrechen",

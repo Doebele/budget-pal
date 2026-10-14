@@ -124,6 +124,9 @@ interface PdfPreviewData {
   ai_tokens?: number;
   // Dokument war zu lang und wurde abgeschnitten — es fehlen Buchungen
   ai_truncated?: boolean;
+  // Schlusssaldo des Auszugs; wird beim Import als Kontostand übernommen,
+  // wenn der Auszug nicht älter ist als der bisher übernommene
+  statement_balance?: { date: string; amount: number; currency: string | null } | null;
 }
 
 interface CategoryRow {
@@ -298,6 +301,7 @@ export default function Import() {
         bank: selectedBank || (pdfPreview?.bank ?? "ubs"),
         filename: pdfFileName || "upload.pdf",
         rows: pdfPreview?.rows ?? [],
+        statement_balance: pdfPreview?.statement_balance ?? null,
       }).then((r) => r.data),
     onSuccess: (data) => {
       setPdfPreview(null);
@@ -670,6 +674,15 @@ export default function Import() {
                       )}
                     </p>
                   </div>
+                )}
+                {pdfPreview.statement_balance && (
+                  <p className="text-text-secondary text-sm mt-2">
+                    {t("pages:import.statementBalance", {
+                      amount: pdfPreview.statement_balance.amount.toLocaleString("de-CH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                      currency: pdfPreview.statement_balance.currency ?? "",
+                      date: format(new Date(pdfPreview.statement_balance.date), "dd.MM.yyyy"),
+                    })}
+                  </p>
                 )}
                 {pdfPreview.ai_truncated && (
                   <p className="text-loss text-xs mt-2 flex items-start gap-1">

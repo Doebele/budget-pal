@@ -92,7 +92,9 @@
     "saving": "Saving...",
     "deleting": "Deleting...",
     "deletingLong": "Deleting...",
-    "confirmDelete": "Yes, delete"
+    "confirmDelete": "Yes, delete",
+    "balanceFromStatement": "Balance per statement of {{date}}",
+    "balanceManual": "Balance entered by hand"
   },
   "budgetplan": {
     "noCategory": "No category",
@@ -424,7 +426,8 @@
     "i45": "Preview first, then import",
     "i46": "Mapping problems",
     "i47": "Overwrite",
-    "i48": "Skip"
+    "i48": "Skip",
+    "statementBalance": "Balance per statement: {{amount}} {{currency}} as of {{date}}. Taken over unless a newer statement was imported."
   },
   "settings2": {
     "g00": "Cancel",

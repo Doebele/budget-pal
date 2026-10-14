@@ -129,7 +129,12 @@ class UBSParser:
                 "description": description,
                 "amount": amount,
                 "currency": "CHF",
-                "balance": prev_balance if has_balance else None,
+                # Saldo nach der Buchung: daraus liest der Import den Kontostand
+                "balance": (
+                    self._parse_amount(self._get_col(row, col_map.get("balance")) or "")
+                    if has_balance and has_debit_credit
+                    else (prev_balance if has_balance else None)
+                ),
             })
 
         # If we calculated amounts from balance, the transactions are in reverse order
