@@ -14,7 +14,7 @@ import logging
 import os
 import re
 import tempfile
-from datetime import datetime, timezone
+from datetime import date as Date, datetime, timezone
 from typing import List, NamedTuple, Optional, Tuple
 from uuid import uuid4
 
@@ -28,6 +28,8 @@ from app.services import ai_client, pdf_ai_extract
 from app.services.categorization import CategorizationService
 from app.services.currency_service import currency_service
 from app.services.transfer_matching import match_transfers
+from app.services import statement_balance
+from app.services.statement_balance import StatementBalance
 from app.services.user_history import CategoryHints, load_category_hints
 from app.services.import_parsers.comdirect import ComdirectParser
 from app.services.import_parsers.n26 import N26Parser
@@ -155,6 +157,13 @@ class PdfPreviewTransaction(BaseModel):
     )
 
 
+class StatementBalanceOut(BaseModel):
+    """Schlusssaldo des Auszugs (services/statement_balance.py)"""
+    date: Date
+    amount: float
+    currency: Optional[str] = None
+
+
 class PdfPreviewResponse(BaseModel):
     bank: str
     filename: str
@@ -176,6 +185,8 @@ class PdfPreviewResponse(BaseModel):
     # True, wenn das Dokument am Kostendeckel abgeschnitten wurde — dann fehlen
     # Buchungen aus dem hinteren Teil und die Vorschau ist unvollstaendig
     ai_truncated: bool = False
+    # Stand des Kontos laut Auszug; die UI gibt ihn beim Bestätigen zurück
+    statement_balance: Optional[StatementBalanceOut] = None
 
 
 class PdfImportConfirmRequest(BaseModel):
@@ -183,6 +194,7 @@ class PdfImportConfirmRequest(BaseModel):
     bank: Optional[str] = None
     filename: Optional[str] = None
     rows: List[PdfPreviewTransaction]
+    statement_balance: Optional[StatementBalanceOut] = None
 
 
 # ── Helper: detect bank format from CSV content ────────────────
@@ -593,6 +605,8 @@ async def import_csv(
         await db.commit()
         raise HTTPException(status_code=422, detail=f"Parse error: {e}")
 
+    statements = statement_balance.from_rows(raw_transactions)
+
     # Process transactions
     ai_cfg = ai_client.from_user(current_user)
     hints = await load_category_hints(db, current_user.id)
@@ -722,8 +736,12 @@ async def import_csv(
     )
     db.add(log)
     await db.flush()
+    rates = await currency_service.get_rates("EUR")
+    # Kontostand laut Auszug übernehmen, wenn er nicht älter ist als der bisherige
+    for sb in statements:
+        statement_balance.apply(account, sb, rates)
     # Kontoüberträge zu Buchungen auf anderen eigenen Konten verbinden
-    await match_transfers(db, current_user.id, await currency_service.get_rates("EUR"))
+    await match_transfers(db, current_user.id, rates)
     await db.commit()
     await db.refresh(log)
 
@@ -853,6 +871,7 @@ class PdfExtraction(NamedTuple):
     ai_model: str = ""
     ai_tokens: int = 0
     ai_truncated: bool = False
+    statement_balance: Optional[StatementBalance] = None
 
 
 async def _extract_pdf_rows(
@@ -944,7 +963,9 @@ async def _extract_pdf_rows(
     )
 
     if not parser_failed or ai is None or not ai.enabled:
-        return PdfExtraction(detected_bank, raw_transactions)
+        return PdfExtraction(
+            detected_bank, raw_transactions, statement_balance=statement_balance.from_text(full_text)
+        )
 
     if len(full_text.strip()) < 100:
         try:
@@ -968,12 +989,14 @@ async def _extract_pdf_rows(
     # Nur ersetzen, wenn die KI etwas geliefert hat — sonst bleibt die
     # (unbrauchbare) Parser-Ausgabe, damit der Nutzer wenigstens sieht, dass
     # etwas gelesen wurde
+    statement = statement_balance.from_text(full_text)
     if ai_rows:
         return PdfExtraction(
-            detected_bank, ai_rows, ai_extracted=True, ai_attempted=True, **ai_meta
+            detected_bank, ai_rows, ai_extracted=True, ai_attempted=True,
+            statement_balance=statement, **ai_meta
         )
     return PdfExtraction(
-        detected_bank, raw_transactions, ai_attempted=True, **ai_meta
+        detected_bank, raw_transactions, ai_attempted=True, statement_balance=statement, **ai_meta
     )
 
 
@@ -1003,6 +1026,7 @@ async def _build_pdf_preview(
         used_ai, ai_attempted = extraction.ai_extracted, extraction.ai_attempted
         ai_model, ai_tokens = extraction.ai_model, extraction.ai_tokens
         ai_truncated = extraction.ai_truncated
+        statement = extraction.statement_balance
     finally:
         os.unlink(tmp_path)
 
@@ -1140,6 +1164,7 @@ async def _build_pdf_preview(
         ai_model=ai_model,
         ai_tokens=ai_tokens,
         ai_truncated=ai_truncated,
+        statement_balance=StatementBalanceOut(**statement._asdict()) if statement else None,
     )
 
 
@@ -1407,6 +1432,8 @@ async def confirm_pdf_import(
     db: AsyncSession = Depends(get_db),
 ):
     """Persist user-reviewed PDF preview rows."""
+    sb = payload.statement_balance
+    statements = [StatementBalance(sb.date, sb.amount, sb.currency)] if sb else []
     acct_result = await db.execute(
         select(Account).where(
             Account.id == payload.account_id, Account.user_id == current_user.id
@@ -1628,8 +1655,12 @@ async def confirm_pdf_import(
     )
     db.add(log)
     await db.flush()
+    rates = await currency_service.get_rates("EUR")
+    # Kontostand laut Auszug übernehmen, wenn er nicht älter ist als der bisherige
+    for sb in statements:
+        statement_balance.apply(account, sb, rates)
     # Kontoüberträge zu Buchungen auf anderen eigenen Konten verbinden
-    await match_transfers(db, current_user.id, await currency_service.get_rates("EUR"))
+    await match_transfers(db, current_user.id, rates)
     await db.commit()
     await db.refresh(log)
 
@@ -1675,9 +1706,9 @@ async def import_pdf(
     ai_cfg = ai_client.from_user(current_user)
     hints = await load_category_hints(db, current_user.id)
     try:
-        raw_transactions = (
-            await _extract_pdf_rows(tmp_path, bank, ai=ai_cfg, hints=hints)
-        ).rows
+        extraction = await _extract_pdf_rows(tmp_path, bank, ai=ai_cfg, hints=hints)
+        raw_transactions = extraction.rows
+        statements = [extraction.statement_balance] if extraction.statement_balance else []
     finally:
         os.unlink(tmp_path)
 
@@ -1789,8 +1820,12 @@ async def import_pdf(
     )
     db.add(log)
     await db.flush()
+    rates = await currency_service.get_rates("EUR")
+    # Kontostand laut Auszug übernehmen, wenn er nicht älter ist als der bisherige
+    for sb in statements:
+        statement_balance.apply(account, sb, rates)
     # Kontoüberträge zu Buchungen auf anderen eigenen Konten verbinden
-    await match_transfers(db, current_user.id, await currency_service.get_rates("EUR"))
+    await match_transfers(db, current_user.id, rates)
     await db.commit()
     await db.refresh(log)
 

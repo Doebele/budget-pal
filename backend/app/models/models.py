@@ -147,6 +147,10 @@ class Account(Base):
     iban: Mapped[Optional[str]] = mapped_column(String(34), nullable=True)
     currency: Mapped[str] = mapped_column(String(3), default="CHF", nullable=False)
     balance: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    # Stand laut dem jüngsten importierten Kontoauszug (services/statement_balance.py):
+    # Datum des Stands und je Währung {"EUR": {"date": "2026-08-06", "amount": 1069.68}}
+    balance_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    statement_balances: Mapped[Optional[dict]] = mapped_column(PortableJSON, nullable=True)
     account_type: Mapped[AccountType] = mapped_column(
         Enum(AccountType, native_enum=False), default=AccountType.checking, nullable=False
     )

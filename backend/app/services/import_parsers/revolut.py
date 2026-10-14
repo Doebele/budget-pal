@@ -108,6 +108,12 @@ class RevolutParser:
                 "amount": amount,
                 "currency": currency,
             }
+            # Saldo der Währungstasche nach der Buchung → Kontostand beim Import
+            try:
+                txn["balance"] = float(row.get(f_balance)) if f_balance and row.get(f_balance) else None
+                txn["balance_currency"] = currency
+            except (ValueError, TypeError):
+                pass
             transactions.append(txn)
 
             # Append fee as a separate transaction if present

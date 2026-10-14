@@ -376,6 +376,9 @@ async def import_backup(
             iban=acc_data.get("iban"),
             currency=acc_data.get("currency", "CHF"),
             balance=acc_data.get("balance", 0.0),
+            # Stand laut Auszug (ISO-Datum im Backup)
+            balance_date=(d.date() if (d := _parse_dt(acc_data.get("balance_date"))) else None),
+            statement_balances=acc_data.get("statement_balances"),
             account_type=acc_data.get("account_type", "checking"),
             is_active=acc_data.get("is_active", True),
             color=acc_data.get("color"),

@@ -535,6 +535,7 @@ export default function Accounts() {
             balance: number;
             account_type: string;
             currency: string;
+            balance_date?: string | null;
           }) => (
             <div
               key={account.id}
@@ -601,6 +602,14 @@ export default function Accounts() {
                     {formatCurrency(account.balance, account.currency)} (≈)
                   </p>
                 )}
+                {/* Herkunft des Stands: jüngster importierter Auszug oder von Hand */}
+                <p className="text-2xs text-text-tertiary mt-1">
+                  {account.balance_date
+                    ? t("pages:accounts.balanceFromStatement", {
+                        date: new Date(account.balance_date).toLocaleDateString("de-CH"),
+                      })
+                    : t("pages:accounts.balanceManual")}
+                </p>
               </div>
             </div>
           )

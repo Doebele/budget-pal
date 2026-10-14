@@ -259,6 +259,14 @@ It runs after every import and via `POST /transactions/match-transfers`. Hand-ca
 bookings (except as «Kontoübertrag») and pairs the user unlinked (`transfer_rejected`, set by
 `PUT is_transfer=false`) are never touched; the relationship needs `post_update=True`.
 
+**Balance per statement** (`services/statement_balance.py`): every import reads the closing
+balance of the statement (PDF text incl. OCR: Comdirect «Neuer Saldo», UBS «Schlusssaldo» /
+«Aktueller Saldo», N26 «Your new balance», Revolut «Gesamt»; CSV: the saldo column of the
+newest booking) and sets `Account.balance`, but only if the statement is not older than the one
+already taken (`balance_date`). One entry per currency in `statement_balances` (Revolut pockets);
+`balance` is their sum in the account currency. PDF: the preview returns `statement_balance`, the
+UI sends it back on confirm. Editing the balance by hand clears `balance_date`.
+
 **Soft delete**: Transactions have `is_deleted` + `deleted_at`. All normal queries filter `is_deleted.isnot(True)`. Archived transactions are accessible at `/transactions/archived`.
 
 **Async sessions**: All DB access goes through `get_db()` dependency. Sessions do NOT auto-commit — routers must call `await db.commit()` or `await db.flush()` explicitly.
