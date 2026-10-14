@@ -26,6 +26,8 @@ from app.core.security import get_current_user
 from app.models.models import Account, ImportLog, ImportStatus, Transaction, User
 from app.services import ai_client, pdf_ai_extract
 from app.services.categorization import CategorizationService
+from app.services.currency_service import currency_service
+from app.services.transfer_matching import match_transfers
 from app.services.user_history import CategoryHints, load_category_hints
 from app.services.import_parsers.comdirect import ComdirectParser
 from app.services.import_parsers.n26 import N26Parser
@@ -720,6 +722,8 @@ async def import_csv(
     )
     db.add(log)
     await db.flush()
+    # Kontoüberträge zu Buchungen auf anderen eigenen Konten verbinden
+    await match_transfers(db, current_user.id, await currency_service.get_rates("EUR"))
     await db.commit()
     await db.refresh(log)
 
@@ -1624,6 +1628,8 @@ async def confirm_pdf_import(
     )
     db.add(log)
     await db.flush()
+    # Kontoüberträge zu Buchungen auf anderen eigenen Konten verbinden
+    await match_transfers(db, current_user.id, await currency_service.get_rates("EUR"))
     await db.commit()
     await db.refresh(log)
 
@@ -1783,6 +1789,8 @@ async def import_pdf(
     )
     db.add(log)
     await db.flush()
+    # Kontoüberträge zu Buchungen auf anderen eigenen Konten verbinden
+    await match_transfers(db, current_user.id, await currency_service.get_rates("EUR"))
     await db.commit()
     await db.refresh(log)
 

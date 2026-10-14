@@ -250,6 +250,15 @@ Central definition of all 11 supercategories (wohnen, essen, mobilitaet, versich
 
 ### Key patterns
 
+**Account transfers** (`services/transfer_matching.py`): a transfer between two of the user's
+own accounts shows up twice in actual data. `match_transfers()` pairs an outgoing and an
+incoming booking (same amount; other currency via the bank's original amount or today's ECB
+rate ±4 %, hints on both sides; at most 4–5 days apart), sets `is_transfer` on both and links
+them via `transfer_pair_id`. Every query that sums income/expenses already skips `is_transfer`.
+It runs after every import and via `POST /transactions/match-transfers`. Hand-categorised
+bookings (except as «Kontoübertrag») and pairs the user unlinked (`transfer_rejected`, set by
+`PUT is_transfer=false`) are never touched; the relationship needs `post_update=True`.
+
 **Soft delete**: Transactions have `is_deleted` + `deleted_at`. All normal queries filter `is_deleted.isnot(True)`. Archived transactions are accessible at `/transactions/archived`.
 
 **Async sessions**: All DB access goes through `get_db()` dependency. Sessions do NOT auto-commit — routers must call `await db.commit()` or `await db.flush()` explicitly.

@@ -202,6 +202,12 @@ class Transaction(Base):
     import_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     is_transfer: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Kontoübertrag zwischen zwei eigenen Konten (services/transfer_matching.py):
+    # die Gegenbuchung, und ob die Person ein erkanntes Paar aufgelöst hat
+    transfer_pair_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("transactions.id", ondelete="SET NULL"), nullable=True
+    )
+    transfer_rejected: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_recurring: Mapped[bool] = mapped_column(Boolean, default=False)
     periodicity: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
@@ -226,6 +232,10 @@ class Transaction(Base):
     category_obj: Mapped[Optional["Category"]] = relationship("Category", back_populates="transactions")
     labels: Mapped[List["Label"]] = relationship(
         "Label", secondary="transaction_labels", back_populates="transactions"
+    )
+    transfer_pair: Mapped[Optional["Transaction"]] = relationship(
+        "Transaction", foreign_keys="Transaction.transfer_pair_id", remote_side="Transaction.id",
+        post_update=True,  # zwei Buchungen zeigen gegenseitig aufeinander
     )
     split_children: Mapped[List["Transaction"]] = relationship(
         "Transaction", foreign_keys="Transaction.parent_id", back_populates="split_parent"
