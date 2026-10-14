@@ -222,6 +222,9 @@ class Completion(NamedTuple):
     model: str = ""
     prompt_tokens: int = 0
     completion_tokens: int = 0
+    # Antwort am max_tokens-Limit abgebrochen? Dann ist sie unvollstaendig —
+    # bei JSON meist unparsebar, und der Aufrufer muss das melden.
+    cut_off: bool = False
 
     @property
     def total_tokens(self) -> int:
@@ -608,6 +611,7 @@ async def _complete_raw(
             model=data.get("model") or prof.model,
             prompt_tokens=int(usage.get("input_tokens") or 0),
             completion_tokens=int(usage.get("output_tokens") or 0),
+            cut_off=data.get("stop_reason") == "max_tokens",
         )
         # Sicherheits-Klassifikatoren können ablehnen — das ist HTTP 200 mit
         # stop_reason "refusal" und leerem content, kein Fehler.
@@ -622,12 +626,13 @@ async def _complete_raw(
         return Completion(text or None, **meta)
 
     usage = data.get("usage") or {}
+    choices = data.get("choices") or []
     meta = dict(
         model=data.get("model") or prof.model,
         prompt_tokens=int(usage.get("prompt_tokens") or 0),
         completion_tokens=int(usage.get("completion_tokens") or 0),
+        cut_off=bool(choices) and choices[0].get("finish_reason") == "length",
     )
-    choices = data.get("choices") or []
     if not choices:
         return Completion(**meta)
 

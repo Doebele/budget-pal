@@ -2280,8 +2280,8 @@ function AiModelSection() {
                 id="ai-context"
                 type="range"
                 min={0}
-                max={120000}
-                step={4000}
+                max={12000} // = MAX_INPUT_CHARS_PER_CHUNK im Backend; mehr wirkt nicht
+                step={2000}
                 value={contextOverride}
                 onChange={(e) => { setSaved(false); setContextDraft(Number(e.target.value)); }}
                 className="flex-1 accent-accent cursor-pointer"

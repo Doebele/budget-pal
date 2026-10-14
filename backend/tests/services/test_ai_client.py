@@ -262,6 +262,29 @@ async def test_anthropic_refusal_returns_none():
         assert await ai_client.complete(cfg, "sys", "user") is None
 
 
+@pytest.mark.parametrize(
+    "provider,key,data",
+    [
+        ("openrouter", {"openrouter_api_key": "sk-or-test"},
+         {"choices": [{"message": {"content": '{"transactions": [{"da'}, "finish_reason": "length"}]}),
+        ("anthropic", {"anthropic_api_key": "sk-ant-test"},
+         {"stop_reason": "max_tokens", "content": [{"type": "text", "text": '{"transactions": [{"da'}]}),
+    ],
+)
+@pytest.mark.asyncio
+async def test_cut_off_at_token_limit_is_reported(provider, key, data):
+    """Eine am max_tokens-Limit abgebrochene Antwort ist unvollstaendig —
+    der Aufrufer muss das erfahren, statt still halbes JSON zu verwerfen."""
+    cfg = AiConfig(provider=provider, **key)
+    with patch("app.services.ai_client.httpx.AsyncClient", _FakeAsyncClient(data)):
+        assert (await ai_client.complete_detailed(cfg, "sys", "user")).cut_off is True
+
+    finished = {"choices": [{"message": {"content": "{}"}, "finish_reason": "stop"}]}
+    cfg = AiConfig(provider="openrouter", openrouter_api_key="sk-or-test")
+    with patch("app.services.ai_client.httpx.AsyncClient", _FakeAsyncClient(finished)):
+        assert (await ai_client.complete_detailed(cfg, "sys", "user")).cut_off is False
+
+
 @pytest.mark.asyncio
 async def test_gemini_uses_the_openai_compatible_endpoint():
     """Wie in fintools: Gemini ueber /v1beta/openai statt eines eigenen
