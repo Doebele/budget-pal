@@ -1299,7 +1299,8 @@ async def _run_pdf_preview_job(
             done, total = _job_progress(log)
             log.preview_json = {
                 "progress": {"done": done or total, "total": total},
-                "result": preview.model_dump(),
+                # mode="json": date-Felder (Schlusssaldo) sind sonst nicht JSON-serialisierbar
+                "result": preview.model_dump(mode="json"),
             }
             log.rows_imported = 0
             log.rows_skipped = 0
