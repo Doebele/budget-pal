@@ -345,3 +345,4 @@ async def delete_pension(
     if not record:
         raise HTTPException(status_code=404, detail="Pension record not found.")
     await db.delete(record)
+    await db.commit()

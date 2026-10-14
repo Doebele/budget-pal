@@ -300,6 +300,20 @@ class TestDeleteTransaction:
         )
         return response.json()
 
+    async def test_delete_is_committed(self, client, db_session, test_user, test_account):
+        """Der Test-Client teilt die Session mit dem Test und sieht deshalb auch
+        nicht gespeicherte Aenderungen. get_db verwirft beim Schliessen alles
+        Ungespeicherte — das rollback() hier spielt genau das nach. Ohne
+        commit() im Endpunkt war die Transaktion danach wieder da."""
+        from app.models.models import Transaction
+
+        txn = self._create_transaction(client, test_user, test_account)
+        assert client.delete(f"/api/transactions/{txn['id']}").status_code == 204
+
+        await db_session.rollback()
+        row = await db_session.get(Transaction, txn["id"])
+        assert row is not None and row.is_deleted is True
+
     def test_delete_transaction_success(self, client, test_user, test_account):
         """Test successful transaction deletion (soft delete)."""
         txn = self._create_transaction(client, test_user, test_account)
