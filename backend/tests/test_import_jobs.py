@@ -111,6 +111,28 @@ class TestStartJob:
         assert body["result"]["filename"] == "auszug.pdf"
         assert isinstance(body["result"]["rows"], list)
 
+    def test_job_with_statement_balance_completes(
+        self, client, test_account, pdf_bytes, background_session
+    ):
+        """Der Schlusssaldo traegt ein date — das muss als JSON in den Job.
+        Auf PostgreSQL scheiterte daran jeder Auszug mit erkanntem Saldo."""
+        from datetime import date
+
+        from app.services.statement_balance import StatementBalance
+
+        with patch(
+            "app.api.imports.statement_balance.from_text",
+            return_value=StatementBalance(date(2023, 4, 30), 159.55),
+        ):
+            started = client.post(
+                "/api/imports/pdf/preview-async",
+                files={"file": ("auszug.pdf", pdf_bytes, "application/pdf")},
+                data={"account_id": str(test_account.id)},
+            )
+        body = client.get(f"/api/imports/jobs/{started.json()['import_id']}").json()
+        assert body["status"] == "completed", body.get("error_message")
+        assert body["result"]["statement_balance"]["date"] == "2023-04-30"
+
     def test_result_matches_synchronous_preview(
         self, client, test_account, pdf_bytes, background_session
     ):
