@@ -149,6 +149,38 @@ class TestTruncationIsReported:
         assert result.chunks_processed == result.chunks_total == 1
 
 
+class TestOutputBudget:
+    """Das Kontextfenster begrenzt nur die Eingabe. Ein 33-seitiger Auszug
+    (52'500 Zeichen, 500 Buchungen) ging mit OpenRouter (128k) in einer Anfrage
+    raus, die Antwort brach am Token-Limit ab — 0 Buchungen, ohne Hinweis."""
+
+    async def test_large_context_window_still_splits_by_output_budget(self):
+        text = "\n".join(f"01.03.2026 Buchung {i:04d} Coop Pronto -12.35" for i in range(1200))
+        mock = AsyncMock(return_value=Completion('{"transactions": []}', "m", 1, 1))
+        with patch.object(pdf_ai_extract.ai_client, "complete_detailed", mock):
+            result = await pdf_ai_extract.extract_transactions(
+                AiConfig(provider="openrouter", openrouter_api_key="sk-or-test"), text
+            )
+
+        assert len(text) > pdf_ai_extract.MAX_INPUT_CHARS_PER_CHUNK
+        assert result.chunks_total > 1
+        sent = [call.args[2] for call in mock.call_args_list]
+        assert all(len(chunk) <= pdf_ai_extract.MAX_INPUT_CHARS_PER_CHUNK for chunk in sent)
+
+    async def test_cut_off_answer_is_flagged(self):
+        cut = Completion('{"transactions": [{"date": "2026-03-01", "desc', "m", 1, 12000, cut_off=True)
+        with patch.object(
+            pdf_ai_extract.ai_client, "complete_detailed", AsyncMock(return_value=cut)
+        ):
+            result = await pdf_ai_extract.extract_transactions(
+                AiConfig(provider="openrouter", openrouter_api_key="sk-or-test"), "Kurzer Text"
+            )
+
+        assert result.chunks_processed == result.chunks_total == 1
+        assert result.chunks_cut_off == 1
+        assert result.truncated is True
+
+
 # ── Ende-zu-Ende mit gemocktem Modell ─────────────────────────
 
 

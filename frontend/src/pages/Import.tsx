@@ -688,10 +688,10 @@ export default function Import() {
                   <p className="text-loss text-xs mt-2 flex items-start gap-1">
                     <WarningCircle className="w-3.5 h-3.5 shrink-0 mt-px" />
                     <span>
-                      <strong>{t("pages:import.i40")}</strong> Das Dokument ist länger, als in
-                      einem Durchgang ausgewertet werden kann — Buchungen aus dem
-                      hinteren Teil fehlen. Teile das PDF auf oder nutze, falls
-                      vorhanden, den CSV-Export der Bank.
+                      <strong>{t("pages:import.i40")}</strong> Nicht das ganze Dokument konnte
+                      ausgewertet werden — es ist zu lang, oder eine Antwort der KI
+                      brach am Token-Limit ab. Es fehlen Buchungen. Teile das PDF auf
+                      oder nutze, falls vorhanden, den CSV-Export der Bank.
                     </span>
                   </p>
                 )}
