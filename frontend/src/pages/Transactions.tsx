@@ -15,7 +15,7 @@ import { de } from "date-fns/locale";
 import { Building, Check, DataTransferBoth, Download, GraphUp, NavArrowDown, PercentageCircle, Repeat, Scissor, Search, Trash, Upload, ViewGrid, Wallet, Xmark } from "@/lib/icons";
 import GranularityNavigator from "@/components/GranularityNavigator";
 import { computeDateRange, TimeGranularity } from "@/lib/granularity";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { clsx } from "clsx";
 import { getBankByName } from "@/data/banks-with-logos";
 import { TransactionOverviewHeader } from "@/components/transactions/TransactionOverviewHeader";
@@ -89,10 +89,14 @@ export default function Transactions() {
   const [editCategory, setEditCategory] = useState("");
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<number | null>(null);
   const [splittingTxn, setSplittingTxn] = useState<Transaction | null>(null);
-  const [granularity, setGranularity] = useState<TimeGranularity>("ytd");
+  // ?account=<id> (Link von der Kontenkarte) waehlt das Konto vor — und den
+  // ganzen Zeitraum, damit auch ein aelterer letzter Auszug oben erscheint
+  const [searchParams] = useSearchParams();
+  const accountParam = searchParams.get("account");
+  const [granularity, setGranularity] = useState<TimeGranularity>(accountParam ? "max" : "ytd");
   const [anchor, setAnchor] = useState<Date>(new Date());
   const queryClient = useQueryClient();
-  const [viewMode, setViewMode] = useState("all");
+  const [viewMode, setViewMode] = useState(accountParam ?? "all");
   const [showBudgetAnalysis, setShowBudgetAnalysis] = useState(false);
 
   const [showAccountDropdown, setShowAccountDropdown] = useState(false);
