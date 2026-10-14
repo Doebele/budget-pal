@@ -51,6 +51,16 @@ class TestRowsLookImplausible:
         ]
         assert _rows_look_implausible(rows) is True
 
+    def test_few_overlong_descriptions_among_many_are_plausible(self):
+        """33-seitiger UBS-Auszug: 15 von 501 Zeilen mit mehrzeiligem Text.
+        Frueher schickte schon eine davon das ganze Dokument zur KI."""
+        rows = [
+            {"date": "2026-03-03", "amount": -12.5, "description": "COOP PRONTO"}
+        ] * 486 + [
+            {"date": "2026-03-05", "amount": -945.8, "description": "X" * 231}
+        ] * 15
+        assert _rows_look_implausible(rows) is False
+
     def test_normal_rows_are_plausible(self):
         rows = [
             {"date": "2026-03-03", "amount": -12.50, "description": "COOP PRONTO ZUERICH"},

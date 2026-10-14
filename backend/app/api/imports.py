@@ -835,6 +835,10 @@ async def _ocr_pdf_to_text(tmp_path: str) -> str:
 # Echte Buchungstexte sind kurz. Ist einer laenger, hat der Regex-Parser
 # mehrere Zeilen (oder den ganzen Auszug) zu einer Zeile verschmolzen.
 MAX_PLAUSIBLE_DESCRIPTION = 200
+# Einzelne ueberlange Zeilen sind bei echten Auszuegen normal: ein 33-seitiger
+# UBS-Auszug hatte 15 von 501 (mehrzeilige Buchungstexte, Seitenfuss
+# angehaengt). Erst ein groesserer Anteil spricht fuer einen verschmolzenen Text.
+MAX_OVERLONG_SHARE = 0.2
 
 
 def _rows_look_implausible(rows: List[dict]) -> bool:
@@ -850,10 +854,11 @@ def _rows_look_implausible(rows: List[dict]) -> bool:
         return True
     if all(abs(float(row.get("amount") or 0)) < 0.005 for row in rows):
         return True
-    return any(
+    overlong = sum(
         len(str(row.get("description") or "")) > MAX_PLAUSIBLE_DESCRIPTION
         for row in rows
     )
+    return overlong > MAX_OVERLONG_SHARE * len(rows)
 
 
 class PdfExtraction(NamedTuple):
