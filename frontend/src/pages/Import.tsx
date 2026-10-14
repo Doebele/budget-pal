@@ -256,6 +256,10 @@ export default function Import() {
       setJobId(started.import_id);
       queryClient.invalidateQueries({ queryKey: ["import-job", "active"] });
     },
+    onError: (error) => {
+      const detail = (error as { response?: { data?: { detail?: unknown } } }).response?.data?.detail;
+      alert(`Fehler beim Hochladen des PDFs: ${typeof detail === "string" ? detail : error.message}`);
+    },
   });
 
   // Vorschau übernehmen — identisch, egal ob sie synchron kam oder aus dem Job
@@ -596,12 +600,18 @@ export default function Import() {
                 neu laden, der Import geht nicht verloren.
               </p>
             )}
+          </div>
+        </div>
+      )}
 
-            {job?.status === "failed" && (
-              <p className="text-loss text-xs mt-1">
-                Auswertung fehlgeschlagen: {job.error_message}
-              </p>
-            )}
+      {/* Ausserhalb des Lade-Blocks: der verschwindet, sobald der Job nicht
+          mehr laeuft — und nahm die Fehlermeldung bisher mit. */}
+      {!isLoading && job?.status === "failed" && (
+        <div className="card flex items-start gap-3">
+          <WarningCircle className="w-5 h-5 text-loss shrink-0 mt-px" />
+          <div className="min-w-0">
+            <p className="text-text-primary text-base font-medium">PDF-Auswertung fehlgeschlagen</p>
+            <p className="text-text-secondary text-sm mt-1 break-words">{job.error_message}</p>
           </div>
         </div>
       )}

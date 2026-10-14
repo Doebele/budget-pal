@@ -177,7 +177,36 @@ class TestOutputBudget:
             )
 
         assert result.chunks_processed == result.chunks_total == 1
-        assert result.chunks_cut_off == 1
+        assert result.chunks_incomplete == 1
+        assert result.truncated is True
+
+
+class TestFailedCallsAreReported:
+    """Scheitern die KI-Aufrufe (402 bei OpenRouter, Timeout), darf die
+    Vorschau nicht "enthaelt keine Buchungen" behaupten."""
+
+    async def test_all_calls_failed_raises_with_cause(self):
+        failed = Completion(error="HTTP 402: Insufficient credits")
+        with patch.object(
+            pdf_ai_extract.ai_client, "complete_detailed", AsyncMock(return_value=failed)
+        ):
+            with pytest.raises(pdf_ai_extract.AiExtractionError, match="HTTP 402"):
+                await pdf_ai_extract.extract_transactions(
+                    AiConfig(provider="openrouter", openrouter_api_key="sk-or-test"), "Text"
+                )
+
+    async def test_partial_failure_is_flagged(self):
+        ok = Completion('{"transactions": [{"date": "2026-03-01", "description": "Coop", "amount": -5}]}', "m", 1, 1)
+        mock = AsyncMock(side_effect=[ok, Completion(error="ReadTimeout")])
+        text = "\n".join(f"Zeile {i} " + "x" * 60 for i in range(300))
+        with patch.object(pdf_ai_extract.ai_client, "complete_detailed", mock):
+            result = await pdf_ai_extract.extract_transactions(
+                AiConfig(provider="openrouter", openrouter_api_key="sk-or-test",
+                         context_chars_override=16000), text
+            )
+
+        assert len(result.rows) == 1
+        assert result.chunks_incomplete == 1
         assert result.truncated is True
 
 

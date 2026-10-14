@@ -50,6 +50,10 @@ _JSON_OBJECT_RE = re.compile(r"\{.*\}", re.S)
 _DATE_FORMATS = ("%Y-%m-%d", "%d.%m.%Y", "%d.%m.%y", "%d/%m/%Y", "%m/%d/%Y")
 
 
+class AiExtractionError(RuntimeError):
+    """Kein Abschnitt kam durch — die Meldung nennt die Ursache des Anbieters."""
+
+
 # (fertige Abschnitte, Abschnitte gesamt) — die UI zeigt daraus den Fortschritt
 ProgressCallback = Callable[[int, int], Awaitable[None]]
 
@@ -66,8 +70,9 @@ class ExtractionResult(NamedTuple):
     # im Glauben, es sei vollstaendig.
     chunks_processed: int = 0
     chunks_total: int = 0
-    # Abschnitte, deren Antwort am Token-Limit abbrach — auch dann fehlen Buchungen
-    chunks_cut_off: int = 0
+    # Abschnitte ohne vollstaendige Antwort (Token-Limit erreicht oder Aufruf
+    # gescheitert) — auch dann fehlen Buchungen
+    chunks_incomplete: int = 0
 
     @property
     def total_tokens(self) -> int:
@@ -75,7 +80,7 @@ class ExtractionResult(NamedTuple):
 
     @property
     def truncated(self) -> bool:
-        return self.chunks_total > self.chunks_processed or self.chunks_cut_off > 0
+        return self.chunks_total > self.chunks_processed or self.chunks_incomplete > 0
 
 
 def _chunks(text: str, chunk_chars: int = CHUNK_CHARS) -> List[str]:
@@ -236,7 +241,8 @@ async def extract_transactions(
     rows: List[Dict[str, Any]] = []
     seen: set[tuple] = set()
     model = ""
-    prompt_tokens = completion_tokens = cut_off = 0
+    prompt_tokens = completion_tokens = incomplete = 0
+    error: Optional[str] = None
 
     chunk_chars = min(
         await ai_client.resolve_chunk_chars(ai, MAX_TOKENS_PER_CHUNK),
@@ -268,8 +274,11 @@ async def extract_transactions(
         model = completion.model or model
         prompt_tokens += completion.prompt_tokens
         completion_tokens += completion.completion_tokens
+        if completion.error:
+            incomplete += 1
+            error = completion.error
         if completion.cut_off:
-            cut_off += 1
+            incomplete += 1
             logger.warning(
                 "KI-Extraktion: Antwort zu Abschnitt %d am Token-Limit (%d) "
                 "abgebrochen — Buchungen daraus fehlen",
@@ -295,6 +304,11 @@ async def extract_transactions(
     if on_progress is not None:
         await on_progress(len(chunks), len(chunks))
 
+    # Nichts bekommen, weil die Aufrufe scheiterten: das ist ein Fehler, kein
+    # leerer Auszug. Der Job meldet ihn dann mit der Ursache des Anbieters.
+    if not rows and error:
+        raise AiExtractionError(f"KI-Anfrage über {ai.provider} fehlgeschlagen: {error}")
+
     logger.info(
         "KI-Extraktion: %d Buchungen aus %d Zeichen (%s, %d Tokens)",
         len(rows),
@@ -305,5 +319,5 @@ async def extract_transactions(
     return ExtractionResult(
         rows, model, prompt_tokens, completion_tokens,
         chunks_processed=len(chunks), chunks_total=len(all_chunks),
-        chunks_cut_off=cut_off,
+        chunks_incomplete=incomplete,
     )
