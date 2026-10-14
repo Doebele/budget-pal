@@ -789,7 +789,7 @@ export default function Import() {
                                 next[idx] = { ...next[idx], original_date: e.target.value };
                                 return { ...prev, rows: next };
                               })}
-                              className="bg-bg-surface2 border border-border rounded px-2 py-1 text-text-primary w-[100px] text-sm"
+                              className="input w-[100px] text-sm"
                             />
                           </td>
 
@@ -803,7 +803,7 @@ export default function Import() {
                                 next[idx] = { ...next[idx], description: e.target.value };
                                 return { ...prev, rows: next };
                               })}
-                              className="bg-bg-surface2 border border-border rounded px-2 py-1 text-text-primary w-full min-w-[200px] text-sm"
+                              className="input min-w-[200px] text-sm"
                               title={row.description}
                             />
                           </td>
@@ -821,10 +821,8 @@ export default function Import() {
                                 return { ...prev, rows: next };
                               })}
                               className={clsx(
-                                "bg-bg-surface2 border rounded px-2 py-1 text-right w-full font-mono font-semibold text-sm",
-                                isExpense
-                                  ? "border-red-800/50 txt-error"
-                                  : "border-green-800/50 txt-success"
+                                "input input-amount font-mono font-semibold text-sm",
+                                isExpense ? "txt-error" : "txt-success"
                               )}
                             />
                           </td>
@@ -855,8 +853,9 @@ export default function Import() {
                                   })
                                 }
                                 className={clsx(
-                                  "w-[130px] flex-shrink-0 rounded border px-1 py-1 text-xs focus:outline-none",
-                                  getFrequencyStyle(row.periodicity)
+                                  "input w-[130px] flex-shrink-0 text-xs",
+                                  // only the text colour: the field keeps the ledger line
+                                  getFrequencyStyle(row.periodicity).split(" ").filter((c) => c.includes("text-"))
                                 )}
                               >
                                 <option value="">{t("pages:import.i16")}</option>
