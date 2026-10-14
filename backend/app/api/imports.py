@@ -2329,8 +2329,8 @@ async def delete_import(
             )
             deleted_count = delete_result.rowcount
 
-    # Delete the import log (get_db() commits on success)
     await db.delete(log)
+    await db.commit()
 
     return {
         "success": True,

@@ -190,6 +190,7 @@ async def delete_category(
         )
 
     await db.delete(cat)
+    await db.commit()
 
 
 # ── Label-level helpers (for taxonomy management) ─────────────
@@ -284,4 +285,5 @@ async def migrate_label(
                 .values(category_id=new_cat.id)
             )
 
+    await db.commit()
     return {"migrated": affected, "old_label": payload.old_label, "new_label": new_name}
