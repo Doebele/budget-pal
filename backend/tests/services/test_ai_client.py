@@ -825,6 +825,25 @@ async def test_error_message_comes_from_the_api_error_field():
 
 
 @pytest.mark.asyncio
+async def test_openrouter_402_is_explained_in_german():
+    """Die Rohmeldung las sich, als waere das Key-Limit erschoepft — dabei
+    war das Kontoguthaben leer."""
+    raw = (
+        "This request requires more credits, or fewer max_tokens. You requested up to "
+        "12000 tokens, but can only afford 2898. To increase, visit "
+        "https://openrouter.ai/workspaces/default/keys/abc"
+    )
+    response = _ErrorResponse(402, {"error": {"message": raw}})
+    cfg = AiConfig(provider="openrouter", openrouter_api_key="sk-or-test")
+    with patch("app.services.ai_client.httpx.AsyncClient", _client_returning(response)):
+        result = await ai_client.complete_detailed(cfg, "sys", "user")
+    assert result.error.startswith("HTTP 402: Das Guthaben beim KI-Anbieter reicht nicht")
+    assert "bis zu 12000 Tokens, bezahlbar sind noch 2898" in result.error
+    assert "openrouter.ai/settings/credits" in result.error
+    assert "/keys/abc" not in result.error
+
+
+@pytest.mark.asyncio
 async def test_raw_response_body_is_never_echoed():
     """Der Endpunkt ist frei waehlbar. Zeigt ihn jemand auf eine interne
     Adresse, darf deren Seiteninhalt nicht in der Fehlermeldung landen —

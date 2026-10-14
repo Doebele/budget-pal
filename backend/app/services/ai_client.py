@@ -533,7 +533,34 @@ def _error_message(res: httpx.Response) -> str:
             detail = err
     except ValueError:
         pass
+    if res.status_code == 402:
+        return _payment_message(detail)
     return f"HTTP {res.status_code}" + (f": {detail[:200]}" if detail else "")
+
+
+def _payment_message(detail: str) -> str:
+    """402 auf Deutsch und mit dem, was zu tun ist.
+
+    OpenRouter reserviert vor dem Aufruf max_tokens zum Modellpreis und
+    vergleicht mit dem kleineren Wert aus Kontoguthaben und Key-Limit. Die
+    Rohmeldung ("can only afford 2898") liest sich, als waere das Key-Limit
+    erschoepft — meist ist aber das Kontoguthaben fast leer.
+    """
+    msg = "HTTP 402: Das Guthaben beim KI-Anbieter reicht nicht"
+    requested = re.search(r"requested up to (\d+)", detail)
+    affordable = re.search(r"can only afford (\d+)", detail)
+    if requested and affordable:
+        msg += (
+            f" — die Anfrage reserviert bis zu {requested.group(1)} Tokens,"
+            f" bezahlbar sind noch {affordable.group(1)}"
+        )
+    msg += ". Guthaben aufladen oder ein günstigeres Modell wählen."
+    if "openrouter" in detail.lower():
+        msg += (
+            " Bei OpenRouter zählt das Kontoguthaben"
+            " (openrouter.ai/settings/credits), nicht nur das Limit des API-Keys."
+        )
+    return msg
 
 
 def _needs_key(provider: str) -> bool:
