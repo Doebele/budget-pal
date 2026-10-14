@@ -225,6 +225,9 @@ class Completion(NamedTuple):
     # Antwort am max_tokens-Limit abgebrochen? Dann ist sie unvollstaendig —
     # bei JSON meist unparsebar, und der Aufrufer muss das melden.
     cut_off: bool = False
+    # Warum `text` fehlt, falls der Aufruf scheiterte (HTTP-Status, Timeout) —
+    # sonst sieht der Nutzer nur "keine Buchungen" statt der Ursache.
+    error: Optional[str] = None
 
     @property
     def total_tokens(self) -> int:
@@ -701,7 +704,7 @@ async def complete_detailed(
             type(e).__name__,
             e or "(keine Meldung)",
         )
-        return Completion()
+        return Completion(error=str(e) or type(e).__name__)
 
 
 # ── Modellliste und Verbindungstest ───────────────────────────
