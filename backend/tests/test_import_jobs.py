@@ -302,3 +302,37 @@ class TestJobReportsAccount:
         await db_session.flush()
 
         assert client.get("/api/imports/jobs/active").json()["account_id"] == test_account.id
+
+
+class TestCsvThroughPreviewJob:
+    """CSV laeuft durch dieselbe Vorschau wie PDF. Vorher importierte /csv
+    direkt — mit KI-Kategorisierung pro Zeile in der Anfrage, die nach 30 s
+    im Browser abbrach, und ohne Kategorie/Periodizitaet in der Vorschau."""
+
+    def test_csv_preview_and_confirm(self, client, test_account, background_session):
+        from tests.test_revolut_parser import GERMAN
+
+        started = client.post(
+            "/api/imports/pdf/preview-async",
+            files={"file": ("revolut.csv", GERMAN, "text/csv")},
+            data={"account_id": str(test_account.id)},
+        )
+        job = client.get(f"/api/imports/jobs/{started.json()['import_id']}").json()
+        assert job["status"] == "completed", job.get("error_message")
+        preview = job["result"]
+        assert preview["bank"] == "revolut"
+        # Zwei abgeschlossene Buchungen plus die Gebuehr; jede Zeile mit
+        # Kategorie und Periodizitaet wie beim PDF
+        assert [r["amount"] for r in preview["rows"]] == [2000.0, -17.82, -0.18]
+        assert all("category" in r and "periodicity" in r for r in preview["rows"])
+        assert preview["statement_balance"]["currency"] == "GBP"
+
+        result = client.post("/api/imports/pdf/confirm", json={
+            "account_id": test_account.id, "bank": preview["bank"],
+            "filename": "revolut.csv", "rows": preview["rows"],
+            "statement_balance": preview["statement_balance"],
+        })
+        assert result.status_code == 201, result.text
+        assert result.json()["rows_imported"] == 3
+        history = client.get("/api/imports/history").json()
+        assert history[0]["file_type"] == "csv"

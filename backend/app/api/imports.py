@@ -926,6 +926,27 @@ class PdfExtraction(NamedTuple):
     statement_balance: Optional[StatementBalance] = None
 
 
+def _extract_csv_rows(tmp_path: str, bank: Optional[str]) -> PdfExtraction:
+    """CSV-Export in Rohzeilen zerlegen — mit denselben Bank-Parsern wie /csv."""
+    with open(tmp_path, "rb") as f:
+        content = f.read()
+    try:
+        detected_bank = bank or detect_bank_format(content)
+    except HTTPException as e:  # im Hintergrundjob zaehlt nur die Meldung
+        raise ValueError(e.detail) from e
+    parser = PARSERS.get(detected_bank)
+    if parser is None:
+        raise ValueError(f"Unbekanntes Bankformat: {detected_bank}")
+    rows = parser.parse(content)
+    # ponytail: die Vorschau traegt einen Saldo; CSVs mit mehreren Waehrungen
+    # (keiner der heutigen Bank-Exporte) bekaemen keinen — dann eine Liste.
+    statements = statement_balance.from_rows(rows)
+    return PdfExtraction(
+        detected_bank, rows,
+        statement_balance=statements[0] if len(statements) == 1 else None,
+    )
+
+
 async def _extract_pdf_rows(
     tmp_path: str,
     bank: Optional[str],
@@ -1071,9 +1092,14 @@ async def _build_pdf_preview(
     ai_cfg = ai_client.from_user(current_user)
     hints = await load_category_hints(db, current_user.id)
     try:
-        extraction = await _extract_pdf_rows(
-            tmp_path, bank, ai=ai_cfg, hints=hints, on_progress=on_progress
-        )
+        # CSV laeuft durch dieselbe Vorschau wie PDF: Kategorie, Periodizitaet
+        # und Dubletten pro Zeile, Bestaetigung ueber /pdf/confirm
+        if filename.lower().endswith(".csv"):
+            extraction = _extract_csv_rows(tmp_path, bank)
+        else:
+            extraction = await _extract_pdf_rows(
+                tmp_path, bank, ai=ai_cfg, hints=hints, on_progress=on_progress
+            )
         detected_bank, raw_transactions = extraction.bank, extraction.rows
         used_ai, ai_attempted = extraction.ai_extracted, extraction.ai_attempted
         ai_model, ai_tokens = extraction.ai_model, extraction.ai_tokens
@@ -1234,7 +1260,9 @@ async def _assert_account_owned(
 
 async def _stash_upload(file: UploadFile) -> str:
     content = await file.read()
-    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+    # Endung behalten: die Vorschau waehlt daran CSV- oder PDF-Auswertung
+    suffix = os.path.splitext(file.filename or "")[1].lower() or ".pdf"
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         tmp.write(content)
         return tmp.name
 
@@ -1696,7 +1724,8 @@ async def confirm_pdf_import(
         account_id=payload.account_id,
         filename=payload.filename or "upload.pdf",
         bank=bank_name,
-        file_type="pdf",
+        # Dieselbe Bestaetigung fuer CSV- und PDF-Vorschau
+        file_type="csv" if (payload.filename or "").lower().endswith(".csv") else "pdf",
         rows_imported=imported,
         rows_skipped=skipped,
         rows_failed=failed,
