@@ -21,7 +21,8 @@ class RevolutParser:
     DELIMITER = ","
     DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
     DATE_FORMAT_ALT = "%Y-%m-%d"
-    VALID_STATES = {"completed"}
+    # Der Export folgt der App-Sprache: Deutsch heisst "COMPLETED" "ABGESCHLOSSEN"
+    VALID_STATES = {"completed", "abgeschlossen"}
 
     def parse(self, content: bytes) -> List[Dict]:
         """Parse Revolut CSV export to normalized transaction list."""
@@ -42,16 +43,17 @@ class RevolutParser:
                     return fieldnames_normalized[c]
             return None
 
-        f_type = find_field(["type"])
-        f_product = find_field(["product"])
-        f_started = find_field(["started date", "started_date"])
-        f_completed = find_field(["completed date", "completed_date"])
-        f_description = find_field(["description"])
-        f_amount = find_field(["amount"])
-        f_fee = find_field(["fee"])
-        f_currency = find_field(["currency"])
-        f_state = find_field(["state"])
-        f_balance = find_field(["balance"])
+        # Englische und deutsche Spaltennamen (Export in der App-Sprache)
+        f_type = find_field(["type", "art"])
+        f_product = find_field(["product", "produkt"])
+        f_started = find_field(["started date", "started_date", "datum des beginns"])
+        f_completed = find_field(["completed date", "completed_date", "datum des abschlusses"])
+        f_description = find_field(["description", "beschreibung"])
+        f_amount = find_field(["amount", "betrag"])
+        f_fee = find_field(["fee", "gebühr"])
+        f_currency = find_field(["currency", "währung"])
+        f_state = find_field(["state", "status"])
+        f_balance = find_field(["balance", "kontostand"])
 
         if not f_amount or not f_description:
             raise ValueError("Could not find required Revolut columns (Amount, Description).")
