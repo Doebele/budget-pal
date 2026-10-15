@@ -107,6 +107,8 @@ class PreviewResponse(BaseModel):
     parsed_rows: int
     error_rows: int
     sample_raw: List[dict]
+    # Vorschauzeilen, die schon im Konto stehen — der Import ueberspringt sie
+    duplicate_rows: int = 0
 
 
 class ImportResultResponse(BaseModel):
@@ -348,6 +350,26 @@ async def preview_import(
         )
         preview_rows.append(parsed_row)
 
+    # Schon vorhandene Buchungen markieren — dieselbe Pruefung wie beim Import,
+    # damit die Vorschau zeigt, was uebersprungen wird. Nur fuer eigene Konten:
+    # sonst liesse sich ein fremdes Konto auf Buchungen abfragen.
+    owns_account = account_id is not None and (
+        await db.execute(
+            select(Account.id).where(
+                Account.id == account_id, Account.user_id == current_user.id
+            )
+        )
+    ).scalar_one_or_none() is not None
+    if owns_account:
+        for row in preview_rows:
+            iso_date = _iso_preview_date(row.date)
+            if not (row.parsed and iso_date and row.description and row.amount is not None):
+                continue
+            row.is_duplicate = await find_database_duplicate_transaction_id(
+                db, account_id, iso_date, row.amount, row.description,
+                compute_import_hash(account_id, iso_date, row.amount, row.description),
+            ) is not None
+
     return PreviewResponse(
         bank=detected_bank,
         detected_columns=detected_columns,
@@ -357,7 +379,18 @@ async def preview_import(
         parsed_rows=sum(1 for r in preview_rows if r.parsed),
         error_rows=sum(1 for r in preview_rows if not r.parsed),
         sample_raw=sample_raw,
+        duplicate_rows=sum(1 for r in preview_rows if r.is_duplicate),
     )
+
+
+def _iso_preview_date(value: Optional[str]) -> Optional[str]:
+    """Datum der CSV-Vorschau (Originalformat der Bank) als YYYY-MM-DD."""
+    for fmt in ("%d.%m.%Y", "%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y"):
+        try:
+            return datetime.strptime((value or "").strip(), fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+    return None
 
 
 def detect_columns(header: List[str], bank: str) -> dict:
