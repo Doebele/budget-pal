@@ -222,6 +222,9 @@ def detect_bank_format(content: bytes) -> str:
         return "n26"
     if "started date" in header and "completed date" in header and "state" in header:
         return "revolut"
+    # Revolut-Export in der App-Sprache Deutsch (Dateiname ..._de-ch_...)
+    if "datum des beginns" in header and "datum des abschlusses" in header:
+        return "revolut"
     if "buchungstag" in header and "wertstellung" in header and "vorgang" in header:
         return "comdirect"
 
@@ -385,12 +388,17 @@ async def preview_import(
 
 def _iso_preview_date(value: Optional[str]) -> Optional[str]:
     """Datum der CSV-Vorschau (Originalformat der Bank) als YYYY-MM-DD."""
-    for fmt in ("%d.%m.%Y", "%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y"):
+    for fmt in PREVIEW_DATE_FORMATS:
         try:
             return datetime.strptime((value or "").strip(), fmt).strftime("%Y-%m-%d")
         except ValueError:
             continue
     return None
+
+
+# Datumsformate der CSV-Vorschau. Revolut schreibt die Uhrzeit dazu
+# ("2024-03-06 09:49:16") — ohne das Format scheiterte dort jede Zeile.
+PREVIEW_DATE_FORMATS = ("%d.%m.%Y", "%Y-%m-%d", "%Y-%m-%d %H:%M:%S", "%d/%m/%Y", "%m/%d/%Y")
 
 
 def detect_columns(header: List[str], bank: str) -> dict:
@@ -409,6 +417,13 @@ def detect_columns(header: List[str], bank: str) -> dict:
     ]
     for i, h in enumerate(header_lower):
         if any(kw in h for kw in date_keywords):
+            result["date"] = header[i]
+            break
+    # Revolut hat Beginn- und Abschlussdatum; der Import nimmt das Abschluss-
+    # datum. Die Vorschau muss dasselbe nehmen, sonst erkennt sie vorhandene
+    # Kartenzahlungen (meist ein Tag dazwischen) nicht als Dublette.
+    for i, h in enumerate(header_lower):
+        if h in ("completed date", "datum des abschlusses"):
             result["date"] = header[i]
             break
 
@@ -472,8 +487,7 @@ def parse_preview_row(
         if date_col in raw_data:
             date_str = raw_data[date_col].strip()
             if date_str:
-                date_formats = ["%d.%m.%Y", "%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y"]
-                for fmt in date_formats:
+                for fmt in PREVIEW_DATE_FORMATS:
                     try:
                         date_val = datetime.strptime(date_str, fmt)
                         break
