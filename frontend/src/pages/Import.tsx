@@ -43,6 +43,7 @@ interface PreviewRow {
   parsed: boolean;
   errors: string[];
   currency: string;
+  is_duplicate?: boolean;
 }
 
 interface PreviewData {
@@ -54,6 +55,7 @@ interface PreviewData {
   parsed_rows: number;
   error_rows: number;
   sample_raw: Record<string, string>[];
+  duplicate_rows?: number;
 }
 
 type PdfDuplicateKind = "none" | "database" | "pdf";
@@ -621,6 +623,17 @@ export default function Import() {
         const isRecurring = (r: PdfPreviewRow) => r.is_recurring;
         const recurringCount = pdfPreview.rows.filter((r) => r.is_recurring).length;
         const hasDuplicates = pdfPreview.rows.some((r) => r.duplicate_kind !== "none");
+        const dbDuplicates = pdfPreview.rows.filter((r) => r.duplicate_kind === "database").length;
+        const pdfDuplicates = pdfPreview.rows.filter((r) => r.duplicate_kind === "pdf").length;
+        // Was nicht importiert wird — gleiche Regel wie im Backend (confirm_pdf_import)
+        const isSkipped = (r: PdfPreviewRow) =>
+          r.merge_action === "skip" || r.merge_action === "keep_existing" || r.merge_action === "delete_both";
+        const importCount = pdfPreview.rows.filter((r) => !isSkipped(r)).length;
+        const setAllDatabaseDuplicates = (action: PdfMergeAction) =>
+          setPdfPreview((prev) => prev && {
+            ...prev,
+            rows: prev.rows.map((r) => (r.duplicate_kind === "database" ? { ...r, merge_action: action } : r)),
+          });
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-2 sm:p-4">
@@ -652,7 +665,8 @@ export default function Import() {
                     Wiederkehrend: <span className="txt-info font-semibold">{recurringCount > 0 ? `${recurringCount} Zahlungen` : "–"}</span>
                   </div>
                   <div className="rounded-lg bg-bg-surface2 px-3 py-2 text-text-secondary">
-                    Duplikate: <span className="txt-warning font-semibold">{pdfPreview.rows.filter((r) => r.duplicate_kind !== "none").length}</span>
+                    {t("pages:import.alreadyExists")}: <span className={dbDuplicates > 0 ? "txt-warning font-semibold" : "text-text-tertiary"}>{dbDuplicates}</span>
+                    {pdfDuplicates > 0 && <span className="text-text-tertiary"> · {t("pages:import.duplicateInPdf")}: {pdfDuplicates}</span>}
                   </div>
                   <div className="rounded-lg bg-bg-surface2 px-3 py-2 text-text-secondary">
                     {t("pages:ui.fehler_2")} <span className={pdfPreview.error_rows > 0 ? "txt-error font-semibold" : "text-text-tertiary"}>{pdfPreview.error_rows}</span>
@@ -724,9 +738,27 @@ export default function Import() {
                   </p>
                 )}
                 {hasDuplicates && (
-                  <p className="text-text-disabled text-xs mt-2">
-                    {t("pages:ui.konto_duplikate_ueberschreiben_behalten_oder")}
-                  </p>
+                  <div className="mt-3 rounded-lg border px-4 py-3 msg-warning flex flex-wrap items-center justify-between gap-3">
+                    <div className="text-sm space-y-1">
+                      {dbDuplicates > 0 && (
+                        <p className="flex items-start gap-1">
+                          <WarningCircle className="w-4 h-4 shrink-0 mt-px" />
+                          {t("pages:import.dupNoticeDb", { count: dbDuplicates })}
+                        </p>
+                      )}
+                      {pdfDuplicates > 0 && <p className="pl-5">{t("pages:import.dupNoticePdf", { count: pdfDuplicates })}</p>}
+                    </div>
+                    {dbDuplicates > 0 && (
+                      <div className="flex gap-2 shrink-0">
+                        <button type="button" className="btn-secondary text-sm" onClick={() => setAllDatabaseDuplicates("keep_existing")}>
+                          {t("pages:import.dupSkipAll")}
+                        </button>
+                        <button type="button" className="btn-ghost text-sm" onClick={() => setAllDatabaseDuplicates("import")}>
+                          {t("pages:import.dupImportAll")}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -762,20 +794,21 @@ export default function Import() {
                             "transition-colors hover:bg-bg-surface2/40",
                             row.is_duplicate && "bg-amber-950/20",
                             recurring && "bg-violet-950/10",
-                            !row.parsed && "opacity-50"
+                            // Wird nicht importiert: sichtbar zuruecknehmen
+                            (!row.parsed || isSkipped(row)) && "opacity-50"
                           )}
                         >
                           {/* ── Status badges ── */}
                           <td className="px-2 py-2 align-middle">
                             <div className="flex flex-col gap-1">
                               {row.duplicate_kind === "database" && (
-                                <span className="inline-flex rounded px-1 py-1 msg-warning text-2xs font-medium leading-tight">
-                                  {t("pages:ui.konto")}
+                                <span className="inline-flex rounded px-1 py-1 msg-warning text-2xs font-medium leading-tight" title={t("pages:import.alreadyExistsTitle")}>
+                                  {t("pages:import.alreadyExists")}
                                 </span>
                               )}
                               {row.duplicate_kind === "pdf" && (
                                 <span className="inline-flex rounded px-1 py-1 bg-bg-elevated text-text-secondary text-2xs font-medium leading-tight">
-                                  PDF-Dup
+                                  {t("pages:import.duplicateInPdf")}
                                 </span>
                               )}
                               {recurring && (
@@ -896,7 +929,7 @@ export default function Import() {
                                 >
                                   <option value="keep_existing">{t("pages:import.i03")}</option>
                                   <option value="overwrite">{t("pages:import.i47")}</option>
-                                  <option value="delete_both">{t("pages:import.i29")}</option>
+                                  <option value="delete_both" title={t("pages:import.deleteBothTitle")}>{t("pages:import.i29")}</option>
                                   <option value="import">{t("pages:import.i31")}</option>
                                 </select>
                               ) : row.duplicate_kind === "pdf" ? (
@@ -930,7 +963,10 @@ export default function Import() {
               {/* ── Footer ── */}
               <div className="flex items-center justify-between gap-3 px-5 py-4 border-t border-border flex-shrink-0">
                 <p className="text-text-disabled text-sm">
-                  {pdfPreview.rows.filter((r) => r.merge_action !== "skip" && r.merge_action !== "keep_existing" && r.merge_action !== "delete_both").length} Transaktionen werden importiert
+                  {t("pages:import.footerImport", { count: importCount })}
+                  {pdfPreview.rows.length > importCount && (
+                    <span className="txt-warning"> · {t("pages:import.footerSkipped", { count: pdfPreview.rows.length - importCount })}</span>
+                  )}
                 </p>
                 <div className="flex gap-3">
                   <button onClick={() => setPdfPreview(null)} className="btn-secondary text-base">{t("pages:import.i00")}</button>
@@ -967,6 +1003,14 @@ export default function Import() {
                     <Check className="w-3 h-3" />
                     {previewData.parsed_rows} erfolgreich
                   </span>
+                  {(previewData.duplicate_rows ?? 0) > 0 && (
+                    <>
+                      <span className="text-text-disabled">|</span>
+                      <span className="txt-warning">
+                        {previewData.duplicate_rows} {t("pages:import.alreadyExists").toLowerCase()}
+                      </span>
+                    </>
+                  )}
                   {previewData.error_rows > 0 && (
                     <>
                       <span className="text-text-disabled">|</span>
@@ -1203,6 +1247,17 @@ export default function Import() {
             </div>
           )}
 
+          <p className={clsx(
+            "rounded-lg border px-4 py-3 text-sm flex items-start gap-2",
+            (previewData.duplicate_rows ?? 0) > 0 ? "msg-warning" : "border-border text-text-secondary"
+          )}>
+            <WarningCircle className="w-4 h-4 shrink-0 mt-px" />
+            <span>
+              {t("pages:import.csvDupHint")}
+              {(previewData.duplicate_rows ?? 0) > 0 && <> {t("pages:import.csvDupCount", { count: previewData.duplicate_rows })}</>}
+            </span>
+          </p>
+
           {/* Preview Table */}
           <div className="overflow-auto max-h-80 border border-border rounded-lg">
             <table className="w-full text-sm">
@@ -1220,7 +1275,8 @@ export default function Import() {
                   <tr key={row.row_index} className={clsx(
                     "hover:bg-bg-surface2/30 transition-colors",
                     !row.parsed && "bg-red-500/5",
-                    row.parsed && "bg-green-500/5"
+                    row.parsed && !row.is_duplicate && "bg-green-500/5",
+                    row.is_duplicate && "opacity-50"
                   )}>
                     <td className="px-3 py-2 text-text-disabled">{row.row_index + 1}</td>
                     <td className="px-3 py-2 text-text-primary font-mono text-sm">{row.date || "-"}</td>
@@ -1234,7 +1290,11 @@ export default function Import() {
                       {row.amount !== null ? formatCHF(row.amount) : "-"}
                     </td>
                     <td className="px-3 py-2 text-center">
-                      {row.parsed ? (
+                      {row.is_duplicate ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border msg-warning text-sm" title={t("pages:import.alreadyExistsTitle")}>
+                          {t("pages:import.alreadyExists")}
+                        </span>
+                      ) : row.parsed ? (
                         <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gain/20 text-gain text-sm">
                           <Check className="w-3 h-3" />
                           OK
@@ -1290,7 +1350,8 @@ export default function Import() {
               title={mappingWarnings.find(w => w.includes("erforderlich")) || "Import durchführen"}
             >
               <CheckCircle className="w-4 h-4" />
-              {previewData.parsed_rows} Transaktionen importieren
+              {/* Vorhandene zaehlen nicht mit — der Import ueberspringt sie */}
+              {previewData.parsed_rows - (previewData.duplicate_rows ?? 0)} Transaktionen importieren
             </button>
           </div>
         </div>
