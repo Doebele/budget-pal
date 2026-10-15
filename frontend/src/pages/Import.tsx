@@ -9,7 +9,7 @@ import {
   type AiSettings,
 } from "@/lib/api";
 import { useActiveImportJob, useImportJob, importJobProgressLabel } from "@/hooks/useImportJob";
-import { Check, CheckCircle, Clock, Database, Eye, MapPin, NavArrowDown, NavArrowUp, Page, Settings, Table, Trash, Upload, WarningCircle, WarningTriangle, Xmark } from "@/lib/icons";
+import { CheckCircle, Clock, Page, Table, Trash, Upload, WarningCircle, Xmark } from "@/lib/icons";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
@@ -24,39 +24,6 @@ const BANKS = [
   { value: "revolut", label: "Revolut" },
   { value: "comdirect", label: "comdirect" },
 ];
-
-interface ColumnMapping {
-  date_col: string;
-  description_col: string;
-  amount_col?: string;
-  debit_col?: string;
-  credit_col?: string;
-  balance_col?: string;
-}
-
-interface PreviewRow {
-  row_index: number;
-  date: string | null;
-  description: string | null;
-  amount: number | null;
-  raw_data: Record<string, string>;
-  parsed: boolean;
-  errors: string[];
-  currency: string;
-  is_duplicate?: boolean;
-}
-
-interface PreviewData {
-  bank: string;
-  detected_columns: Record<string, string>;
-  column_mapping: ColumnMapping | null;
-  rows: PreviewRow[];
-  total_rows: number;
-  parsed_rows: number;
-  error_rows: number;
-  sample_raw: Record<string, string>[];
-  duplicate_rows?: number;
-}
 
 type PdfDuplicateKind = "none" | "database" | "pdf";
 type PdfMergeAction = "import" | "skip" | "overwrite" | "keep_existing" | "delete_both";
@@ -156,10 +123,6 @@ export default function Import() {
   } | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [importToDelete, setImportToDelete] = useState<number | null>(null);
-  const [previewData, setPreviewData] = useState<PreviewData | null>(null);
-  const [showColumnMapping, setShowColumnMapping] = useState(false);
-  const [manualMapping, setManualMapping] = useState<Partial<ColumnMapping>>({});
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [pdfPreview, setPdfPreview] = useState<PdfPreviewData | null>(null);
   const [pdfFileName, setPdfFileName] = useState<string>("");
   /** Row IDs where the user has manually picked a category — excluded from smart auto-apply. */
@@ -213,21 +176,6 @@ export default function Import() {
     },
     [],
   );
-
-  const csvMutation = useMutation({
-    mutationFn: (file: File) => {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("account_id", selectedAccount);
-      if (selectedBank) fd.append("bank", selectedBank);
-      return importsApi.uploadCsv(fd).then((r) => r.data);
-    },
-    onSuccess: (data) => {
-      setImportResult(data);
-      queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["import-history"] });
-    },
-  });
 
   // Der Upload stösst nur an; die Auswertung läuft als Hintergrundjob, damit
   // man währenddessen navigieren kann und ein Neuladen nichts verliert.
@@ -335,34 +283,6 @@ export default function Import() {
     },
   });
 
-  // Preview mutation
-  const previewMutation = useMutation({
-    mutationFn: (file: File) => {
-      const fd = new FormData();
-      fd.append("file", file);
-      if (selectedBank) fd.append("bank", selectedBank);
-      if (selectedAccount) fd.append("account_id", selectedAccount);
-      return importsApi.previewUpload(fd).then((r) => r.data);
-    },
-    onSuccess: (data: PreviewData) => {
-      setPreviewData(data);
-      // Initialize manual mapping with detected columns
-      if (data.detected_columns) {
-        setManualMapping({
-          date_col: data.detected_columns.date || "",
-          description_col: data.detected_columns.description || "",
-          amount_col: data.detected_columns.amount || "",
-          debit_col: data.detected_columns.debit || "",
-          credit_col: data.detected_columns.credit || "",
-          balance_col: data.detected_columns.balance || "",
-        });
-      }
-    },
-    onError: (error) => {
-      alert(`Fehler bei der Vorschau: ${error instanceof Error ? error.message : "Unbekannter Fehler"}`);
-    },
-  });
-
   // Get the last completed import
   const lastImport = history?.[0];
   // Der Eintrag, auf den sich der Löschdialog bezieht — nicht zwingend der letzte
@@ -370,27 +290,11 @@ export default function Import() {
     (l: { id: number }) => l.id === importToDelete,
   ) as { id: number; filename: string; rows_imported: number } | undefined;
 
-  const handleCsvPreview = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!selectedAccount) {
-      alert("Bitte zuerst ein Ziel-Konto auswählen.");
-      return;
-    }
-
-    setSelectedFile(file);
-    previewMutation.mutate(file);
-  };
-
-  const handleCsvImport = () => {
-    if (!selectedFile || !selectedAccount) return;
-    csvMutation.mutate(selectedFile);
-    setPreviewData(null);
-    setSelectedFile(null);
-  };
-
-  const handlePdfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // CSV und PDF laufen durch denselben Hintergrundjob und dieselbe Vorschau
+  // (Kategorie, Periodizität, Dubletten). Die alte CSV-Vorschau zeigte nur
+  // Rohspalten, und /csv kategorisierte in der Anfrage — nach 30 s brach der
+  // Browser ab.
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!selectedAccount) {
@@ -404,8 +308,6 @@ export default function Import() {
 
   const pdfJobRunning = startPdfJob.isPending || isImportJobRunning(job);
   const isLoading =
-    csvMutation.isPending ||
-    previewMutation.isPending ||
     pdfPreviewMutation.isPending ||
     pdfJobRunning ||
     pdfConfirmMutation.isPending;
@@ -435,57 +337,6 @@ export default function Import() {
     );
     return () => clearInterval(id);
   }, [isLoading]);
-
-  // Get all available columns from sample data
-  const availableColumns = previewData?.sample_raw?.[0]
-    ? Object.keys(previewData.sample_raw[0])
-    : [];
-
-  // Apply manual mapping and re-parse preview
-  const applyMapping = () => {
-    if (!previewData || !selectedFile) return;
-
-    // For now, just re-trigger preview with updated logic
-    // In a full implementation, we'd re-parse client-side or send mapping to backend
-    previewMutation.mutate(selectedFile);
-  };
-
-  // Get example value for a column from sample data
-  const getExampleValue = (columnName: string): string => {
-    if (!previewData?.sample_raw?.[0]) return "-";
-    const value = previewData.sample_raw[0][columnName];
-    return value && value.length > 30 ? value.substring(0, 30) + "..." : (value || "-");
-  };
-
-  // Determine column type based on detected mapping
-  const getColumnType = (columnName: string): { type: string; label: string; icon: string } => {
-    if (manualMapping.date_col === columnName) return { type: "date", label: "Datum", icon: "📅" };
-    if (manualMapping.description_col === columnName) return { type: "description", label: "Beschreibung", icon: "📝" };
-    if (manualMapping.amount_col === columnName) return { type: "amount", label: "Betrag", icon: "💰" };
-    if (manualMapping.debit_col === columnName) return { type: "debit", label: "Belastung", icon: "➖" };
-    if (manualMapping.credit_col === columnName) return { type: "credit", label: "Gutschrift", icon: "➕" };
-    if (manualMapping.balance_col === columnName) return { type: "balance", label: "Saldo", icon: "📊" };
-    return { type: "unassigned", label: "Nicht zugewiesen", icon: "❓" };
-  };
-
-  // Check for mapping issues
-  const mappingWarnings = useMemo(() => {
-    const warnings: string[] = [];
-    if (!manualMapping.date_col) warnings.push("Keine Datumsspalte zugewiesen - erforderlich für Import");
-    if (!manualMapping.description_col) warnings.push("Keine Beschreibungsspalte zugewiesen");
-    if (!manualMapping.amount_col && !manualMapping.debit_col && !manualMapping.credit_col) {
-      warnings.push("Keine Betragsspalte zugewiesen - erforderlich für Import");
-    }
-    if (manualMapping.amount_col && (manualMapping.debit_col || manualMapping.credit_col)) {
-      warnings.push("Betrag UND Belastung/Gutschrift gewählt - es wird nur eine Option verwendet");
-    }
-    return warnings;
-  }, [manualMapping]);
-
-  // Get mapped columns count
-  const mappedColumnsCount = useMemo(() => {
-    return Object.values(manualMapping).filter(Boolean).length;
-  }, [manualMapping]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -531,7 +382,7 @@ export default function Import() {
           <Upload className="w-8 h-8 text-text-tertiary mx-auto mb-3" />
           <p className="text-text-primary font-medium text-base">{t("pages:import.i11")}</p>
           <p className="text-text-tertiary text-sm mt-1">{t("pages:import.i45")}</p>
-          <input ref={csvRef} type="file" accept=".csv" className="hidden" onChange={handleCsvPreview} />
+          <input ref={csvRef} type="file" accept=".csv" className="hidden" onChange={handleFileChange} />
         </div>
 
         <div
@@ -544,17 +395,17 @@ export default function Import() {
           <Page className="w-8 h-8 text-text-tertiary mx-auto mb-3" />
           <p className="text-text-primary font-medium text-base">{t("pages:import.i36")}</p>
           <p className="text-text-tertiary text-sm mt-1">{t("pages:import.i34")}</p>
-          <input ref={pdfRef} type="file" accept=".pdf" className="hidden" onChange={handlePdfChange} />
+          <input ref={pdfRef} type="file" accept=".pdf" className="hidden" onChange={handleFileChange} />
         </div>
       </div>
 
       {/* Loading */}
-      {isLoading && !previewData && (
+      {isLoading && (
         <div className="card flex items-center gap-4">
           <div className="w-8 h-8 border-2 border-accent/30 border-t-accent rounded-full animate-spin shrink-0" />
           <div className="min-w-0">
             <p className="text-text-primary text-base font-medium flex items-center gap-2">
-              {previewMutation.isPending || pdfPreviewMutation.isPending
+              {pdfPreviewMutation.isPending || pdfJobRunning
                 ? "Vorschau wird erstellt…"
                 : "Import läuft…"}
               {elapsed > 0 && (
@@ -564,15 +415,13 @@ export default function Import() {
               )}
             </p>
             <p className="text-text-tertiary text-sm">
-              {previewMutation.isPending
-                ? "CSV wird analysiert"
-                : startPdfJob.isPending
-                  ? "PDF wird hochgeladen"
-                  : pdfJobRunning
-                    ? `PDF wird ausgewertet — ${importJobProgressLabel(job)}`
-                    : pdfPreviewMutation.isPending
-                      ? "PDF wird gelesen und ausgewertet"
-                      : "KI-Kategorisierung wird durchgeführt"}
+              {startPdfJob.isPending
+                ? "Datei wird hochgeladen"
+                : pdfJobRunning
+                  ? `Datei wird ausgewertet — ${importJobProgressLabel(job)}`
+                  : pdfPreviewMutation.isPending
+                    ? "PDF wird gelesen und ausgewertet"
+                    : "KI-Kategorisierung wird durchgeführt"}
             </p>
 
             {/* Echter Fortschritt: der Job meldet, welchen Textabschnitt er gerade
@@ -645,6 +494,7 @@ export default function Import() {
                   <h3 className="text-text-primary font-semibold">{t("pages:import.i35")}</h3>
                   <p className="text-text-tertiary text-sm">
                     {pdfPreview.filename} · {pdfPreview.total_rows} Zeilen · {pdfPreview.parsed_rows} erkannt
+                    {pdfPreview.rows[0]?.currency && ` · ${pdfPreview.rows[0].currency}`}
                   </p>
                 </div>
                 <button onClick={() => setPdfPreview(null)} className="text-text-tertiary hover:text-text-primary" type="button">
@@ -983,379 +833,6 @@ export default function Import() {
           </div>
         );
       })()}
-
-      {/* Preview Section */}
-      {previewData && (
-        <div className="card space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-accent/20 flex items-center justify-center">
-                <Eye className="w-5 h-5 text-accent" />
-              </div>
-              <div>
-                <p className="text-text-primary font-semibold text-base">Import-Vorschau: {previewData.total_rows} Zeilen</p>
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="text-text-tertiary">
-                    Bank: <span className="text-text-primary">{previewData.bank.toUpperCase()}</span>
-                  </span>
-                  <span className="text-text-disabled">|</span>
-                  <span className="text-gain flex items-center gap-1">
-                    <Check className="w-3 h-3" />
-                    {previewData.parsed_rows} erfolgreich
-                  </span>
-                  {(previewData.duplicate_rows ?? 0) > 0 && (
-                    <>
-                      <span className="text-text-disabled">|</span>
-                      <span className="txt-warning">
-                        {previewData.duplicate_rows} {t("pages:import.alreadyExists").toLowerCase()}
-                      </span>
-                    </>
-                  )}
-                  {previewData.error_rows > 0 && (
-                    <>
-                      <span className="text-text-disabled">|</span>
-                      <span className="txt-error flex items-center gap-1">
-                        <WarningTriangle className="w-3 h-3" />
-                        {previewData.error_rows} Fehler
-                      </span>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowColumnMapping(!showColumnMapping)}
-                className={clsx(
-                  "px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1 transition-colors",
-                  showColumnMapping
-                    ? "bg-accent/20 text-accent border border-accent/30"
-                    : "bg-bg-surface2 text-text-secondary hover:bg-bg-elevated border border-border"
-                )}
-              >
-                <Table className="w-3.5 h-3.5" />
-                Feldzuweisung
-                {showColumnMapping ? <NavArrowUp className="w-3.5 h-3.5" /> : <NavArrowDown className="w-3.5 h-3.5" />}
-              </button>
-              <button
-                onClick={() => {
-                  setPreviewData(null);
-                  setSelectedFile(null);
-                  setShowColumnMapping(false);
-                }}
-                className="px-3 py-2 rounded-lg bg-bg-surface2 text-text-tertiary hover:text-text-primary hover:bg-bg-elevated border border-border transition-colors"
-              >
-                <Xmark className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
-
-          {/* Enhanced Column Mapping Panel */}
-          {showColumnMapping && availableColumns.length > 0 && (
-            <div className="bg-bg-surface2/50 rounded-lg border border-border overflow-hidden">
-              {/* Header */}
-              <div className="bg-bg-surface2 px-4 py-3 border-b border-border flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Table className="w-4 h-4 text-accent" />
-                  <span className="text-text-primary font-medium text-base">{t("pages:import.i13")}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-text-tertiary">
-                    {mappedColumnsCount} von {availableColumns.length} Spalten zugewiesen
-                  </span>
-                  {mappingWarnings.length === 0 && (
-                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gain/20 text-gain text-sm">
-                      <Check className="w-3 h-3" />
-                      OK
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="p-4 space-y-4">
-                {/* CSV Columns Overview Table */}
-                <div className="overflow-auto max-h-48 border border-border rounded-lg">
-                  <table className="w-full text-base">
-                    <thead className="bg-bg-elevated text-text-secondary">
-                      <tr>
-                        <th className="text-left px-3 py-2 text-sm font-medium">{t("pages:import.i10")}</th>
-                        <th className="text-left px-3 py-2 text-sm font-medium">{t("pages:import.i43")}</th>
-                        <th className="text-left px-3 py-2 text-sm font-medium">{t("pages:import.i04")}</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {availableColumns.map((col) => {
-                        const { type, label, icon } = getColumnType(col);
-                        const isMapped = type !== "unassigned";
-                        return (
-                          <tr key={col} className={clsx(
-                            "hover:bg-bg-elevated/30 transition-colors",
-                            isMapped && "bg-accent/5"
-                          )}>
-                            <td className="px-3 py-2">
-                              <div className="flex items-center gap-2">
-                                <span className="text-lg">{icon}</span>
-                                <span className={clsx(
-                                  "font-medium",
-                                  isMapped ? "text-text-primary" : "text-text-tertiary"
-                                )}>
-                                  {col}
-                                </span>
-                              </div>
-                            </td>
-                            <td className="px-3 py-2">
-                              {isMapped ? (
-                                <span className="inline-flex items-center px-2 py-1 rounded bg-accent/20 text-accent text-sm">
-                                  <MapPin className="w-3 h-3 mr-1" />
-                                  {label}
-                                </span>
-                              ) : (
-                                <span className="text-text-disabled text-sm italic">{t("pages:import.i32")}</span>
-                              )}
-                            </td>
-                            <td className="px-3 py-2 text-text-tertiary text-sm font-mono truncate max-w-[150px]">
-                              {getExampleValue(col)}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Manual Field Assignment */}
-                <div className="border-t border-border pt-4">
-                  <p className="text-text-secondary text-sm font-medium mb-3 flex items-center gap-2">
-                    <Database className="w-3.5 h-3.5 text-text-tertiary" />
-                    Manuelle Feld-Zuweisung
-                  </p>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    <div>
-                      <label className="label text-sm flex items-center gap-1">
-                        <span className="text-red-400">*</span> {t("pages:ui.datum")}
-                      </label>
-                      <select
-                        className="input text-sm"
-                        value={manualMapping.date_col || ""}
-                        onChange={(e) => setManualMapping({ ...manualMapping, date_col: e.target.value })}
-                      >
-                        <option value="">{t("pages:misc.r28")}</option>
-                        {availableColumns.map((col) => (
-                          <option key={col} value={col}>{col}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="label text-sm flex items-center gap-1">
-                        <span className="text-red-400">*</span> Beschreibung
-                      </label>
-                      <select
-                        className="input text-sm"
-                        value={manualMapping.description_col || ""}
-                        onChange={(e) => setManualMapping({ ...manualMapping, description_col: e.target.value })}
-                      >
-                        <option value="">{t("pages:misc.r28")}</option>
-                        {availableColumns.map((col) => (
-                          <option key={col} value={col}>{col}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="label text-sm">{t("pages:import.i09")}</label>
-                      <select
-                        className="input text-sm"
-                        value={manualMapping.amount_col || ""}
-                        onChange={(e) => setManualMapping({ ...manualMapping, amount_col: e.target.value })}
-                      >
-                        <option value="">{t("pages:misc.r28")}</option>
-                        {availableColumns.map((col) => (
-                          <option key={col} value={col}>{col}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="label text-sm">{t("pages:import.i05")}</label>
-                      <select
-                        className="input text-sm"
-                        value={manualMapping.debit_col || ""}
-                        onChange={(e) => setManualMapping({ ...manualMapping, debit_col: e.target.value })}
-                      >
-                        <option value="">{t("pages:misc.r28")}</option>
-                        {availableColumns.map((col) => (
-                          <option key={col} value={col}>{col}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="label text-sm">{t("pages:import.i17")}</label>
-                      <select
-                        className="input text-sm"
-                        value={manualMapping.credit_col || ""}
-                        onChange={(e) => setManualMapping({ ...manualMapping, credit_col: e.target.value })}
-                      >
-                        <option value="">{t("pages:misc.r28")}</option>
-                        {availableColumns.map((col) => (
-                          <option key={col} value={col}>{col}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="label text-sm">{t("pages:import.i37")}</label>
-                      <select
-                        className="input text-sm"
-                        value={manualMapping.balance_col || ""}
-                        onChange={(e) => setManualMapping({ ...manualMapping, balance_col: e.target.value })}
-                      >
-                        <option value="">{t("pages:misc.r28")}</option>
-                        {availableColumns.map((col) => (
-                          <option key={col} value={col}>{col}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Warnings */}
-                {mappingWarnings.length > 0 && (
-                  <div className="msg msg-error flex-col gap-0 p-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <WarningTriangle className="w-4 h-4" />
-                      <span className="font-medium text-base">{t("pages:import.i46")}</span>
-                    </div>
-                    <ul className="space-y-1">
-                      {mappingWarnings.map((warn, idx) => (
-                        <li key={idx} className="text-sm flex items-start gap-2">
-                          <span>•</span>
-                          {warn}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {/* Tips */}
-                <div className="bg-bg-elevated/30 rounded p-3 text-sm text-text-tertiary">
-                  <p className="flex items-start gap-2">
-                    <span className="text-accent">💡</span>
-                    <span>
-                      <strong className="text-text-secondary">{t("pages:import.i39")}</strong> Wähle "Belastung" und "Gutschrift" für separate Spalten,
-                      oder "Betrag" für eine kombinierte Spalte mit +/- Vorzeichen. Felder mit <span className="text-red-400">*</span> {t("pages:ui.sind_erforderlich")}
-                    </span>
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <p className={clsx(
-            "rounded-lg border px-4 py-3 text-sm flex items-start gap-2",
-            (previewData.duplicate_rows ?? 0) > 0 ? "msg-warning" : "border-border text-text-secondary"
-          )}>
-            <WarningCircle className="w-4 h-4 shrink-0 mt-px" />
-            <span>
-              {t("pages:import.csvDupHint")}
-              {(previewData.duplicate_rows ?? 0) > 0 && <> {t("pages:import.csvDupCount", { count: previewData.duplicate_rows })}</>}
-            </span>
-          </p>
-
-          {/* Preview Table */}
-          <div className="overflow-auto max-h-80 border border-border rounded-lg">
-            <table className="w-full text-sm">
-              <thead className="bg-bg-surface2 sticky top-0">
-                <tr>
-                  <th className="text-left px-3 py-2 text-text-tertiary font-medium">#</th>
-                  <th className="text-left px-3 py-2 text-text-tertiary font-medium">{t("pages:import.i14")}</th>
-                  <th className="text-left px-3 py-2 text-text-tertiary font-medium">{t("pages:import.i06")}</th>
-                  <th className="text-right px-3 py-2 text-text-tertiary font-medium">{t("pages:import.i07")}</th>
-                  <th className="text-center px-3 py-2 text-text-tertiary font-medium">{t("pages:import.i38")}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {previewData.rows.map((row) => (
-                  <tr key={row.row_index} className={clsx(
-                    "hover:bg-bg-surface2/30 transition-colors",
-                    !row.parsed && "bg-red-500/5",
-                    row.parsed && !row.is_duplicate && "bg-green-500/5",
-                    row.is_duplicate && "opacity-50"
-                  )}>
-                    <td className="px-3 py-2 text-text-disabled">{row.row_index + 1}</td>
-                    <td className="px-3 py-2 text-text-primary font-mono text-sm">{row.date || "-"}</td>
-                    <td className="px-3 py-2 text-text-primary max-w-xs truncate" title={row.description || ""}>
-                      {row.description || "-"}
-                    </td>
-                    <td className={clsx(
-                      "px-3 py-2 text-right font-mono font-medium",
-                      row.amount === null ? "text-text-disabled" : row.amount >= 0 ? "text-gain" : "text-loss"
-                    )}>
-                      {row.amount !== null ? formatCHF(row.amount) : "-"}
-                    </td>
-                    <td className="px-3 py-2 text-center">
-                      {row.is_duplicate ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border msg-warning text-sm" title={t("pages:import.alreadyExistsTitle")}>
-                          {t("pages:import.alreadyExists")}
-                        </span>
-                      ) : row.parsed ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gain/20 text-gain text-sm">
-                          <Check className="w-3 h-3" />
-                          OK
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border msg-error text-sm" title={row.errors.join(", ")}>
-                          <WarningTriangle className="w-3 h-3" />
-                          {t("pages:ui.fehler")}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Raw Data Sample */}
-          {previewData.sample_raw?.length > 0 && (
-            <details className="text-sm">
-              <summary className="text-text-tertiary cursor-pointer hover:text-text-secondary">
-                Rohdaten (erste {previewData.sample_raw.length} Zeilen)
-              </summary>
-              <div className="mt-2 bg-bg-surface2/50 rounded p-2 overflow-auto max-h-40">
-                <pre className="text-text-tertiary text-sm">
-                  {JSON.stringify(previewData.sample_raw, null, 2)}
-                </pre>
-              </div>
-            </details>
-          )}
-
-          {/* Import Button */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-border">
-            <button
-              onClick={() => {
-                setPreviewData(null);
-                setSelectedFile(null);
-                setShowColumnMapping(false);
-              }}
-              className="px-4 py-2 rounded-lg bg-bg-elevated text-text-secondary hover:bg-bg-elevated transition-colors text-base"
-            >
-              {t("pages:ui.abbrechen")}
-            </button>
-            <button
-              onClick={handleCsvImport}
-              disabled={previewData.parsed_rows === 0 || mappingWarnings.some(w => w.includes("erforderlich"))}
-              className={clsx(
-                "px-4 py-2 rounded-lg text-base font-medium flex items-center gap-2 transition-all",
-                previewData.parsed_rows > 0 && !mappingWarnings.some(w => w.includes("erforderlich"))
-                  ? "bg-accent text-white hover:bg-accent-light"
-                  : "bg-bg-elevated text-text-disabled cursor-not-allowed"
-              )}
-              title={mappingWarnings.find(w => w.includes("erforderlich")) || "Import durchführen"}
-            >
-              <CheckCircle className="w-4 h-4" />
-              {/* Vorhandene zaehlen nicht mit — der Import ueberspringt sie */}
-              {previewData.parsed_rows - (previewData.duplicate_rows ?? 0)} Transaktionen importieren
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Result */}
       {importResult && !isLoading && (
