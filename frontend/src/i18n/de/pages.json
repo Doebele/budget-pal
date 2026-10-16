@@ -77,7 +77,9 @@
     "srcEmpirical": "Empirische Angaben · Steuern fix",
     "srcRecurring": "Wiederkehrende Zahlungen · Ø letzte 12 Monate",
     "noDataForPeriod": "Keine Daten für den gewählten Zeitraum.",
-    "noDataWizardHint": "Starte den <a>Setup-Wizard</a>, um empirische Budgets zu erfassen."
+    "noDataWizardHint": "Starte den <a>Setup-Wizard</a>, um empirische Budgets zu erfassen.",
+    "invested": "Investiert: {{amount}} (nicht in Ausgaben)",
+    "investedHint": "Käufe minus Verkäufe von Wertpapieren, Fonds und Krypto (Kategorie «Investitionen»). Eine Umschichtung ins Vermögen, keine Ausgabe."
   },
   "accounts": {
     "title": "Konten",

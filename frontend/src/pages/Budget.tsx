@@ -56,7 +56,11 @@ interface TxnRow {
   is_recurring?: boolean;
   periodicity?: string;
   is_transfer?: boolean;
+  is_ignored?: boolean;
 }
+
+// Wertpapier-, Fonds- und Kryptokäufe: weder Einnahme noch Ausgabe, sondern «Investiert»
+const INVEST_CATEGORY = "Investitionen";
 
 // ── Wizard peer-config types + SC→key mapping ─────────────────
 interface PeerConfig {
@@ -276,7 +280,8 @@ export default function Budget() {
   //          "einmalig" → not recurring (one-time payments)
   // When excludeTransfers is on, "Kontoübertrag" category entries are removed.
   const freqFilteredTxns = useMemo((): TxnRow[] => {
-    let txns = periodTransactions as TxnRow[];
+    // Wie das Backend (counted_in_totals): ohne Überträge und ignorierte Buchungen
+    let txns = (periodTransactions as TxnRow[]).filter((t) => !t.is_transfer && !t.is_ignored);
     if (excludeTransfers) txns = txns.filter((t) => !TRANSFER_CATEGORIES.has(t.category ?? ""));
     if (ALL_FREQS_SELECTED) return txns;
     return txns.filter((t) => {
@@ -326,14 +331,16 @@ export default function Budget() {
         income:   stats?.total_income   ?? 0,
         expenses: stats?.total_expenses ?? 0,
         net: (stats?.total_income ?? 0) - (stats?.total_expenses ?? 0),
+        invested: stats?.total_invested ?? 0,
       };
     }
-    let income = 0, expenses = 0;
+    let income = 0, expenses = 0, invested = 0;
     for (const t of freqFilteredTxns) {
-      if (t.amount > 0) income += t.amount;
+      if (t.category === INVEST_CATEGORY) invested -= t.amount;
+      else if (t.amount > 0) income += t.amount;
       else expenses += -t.amount;
     }
-    return { income, expenses, net: income - expenses };
+    return { income, expenses, net: income - expenses, invested };
   }, [USE_FAST_PATH, stats, freqFilteredTxns]);
 
   // ── Actual by supercategory ───────────────────────────────────
@@ -354,7 +361,7 @@ export default function Budget() {
       }
     } else {
       for (const t of freqFilteredTxns) {
-        if (t.amount >= 0) continue; // skip income
+        if (t.amount >= 0 || t.category === INVEST_CATEGORY) continue; // Einnahmen, Anlagen
         const sc = resolveSuperCategory(t.category || "");
         if (sc.id === "sparen") continue;
         const abs = -t.amount;
@@ -666,6 +673,11 @@ export default function Budget() {
           <p className="text-text-tertiary text-sm">
             {fmtRef(kpi.income)} Einnahmen · {fmtRef(kpi.expenses)} Ausgaben
           </p>
+          {kpi.invested !== 0 && (
+            <p className="text-text-secondary text-sm" title={t("pages:budget.investedHint")}>
+              {t("pages:budget.invested", { amount: fmtRef(kpi.invested) })}
+            </p>
+          )}
         </div>
 
         {/* Ausgaben Ist vs Soll — clickable for detail breakdown */}

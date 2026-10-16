@@ -271,6 +271,14 @@ already taken (`balance_date`). One entry per currency in `statement_balances` (
 `balance` is their sum in the account currency. PDF: the preview returns `statement_balance`, the
 UI sends it back on confirm. Editing the balance by hand clears `balance_date`.
 
+**Totals filter**: every sum of income/expenses uses `counted_in_totals()` (models.py): no
+transfers between own accounts (`is_transfer`) and no bookings the user ignored (`is_ignored`, set
+in the transaction row's «⋯»/context menu; the row stays in the list, its amount struck through).
+Category `INVEST_CATEGORY` («Investitionen»: securities, funds, crypto — keywords first in
+`MERCHANT_RULES`) is neither income nor expense: `/transactions/stats` returns it as
+`total_invested` (purchases minus sales), the Budgetanalyse shows «Investiert». Investments never
+pair as transfers.
+
 **Import currency**: a statement books in the account's currency; PDF rows (parsers and AI
 extraction) default to `Account.currency`, never a fixed CHF.
 

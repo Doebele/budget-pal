@@ -86,6 +86,14 @@ EN_TO_DE_CATEGORY: Dict[str, str] = {
 # Pattern wird case-insensitiv als Substring gesucht.
 
 MERCHANT_RULES: Dict[str, Tuple[str, str, str]] = {
+    # ── Investitionen (zuerst: «Übertrag an Fondskonto» ist eine Anlage, kein
+    #    Kontoübertrag). Zählen in der Budgetanalyse als «Investiert».
+    "wertpapiere": ("Investitionen", "Wertpapiere", "Wertpapierkauf"),
+    "geldmarktfonds": ("Investitionen", "Fonds", "Geldmarktfonds"),
+    "fondskonto": ("Investitionen", "Fonds", "Fondskonto"),
+    "anlagekonto": ("Investitionen", "Anlagekonto", "Anlagekonto"),
+    "robo portfolio": ("Investitionen", "Robo-Advisor", "Robo-Portfolio"),
+    "kraken": ("Investitionen", "Krypto", "Kraken"),
     # ── Lebensmittel ─────────────────────────────────────────
     "migros": ("Lebensmittel", "Supermarkt", "Migros"),
     "coop": ("Lebensmittel", "Supermarkt", "Coop"),

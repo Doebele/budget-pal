@@ -27,7 +27,7 @@ from sqlalchemy.orm import selectinload
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.core.taxonomy import default_transaction_category_for_wizard_label, load_merged_taxonomy_for_user
-from app.models.models import Account, Category, RecurringPlan, Transaction, User, UserWizardConfig
+from app.models.models import Account, Category, RecurringPlan, Transaction, User, UserWizardConfig, counted_in_totals
 from app.services.pdf_duplicate_detection import _descriptions_match
 from app.services.plan_schedule import applicable_months, occurrences_per_month
 from app.services.wizard_derive import (
@@ -334,7 +334,7 @@ async def _suggest_historical(
         .where(
             Account.user_id == current_user.id,
             Transaction.is_deleted.isnot(True),
-            Transaction.is_transfer.isnot(True),
+            counted_in_totals(),
             extract("year", Transaction.date) == year,
         )
         .group_by("key", "sign", Transaction.category)

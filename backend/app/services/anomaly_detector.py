@@ -19,7 +19,7 @@ from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, extract, func
 
-from app.models.models import Transaction, Account, User, RecurringPlan
+from app.models.models import Transaction, Account, User, RecurringPlan, counted_in_totals
 from app.services.currency_service import currency_service, convert_with_eur_rates, normalize_reference_currency
 
 
@@ -79,7 +79,7 @@ async def detect(
         .where(
             Account.user_id == user.id,
             Transaction.is_deleted.isnot(True),
-            Transaction.is_transfer.isnot(True),
+            counted_in_totals(),
             Transaction.date >= datetime.combine(cutoff, datetime.min.time(), tzinfo=timezone.utc),
         )
         .order_by(Transaction.date.desc())

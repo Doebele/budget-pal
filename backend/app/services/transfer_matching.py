@@ -31,7 +31,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.models import Account, Transaction
+from app.models.models import INVEST_CATEGORY, Account, Transaction
 from app.services.currency_service import convert_with_eur_rates, get_rate_series, rates_on
 
 TRANSFER_CATEGORY = "Kontoübertrag"
@@ -64,7 +64,10 @@ def _hinted(t: Transaction) -> bool:
 
 
 def _eligible(t: Transaction) -> bool:
-    if t.is_deleted or t.is_split or t.transfer_pair_id or t.transfer_rejected:
+    if t.is_deleted or t.is_split or t.transfer_pair_id or t.transfer_rejected or t.is_ignored:
+        return False
+    # Fonds-, Wertpapier- und Kryptokäufe sind Anlagen, kein Übertrag
+    if t.category == INVEST_CATEGORY:
         return False
     return not t.user_verified or t.category == TRANSFER_CATEGORY
 

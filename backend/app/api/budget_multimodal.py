@@ -34,6 +34,7 @@ from app.core.taxonomy import (
     resolve_mapping_value_to_txn_category,
 )
 from app.models.models import (
+    counted_in_totals,
     Account, Budget, PeerGroupBenchmark, Scenario, Transaction, User,
     WizardCategoryMapping,
 )
@@ -213,7 +214,7 @@ async def _get_actual_stats(
             and_(
                 Account.user_id == user_id,
                 Transaction.is_deleted.isnot(True),
-                Transaction.is_transfer == False,
+                counted_in_totals(),
                 Transaction.date >= _utc_start(period_start),
                 Transaction.date <= _utc_end(period_end),
             )
@@ -779,7 +780,7 @@ async def budget_health_score(
             .where(
                 Account.user_id == current_user.id,
                 Transaction.is_deleted.isnot(True),
-                Transaction.is_transfer.isnot(True),
+                counted_in_totals(),
                 Transaction.date >= _utc_start(period_start),
                 Transaction.date <= _utc_end(period_end),
             )
@@ -948,7 +949,7 @@ async def budget_health_score(
             .where(
                 Account.user_id == current_user.id,
                 Transaction.is_deleted.isnot(True),
-                Transaction.is_transfer.isnot(True),
+                counted_in_totals(),
                 Transaction.date >= _utc_start(period_start),
                 Transaction.date <= _utc_end(period_end),
             )

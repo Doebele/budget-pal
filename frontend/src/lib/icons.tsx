@@ -64,6 +64,7 @@ export const Download = withSize(Iconoir.Download, "Download");
 export const Drag = withSize(Iconoir.Drag, "Drag");
 export const EditPencil = withSize(Iconoir.EditPencil, "EditPencil");
 export const Eye = withSize(Iconoir.Eye, "Eye");
+export const MoreHoriz = withSize(Iconoir.MoreHoriz, "MoreHoriz");
 export const EyeClosed = withSize(Iconoir.EyeClosed, "EyeClosed");
 export const Flask = withSize(Iconoir.Flask, "Flask");
 export const FloppyDisk = withSize(Iconoir.FloppyDisk, "FloppyDisk");
