@@ -67,7 +67,10 @@
     "matchTransfers": "Detect transfers",
     "transfersMatched_one": "1 transfer linked",
     "transfersMatched_other": "{{count}} transfers linked",
-    "matchTransfersHint": "Finds outgoing and incoming bookings of the same amount across your own accounts (also in another currency) and counts them as a transfer instead of expense and income. Also runs after every import."
+    "matchTransfersHint": "Finds outgoing and incoming bookings of the same amount across your own accounts (also in another currency) and counts them as a transfer instead of expense and income. Also runs after every import.",
+    "ignore": "Ignore (left out of all totals)",
+    "unignore": "Count again",
+    "ignoredHint": "Ignored – left out of all totals"
   },
   "periodicity": {
     "weekly": "Weekly",

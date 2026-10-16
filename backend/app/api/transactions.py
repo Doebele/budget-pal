@@ -23,7 +23,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.core.security import get_current_user
-from app.models.models import Transaction, Account, User, Category
+from app.models.models import INVEST_CATEGORY, Transaction, Account, User, Category, counted_in_totals
 from app.services import ai_client
 from app.services.categorization import CategorizationService
 from app.services.audit_log import record_activity
@@ -105,6 +105,7 @@ class TransactionResponse(BaseModel):
     user_verified: bool
     notes: Optional[str]
     is_transfer: bool
+    is_ignored: bool = False
     # Kontoübertrag: die Gegenbuchung und ihr Konto
     transfer_pair_id: Optional[int] = None
     transfer_account_name: Optional[str] = None
@@ -172,6 +173,8 @@ class TransactionUpdate(BaseModel):
     subcategory: Optional[str] = None
     notes: Optional[str] = None
     is_transfer: Optional[bool] = None
+    # Buchung in keiner Summe berücksichtigen (bleibt in der Liste)
+    is_ignored: Optional[bool] = None
     is_recurring: Optional[bool] = None
     periodicity: Optional[str] = None
     user_verified: Optional[bool] = None
@@ -200,6 +203,9 @@ class StatsResponse(BaseModel):
     top_categories: List[dict]
     top_income_categories: List[dict]
     transaction_count: int
+    # Netto in Wertpapiere, Fonds und Krypto angelegt (Käufe minus Verkäufe);
+    # weder Einnahme noch Ausgabe
+    total_invested: float = 0.0
 
 
 class RecurringCostItem(BaseModel):
@@ -279,6 +285,7 @@ def _transaction_to_response(txn: Transaction, user: User, rates: Dict[str, floa
         user_verified=txn.user_verified,
         notes=txn.notes,
         is_transfer=txn.is_transfer,
+        is_ignored=bool(txn.is_ignored),
         transfer_pair_id=txn.transfer_pair_id,
         transfer_account_name=_transfer_account_name(txn),
         is_recurring=txn.is_recurring,
@@ -785,7 +792,7 @@ async def get_stats(
     """Aggregated transaction statistics for the given period."""
     filters = [
         Account.user_id == current_user.id,
-        Transaction.is_transfer == False,
+        counted_in_totals(),
         Transaction.is_deleted.isnot(True)
     ]
     if start:
@@ -807,12 +814,16 @@ async def get_stats(
 
     total_income = 0.0
     total_expenses = 0.0
+    total_invested = 0.0
     cat_expense: Dict[str, float] = defaultdict(float)
     cat_income: Dict[str, float] = defaultdict(float)
 
     for amt, cat, acur in raw:
         cur = (acur or "CHF").strip().upper()
         conv = convert_with_eur_rates(rates, float(amt), cur, ref)
+        if cat == INVEST_CATEGORY:
+            total_invested -= conv
+            continue
         if conv > 0:
             total_income += conv
             if cat:
@@ -842,6 +853,7 @@ async def get_stats(
         top_categories=top_categories,
         top_income_categories=top_income_categories,
         transaction_count=txn_count,
+        total_invested=total_invested,
     )
 
 
@@ -855,7 +867,7 @@ async def monthly_summary(
     """Monthly income vs expense summary."""
     filters = [
         Account.user_id == current_user.id,
-        Transaction.is_transfer == False,
+        counted_in_totals(),
         Transaction.is_deleted.isnot(True)
     ]
     if year:
@@ -963,7 +975,7 @@ async def monthly_category_breakdown(
         Account.user_id == current_user.id,
         Transaction.amount < 0,
         Transaction.is_deleted.isnot(True),
-        Transaction.is_transfer.isnot(True),
+        counted_in_totals(),
         Transaction.date >= date_filter_start,
         Transaction.date <= date_filter_end,
         Transaction.category.isnot(None),
@@ -1020,7 +1032,7 @@ async def budget_analysis(
 
     filters = [
         Account.user_id == current_user.id,
-        Transaction.is_transfer == False,
+        counted_in_totals(),
         Transaction.is_deleted.isnot(True)
     ]
     if account_id:

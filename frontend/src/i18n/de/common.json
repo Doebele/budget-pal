@@ -67,7 +67,10 @@
     "matchTransfers": "Überträge erkennen",
     "transfersMatched_one": "1 Übertrag verbunden",
     "transfersMatched_other": "{{count}} Überträge verbunden",
-    "matchTransfersHint": "Sucht Abgänge und Eingänge mit gleichem Betrag auf Ihren eigenen Konten (auch in anderer Währung) und zählt sie als Kontoübertrag statt als Ausgabe und Einnahme. Läuft auch nach jedem Import."
+    "matchTransfersHint": "Sucht Abgänge und Eingänge mit gleichem Betrag auf Ihren eigenen Konten (auch in anderer Währung) und zählt sie als Kontoübertrag statt als Ausgabe und Einnahme. Läuft auch nach jedem Import.",
+    "ignore": "Ignorieren (in keiner Summe)",
+    "unignore": "Wieder berücksichtigen",
+    "ignoredHint": "Ignoriert – zählt in keiner Summe"
   },
   "periodicity": {
     "weekly": "Wöchentlich",

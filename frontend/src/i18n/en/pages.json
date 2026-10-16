@@ -77,7 +77,9 @@
     "srcEmpirical": "Empirical data · Taxes fixed",
     "srcRecurring": "Recurring payments · Ø last 12 months",
     "noDataForPeriod": "No data for the selected period.",
-    "noDataWizardHint": "Start the <a>setup wizard</a> to capture empirical budgets."
+    "noDataWizardHint": "Start the <a>setup wizard</a> to capture empirical budgets.",
+    "invested": "Invested: {{amount}} (not in expenses)",
+    "investedHint": "Purchases minus sales of securities, funds and crypto (category «Investitionen»). A shift into assets, not an expense."
   },
   "accounts": {
     "title": "Accounts",

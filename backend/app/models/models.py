@@ -21,6 +21,7 @@ from sqlalchemy import (
     Enum,
     UniqueConstraint,
     Index,
+    and_,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -171,6 +172,18 @@ class Account(Base):
 
 # ── Transaction ───────────────────────────────────────────────
 
+#: Kategorie der Wertpapier-, Fonds- und Kryptokäufe (und -verkäufe): keine
+#: Ausgabe, sondern eine Umschichtung ins Vermögen — die Budgetanalyse zeigt sie
+#: als «Investiert» neben Einnahmen und Ausgaben
+INVEST_CATEGORY = "Investitionen"
+
+
+def counted_in_totals():
+    """Filter für jede Summe von Einnahmen und Ausgaben: ohne Kontoüberträge
+    zwischen eigenen Konten und ohne ignorierte Buchungen."""
+    return and_(Transaction.is_transfer.isnot(True), Transaction.is_ignored.isnot(True))
+
+
 class Transaction(Base):
     __tablename__ = "transactions"
     __table_args__ = (
@@ -212,6 +225,8 @@ class Transaction(Base):
         Integer, ForeignKey("transactions.id", ondelete="SET NULL"), nullable=True
     )
     transfer_rejected: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Von der Person ignoriert: bleibt in der Liste, zählt in keiner Summe
+    is_ignored: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_recurring: Mapped[bool] = mapped_column(Boolean, default=False)
     periodicity: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 

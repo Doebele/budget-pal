@@ -12,7 +12,7 @@ import { useAuth } from "@/lib/auth";
 import { useTaxonomy, useTaxonomySuperCategories } from "@/lib/categories";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
-import { Building, Check, DataTransferBoth, Download, GraphUp, NavArrowDown, PercentageCircle, Repeat, Scissor, Search, Trash, Upload, ViewGrid, Wallet, Xmark } from "@/lib/icons";
+import { Building, Check, DataTransferBoth, Download, Eye, EyeClosed, MoreHoriz, GraphUp, NavArrowDown, PercentageCircle, Repeat, Scissor, Search, Trash, Upload, ViewGrid, Wallet, Xmark } from "@/lib/icons";
 import GranularityNavigator from "@/components/GranularityNavigator";
 import { computeDateRange, TimeGranularity } from "@/lib/granularity";
 import { Link, useSearchParams } from "react-router-dom";
@@ -47,6 +47,7 @@ interface Transaction {
   user_verified: boolean;
   notes?: string;
   is_transfer?: boolean;
+  is_ignored?: boolean;
   transfer_pair_id?: number | null;
   transfer_account_name?: string | null;
   is_recurring?: boolean;
@@ -240,6 +241,9 @@ export default function Transactions() {
       setEditingId(null);
     },
   });
+
+  // «⋯»-Menü bzw. Kontextmenü einer Zeile
+  const [menuFor, setMenuFor] = useState<number | null>(null);
 
   // Kontoüberträge zwischen eigenen Konten erkennen (läuft auch nach jedem Import)
   const matchTransfersMutation = useMutation({
@@ -710,7 +714,11 @@ export default function Transactions() {
                 ))}
               {!isLoading &&
                 (transactions || []).map((txn: Transaction) => (
-                  <tr key={txn.id} className="group border-b border-border/30 hover:bg-bg-surface2/50 transition-colors">
+                  <tr
+                    key={txn.id}
+                    className="group border-b border-border/30 hover:bg-bg-surface2/50 transition-colors"
+                    onContextMenu={(e) => { e.preventDefault(); setMenuFor(txn.id); }}
+                  >
                     <td className="px-4 py-3 text-text-tertiary text-sm font-mono whitespace-nowrap">
                       {format(new Date(txn.date), "dd.MM.yyyy")}
                     </td>
@@ -747,6 +755,9 @@ export default function Transactions() {
                         <p className="text-text-tertiary text-sm truncate" title={txn.description}>
                           {txn.description}
                         </p>
+                      )}
+                      {txn.is_ignored && (
+                        <p className="text-text-tertiary text-sm">{t("txn.ignoredHint")}</p>
                       )}
                       {txn.is_transfer && (
                         <p className="flex items-center gap-1 text-text-tertiary text-sm">
@@ -856,7 +867,7 @@ export default function Transactions() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className={clsx("text-base font-mono", txn.amount >= 0 ? "text-gain" : "text-loss")}>
+                      <span className={clsx("text-base font-mono", txn.amount >= 0 ? "text-gain" : "text-loss", txn.is_ignored && "line-through opacity-50")}>
                         {txn.amount >= 0 ? "+" : ""}
                         {formatAmount(txn.amount, txn.currency || txn.account_currency || "CHF")}
                       </span>
@@ -866,6 +877,7 @@ export default function Transactions() {
                         className={clsx(
                           "text-base font-mono",
                           txn.amount_reference >= 0 ? "text-gain" : "text-loss",
+                          txn.is_ignored && "line-through opacity-50",
                         )}
                       >
                         {txn.amount_reference >= 0 ? "+" : ""}
@@ -875,7 +887,26 @@ export default function Transactions() {
                         )}
                       </span>
                     </td>
-                    <td className="px-2 py-3 w-20">
+                    <td className="px-2 py-3 w-24 relative">
+                      {menuFor === txn.id && (
+                        <>
+                          {/* Klick daneben schliesst */}
+                          <div className="fixed inset-0 z-30" onClick={() => setMenuFor(null)} />
+                          <div className="absolute right-2 top-10 z-40 min-w-max whitespace-nowrap rounded-md border border-border bg-bg-surface shadow-card py-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                updateMutation.mutate({ id: txn.id, data: { is_ignored: !txn.is_ignored } });
+                                setMenuFor(null);
+                              }}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm text-text-primary hover:bg-bg-surface2"
+                            >
+                              {txn.is_ignored ? <Eye className="w-4 h-4" /> : <EyeClosed className="w-4 h-4" />}
+                              {t(txn.is_ignored ? "txn.unignore" : "txn.ignore")}
+                            </button>
+                          </div>
+                        </>
+                      )}
                       {confirmingDeleteId === txn.id ? (
                         <div className="flex items-center gap-1">
                           <button
@@ -893,7 +924,16 @@ export default function Transactions() {
                           </button>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                        <div className={clsx("flex items-center gap-1 group-hover:opacity-100 transition-all", menuFor === txn.id ? "opacity-100" : "opacity-0")}>
+                          <button
+                            type="button"
+                            onClick={() => setMenuFor(menuFor === txn.id ? null : txn.id)}
+                            className="text-text-tertiary hover:text-text-primary transition-colors"
+                            title={t("common.more")}
+                            aria-haspopup="menu"
+                          >
+                            <MoreHoriz className="w-4 h-4" />
+                          </button>
                           {!txn.parent_id && (
                             <button
                               onClick={() => setSplittingTxn(txn)}
