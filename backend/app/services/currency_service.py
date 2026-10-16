@@ -7,7 +7,7 @@ Uses Frankfurter API (free tier) with SQLite persistence.
 import json
 import os
 import logging
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Dict, Optional, FrozenSet
 import aiofiles
@@ -274,6 +274,39 @@ class CurrencyService:
         except Exception:
             pass
         return None
+
+
+# ── Historische Kurse (ECB über Frankfurter) ──────────────────
+# ponytail: Cache im Prozess, je Tag einmal geladen; bei Neustart neu. Reicht für
+# den Übertrag-Abgleich (ein Abruf pro Zeitraum); persistieren, wenn er öfter läuft.
+_series_cache: Dict[str, Dict[str, float]] = {}
+
+
+async def get_rate_series(start: date, end: date) -> Dict[str, Dict[str, float]]:
+    """Tageskurse (EUR-Basis) von `start` bis `end`, Schlüssel ISO-Datum. Ein
+    Abruf für den ganzen Zeitraum; Wochenenden und Feiertage fehlen (die ECB
+    veröffentlicht dann keinen Kurs). Ohne Netz: was im Cache liegt."""
+    missing = start.isoformat() < min(_series_cache, default="9999") or end.isoformat() > max(_series_cache, default="0000")
+    if missing:
+        url = f"https://api.frankfurter.app/{start.isoformat()}..{end.isoformat()}?from=EUR"
+        try:
+            async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+                response = await client.get(url, headers={"User-Agent": "budget-pal/1.0"})
+                response.raise_for_status()
+                for day, rates in (response.json().get("rates") or {}).items():
+                    _series_cache[day] = {"EUR": 1.0, **{k: float(v) for k, v in rates.items()}}
+        except Exception as err:  # Kurse sind ein Extra, der Abgleich fällt auf heute zurück
+            logger.warning("Historische Kurse nicht verfügbar (%s): %s", url, err)
+    return {d: r for d, r in _series_cache.items() if start.isoformat() <= d <= end.isoformat()}
+
+
+def rates_on(series: Dict[str, Dict[str, float]], day: date) -> Optional[Dict[str, float]]:
+    """Kurse des Tages oder des letzten Bankarbeitstags davor (bis 7 Tage)."""
+    for back in range(8):
+        hit = series.get((day - timedelta(days=back)).isoformat())
+        if hit:
+            return hit
+    return None
 
 
 # Singleton instance

@@ -132,6 +132,13 @@ async def delete_account(
     if not account:
         raise HTTPException(status_code=404, detail="Account not found.")
     account.is_active = False  # Soft delete
+    # Die Buchungen gehen mit ins Archiv (wiederherstellbar) — sonst zählten
+    # sie in allen Auswertungen weiter, obwohl das Konto weg ist
+    await db.execute(
+        update(Transaction)
+        .where(Transaction.account_id == account.id, Transaction.is_deleted.isnot(True))
+        .values(is_deleted=True, deleted_at=datetime.now(timezone.utc))
+    )
     await db.flush()
     await db.commit()
 

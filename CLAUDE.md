@@ -252,9 +252,13 @@ Central definition of all 11 supercategories (wohnen, essen, mobilitaet, versich
 
 **Account transfers** (`services/transfer_matching.py`): a transfer between two of the user's
 own accounts shows up twice in actual data. `match_transfers()` pairs an outgoing and an
-incoming booking (same amount; other currency via the bank's original amount or today's ECB
-rate ±4 %, hints on both sides; at most 4–5 days apart), sets `is_transfer` on both and links
-them via `transfer_pair_id`. Every query that sums income/expenses already skips `is_transfer`.
+incoming booking (same amount; other currency via the bank's original amount or the ECB rate
+of the booking day ±4 % — `currency_service.get_rate_series`, one call per period — with hints
+on both sides; at most 4–5 days apart), sets `is_transfer` on both and links them via
+`transfer_pair_id`. Within one account only mirror rows (same day, near-identical text) or a
+card statement (Monats-/Kartenabrechnung) pair; cash withdrawals (ATM, Bancomat) never do. Credit
+cards: the UBS card parser keeps the «LSV-Zahlung» as an incoming «Kontoübertrag» on the card
+account, the counterpart of the bill's direct debit on the bank account. Every query that sums income/expenses already skips `is_transfer`.
 It runs after every import and via `POST /transactions/match-transfers`. Hand-categorised
 bookings (except as «Kontoübertrag») and pairs the user unlinked (`transfer_rejected`, set by
 `PUT is_transfer=false`) are never touched; the relationship needs `post_update=True`.
@@ -267,7 +271,12 @@ already taken (`balance_date`). One entry per currency in `statement_balances` (
 `balance` is their sum in the account currency. PDF: the preview returns `statement_balance`, the
 UI sends it back on confirm. Editing the balance by hand clears `balance_date`.
 
-**Soft delete**: Transactions have `is_deleted` + `deleted_at`. All normal queries filter `is_deleted.isnot(True)`. Archived transactions are accessible at `/transactions/archived`.
+**Import currency**: a statement books in the account's currency; PDF rows (parsers and AI
+extraction) default to `Account.currency`, never a fixed CHF.
+
+**Soft delete**: Deleting an account deactivates it and archives its transactions (otherwise they
+kept counting). The backup import matches accounts by name among *active* accounts only and
+checks duplicates per target account (hash or date + amount + text). Transactions have `is_deleted` + `deleted_at`. All normal queries filter `is_deleted.isnot(True)`. Archived transactions are accessible at `/transactions/archived`.
 
 **Async sessions**: All DB access goes through `get_db()` dependency. Sessions do NOT auto-commit — routers must call `await db.commit()` or `await db.flush()` explicitly.
 

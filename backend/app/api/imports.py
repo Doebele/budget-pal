@@ -1091,6 +1091,10 @@ async def _build_pdf_preview(
     """
     ai_cfg = ai_client.from_user(current_user)
     hints = await load_category_hints(db, current_user.id)
+    # Der Auszug bucht in der Währung des Kontos: Vorgabe für alle Zeilen, auch
+    # für die KI-Extraktion (früher fest CHF — N26/Comdirect landeten in CHF)
+    account = await db.get(Account, account_id) if account_id else None
+    account_currency = (account.currency if account else None) or "CHF"
     try:
         # CSV laeuft durch dieselbe Vorschau wie PDF: Kategorie, Periodizitaet
         # und Dubletten pro Zeile, Bestaetigung ueber /pdf/confirm
@@ -1098,7 +1102,8 @@ async def _build_pdf_preview(
             extraction = _extract_csv_rows(tmp_path, bank)
         else:
             extraction = await _extract_pdf_rows(
-                tmp_path, bank, ai=ai_cfg, hints=hints, on_progress=on_progress
+                tmp_path, bank, ai=ai_cfg, hints=hints, currency=account_currency,
+                on_progress=on_progress,
             )
         detected_bank, raw_transactions = extraction.bank, extraction.rows
         used_ai, ai_attempted = extraction.ai_extracted, extraction.ai_attempted
@@ -1198,7 +1203,7 @@ async def _build_pdf_preview(
                 sign="+" if amount_val > 0 else "",
                 amount=amount_val,
                 description=description_val,
-                currency=row.get("currency", "CHF"),
+                currency=row.get("currency") or account_currency,
                 category=preview_category,
                 account_id=account_id,
                 is_duplicate=is_duplicate,
@@ -1587,7 +1592,7 @@ async def confirm_pdf_import(
         import_hash = compute_import_hash(
             payload.account_id, date_norm, amount, description
         )
-        cur = row.currency or "CHF"
+        cur = row.currency or account.currency
 
         if row.duplicate_kind == "database":
             if action in ("keep_existing", "skip"):
@@ -1788,7 +1793,9 @@ async def import_pdf(
     ai_cfg = ai_client.from_user(current_user)
     hints = await load_category_hints(db, current_user.id)
     try:
-        extraction = await _extract_pdf_rows(tmp_path, bank, ai=ai_cfg, hints=hints)
+        extraction = await _extract_pdf_rows(
+            tmp_path, bank, ai=ai_cfg, hints=hints, currency=account.currency or "CHF"
+        )
         raw_transactions = extraction.rows
         statements = [extraction.statement_balance] if extraction.statement_balance else []
     finally:

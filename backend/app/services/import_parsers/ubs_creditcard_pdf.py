@@ -133,19 +133,36 @@ def parse_ubs_creditcard_pdf(pdf) -> List[dict]:
             i += 1
             continue
 
-        # LSV payment (e.g. "27.02.2026 LSV-Zahlung vom 26.02.2026 -1'337.65")
-        # Import as income (positive amount) since it's a credit on the card account.
-        # We skip LSV lines — they represent bank-to-card settlements, not real spending.
+        # LSV payment (e.g. "27.02.2026 LSV-Zahlung vom 26.02.2026 -1'337.65"):
+        # die Bank begleicht die Kartenrechnung. Als Eingang aufs Kartenkonto
+        # (Kategorie Kontoübertrag) — die Gegenbuchung zur Lastschrift auf dem
+        # Bankkonto; der Übertrag-Abgleich verbindet beide, sonst zählte die
+        # Rechnung doppelt (Lastschrift + Einzelkäufe).
         tm = _TXN_LINE_RE.match(line)
         if tm:
             booking_date_str, merchant, amount_str = tm.group(1), tm.group(2), tm.group(3)
+
+            if _LSV_RE.search(merchant):
+                booking_date = _parse_date(booking_date_str)
+                amount = _parse_chf_amount(amount_str)
+                if booking_date is not None and amount is not None:
+                    transactions.append({
+                        "date": booking_date.strftime("%Y-%m-%d"),
+                        "description": merchant.strip(),
+                        "amount": abs(amount),
+                        "currency": "CHF",
+                        "category": "Kontoübertrag",
+                        "notes": "Kartenrechnung beglichen",
+                    })
+                i += 1
+                continue
 
             # Skip internal settlement / summary lines
             _skip_merchants = (
                 "Rechnungsbetrag", "Kartentotal", "letzte Rechnung",
                 "Kontoabschluss", "Jahresgebühr",
             )
-            if _LSV_RE.search(merchant) or any(kw in merchant for kw in _skip_merchants):
+            if any(kw in merchant for kw in _skip_merchants):
                 i += 1
                 continue
 

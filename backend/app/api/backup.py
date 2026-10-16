@@ -24,6 +24,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import and_, select
+
+from app.services.currency_service import currency_service
+from app.services.transfer_matching import match_transfers
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -356,8 +359,10 @@ async def import_backup(
             current_user.taxonomy_hidden_json = u["taxonomy_hidden_json"]
 
     # ── Accounts (upsert by name) ─────────────────────────────
+    # Nur aktive Konten: ein gelöschtes Konto gleichen Namens (z. B. ein altes
+    # «N26») schluckte sonst die Buchungen, und das Konto fehlte in der Liste
     existing_accounts = (await db.execute(
-        select(Account).where(Account.user_id == uid)
+        select(Account).where(Account.user_id == uid, Account.is_active.is_(True))
     )).scalars().all()
     acc_by_name: Dict[str, Account] = {a.name: a for a in existing_accounts}
     acc_id_map: Dict[int, int] = {}  # old_id → new_id
@@ -392,19 +397,21 @@ async def import_backup(
 
     # ── Transactions ───────────────────────────────────────────
     if payload.import_transactions:
-        existing_hashes = set()
+        # Duplikate je Zielkonto: gleicher Hash, oder gleiche Buchung (Datum,
+        # Betrag, Text). Der Hash enthält die Konto-ID der Quelle — über alle
+        # Konten verglichen, verschwanden Buchungen in einem anderen Konto, und
+        # aus einer anderen Installation erkennt ihn niemand wieder.
+        existing_keys: set = set()
         if acc_id_map:
-            hash_rows = (await db.execute(
-                select(Transaction.import_hash)
-                .join(Account)
-                .where(
-                    and_(
-                        Account.user_id == uid,
-                        Transaction.import_hash.isnot(None),
-                    )
-                )
-            )).scalars().all()
-            existing_hashes = {h for h in hash_rows if h}
+            rows = (await db.execute(
+                select(Transaction.account_id, Transaction.import_hash, Transaction.date,
+                       Transaction.amount, Transaction.description)
+                .where(Transaction.account_id.in_(set(acc_id_map.values())))
+            )).all()
+            for acc_id, h, d, amt, desc in rows:
+                if h:
+                    existing_keys.add((acc_id, h))
+                existing_keys.add((acc_id, d.date().isoformat(), round(float(amt), 2), desc or ""))
 
         label_id_map: Dict[int, int] = {}
 
@@ -416,13 +423,14 @@ async def import_backup(
                 continue
 
             imp_hash = txn_data.get("import_hash")
-            if imp_hash and imp_hash in existing_hashes:
-                result.transactions_skipped += 1
-                continue
-
             try:
                 date_val = datetime.fromisoformat(txn_data["date"])
             except Exception:
+                result.transactions_skipped += 1
+                continue
+            content_key = (new_acc_id, date_val.date().isoformat(),
+                           round(float(txn_data.get("amount", 0.0)), 2), txn_data.get("description", "") or "")
+            if (imp_hash and (new_acc_id, imp_hash) in existing_keys) or content_key in existing_keys:
                 result.transactions_skipped += 1
                 continue
 
@@ -455,7 +463,8 @@ async def import_backup(
             db.add(new_txn)
             await db.flush()
             if imp_hash:
-                existing_hashes.add(imp_hash)
+                existing_keys.add((new_acc_id, imp_hash))
+            existing_keys.add(content_key)
             if old_txn_id:
                 label_id_map[old_txn_id] = new_txn.id
             result.transactions_created += 1
@@ -637,6 +646,8 @@ async def import_backup(
             ))
             result.assets_created += 1
 
+    # Paar-Verbindungen kommen nicht mit (andere IDs): neu verbinden
+    await match_transfers(db, uid, await currency_service.get_rates("EUR"))
     await db.commit()
     return result
 

@@ -78,6 +78,42 @@ class TestFindPairs:
         rejected = txn(3, 3000, description="Übertrag", transfer_rejected=True)
         assert find_transfer_pairs([out, verified, rejected], RATES) == []
 
+    def test_revolut_exchange_at_the_rate_of_the_day(self):
+        """EUR → USD im April zu 1.1746; der heutige Kurs (1.08) läge 8 % daneben."""
+        out = txn(1, -500, currency="EUR", description="Umgetauscht in USD")
+        inc = txn(2, 587.32, currency="USD", description="Umgetauscht in USD")
+        assert find_transfer_pairs([out, inc], RATES) == []
+        series = {DAY.date().isoformat(): {"EUR": 1.0, "USD": 1.1746, "CHF": 0.93}}
+        assert ids(find_transfer_pairs([out, inc], RATES, series)) == [(out.id, inc.id)]
+
+    def test_credit_card_bill_pairs_with_the_lsv_payment_on_the_card(self):
+        """UBS: Lastschrift auf dem Lohnkonto, LSV-Zahlung zwei Tage später auf dem Kartenkonto."""
+        bill = txn(1, -1337.65, description="UBSSwitzerlandAG ECA02WIDERSPRUCHANUBSINNERT30 TAGEN;Lastschrift")
+        paid = txn(2, 1337.65, description="LSV-Zahlung vom 26.02.2026", days=2)
+        assert ids(find_transfer_pairs([bill, paid], RATES)) == [(bill.id, paid.id)]
+
+    def test_visa_statement_in_the_same_report_a_day_apart(self):
+        """Comdirect: Giro bucht die Summe, der Visa-Teil desselben Berichts den Ausgleich."""
+        out = txn(4, -148.49, currency="EUR", description="Summe Monatsabrechnung Visa-Karte", days=1)
+        inc = txn(4, 148.49, currency="EUR", description="Visa-Kartenabrechnung")
+        assert ids(find_transfer_pairs([out, inc], RATES)) == [(out.id, inc.id)]
+
+    def test_fund_purchase_is_no_mirror_of_a_deposit(self):
+        """Revolut: Kauf eines Geldmarktfonds und eine gleich hohe Einzahlung am selben Tag."""
+        out = txn(9, -2000, currency="EUR", description="An EUR Flexibler Geldmarktfonds (Transfer)")
+        inc = txn(9, 2000, currency="EUR", description="Zahlung von CLAUS MEDVESEK (Einzahlung)")
+        assert find_transfer_pairs([out, inc], RATES) == []
+
+    def test_two_different_transfers_in_one_account_are_no_pair(self):
+        out = txn(4, -2000, currency="EUR", description="Übertrag/ ClausMedvesek LohnMai")
+        inc = txn(4, 2000, currency="EUR", description="Übertrag/ ClausPeterMedvesek MONATSZAHLUNG", days=2)
+        assert find_transfer_pairs([out, inc], RATES) == []
+
+    def test_cash_withdrawal_is_never_a_transfer(self):
+        out = txn(5, -500, currency="EUR", description="COMMERZBANK ATM", category="Kontoübertrag")
+        inc = txn(9, 500, currency="EUR", description="Von EUR Flexibler Geldmarktfonds", days=1)
+        assert find_transfer_pairs([out, inc], RATES) == []
+
     def test_mirror_rows_in_one_account(self):
         """Comdirect: Übertrag aufs Tagesgeld steht im selben Auszug als − und +."""
         out = txn(4, -1400, currency="EUR", description="Uebertrag auf Girokonto")
@@ -105,7 +141,8 @@ def _post(client, account_id, amount, currency, description):
 
 class TestApi:
     def test_match_excludes_from_stats_and_unlink_sticks(self, client, test_account, second_account):
-        with patch("app.api.transactions.currency_service.get_rates", new=AsyncMock(return_value=RATES)):
+        with patch("app.api.transactions.currency_service.get_rates", new=AsyncMock(return_value=RATES)), \
+                patch("app.services.transfer_matching.get_rate_series", new=AsyncMock(return_value={})):
             out = _post(client, test_account.id, -1847.95, "CHF", "CLAUSMEDVESEK Dauerauftrag")
             inc = _post(client, second_account.id, 2000, "EUR", "MONATSZAHLUNG Übertrag")
             _post(client, test_account.id, -50, "CHF", "Migros")
@@ -126,7 +163,8 @@ class TestApi:
             assert client.post("/api/transactions/match-transfers").json() == {"pairs": 0}
 
     def test_deleting_one_side_releases_the_other(self, client, test_account, second_account):
-        with patch("app.api.transactions.currency_service.get_rates", new=AsyncMock(return_value=RATES)):
+        with patch("app.api.transactions.currency_service.get_rates", new=AsyncMock(return_value=RATES)), \
+                patch("app.services.transfer_matching.get_rate_series", new=AsyncMock(return_value={})):
             out = _post(client, test_account.id, -500, "CHF", "Übertrag")
             inc = _post(client, test_account.id, 500, "CHF", "Übertrag")
             client.post("/api/transactions/match-transfers")
@@ -134,3 +172,17 @@ class TestApi:
             client.post("/api/transactions/match-transfers")
             rows = {t["id"]: t for t in client.get("/api/transactions").json()}
             assert rows[inc]["is_transfer"] is False and rows[inc]["transfer_pair_id"] is None
+
+
+def test_ubs_card_parser_keeps_the_lsv_payment_as_transfer():
+    from types import SimpleNamespace
+
+    from app.services.import_parsers.ubs_creditcard_pdf import parse_ubs_creditcard_pdf
+
+    text = "16.02.2026 F und F Kantine Zuerich 18.00\n27.02.2026 LSV-Zahlung vom 26.02.2026 -1'337.65\n"
+    pdf = SimpleNamespace(pages=[SimpleNamespace(extract_text=lambda: text)])
+    rows = parse_ubs_creditcard_pdf(pdf)
+    lsv = [r for r in rows if r["description"].startswith("LSV")]
+    assert lsv == [{"date": "2026-02-27", "description": "LSV-Zahlung vom 26.02.2026", "amount": 1337.65,
+                    "currency": "CHF", "category": "Kontoübertrag", "notes": "Kartenrechnung beglichen"}]
+    assert any(r["amount"] == -18.0 for r in rows)
