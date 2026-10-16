@@ -98,7 +98,25 @@ jobs:
       DEPLOY_USER: ${{ secrets.STRATO_USER }}
       DEPLOY_PATH: ${{ secrets.STRATO_DEPLOY_PATH }}
     steps:
+      # Zwei Merges kurz nacheinander starten zwei Laeufe. Braucht der aeltere
+      # laenger fuer den Build, kommt sein Deploy als Zweiter dran und rollt
+      # den neueren zurueck (passiert mit 610c44f nach 1a6fd60). Ein Commit,
+      # der nicht mehr Spitze von main ist, wird deshalb nicht ausgerollt —
+      # der Lauf des neueren Commits enthaelt seine Aenderungen ohnehin.
+      - name: Nur den neuesten main-Commit ausrollen
+        id: aktuell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          head=$(gh api "repos/${{ github.repository }}/commits/main" --jq .sha)
+          if [ "$head" = "$GITHUB_SHA" ]; then
+            echo "neuester=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::${GITHUB_SHA::7} ist nicht mehr die Spitze von main (${head::7}) — kein Deploy."
+            echo "neuester=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: SSH einrichten
+        if: steps.aktuell.outputs.neuester == 'true'
         env:
           SSH_KEY: ${{ secrets.STRATO_SSH_KEY }}
           # Fester Host-Key statt ssh-keyscan: sonst wuerde die Action jedem
@@ -112,6 +130,7 @@ jobs:
           printf 'Host strato\n  HostName %s\n  User %s\n  IdentityFile ~/.ssh/id_deploy\n  IdentitiesOnly yes\n' \
             "$HOST" "$DEPLOY_USER" > ~/.ssh/config
       - name: Ausrollen
+        if: steps.aktuell.outputs.neuester == 'true'
         env:
           ENV_FILE: ${{ secrets.STRATO_ENV_FILE }}
         run: |
@@ -120,4 +139,5 @@ jobs:
           printf '%s\n' "$ENV_FILE" | ssh strato "umask 077 && cat > '$DEPLOY_PATH/.env'"
           ssh strato "cd '$DEPLOY_PATH' && IMAGE_TAG=${GITHUB_SHA::7} ./deploy.sh"
       - name: Von aussen pruefen
+        if: steps.aktuell.outputs.neuester == 'true'
         run: curl -fsS --retry 6 --retry-delay 5 --retry-all-errors https://budgetpal.doebele12.de/api/health

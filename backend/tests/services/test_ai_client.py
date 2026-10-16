@@ -262,6 +262,29 @@ async def test_anthropic_refusal_returns_none():
         assert await ai_client.complete(cfg, "sys", "user") is None
 
 
+@pytest.mark.parametrize(
+    "provider,key,data",
+    [
+        ("openrouter", {"openrouter_api_key": "sk-or-test"},
+         {"choices": [{"message": {"content": '{"transactions": [{"da'}, "finish_reason": "length"}]}),
+        ("anthropic", {"anthropic_api_key": "sk-ant-test"},
+         {"stop_reason": "max_tokens", "content": [{"type": "text", "text": '{"transactions": [{"da'}]}),
+    ],
+)
+@pytest.mark.asyncio
+async def test_cut_off_at_token_limit_is_reported(provider, key, data):
+    """Eine am max_tokens-Limit abgebrochene Antwort ist unvollstaendig —
+    der Aufrufer muss das erfahren, statt still halbes JSON zu verwerfen."""
+    cfg = AiConfig(provider=provider, **key)
+    with patch("app.services.ai_client.httpx.AsyncClient", _FakeAsyncClient(data)):
+        assert (await ai_client.complete_detailed(cfg, "sys", "user")).cut_off is True
+
+    finished = {"choices": [{"message": {"content": "{}"}, "finish_reason": "stop"}]}
+    cfg = AiConfig(provider="openrouter", openrouter_api_key="sk-or-test")
+    with patch("app.services.ai_client.httpx.AsyncClient", _FakeAsyncClient(finished)):
+        assert (await ai_client.complete_detailed(cfg, "sys", "user")).cut_off is False
+
+
 @pytest.mark.asyncio
 async def test_gemini_uses_the_openai_compatible_endpoint():
     """Wie in fintools: Gemini ueber /v1beta/openai statt eines eigenen
@@ -799,6 +822,25 @@ async def test_error_message_comes_from_the_api_error_field():
         result = await ai_client.check_connection(cfg)
     assert result.ok is False
     assert result.error == "HTTP 401: Incorrect API key provided"
+
+
+@pytest.mark.asyncio
+async def test_openrouter_402_is_explained_in_german():
+    """Die Rohmeldung las sich, als waere das Key-Limit erschoepft — dabei
+    war das Kontoguthaben leer."""
+    raw = (
+        "This request requires more credits, or fewer max_tokens. You requested up to "
+        "12000 tokens, but can only afford 2898. To increase, visit "
+        "https://openrouter.ai/workspaces/default/keys/abc"
+    )
+    response = _ErrorResponse(402, {"error": {"message": raw}})
+    cfg = AiConfig(provider="openrouter", openrouter_api_key="sk-or-test")
+    with patch("app.services.ai_client.httpx.AsyncClient", _client_returning(response)):
+        result = await ai_client.complete_detailed(cfg, "sys", "user")
+    assert result.error.startswith("HTTP 402: Das Guthaben beim KI-Anbieter reicht nicht")
+    assert "bis zu 12000 Tokens, bezahlbar sind noch 2898" in result.error
+    assert "openrouter.ai/settings/credits" in result.error
+    assert "/keys/abc" not in result.error
 
 
 @pytest.mark.asyncio

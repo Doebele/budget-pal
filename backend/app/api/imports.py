@@ -107,6 +107,8 @@ class PreviewResponse(BaseModel):
     parsed_rows: int
     error_rows: int
     sample_raw: List[dict]
+    # Vorschauzeilen, die schon im Konto stehen — der Import ueberspringt sie
+    duplicate_rows: int = 0
 
 
 class ImportResultResponse(BaseModel):
@@ -219,6 +221,9 @@ def detect_bank_format(content: bytes) -> str:
     if "payee" in header and "transaction type" in header:
         return "n26"
     if "started date" in header and "completed date" in header and "state" in header:
+        return "revolut"
+    # Revolut-Export in der App-Sprache Deutsch (Dateiname ..._de-ch_...)
+    if "datum des beginns" in header and "datum des abschlusses" in header:
         return "revolut"
     if "buchungstag" in header and "wertstellung" in header and "vorgang" in header:
         return "comdirect"
@@ -348,6 +353,26 @@ async def preview_import(
         )
         preview_rows.append(parsed_row)
 
+    # Schon vorhandene Buchungen markieren — dieselbe Pruefung wie beim Import,
+    # damit die Vorschau zeigt, was uebersprungen wird. Nur fuer eigene Konten:
+    # sonst liesse sich ein fremdes Konto auf Buchungen abfragen.
+    owns_account = account_id is not None and (
+        await db.execute(
+            select(Account.id).where(
+                Account.id == account_id, Account.user_id == current_user.id
+            )
+        )
+    ).scalar_one_or_none() is not None
+    if owns_account:
+        for row in preview_rows:
+            iso_date = _iso_preview_date(row.date)
+            if not (row.parsed and iso_date and row.description and row.amount is not None):
+                continue
+            row.is_duplicate = await find_database_duplicate_transaction_id(
+                db, account_id, iso_date, row.amount, row.description,
+                compute_import_hash(account_id, iso_date, row.amount, row.description),
+            ) is not None
+
     return PreviewResponse(
         bank=detected_bank,
         detected_columns=detected_columns,
@@ -357,7 +382,23 @@ async def preview_import(
         parsed_rows=sum(1 for r in preview_rows if r.parsed),
         error_rows=sum(1 for r in preview_rows if not r.parsed),
         sample_raw=sample_raw,
+        duplicate_rows=sum(1 for r in preview_rows if r.is_duplicate),
     )
+
+
+def _iso_preview_date(value: Optional[str]) -> Optional[str]:
+    """Datum der CSV-Vorschau (Originalformat der Bank) als YYYY-MM-DD."""
+    for fmt in PREVIEW_DATE_FORMATS:
+        try:
+            return datetime.strptime((value or "").strip(), fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+    return None
+
+
+# Datumsformate der CSV-Vorschau. Revolut schreibt die Uhrzeit dazu
+# ("2024-03-06 09:49:16") — ohne das Format scheiterte dort jede Zeile.
+PREVIEW_DATE_FORMATS = ("%d.%m.%Y", "%Y-%m-%d", "%Y-%m-%d %H:%M:%S", "%d/%m/%Y", "%m/%d/%Y")
 
 
 def detect_columns(header: List[str], bank: str) -> dict:
@@ -376,6 +417,13 @@ def detect_columns(header: List[str], bank: str) -> dict:
     ]
     for i, h in enumerate(header_lower):
         if any(kw in h for kw in date_keywords):
+            result["date"] = header[i]
+            break
+    # Revolut hat Beginn- und Abschlussdatum; der Import nimmt das Abschluss-
+    # datum. Die Vorschau muss dasselbe nehmen, sonst erkennt sie vorhandene
+    # Kartenzahlungen (meist ein Tag dazwischen) nicht als Dublette.
+    for i, h in enumerate(header_lower):
+        if h in ("completed date", "datum des abschlusses"):
             result["date"] = header[i]
             break
 
@@ -439,8 +487,7 @@ def parse_preview_row(
         if date_col in raw_data:
             date_str = raw_data[date_col].strip()
             if date_str:
-                date_formats = ["%d.%m.%Y", "%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y"]
-                for fmt in date_formats:
+                for fmt in PREVIEW_DATE_FORMATS:
                     try:
                         date_val = datetime.strptime(date_str, fmt)
                         break
@@ -835,6 +882,10 @@ async def _ocr_pdf_to_text(tmp_path: str) -> str:
 # Echte Buchungstexte sind kurz. Ist einer laenger, hat der Regex-Parser
 # mehrere Zeilen (oder den ganzen Auszug) zu einer Zeile verschmolzen.
 MAX_PLAUSIBLE_DESCRIPTION = 200
+# Einzelne ueberlange Zeilen sind bei echten Auszuegen normal: ein 33-seitiger
+# UBS-Auszug hatte 15 von 501 (mehrzeilige Buchungstexte, Seitenfuss
+# angehaengt). Erst ein groesserer Anteil spricht fuer einen verschmolzenen Text.
+MAX_OVERLONG_SHARE = 0.2
 
 
 def _rows_look_implausible(rows: List[dict]) -> bool:
@@ -850,10 +901,11 @@ def _rows_look_implausible(rows: List[dict]) -> bool:
         return True
     if all(abs(float(row.get("amount") or 0)) < 0.005 for row in rows):
         return True
-    return any(
+    overlong = sum(
         len(str(row.get("description") or "")) > MAX_PLAUSIBLE_DESCRIPTION
         for row in rows
     )
+    return overlong > MAX_OVERLONG_SHARE * len(rows)
 
 
 class PdfExtraction(NamedTuple):
@@ -872,6 +924,27 @@ class PdfExtraction(NamedTuple):
     ai_tokens: int = 0
     ai_truncated: bool = False
     statement_balance: Optional[StatementBalance] = None
+
+
+def _extract_csv_rows(tmp_path: str, bank: Optional[str]) -> PdfExtraction:
+    """CSV-Export in Rohzeilen zerlegen — mit denselben Bank-Parsern wie /csv."""
+    with open(tmp_path, "rb") as f:
+        content = f.read()
+    try:
+        detected_bank = bank or detect_bank_format(content)
+    except HTTPException as e:  # im Hintergrundjob zaehlt nur die Meldung
+        raise ValueError(e.detail) from e
+    parser = PARSERS.get(detected_bank)
+    if parser is None:
+        raise ValueError(f"Unbekanntes Bankformat: {detected_bank}")
+    rows = parser.parse(content)
+    # ponytail: die Vorschau traegt einen Saldo; CSVs mit mehreren Waehrungen
+    # (keiner der heutigen Bank-Exporte) bekaemen keinen — dann eine Liste.
+    statements = statement_balance.from_rows(rows)
+    return PdfExtraction(
+        detected_bank, rows,
+        statement_balance=statements[0] if len(statements) == 1 else None,
+    )
 
 
 async def _extract_pdf_rows(
@@ -1023,10 +1096,15 @@ async def _build_pdf_preview(
     account = await db.get(Account, account_id) if account_id else None
     account_currency = (account.currency if account else None) or "CHF"
     try:
-        extraction = await _extract_pdf_rows(
-            tmp_path, bank, ai=ai_cfg, hints=hints, currency=account_currency,
-            on_progress=on_progress,
-        )
+        # CSV laeuft durch dieselbe Vorschau wie PDF: Kategorie, Periodizitaet
+        # und Dubletten pro Zeile, Bestaetigung ueber /pdf/confirm
+        if filename.lower().endswith(".csv"):
+            extraction = _extract_csv_rows(tmp_path, bank)
+        else:
+            extraction = await _extract_pdf_rows(
+                tmp_path, bank, ai=ai_cfg, hints=hints, currency=account_currency,
+                on_progress=on_progress,
+            )
         detected_bank, raw_transactions = extraction.bank, extraction.rows
         used_ai, ai_attempted = extraction.ai_extracted, extraction.ai_attempted
         ai_model, ai_tokens = extraction.ai_model, extraction.ai_tokens
@@ -1187,7 +1265,9 @@ async def _assert_account_owned(
 
 async def _stash_upload(file: UploadFile) -> str:
     content = await file.read()
-    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+    # Endung behalten: die Vorschau waehlt daran CSV- oder PDF-Auswertung
+    suffix = os.path.splitext(file.filename or "")[1].lower() or ".pdf"
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         tmp.write(content)
         return tmp.name
 
@@ -1299,7 +1379,8 @@ async def _run_pdf_preview_job(
             done, total = _job_progress(log)
             log.preview_json = {
                 "progress": {"done": done or total, "total": total},
-                "result": preview.model_dump(),
+                # mode="json": date-Felder (Schlusssaldo) sind sonst nicht JSON-serialisierbar
+                "result": preview.model_dump(mode="json"),
             }
             log.rows_imported = 0
             log.rows_skipped = 0
@@ -1648,7 +1729,8 @@ async def confirm_pdf_import(
         account_id=payload.account_id,
         filename=payload.filename or "upload.pdf",
         bank=bank_name,
-        file_type="pdf",
+        # Dieselbe Bestaetigung fuer CSV- und PDF-Vorschau
+        file_type="csv" if (payload.filename or "").lower().endswith(".csv") else "pdf",
         rows_imported=imported,
         rows_skipped=skipped,
         rows_failed=failed,
@@ -2330,8 +2412,8 @@ async def delete_import(
             )
             deleted_count = delete_result.rowcount
 
-    # Delete the import log (get_db() commits on success)
     await db.delete(log)
+    await db.commit()
 
     return {
         "success": True,

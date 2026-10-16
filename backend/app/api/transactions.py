@@ -473,6 +473,7 @@ async def purge_archived_transaction(
         affected_rows=1,
         detail={"transaction_id": transaction_id, "account_id": aid},
     )
+    await db.commit()
 
 
 # ── Routes ────────────────────────────────────────────────────
@@ -734,6 +735,7 @@ async def delete_transaction(
             affected_rows=1,
             detail={"transaction_id": transaction_id, "account_id": txn.account_id},
         )
+    await db.commit()
 
 
 @router.post("/bulk-categorize")

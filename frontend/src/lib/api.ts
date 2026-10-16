@@ -157,8 +157,6 @@ export const transactionsApi = {
 
 // Imports
 export const importsApi = {
-  uploadCsv: (formData: FormData) =>
-    api.post("/imports/csv", formData, { headers: { "Content-Type": "multipart/form-data" } }),
   // PDF-Import laeuft bei unbekannten Formaten synchron durch das KI-Modell.
   // Ein lokales Modell braucht dafuer Minuten, nicht Sekunden — der globale
   // 30s-Timeout wuerde den Upload abbrechen, waehrend das Backend noch arbeitet.
@@ -187,8 +185,6 @@ export const importsApi = {
   preview: (id: number) => api.get(`/imports/${id}/preview`),
   delete: (id: number, deleteTransactions = true) =>
     api.delete(`/imports/${id}?delete_transactions=${deleteTransactions}`),
-  previewUpload: (formData: FormData) =>
-    api.post("/imports/preview", formData, { headers: { "Content-Type": "multipart/form-data" } }),
 };
 
 // Projections

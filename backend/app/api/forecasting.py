@@ -331,3 +331,4 @@ async def delete_scenario(
     if not scenario:
         raise HTTPException(status_code=404, detail="Scenario not found.")
     await db.delete(scenario)
+    await db.commit()

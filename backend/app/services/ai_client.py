@@ -222,6 +222,12 @@ class Completion(NamedTuple):
     model: str = ""
     prompt_tokens: int = 0
     completion_tokens: int = 0
+    # Antwort am max_tokens-Limit abgebrochen? Dann ist sie unvollstaendig —
+    # bei JSON meist unparsebar, und der Aufrufer muss das melden.
+    cut_off: bool = False
+    # Warum `text` fehlt, falls der Aufruf scheiterte (HTTP-Status, Timeout) —
+    # sonst sieht der Nutzer nur "keine Buchungen" statt der Ursache.
+    error: Optional[str] = None
 
     @property
     def total_tokens(self) -> int:
@@ -527,7 +533,34 @@ def _error_message(res: httpx.Response) -> str:
             detail = err
     except ValueError:
         pass
+    if res.status_code == 402:
+        return _payment_message(detail)
     return f"HTTP {res.status_code}" + (f": {detail[:200]}" if detail else "")
+
+
+def _payment_message(detail: str) -> str:
+    """402 auf Deutsch und mit dem, was zu tun ist.
+
+    OpenRouter reserviert vor dem Aufruf max_tokens zum Modellpreis und
+    vergleicht mit dem kleineren Wert aus Kontoguthaben und Key-Limit. Die
+    Rohmeldung ("can only afford 2898") liest sich, als waere das Key-Limit
+    erschoepft — meist ist aber das Kontoguthaben fast leer.
+    """
+    msg = "HTTP 402: Das Guthaben beim KI-Anbieter reicht nicht"
+    requested = re.search(r"requested up to (\d+)", detail)
+    affordable = re.search(r"can only afford (\d+)", detail)
+    if requested and affordable:
+        msg += (
+            f" — die Anfrage reserviert bis zu {requested.group(1)} Tokens,"
+            f" bezahlbar sind noch {affordable.group(1)}"
+        )
+    msg += ". Guthaben aufladen oder ein günstigeres Modell wählen."
+    if "openrouter" in detail.lower():
+        msg += (
+            " Bei OpenRouter zählt das Kontoguthaben"
+            " (openrouter.ai/settings/credits), nicht nur das Limit des API-Keys."
+        )
+    return msg
 
 
 def _needs_key(provider: str) -> bool:
@@ -608,6 +641,7 @@ async def _complete_raw(
             model=data.get("model") or prof.model,
             prompt_tokens=int(usage.get("input_tokens") or 0),
             completion_tokens=int(usage.get("output_tokens") or 0),
+            cut_off=data.get("stop_reason") == "max_tokens",
         )
         # Sicherheits-Klassifikatoren können ablehnen — das ist HTTP 200 mit
         # stop_reason "refusal" und leerem content, kein Fehler.
@@ -622,12 +656,13 @@ async def _complete_raw(
         return Completion(text or None, **meta)
 
     usage = data.get("usage") or {}
+    choices = data.get("choices") or []
     meta = dict(
         model=data.get("model") or prof.model,
         prompt_tokens=int(usage.get("prompt_tokens") or 0),
         completion_tokens=int(usage.get("completion_tokens") or 0),
+        cut_off=bool(choices) and choices[0].get("finish_reason") == "length",
     )
-    choices = data.get("choices") or []
     if not choices:
         return Completion(**meta)
 
@@ -696,7 +731,7 @@ async def complete_detailed(
             type(e).__name__,
             e or "(keine Meldung)",
         )
-        return Completion()
+        return Completion(error=str(e) or type(e).__name__)
 
 
 # ── Modellliste und Verbindungstest ───────────────────────────

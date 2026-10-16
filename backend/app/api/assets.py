@@ -123,3 +123,4 @@ async def delete_asset(
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found.")
     await db.delete(asset)
+    await db.commit()
