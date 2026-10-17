@@ -18,7 +18,7 @@
  *  → Review & Submit
  */
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Airplane, ArrowRight, Bank, BitcoinCircle, Building, Car, Cash, Check, Coins, Community, Globe, GraphDown, GraphUp, Group, Heart, Home, Laptop, NavArrowLeft, NavArrowRight, OpenBook, PiggyBank, Reports, ShieldCheck, Shuffle, Sofa, StatsReport, Suitcase, Train, Trash, User, UserXmark, Wallet } from "@/lib/icons";
@@ -2174,6 +2174,22 @@ function persistWizardDraft(data: WizardData) {
 }
 
 export default function Wizard() {
+  // Höhe von Kopf- und Fusszeile messen: die Seitenleiste (Step 5) klebt
+  // darunter und darf nicht hinter die Fusszeile rutschen. Beide wachsen mit
+  // der Dichte (Komfort = grössere Schrift) — feste Pixel passten nicht.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const headRef = useRef<HTMLElement>(null);
+  const navRef = useRef<HTMLElement>(null);
+  const [chrome, setChrome] = useState({ head: 134, nav: 64 });
+  useEffect(() => {
+    const measure = () =>
+      setChrome({ head: headRef.current?.offsetHeight ?? 134, nav: navRef.current?.offsetHeight ?? 64 });
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (headRef.current) ro.observe(headRef.current);
+    if (navRef.current) ro.observe(navRef.current);
+    return () => ro.disconnect();
+  }, []);
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -2329,9 +2345,13 @@ export default function Wizard() {
   };
 
   return (
-    <div className="min-h-screen bg-bg flex flex-col">
+    <div
+      ref={rootRef}
+      className="min-h-full bg-bg flex flex-col"
+      style={{ "--wiz-head": `${chrome.head}px`, "--wiz-nav": `${chrome.nav}px` } as React.CSSProperties}
+    >
       {/* ── Top bar ────────────────────────────── */}
-      <header className="sticky top-0 z-10 bg-bg/95 backdrop-blur border-b border-border/50 px-4 py-3">
+      <header ref={headRef} className="sticky top-0 z-10 bg-bg/95 backdrop-blur border-b border-border/50 pl-4 pr-16 md:pr-4 py-3">
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-accent/40 to-accent/15 flex items-center justify-center">
@@ -2392,7 +2412,7 @@ export default function Wizard() {
       </main>
 
       {/* ── Navigation (always visible) ────────── */}
-      <nav className="sticky bottom-0 z-10 bg-bg/95 backdrop-blur border-t border-border/50 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <nav ref={navRef} className="sticky bottom-0 z-10 bg-bg/95 backdrop-blur border-t border-border/50 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         {submitError && (
           <div className="max-w-2xl mx-auto mb-2 flex items-center gap-2 rounded-lg border border-loss/40 bg-loss/10 px-3 py-2 text-sm text-loss">
             <span className="flex-1">{submitError}</span>

@@ -1163,9 +1163,9 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
 
       {/* ── RIGHT: Sticky Sidebar (desktop lg+) ──────────────── */}
       <div className={clsx(
-        // top-[134px]  = wizard header height (logo bar + progress dots, measured 134 px)
-        // max-h subtracts: 134 px header + 63 px bottom-nav + 16 px breathing room = 213 px
-        "hidden lg:flex lg:flex-col w-72 flex-shrink-0 sticky top-[134px] max-h-[calc(100vh-213px)] overflow-hidden",
+        // Unter der Wizard-Kopfzeile kleben, über der Fusszeile enden: beide
+        // Höhen misst der Wizard (--wiz-head / --wiz-nav), je 16 px Luft
+        "hidden lg:flex lg:flex-col w-72 flex-shrink-0 sticky top-[calc(var(--wiz-head)+16px)] max-h-[calc(100vh-var(--wiz-head)-var(--wiz-nav)-32px)] overflow-hidden",
         !focusedProvider && !customSidebarState && "invisible pointer-events-none"
       )}>
         {focusedProvider && focusedCategory && !customSidebarState && (
