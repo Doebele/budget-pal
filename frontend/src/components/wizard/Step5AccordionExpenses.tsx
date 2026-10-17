@@ -10,7 +10,8 @@ import { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Activity, Cart, Check, Cloud, CreditCard, EditPencil, Home, Journal, MusicDoubleNote, NavArrowDown, NavArrowRight, Plus, Search, SmartphoneDevice, Suitcase, Train, Tv, Xmark } from "@/lib/icons";
 import { clsx } from "clsx";
-import { toCHF, toMonthlyCHF } from "@/services/faviconService";
+import { frequencyMonths, toCHF, toMonthlyCHF } from "@/services/faviconService";
+import RenewalInfo from "./RenewalInfo";
 import type { Frequency, SupportedCurrency } from "@/services/faviconService";
 import ProviderBrandIcon from "./ProviderBrandIcon";
 import ProviderSidebar from "./ProviderSidebar";
@@ -80,6 +81,13 @@ export function providerCountries(provider: ExpenseProvider): Country[] {
 export function entryVariant(provider: ExpenseProvider, variantId: string): ProviderVariant {
   return provider.variants.find((v) => v.id === variantId)
     ?? provider.variants.find((v) => v.popular) ?? provider.variants[0];
+}
+
+/** Takt der Verlängerung in Monaten: eigener Rhythmus, sonst Jahresabo 12, sonst 1 */
+export function entryRenewalMonths(entry: SelectedExpenseEntry, provider: ExpenseProvider): number {
+  if (entry.viewMode === "individual") return frequencyMonths(entry.frequency ?? "monthly");
+  if (entry.customPrice != null) return 1;
+  return entryVariant(provider, entry.variantId).billing === "yearly" ? 12 : 1;
 }
 
 /** Vorauswahl beim Hinzufügen: der beliebteste Tarif, den es in der Schweiz gibt,
@@ -1232,7 +1240,11 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
                         {/* Name + tagline */}
                         <div className="flex-1 min-w-0">
                           <div className="text-text-primary text-base font-medium leading-tight">{prov.name}</div>
-                          <div className="text-text-tertiary text-xs truncate mt-1">{catalogText(prov.tagline)}</div>
+                          <div className="text-text-tertiary text-xs truncate mt-1">
+                            {entry?.firstPaymentDate
+                              ? <RenewalInfo start={entry.firstPaymentDate} everyMonths={entryRenewalMonths(entry, prov)} compact />
+                              : catalogText(prov.tagline)}
+                          </div>
                         </div>
 
                         {/* Price + peer */}
