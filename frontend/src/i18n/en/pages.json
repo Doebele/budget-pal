@@ -382,7 +382,13 @@
     "s15": "e.g. newspaper subscription, club membership…",
     "country": "Country",
     "yearly": "Annual",
-    "unavailable": "not available"
+    "unavailable": "not available",
+    "since": "Subscribed since",
+    "renews_one": "Next renewal: {{date}} (tomorrow)",
+    "renews_other": "Next renewal: {{date}} (in {{count}} days)",
+    "renews_zero": "Next renewal: {{date}} (today)",
+    "renewsShort": "renews on {{date}}",
+    "sinceHint": "Date of the first payment; the next renewal follows from it"
   },
   "import": {
     "i00": "Cancel",

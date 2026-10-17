@@ -15,7 +15,8 @@ import {
   type Frequency, type SupportedCurrency,
 } from "@/services/faviconService";
 import type { ExpenseProvider, ExpenseCategory, SelectedExpenseEntry, Country } from "./Step5AccordionExpenses";
-import { getEffectiveMonthly, providerCountries, variantPrice } from "./Step5AccordionExpenses";
+import { entryRenewalMonths, getEffectiveMonthly, providerCountries, variantPrice } from "./Step5AccordionExpenses";
+import RenewalInfo from "./RenewalInfo";
 import { catalogText } from "./catalogI18n";
 import { useTranslation } from "react-i18next";
 
@@ -276,6 +277,26 @@ export default function ProviderSidebar({
               )}
             </div>
 
+            {/* Abo seit → nächste Verlängerung (Kündigung planen) */}
+            {entry && (
+              <div>
+                <p className="text-2xs font-semibold text-text-tertiary mb-1" title={t("pages:step5.sinceHint")}>
+                  <Calendar className="w-3 h-3 inline mr-1 mb-1" />
+                  {t("pages:step5.since")}
+                </p>
+                <input
+                  type="date"
+                  className="input text-base w-full"
+                  value={entry.firstPaymentDate ?? ""}
+                  onChange={e => onUpdate({ firstPaymentDate: e.target.value || undefined })}
+                  max="2030-12-31"
+                />
+                <div className="mt-1">
+                  <RenewalInfo start={entry.firstPaymentDate} everyMonths={entryRenewalMonths(entry, provider)} />
+                </div>
+              </div>
+            )}
+
             {/* Note */}
             {entry && (
               <div>
@@ -354,7 +375,7 @@ export default function ProviderSidebar({
             <div>
               <p className="text-2xs font-semibold text-text-tertiary mb-1">
                 <Calendar className="w-3 h-3 inline mr-1 mb-1" />
-                Erste Zahlung
+                {t("pages:step5.since")}
               </p>
               <input
                 type="date"
@@ -363,6 +384,9 @@ export default function ProviderSidebar({
                 onChange={e => onUpdate({ firstPaymentDate: e.target.value || undefined })}
                 max="2030-12-31"
               />
+              <div className="mt-1">
+                <RenewalInfo start={entry.firstPaymentDate} everyMonths={entryRenewalMonths(entry, provider)} />
+              </div>
             </div>
 
             {/* Note */}

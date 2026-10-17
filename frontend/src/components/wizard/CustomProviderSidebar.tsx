@@ -8,13 +8,14 @@ import { useState } from "react";
 import { Calendar, Check, Globe, OpenNewWindow, Refresh, Trash, Xmark } from "@/lib/icons";
 import { clsx } from "clsx";
 import {
-  toMonthlyCHF, getFaviconUrl,
+  toMonthlyCHF, getFaviconUrl, frequencyMonths,
   FREQUENCIES, FREQUENCY_LABELS,
   SUPPORTED_CURRENCIES, CURRENCY_SYMBOLS,
   type Frequency, type SupportedCurrency,
 } from "@/services/faviconService";
 import type { CustomExpenseEntry, ExpenseCategory } from "./Step5AccordionExpenses";
 import { catalogText } from "./catalogI18n";
+import RenewalInfo from "./RenewalInfo";
 import { useTranslation } from "react-i18next";
 
 // ── helpers ────────────────────────────────────────────────────
@@ -272,7 +273,7 @@ export default function CustomProviderSidebar({
         <div>
           <p className="text-2xs font-semibold text-text-tertiary mb-1">
             <Calendar className="w-3 h-3 inline mr-1 mb-1" />
-            Erste Zahlung <span className="normal-case font-normal">(optional)</span>
+            {t("pages:step5.since")} <span className="normal-case font-normal">(optional)</span>
           </p>
           <input
             type="date"
@@ -281,6 +282,9 @@ export default function CustomProviderSidebar({
             onChange={e => setFirstPaymentDate(e.target.value)}
             max="2030-12-31"
           />
+          <div className="mt-1">
+            <RenewalInfo start={firstPaymentDate || undefined} everyMonths={frequencyMonths(frequency)} />
+          </div>
         </div>
 
         {/* Notiz */}

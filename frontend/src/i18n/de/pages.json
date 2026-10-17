@@ -382,7 +382,13 @@
     "s15": "z.B. Zeitungsabo, Vereinsmitgliedschaft…",
     "country": "Land",
     "yearly": "Jahresabo",
-    "unavailable": "nicht erhältlich"
+    "unavailable": "nicht erhältlich",
+    "since": "Abo seit",
+    "renews_one": "Nächste Verlängerung: {{date}} (morgen)",
+    "renews_other": "Nächste Verlängerung: {{date}} (in {{count}} Tagen)",
+    "renews_zero": "Nächste Verlängerung: {{date}} (heute)",
+    "renewsShort": "verlängert sich am {{date}}",
+    "sinceHint": "Datum der ersten Zahlung; daraus folgt die nächste Verlängerung"
   },
   "import": {
     "i00": "Abbrechen",

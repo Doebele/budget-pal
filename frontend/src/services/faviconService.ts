@@ -56,6 +56,26 @@ const FREQUENCY_DIVISOR: Record<Frequency, number> = {
   monthly: 1, quarterly: 3, semiannually: 6, yearly: 12,
 };
 
+/** Nächste Verlängerung eines Abos: ab dem Startdatum im Takt von `everyMonths`
+ *  Monaten, der erste Termin heute oder später. Monatsende wird gekappt
+ *  (Start 31.01. → 28./29.02.). */
+export function nextRenewal(start: string, everyMonths: number, today: Date = new Date()): Date | null {
+  const [y, m, d] = start.split("-").map(Number);
+  if (!y || !m || !d || everyMonths < 1) return null;
+  const day0 = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  for (let k = 0; k < 1200; k += everyMonths) {
+    const last = new Date(y, m - 1 + k + 1, 0).getDate();
+    const due = new Date(y, m - 1 + k, Math.min(d, last));
+    if (due >= day0) return due;
+  }
+  return null;
+}
+
+/** Monate pro Zahlung je Rhythmus */
+export function frequencyMonths(frequency: Frequency): number {
+  return FREQUENCY_DIVISOR[frequency];
+}
+
 /** Convert any amount/frequency/currency → CHF per month */
 export function toMonthlyCHF(
   amount: number,
