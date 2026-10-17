@@ -73,12 +73,14 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 // ── App Shell (authenticated layout) ─────────────────────────
-function AppShell({ children }: { children: React.ReactNode }) {
+// `bare`: ohne Innenabstand — für Seiten mit eigener, klebender Kopf- und
+// Fusszeile (Wizard). Sonst rutscht Inhalt im Abstand über bzw. unter sie.
+function AppShell({ children, bare = false }: { children: React.ReactNode; bare?: boolean }) {
   return (
     <div className="app-shell flex h-screen bg-bg overflow-hidden">
       <Rail />
       <MobileDrawer />
-      <main className="flex-1 overflow-y-auto p-6 pb-20 md:pb-6">
+      <main className={bare ? "flex-1 overflow-y-auto pb-16 md:pb-0" : "flex-1 overflow-y-auto p-6 pb-20 md:pb-6"}>
         <Suspense fallback={<LoadingScreen />}>{children}</Suspense>
       </main>
       {/* Läuft ein PDF-Import, bleibt er von jeder Seite aus sichtbar */}
@@ -224,7 +226,7 @@ export default function App() {
           path="/wizard"
           element={
             <ProtectedRoute>
-              <AppShell>
+              <AppShell bare>
                 <Wizard />
               </AppShell>
             </ProtectedRoute>
