@@ -15,7 +15,7 @@ import {
   type Frequency, type SupportedCurrency,
 } from "@/services/faviconService";
 import type { ExpenseProvider, ExpenseCategory, SelectedExpenseEntry, Country } from "./Step5AccordionExpenses";
-import { entryRenewalMonths, getEffectiveMonthly, providerCountries, variantPrice } from "./Step5AccordionExpenses";
+import { entryNoticeDays, entryRenewalMonths, getEffectiveMonthly, providerCountries, variantPrice } from "./Step5AccordionExpenses";
 import RenewalInfo from "./RenewalInfo";
 import { catalogText } from "./catalogI18n";
 import { useTranslation } from "react-i18next";
@@ -32,6 +32,31 @@ function fmoney(amount: number, currency: SupportedCurrency): string {
   if (amount === 0) return "Gratis";
   const n = amount % 1 === 0 ? String(amount) : amount.toFixed(2);
   return currency === "CHF" ? `CHF ${n}` : currency === "USD" ? `$${n}` : `${n} ${CURRENCY_SYMBOLS[currency]}`;
+}
+
+/** Kündigungsfrist in Tagen: Vorgabe des Anbieters, pro Abo überschreibbar */
+function NoticeField({ entry, provider, onUpdate }: {
+  entry: SelectedExpenseEntry;
+  provider: ExpenseProvider;
+  onUpdate: (patch: Partial<SelectedExpenseEntry>) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="mt-2">
+      <p className="text-2xs font-semibold text-text-tertiary mb-1">{t("pages:step5.notice")}</p>
+      <div className="flex items-center gap-2">
+        <input
+          type="number"
+          min={0}
+          max={365}
+          className="input input-amount text-base w-20"
+          value={entryNoticeDays(entry, provider)}
+          onChange={(e) => onUpdate({ noticeDays: e.target.value === "" ? undefined : Math.max(0, parseInt(e.target.value, 10) || 0) })}
+        />
+        {provider.noticeHint && <span className="text-text-tertiary text-2xs">{provider.noticeHint}</span>}
+      </div>
+    </div>
+  );
 }
 
 const COUNTRY_LABEL: Record<Country, string> = { CH: "🇨🇭 CH", DE: "🇩🇪 DE", FR: "🇫🇷 FR", US: "🇺🇸 US" };
@@ -89,7 +114,7 @@ export default function ProviderSidebar({
               "p-1 rounded-md transition-all flex-shrink-0",
               viewMode === "individual"
                 ? "bg-accent/20 text-accent"
-                : "text-text-tertiary hover:text-text-primary hover:bg-white/[0.05]"
+                : "text-text-tertiary hover:text-text-primary hover:bg-bg-surface2"
             )}
           >
             {viewMode === "simple"
@@ -170,14 +195,14 @@ export default function ProviderSidebar({
                         "w-full flex items-start justify-between rounded-md px-3 py-2 text-left text-sm transition-all border",
                         isActive
                           ? "border-accent/60 bg-accent/12 text-text-primary"
-                          : "border-border/50 hover:border-border text-text-secondary hover:bg-white/[0.03]",
+                          : "border-border/50 hover:border-border text-text-secondary hover:bg-bg-surface2",
                         (!entry || !local) && "opacity-40 cursor-not-allowed"
                       )}
                     >
                       <div className="flex items-start gap-2">
                         <div className={clsx(
                           "w-3.5 h-3.5 rounded-full border mt-1 flex-shrink-0 flex items-center justify-center transition-all",
-                          isActive ? "border-accent bg-accent" : "border-white/25"
+                          isActive ? "border-accent bg-accent" : "border-border-strong"
                         )}>
                           {isActive && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
                         </div>
@@ -222,13 +247,13 @@ export default function ProviderSidebar({
                         "w-full flex items-start justify-between rounded-md px-3 py-2 text-left text-sm transition-all border",
                         isCustomActive
                           ? "border-accent/60 bg-accent/12 text-text-primary"
-                          : "border-border/50 hover:border-border text-text-secondary hover:bg-white/[0.03]"
+                          : "border-border/50 hover:border-border text-text-secondary hover:bg-bg-surface2"
                       )}
                     >
                       <div className="flex items-start gap-2 flex-1 min-w-0">
                         <div className={clsx(
                           "w-3.5 h-3.5 rounded-full border mt-1 flex-shrink-0 flex items-center justify-center transition-all",
-                          isCustomActive ? "border-accent bg-accent" : "border-white/25"
+                          isCustomActive ? "border-accent bg-accent" : "border-border-strong"
                         )}>
                           {isCustomActive && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
                         </div>
@@ -292,7 +317,8 @@ export default function ProviderSidebar({
                   max="2030-12-31"
                 />
                 <div className="mt-1">
-                  <RenewalInfo start={entry.firstPaymentDate} everyMonths={entryRenewalMonths(entry, provider)} />
+                  <RenewalInfo start={entry.firstPaymentDate} everyMonths={entryRenewalMonths(entry, provider)} noticeDays={entryNoticeDays(entry, provider)} />
+                <NoticeField entry={entry} provider={provider} onUpdate={onUpdate} />
                 </div>
               </div>
             )}
@@ -385,7 +411,8 @@ export default function ProviderSidebar({
                 max="2030-12-31"
               />
               <div className="mt-1">
-                <RenewalInfo start={entry.firstPaymentDate} everyMonths={entryRenewalMonths(entry, provider)} />
+                <RenewalInfo start={entry.firstPaymentDate} everyMonths={entryRenewalMonths(entry, provider)} noticeDays={entryNoticeDays(entry, provider)} />
+                <NoticeField entry={entry} provider={provider} onUpdate={onUpdate} />
               </div>
             </div>
 

@@ -48,6 +48,10 @@ export interface ExpenseProvider {
   website?: string;
   variants: ProviderVariant[];
   peerPopularity?: number;
+  /** Kündigungsfrist in Tagen vor der Verlängerung (Standard 1: bis zum Vortag) */
+  noticeDays?: number;
+  /** Kurzer Hinweis zur Frist, z. B. «auf Ende Monat, Vertrag prüfen» */
+  noticeHint?: string;
   /** Weltweit in dieser Währung verrechnet (z. B. KI-Dienste in USD): `price` ist
    *  dann in dieser Währung, eine Länderwahl gibt es nicht */
   currency?: SupportedCurrency;
@@ -90,6 +94,11 @@ export function entryRenewalMonths(entry: SelectedExpenseEntry, provider: Expens
   return entryVariant(provider, entry.variantId).billing === "yearly" ? 12 : 1;
 }
 
+/** Kündigungsfrist eines Eintrags in Tagen */
+export function entryNoticeDays(entry: SelectedExpenseEntry, provider: ExpenseProvider): number {
+  return entry.noticeDays ?? provider.noticeDays ?? 1;
+}
+
 /** Vorauswahl beim Hinzufügen: der beliebteste Tarif, den es in der Schweiz gibt,
  *  sonst im ersten Land mit Tarifen (z. B. TIDAL, Duolingo nur mit EU/US-Preisen) */
 export function defaultSelection(provider: ExpenseProvider): { variantId: string; country?: Country } {
@@ -113,6 +122,8 @@ export interface SelectedExpenseEntry {
   variantId: string;
   /** Land der Tarife (Standard CH) */
   country?: Country;
+  /** Eigene Kündigungsfrist in Tagen (sonst die des Anbieters) */
+  noticeDays?: number;
   customPrice?: number;
   note?: string;
   // Individual mode fields
@@ -182,6 +193,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
       },
       {
         id: "apple-tv", name: "Apple TV",
+        noticeDays: 1, noticeHint: "Apple: bis 24 Stunden vor der Verlängerung",
         tagline: "Apple Originals (früher Apple TV+)", website: "https://tv.apple.com",
         peerPopularity: 18,
         variants: [
@@ -190,6 +202,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
       },
       {
         id: "apple-one", name: "Apple One",
+        noticeDays: 1, noticeHint: "Apple: bis 24 Stunden vor der Verlängerung",
         tagline: "Apple Music, TV, Arcade und iCloud+ im Paket", website: "https://apple.com/apple-one",
         peerPopularity: 14,
         variants: [
@@ -239,6 +252,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
       },
       {
         id: "apple-music", name: "Apple Music",
+        noticeDays: 1, noticeHint: "Apple: bis 24 Stunden vor der Verlängerung",
         tagline: "Hi-Res Audio, für Apple-Nutzer (auch in Apple One)", website: "https://music.apple.com",
         peerPopularity: 24,
         variants: [
@@ -267,6 +281,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
     providers: [
       {
         id: "icloud", name: "iCloud+",
+        noticeDays: 1, noticeHint: "Apple: bis 24 Stunden vor der Verlängerung",
         tagline: "Apple Cloud-Speicher", website: "https://apple.com/icloud",
         peerPopularity: 55,
         variants: [
@@ -335,6 +350,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
     providers: [
       {
         id: "swisscom-internet", name: "Swisscom Internet",
+        noticeDays: 60, noticeHint: "60 Tage, nach Mindestlaufzeit; Vertrag prüfen",
         tagline: "Glasfaser/VDSL, Marktführer Schweiz", website: "https://swisscom.ch",
         peerPopularity: 38,
         variants: [
@@ -346,6 +362,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
       },
       {
         id: "sunrise-internet", name: "Sunrise Internet",
+        noticeDays: 60, noticeHint: "60 Tage auf Monatsende; Vertrag prüfen",
         tagline: "Breitband & TV von Sunrise", website: "https://sunrise.ch",
         peerPopularity: 22,
         variants: [
@@ -356,6 +373,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
       },
       {
         id: "salt-home", name: "Salt Home",
+        noticeDays: 60, noticeHint: "30–60 Tage je nach Vertrag",
         tagline: "Günstiges Glasfaser-Internet", website: "https://salt.ch",
         peerPopularity: 12,
         variants: [
@@ -365,6 +383,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
       },
       {
         id: "swisscom-mobile", name: "Swisscom Mobile",
+        noticeDays: 60, noticeHint: "60 Tage, nach Mindestlaufzeit; Vertrag prüfen",
         tagline: "Bestes Netz der Schweiz", website: "https://swisscom.ch",
         peerPopularity: 35,
         variants: [
@@ -375,6 +394,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
       },
       {
         id: "sunrise-mobile", name: "Sunrise Mobile",
+        noticeDays: 60, noticeHint: "60 Tage auf Monatsende; Vertrag prüfen",
         tagline: "Günstig und schnell", website: "https://sunrise.ch",
         peerPopularity: 20,
         variants: [
@@ -385,6 +405,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
       },
       {
         id: "wingo", name: "Wingo",
+        noticeDays: 60, noticeHint: "2 Monate auf Ende Monat",
         tagline: "Swisscom-Netz zum Sparpreis", website: "https://wingo.ch",
         peerPopularity: 16,
         variants: [
@@ -395,6 +416,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
       },
       {
         id: "salt-mobile", name: "Salt Mobile",
+        noticeDays: 60, noticeHint: "30–60 Tage je nach Vertrag",
         tagline: "Günstige Alternative", website: "https://salt.ch",
         peerPopularity: 12,
         variants: [
@@ -412,6 +434,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
     providers: [
       {
         id: "nzz", name: "NZZ Digital",
+        noticeDays: 5, noticeHint: "5 Tage vor Ablauf der Laufzeit",
         tagline: "Neue Zürcher Zeitung – Premium-Journalismus", website: "https://nzz.ch",
         peerPopularity: 24,
         variants: [
@@ -421,6 +444,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
       },
       {
         id: "tagi", name: "Tages-Anzeiger",
+        noticeDays: 14, noticeHint: "14 Tage vor der neuen Laufzeit",
         tagline: "Tagi Digital Abo", website: "https://tagesanzeiger.ch",
         peerPopularity: 18,
         variants: [
@@ -455,6 +479,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
     providers: [
       {
         id: "fitnesscenter", name: "Fitnesscenter",
+        noticeDays: 30, noticeHint: "Üblich 1–3 Monate, Vertrag prüfen",
         tagline: "Monatliches Fitnesscenter-Abo",
         peerPopularity: 42,
         variants: [
@@ -465,6 +490,7 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
       },
       {
         id: "apple-fitness", name: "Apple Fitness+",
+        noticeDays: 1, noticeHint: "Apple: bis 24 Stunden vor der Verlängerung",
         tagline: "Online-Workouts von Apple", website: "https://apple.com/apple-fitness-plus",
         peerPopularity: 12,
         variants: [
@@ -1179,7 +1205,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
               <button
                 type="button"
                 onClick={() => toggleCategory(cat.id)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/[0.02] transition-colors text-left"
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-bg-surface2 transition-colors text-left"
               >
                 <cat.Icon className="w-5 h-5 text-text-secondary flex-shrink-0" />
                 <div className="flex-1 min-w-0">
@@ -1220,7 +1246,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
                         onClick={() => handleProviderClick(prov, cat.id)}
                         className={clsx(
                           "flex items-center gap-3 px-4 py-3 cursor-pointer border-b border-border/30 last:border-b-0 transition-all duration-150",
-                          isFocused ? "bg-accent/10" : isSelected ? "bg-accent/5 hover:bg-accent/8" : "hover:bg-white/[0.025]"
+                          isFocused ? "bg-accent/10" : isSelected ? "bg-accent/5 hover:bg-accent/8" : "hover:bg-bg-surface2"
                         )}
                       >
                         {/* Checkbox */}
@@ -1228,7 +1254,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
                           onClick={(e) => handleCheckboxClick(e, prov, cat.id)}
                           className={clsx(
                             "w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 transition-all cursor-pointer",
-                            isSelected ? "bg-accent border-accent" : "border-white/20 hover:border-white/40"
+                            isSelected ? "bg-accent border-accent" : "border-border-strong hover:border-text-tertiary"
                           )}
                         >
                           {isSelected && <Check className="w-3 h-3 text-white" />}
@@ -1242,7 +1268,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
                           <div className="text-text-primary text-base font-medium leading-tight">{prov.name}</div>
                           <div className="text-text-tertiary text-xs truncate mt-1">
                             {entry?.firstPaymentDate
-                              ? <RenewalInfo start={entry.firstPaymentDate} everyMonths={entryRenewalMonths(entry, prov)} compact />
+                              ? <RenewalInfo start={entry.firstPaymentDate} everyMonths={entryRenewalMonths(entry, prov)} noticeDays={entryNoticeDays(entry, prov)} compact />
                               : catalogText(prov.tagline)}
                           </div>
                         </div>
@@ -1331,7 +1357,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
                                 type="button"
                                 onClick={() => handleSearchSelect(provider, resCat)}
                                 className={clsx(
-                                  "w-full flex items-center gap-2 px-2 py-2 rounded-md hover:bg-white/[0.04] transition-colors text-left",
+                                  "w-full flex items-center gap-2 px-2 py-2 rounded-md hover:bg-bg-surface2 transition-colors text-left",
                                   selectedMap[provider.id] && "opacity-60"
                                 )}
                               >
@@ -1386,7 +1412,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
                         setCustomSidebarState(null);
                         closeSidebarProvider();
                       }}
-                      className="w-full flex items-center gap-2 px-4 py-2 text-text-tertiary hover:text-text-secondary hover:bg-white/[0.02] text-sm transition-colors border-t border-border/40"
+                      className="w-full flex items-center gap-2 px-4 py-2 text-text-tertiary hover:text-text-secondary hover:bg-bg-surface2 text-sm transition-colors border-t border-border/40"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       {t("pages:ui.anbieter_hinzufuegen")}
@@ -1448,7 +1474,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
           <div className="fixed bottom-0 left-0 right-0 z-50 flex flex-col overlay-sheet animate-slide-up">
             {/* Drag handle */}
             <div className="flex justify-center pt-2 pb-1 bg-bg-surface rounded-t-lg border-t border-x border-border/50">
-              <div className="w-10 h-1 rounded-full bg-white/20" />
+              <div className="w-10 h-1 rounded-full bg-border-strong" />
             </div>
 
             <div className="flex-1 min-h-0 flex flex-col overflow-hidden border-x border-b border-border/50 rounded-b-lg">

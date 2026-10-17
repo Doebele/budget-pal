@@ -388,7 +388,10 @@
     "renews_other": "Nächste Verlängerung: {{date}} (in {{count}} Tagen)",
     "renews_zero": "Nächste Verlängerung: {{date}} (heute)",
     "renewsShort": "verlängert sich am {{date}}",
-    "sinceHint": "Datum der ersten Zahlung; daraus folgt die nächste Verlängerung"
+    "sinceHint": "Datum der ersten Zahlung; daraus folgt die nächste Verlängerung",
+    "cancelBy": "Kündigen bis {{deadline}}, dann endet es am {{end}}",
+    "cancelShort": "kündigen bis {{deadline}}",
+    "notice": "Kündigungsfrist (Tage)"
   },
   "import": {
     "i00": "Abbrechen",
