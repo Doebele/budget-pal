@@ -15,7 +15,8 @@ import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { clsx } from "clsx";
 import { useUiStore } from "@/lib/store";
-import { formatCHF, getFrequencyStyle, getFrequencyBadgeStyle, PERIODICITY_LABELS } from "@/lib/theme";
+import { formatCHF, frequencyPillStyle, PERIODICITY_LABELS } from "@/lib/theme";
+import { useThemeColors } from "@/hooks/useThemeColors";
 import { useTranslation } from "react-i18next";
 
 const BANKS = [
@@ -107,6 +108,7 @@ interface CategoryRow {
 
 export default function Import() {
   const { t } = useTranslation();
+  const { theme } = useThemeColors();
   const queryClient = useQueryClient();
   const csvRef = useRef<HTMLInputElement>(null);
   const pdfRef = useRef<HTMLInputElement>(null);
@@ -662,7 +664,7 @@ export default function Import() {
                                 </span>
                               )}
                               {recurring && (
-                                <span className={clsx("inline-flex items-center gap-1 rounded px-1 py-1 text-2xs font-medium leading-tight", getFrequencyBadgeStyle(row.periodicity))} title={row.periodicity ? PERIODICITY_LABELS[row.periodicity] : "Wiederkehrend"}>
+                                <span className="pill text-2xs" style={frequencyPillStyle(row.periodicity ?? "monthly", theme)} title={row.periodicity ? PERIODICITY_LABELS[row.periodicity] : "Wiederkehrend"}>
                                   ↻ {row.periodicity ? PERIODICITY_LABELS[row.periodicity] : "Abo"}
                                 </span>
                               )}
@@ -745,11 +747,9 @@ export default function Import() {
                                     return { ...prev, rows: next };
                                   })
                                 }
-                                className={clsx(
-                                  "input w-[130px] flex-shrink-0 text-xs",
-                                  // only the text colour: the field keeps the ledger line
-                                  getFrequencyStyle(row.periodicity).split(" ").filter((c) => c.includes("text-"))
-                                )}
+                                className="input w-[130px] flex-shrink-0 text-xs"
+                                // nur die Textfarbe: das Feld behält die Ledger-Linie
+                                style={row.periodicity ? { color: frequencyPillStyle(row.periodicity, theme).color } : undefined}
                               >
                                 <option value="">{t("pages:import.i16")}</option>
                                 <option value="weekly">{t("pages:import.i42")}</option>
