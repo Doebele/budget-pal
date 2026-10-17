@@ -14,6 +14,7 @@ import {
   type BankWithLogo,
 } from "@/data/banks-with-logos";
 import { useTranslation } from "react-i18next";
+import { toCHF } from "@/services/faviconService";
 
 const ACCOUNT_TYPE_LABELS: Record<string, string> = {
   checking: "Girokonto",
@@ -67,22 +68,8 @@ const DefaultBankIcon = ({ size = 24 }: { size?: number }) => {
   );
 };
 
-// Exchange rates: CHF value per 1 unit of foreign currency (mock - in production this would come from an API)
-const EXCHANGE_RATES: Record<string, number> = {
-  CHF: 1,
-  EUR: 0.94,
-  USD: 0.88,
-  GBP: 1.18,
-  SEK: 0.085,
-  JPY: 0.006,
-};
-
-// Convert to CHF
-const convertToCHF = (amount: number, currency: string): number => {
-  if (currency === "CHF") return amount;
-  const rate = EXCHANGE_RATES[currency] || 1;
-  return amount * rate;
-};
+// Umrechnung wie im Wizard: EZB-Kurse des Servers (faviconService.toCHF)
+const convertToCHF = (amount: number, currency: string): number => toCHF(amount, currency);
 
 // Format currency amount
 const formatCurrency = (amount: number, currency: string): string => {

@@ -9,6 +9,8 @@ import MobileDrawer from "@/components/layout/MobileDrawer";
 import BottomNav from "@/components/layout/BottomNav";
 import LoadingScreen from "@/components/layout/LoadingScreen";
 import { useTranslation } from "react-i18next";
+import { useQuery } from "@tanstack/react-query";
+import { loadLiveRates } from "@/services/faviconService";
 
 // ── UI-Attribute (Theme / Akzent / Density) ───────────────────
 function UiAttributes() {
@@ -76,6 +78,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 // `bare`: ohne Innenabstand — für Seiten mit eigener, klebender Kopf- und
 // Fusszeile (Wizard). Sonst rutscht Inhalt im Abstand über bzw. unter sie.
 function AppShell({ children, bare = false }: { children: React.ReactNode; bare?: boolean }) {
+  // Aktuelle Wechselkurse für Umrechnungen im Browser (Wizard, Konten).
+  // ponytail: bis sie da sind, gelten die Rückfallwerte in faviconService
+  useQuery({ queryKey: ["fx-rates-chf"], queryFn: loadLiveRates, staleTime: 6 * 3600_000 });
   return (
     <div className="app-shell flex h-screen bg-bg overflow-hidden">
       <Rail />
