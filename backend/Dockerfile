@@ -57,7 +57,7 @@ RUN pip install --upgrade pip && \
 
 # Create non-root user for security
 RUN useradd -m -u 1000 appuser && \
-    mkdir -p /app/data/uploads /app/data/ocr_cache /shared && \
+    mkdir -p /app/data/uploads /app/data/ocr_cache /app/data/cache /shared && \
     chown -R appuser:appuser /app /shared
 
 # Copy application code
