@@ -10,11 +10,12 @@ import { Calendar, Check, EditPencil, Group, NavArrowLeft, OpenNewWindow, Refres
 import { clsx } from "clsx";
 import ProviderBrandIcon from "./ProviderBrandIcon";
 import {
-  toMonthlyCHF, FREQUENCY_LABELS, FREQUENCIES,
+  toCHF, toMonthlyCHF, FREQUENCY_LABELS, FREQUENCIES,
   SUPPORTED_CURRENCIES, CURRENCY_SYMBOLS,
   type Frequency, type SupportedCurrency,
 } from "@/services/faviconService";
-import type { ExpenseProvider, ExpenseCategory, SelectedExpenseEntry, ProviderVariant } from "./Step5AccordionExpenses";
+import type { ExpenseProvider, ExpenseCategory, SelectedExpenseEntry, Country } from "./Step5AccordionExpenses";
+import { getEffectiveMonthly, providerCountries, variantPrice } from "./Step5AccordionExpenses";
 import { catalogText } from "./catalogI18n";
 import { useTranslation } from "react-i18next";
 
@@ -25,17 +26,14 @@ function fchf(n: number) {
   return `CHF ${n % 1 === 0 ? n : n.toFixed(2)}`;
 }
 
-function getEffectiveMonthly(entry: SelectedExpenseEntry, variants: ProviderVariant[]): number {
-  if (entry.viewMode === "individual" && entry.individualAmount != null) {
-    return toMonthlyCHF(
-      entry.individualAmount,
-      entry.frequency ?? "monthly",
-      entry.currency ?? "CHF"
-    );
-  }
-  if (entry.customPrice != null) return entry.customPrice;
-  return variants.find(v => v.id === entry.variantId)?.price ?? 0;
+/** Tarifpreis in der Abrechnungswährung, z. B. «12.99 €» oder «$20» */
+function fmoney(amount: number, currency: SupportedCurrency): string {
+  if (amount === 0) return "Gratis";
+  const n = amount % 1 === 0 ? String(amount) : amount.toFixed(2);
+  return currency === "CHF" ? `CHF ${n}` : currency === "USD" ? `$${n}` : `${n} ${CURRENCY_SYMBOLS[currency]}`;
 }
+
+const COUNTRY_LABEL: Record<Country, string> = { CH: "🇨🇭 CH", DE: "🇩🇪 DE", FR: "🇫🇷 FR", US: "🇺🇸 US" };
 
 // ── props ──────────────────────────────────────────────────────
 
@@ -65,7 +63,9 @@ export default function ProviderSidebar({
     if (entry) onUpdate({ viewMode: mode });
   }
 
-  const effectiveMonthly = entry ? getEffectiveMonthly(entry, provider.variants) : null;
+  const effectiveMonthly = entry ? getEffectiveMonthly(entry, [provider]) : null;
+  const countries = providerCountries(provider);
+  const country: Country = entry?.country ?? "CH";
 
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-bg-surface border border-border/50 rounded-lg overflow-hidden shadow-2xl">
@@ -126,23 +126,51 @@ export default function ProviderSidebar({
         {/* ── SIMPLE VIEW ─────────────────────────────── */}
         {viewMode === "simple" && (
           <>
+            {/* Land der Tarife: Preise in der Landeswährung, umgerechnet in CHF */}
+            {countries.length > 1 && (
+              <div>
+                <p className="text-2xs font-semibold text-text-tertiary mb-2">{t("pages:step5.country")}</p>
+                <div className="toggle-group w-full">
+                  {countries.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      disabled={!entry}
+                      onClick={() => {
+                        if (!entry) return;
+                        // Gibt es den gewählten Tarif im Land nicht, den beliebtesten dort nehmen
+                        const has = (id: string) => provider.variants.some((v) => v.id === id && variantPrice(provider, v, c));
+                        const next = has(entry.variantId) ? entry.variantId
+                          : (provider.variants.find((v) => v.popular && has(v.id)) ?? provider.variants.find((v) => has(v.id)))?.id;
+                        onUpdate({ country: c, customPrice: undefined, ...(next ? { variantId: next } : {}) });
+                      }}
+                      className={clsx("toggle-btn", country === c && "active")}
+                    >
+                      {COUNTRY_LABEL[c]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div>
               <p className="text-2xs font-semibold text-text-tertiary mb-2">{t("pages:step5.s08")}</p>
               <div className="space-y-1">
                 {provider.variants.map(variant => {
                   const isActive = entry?.variantId === variant.id && entry?.customPrice == null;
+                  const local = variantPrice(provider, variant, country);
                   return (
                     <button
                       key={variant.id}
                       type="button"
-                      disabled={!entry}
+                      disabled={!entry || !local}
                       onClick={() => entry && onUpdate({ variantId: variant.id, customPrice: undefined })}
                       className={clsx(
                         "w-full flex items-start justify-between rounded-md px-3 py-2 text-left text-sm transition-all border",
                         isActive
                           ? "border-accent/60 bg-accent/12 text-text-primary"
                           : "border-border/50 hover:border-border text-text-secondary hover:bg-white/[0.03]",
-                        !entry && "opacity-40 cursor-not-allowed"
+                        (!entry || !local) && "opacity-40 cursor-not-allowed"
                       )}
                     >
                       <div className="flex items-start gap-2">
@@ -158,14 +186,20 @@ export default function ProviderSidebar({
                             {variant.popular && (
                               <span className="text-2xs bg-gain/15 text-gain px-1 py-px rounded-full font-semibold">{t("pages:step5.s04")}</span>
                             )}
+                            {variant.billing === "yearly" && (
+                              <span className="text-2xs bg-bg-surface2 text-text-secondary px-1 py-px rounded-full">{t("pages:step5.yearly")}</span>
+                            )}
                           </div>
                           {variant.description && (
                             <div className="text-text-tertiary text-2xs mt-1">{catalogText(variant.description)}</div>
                           )}
                         </div>
                       </div>
-                      <span className={clsx("font-mono flex-shrink-0 ml-2 mt-1 text-sm", isActive ? "text-accent font-semibold" : "text-text-tertiary")}>
-                        {fchf(variant.price)}
+                      <span className={clsx("font-mono flex-shrink-0 ml-2 mt-1 text-sm text-right", isActive ? "text-accent font-semibold" : "text-text-tertiary")}>
+                        {local ? fmoney(local.amount, local.currency) : t("pages:step5.unavailable")}
+                        {local && local.currency !== "CHF" && local.amount > 0 && (
+                          <span className="block text-2xs font-normal opacity-70">≈ {fchf(toCHF(local.amount, local.currency))}</span>
+                        )}
                       </span>
                     </button>
                   );
