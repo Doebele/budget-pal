@@ -1,30 +1,43 @@
 /**
  * faviconService.ts
- * Currency conversion (static CHF reference rates 2024) and
+ * Currency conversion (live ECB rates from /api/currency, static fallback) and
  * payment frequency helpers for the expense wizard.
  */
+import api from "@/lib/api";
 
 // ── Currency ────────────────────────────────────────────────────
 
 export const SUPPORTED_CURRENCIES = ["CHF", "EUR", "USD", "GBP", "SEK", "NOK"] as const;
 export type SupportedCurrency = (typeof SUPPORTED_CURRENCIES)[number];
 
-// Approximate rates TO CHF (Zürich reference, indicative only)
-const RATES_TO_CHF: Record<SupportedCurrency, number> = {
+// CHF je Einheit der Fremdwährung. Startwerte nur als Rückfall (Stand
+// Oktober 2026); loadLiveRates() ersetzt sie nach dem Login durch die
+// EZB-Kurse des Servers. Früher stand hier EUR 1.052 — ein Euro-Betrag wurde
+// so um rund 13 % zu hoch in Franken umgerechnet.
+const RATES_TO_CHF: Record<string, number> = {
   CHF: 1.000,
-  EUR: 1.052,
-  USD: 0.910,
-  GBP: 1.160,
-  SEK: 0.088,
-  NOK: 0.086,
+  EUR: 0.930,
+  USD: 0.830,
+  GBP: 1.100,
+  SEK: 0.083,
+  NOK: 0.087,
 };
+
+/** EZB-Kurse vom Server holen (Basis CHF: 1 CHF = x Fremdwährung). */
+export async function loadLiveRates(): Promise<Record<string, number>> {
+  const { data } = await api.get("/currency/rates", { params: { base: "CHF" } });
+  for (const [cur, perChf] of Object.entries(data.rates as Record<string, number>)) {
+    if (perChf > 0) RATES_TO_CHF[cur] = 1 / perChf;
+  }
+  return RATES_TO_CHF;
+}
 
 export const CURRENCY_SYMBOLS: Record<SupportedCurrency, string> = {
   CHF: "CHF", EUR: "€", USD: "$", GBP: "£", SEK: "kr", NOK: "kr",
 };
 
-export function toCHF(amount: number, currency: SupportedCurrency): number {
-  return +(amount * RATES_TO_CHF[currency]).toFixed(2);
+export function toCHF(amount: number, currency: SupportedCurrency | string): number {
+  return +(amount * (RATES_TO_CHF[currency] ?? 1)).toFixed(2);
 }
 
 // ── Frequency ───────────────────────────────────────────────────
