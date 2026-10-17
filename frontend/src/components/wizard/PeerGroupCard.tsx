@@ -86,7 +86,7 @@ function BarRow({
   return (
     <div className="flex items-center gap-3">
       <span className="text-text-secondary text-sm w-20 shrink-0">{label}</span>
-      <div className="flex-1 h-1.5 bg-white/8 rounded-full overflow-hidden">
+      <div className="flex-1 h-1.5 bg-bg-surface2 rounded-full overflow-hidden">
         <div
           className="h-full bg-accent rounded-full transition-all duration-700 ease-out"
           style={{ width: `${width}%` }}
@@ -129,7 +129,7 @@ function IncomeComparison({
     <div className="space-y-2">
       <div className="flex items-center gap-3">
         <span className="text-text-tertiary text-sm w-24 shrink-0">{t("pages:misc.r17")}</span>
-        <div className="flex-1 h-2.5 bg-white/8 rounded-full overflow-hidden">
+        <div className="flex-1 h-2.5 bg-bg-surface2 rounded-full overflow-hidden">
           <div
             className="h-full bg-accent rounded-full transition-all duration-700 ease-out"
             style={{ width: `${userWidth}%` }}
@@ -141,9 +141,9 @@ function IncomeComparison({
       </div>
       <div className="flex items-center gap-3">
         <span className="text-text-tertiary text-sm w-24 shrink-0">{t("pages:ui.peer_median")}</span>
-        <div className="flex-1 h-2.5 bg-white/8 rounded-full overflow-hidden">
+        <div className="flex-1 h-2.5 bg-bg-surface2 rounded-full overflow-hidden">
           <div
-            className="h-full bg-white/30 rounded-full transition-all duration-700 ease-out"
+            className="h-full bg-text-tertiary rounded-full transition-all duration-700 ease-out"
             style={{ width: `${peerWidth}%` }}
           />
         </div>
@@ -287,7 +287,7 @@ export default function PeerGroupCard({
                 className={clsx(
                   "rounded-md p-box border transition-all duration-300",
                   "opacity-0 animate-[fadeSlideUp_0.4s_ease-out_forwards]",
-                  "border-white/8 bg-white/3 hover:border-white/15 hover:bg-white/5 cursor-pointer"
+                  "border-border bg-bg-surface2 hover:border-border-strong cursor-pointer"
                 )}
                 style={{ animationDelay: `${i * 60 + 200}ms` }}
                 onClick={() => !isEditing && startEdit(cat.key)}

@@ -129,7 +129,7 @@ export default function ProviderBrandIcon({ providerId, size = 20, className }: 
     return (
       <div
         className={clsx(
-          "flex items-center justify-center rounded-sm bg-white/5 flex-shrink-0 overflow-hidden",
+          "flex items-center justify-center rounded-sm bg-bg-surface2 flex-shrink-0 overflow-hidden",
           className
         )}
         style={{ width: size, height: size }}
@@ -149,7 +149,7 @@ export default function ProviderBrandIcon({ providerId, size = 20, className }: 
     return (
       <div
         className={clsx(
-          "flex items-center justify-center rounded-sm bg-white/5 flex-shrink-0 overflow-hidden",
+          "flex items-center justify-center rounded-sm bg-bg-surface2 flex-shrink-0 overflow-hidden",
           className
         )}
         style={{ width: size, height: size }}
@@ -163,7 +163,7 @@ export default function ProviderBrandIcon({ providerId, size = 20, className }: 
   return (
     <div
       className={clsx(
-        "flex items-center justify-center rounded-sm bg-white/5 flex-shrink-0 overflow-hidden",
+        "flex items-center justify-center rounded-sm bg-bg-surface2 flex-shrink-0 overflow-hidden",
         className
       )}
       style={{ width: size, height: size }}

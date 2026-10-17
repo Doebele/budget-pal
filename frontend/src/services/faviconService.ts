@@ -71,6 +71,17 @@ export function nextRenewal(start: string, everyMonths: number, today: Date = ne
   return null;
 }
 
+/** Spätester Kündigungstermin: die erste Verlängerung, bei der heute noch
+ *  `noticeDays` Tage Frist bleiben. `end` = an diesem Tag endet das Abo. */
+export function nextCancellation(
+  start: string, everyMonths: number, noticeDays: number, today: Date = new Date(),
+): { deadline: Date; end: Date } | null {
+  const earliest = new Date(today.getFullYear(), today.getMonth(), today.getDate() + noticeDays);
+  const end = nextRenewal(start, everyMonths, earliest);
+  if (!end) return null;
+  return { deadline: new Date(end.getFullYear(), end.getMonth(), end.getDate() - noticeDays), end };
+}
+
 /** Monate pro Zahlung je Rhythmus */
 export function frequencyMonths(frequency: Frequency): number {
   return FREQUENCY_DIVISOR[frequency];

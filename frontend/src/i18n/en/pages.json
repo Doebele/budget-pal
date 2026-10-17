@@ -388,7 +388,10 @@
     "renews_other": "Next renewal: {{date}} (in {{count}} days)",
     "renews_zero": "Next renewal: {{date}} (today)",
     "renewsShort": "renews on {{date}}",
-    "sinceHint": "Date of the first payment; the next renewal follows from it"
+    "sinceHint": "Date of the first payment; the next renewal follows from it",
+    "cancelBy": "Cancel by {{deadline}} to end it on {{end}}",
+    "cancelShort": "cancel by {{deadline}}",
+    "notice": "Notice period (days)"
   },
   "import": {
     "i00": "Cancel",

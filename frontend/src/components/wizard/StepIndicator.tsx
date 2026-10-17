@@ -102,8 +102,8 @@ export default function StepIndicator({
                     isCompleted && "bg-accent border-accent text-white",
                     isCompleted && clickable && "group-hover:bg-accent/75 group-hover:border-accent/75",
                     isActive && "bg-accent/15 border-accent text-accent shadow-[0_0_12px_rgba(59,130,246,0.35)]",
-                    isPending && "bg-transparent border-white/15 text-text-tertiary",
-                    isPending && clickable && "group-hover:border-white/40 group-hover:text-text-secondary",
+                    isPending && "bg-transparent border-border-strong text-text-tertiary",
+                    isPending && clickable && "group-hover:border-text-tertiary group-hover:text-text-secondary",
                   )}
                 >
                   {isCompleted ? (
@@ -131,7 +131,7 @@ export default function StepIndicator({
                 <div
                   className={clsx(
                     "flex-1 h-[2px] mx-2 rounded-full transition-all duration-500",
-                    isCompleted ? "bg-accent" : "bg-white/10"
+                    isCompleted ? "bg-accent" : "bg-border-strong"
                   )}
                 />
               )}
@@ -162,8 +162,8 @@ export default function StepIndicator({
                   isActive && "w-4 h-2 bg-accent",
                   isCompleted && "w-2 h-2 bg-accent/60",
                   isCompleted && clickable && "hover:bg-accent",
-                  !isActive && !isCompleted && "w-2 h-2 bg-white/15",
-                  !isActive && !isCompleted && clickable && "hover:bg-white/30",
+                  !isActive && !isCompleted && "w-2 h-2 bg-border-strong",
+                  !isActive && !isCompleted && clickable && "hover:bg-text-tertiary",
                 )}
               >
                 {/* Der Punkt allein sagt nichts — die Beschriftung traegt ihn. */}
