@@ -379,7 +379,10 @@
     "s12": "z.B. Family-Plan, geteilt mit Partner…",
     "s13": "z.B. Jahresabo, shared account…",
     "s14": "z.B. Jahresabo, geteilter Account…",
-    "s15": "z.B. Zeitungsabo, Vereinsmitgliedschaft…"
+    "s15": "z.B. Zeitungsabo, Vereinsmitgliedschaft…",
+    "country": "Land",
+    "yearly": "Jahresabo",
+    "unavailable": "nicht erhältlich"
   },
   "import": {
     "i00": "Abbrechen",

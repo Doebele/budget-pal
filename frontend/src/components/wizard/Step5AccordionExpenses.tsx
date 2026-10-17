@@ -10,7 +10,7 @@ import { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Activity, Cart, Check, Cloud, CreditCard, EditPencil, Home, Journal, MusicDoubleNote, NavArrowDown, NavArrowRight, Plus, Search, SmartphoneDevice, Suitcase, Train, Tv, Xmark } from "@/lib/icons";
 import { clsx } from "clsx";
-import { toMonthlyCHF } from "@/services/faviconService";
+import { toCHF, toMonthlyCHF } from "@/services/faviconService";
 import type { Frequency, SupportedCurrency } from "@/services/faviconService";
 import ProviderBrandIcon from "./ProviderBrandIcon";
 import ProviderSidebar from "./ProviderSidebar";
@@ -22,10 +22,20 @@ import { useTranslation } from "react-i18next";
 // Types
 // ─────────────────────────────────────────────────────────────────
 
+/** Länder mit eigenen Tarifen (Streaming, Musik, Apple One): CH in CHF, DE/FR in EUR, US in USD */
+export type Country = "CH" | "DE" | "FR" | "US";
+export const COUNTRIES: Country[] = ["CH", "DE", "FR", "US"];
+export const COUNTRY_CURRENCY: Record<Country, SupportedCurrency> = { CH: "CHF", DE: "EUR", FR: "EUR", US: "USD" };
+
 export interface ProviderVariant {
   id: string;
   label: string;
-  price: number;
+  /** Monatspreis in der Schweiz (CHF); fehlt, wenn es den Tarif dort nicht gibt */
+  price?: number;
+  /** Monatspreise in anderen Ländern, in deren Währung (DE/FR EUR, US USD) */
+  prices?: Partial<Record<Exclude<Country, "CH">, number>>;
+  /** Jahresabo: der Preis ist der Monatsanteil, bezahlt wird für 12 Monate im Voraus */
+  billing?: "yearly";
   description?: string;
   popular?: boolean;
 }
@@ -37,6 +47,48 @@ export interface ExpenseProvider {
   website?: string;
   variants: ProviderVariant[];
   peerPopularity?: number;
+  /** Weltweit in dieser Währung verrechnet (z. B. KI-Dienste in USD): `price` ist
+   *  dann in dieser Währung, eine Länderwahl gibt es nicht */
+  currency?: SupportedCurrency;
+}
+
+/** Preis eines Tarifs im gewählten Land, in der Abrechnungswährung; null = dort nicht erhältlich */
+export function variantPrice(
+  provider: ExpenseProvider, variant: ProviderVariant, country: Country = "CH",
+): { amount: number; currency: SupportedCurrency } | null {
+  if (provider.currency) {
+    return variant.price == null ? null : { amount: variant.price, currency: provider.currency };
+  }
+  const amount = country === "CH" ? variant.price : variant.prices?.[country];
+  return amount == null ? null : { amount, currency: COUNTRY_CURRENCY[country] };
+}
+
+/** Monatsbetrag eines Tarifs in CHF zum aktuellen Kurs */
+export function variantMonthlyCHF(provider: ExpenseProvider, variant: ProviderVariant, country: Country = "CH"): number {
+  const p = variantPrice(provider, variant, country);
+  return p ? toCHF(p.amount, p.currency) : 0;
+}
+
+/** Länder, für die der Anbieter Tarife hat (CH immer zuerst) */
+export function providerCountries(provider: ExpenseProvider): Country[] {
+  if (provider.currency) return [];
+  return COUNTRIES.filter((c) =>
+    provider.variants.some((v) => (c === "CH" ? v.price != null : v.prices?.[c] != null)));
+}
+
+/** Gewählter Tarif; fehlt er (Katalog geändert), der beliebteste */
+export function entryVariant(provider: ExpenseProvider, variantId: string): ProviderVariant {
+  return provider.variants.find((v) => v.id === variantId)
+    ?? provider.variants.find((v) => v.popular) ?? provider.variants[0];
+}
+
+/** Vorauswahl beim Hinzufügen: der beliebteste Tarif, den es in der Schweiz gibt,
+ *  sonst im ersten Land mit Tarifen (z. B. TIDAL, Duolingo nur mit EU/US-Preisen) */
+export function defaultSelection(provider: ExpenseProvider): { variantId: string; country?: Country } {
+  const country = providerCountries(provider)[0] ?? "CH";
+  const available = provider.variants.filter((v) => variantPrice(provider, v, country));
+  const v = available.find((x) => x.popular) ?? available[0] ?? provider.variants[0];
+  return country === "CH" ? { variantId: v.id } : { variantId: v.id, country };
 }
 
 export interface ExpenseCategory {
@@ -51,6 +103,8 @@ export interface SelectedExpenseEntry {
   providerId: string;
   categoryId: string;
   variantId: string;
+  /** Land der Tarife (Standard CH) */
+  country?: Country;
   customPrice?: number;
   note?: string;
   // Individual mode fields
@@ -90,9 +144,10 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         tagline: "Serien, Filme und Dokus", website: "https://netflix.com",
         peerPopularity: 68,
         variants: [
-          { id: "ads",      label: "Standard mit Werbung", price: 6.99 },
-          { id: "standard", label: "Standard",             price: 17.99, popular: true, description: "HD, 2 Geräte" },
-          { id: "premium",  label: "Premium",              price: 24.99, description: "4K, 4 Geräte" },
+          { id: "basic",    label: "Basis",                price: 14.90, description: "Nur in der Schweiz" },
+          { id: "ads",      label: "Standard mit Werbung", prices: { DE: 6.99, FR: 7.99, US: 8.99 }, description: "In der Schweiz nicht erhältlich" },
+          { id: "standard", label: "Standard",             price: 22.90, prices: { DE: 15.99, FR: 14.99, US: 19.99 }, popular: true, description: "Full HD, 2 Geräte" },
+          { id: "premium",  label: "Premium",              price: 29.90, prices: { DE: 21.99, FR: 21.99, US: 26.99 }, description: "4K, 4 Geräte" },
         ],
       },
       {
@@ -100,37 +155,48 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         tagline: "Disney, Marvel, Star Wars, Pixar", website: "https://disneyplus.com",
         peerPopularity: 34,
         variants: [
-          { id: "ads",      label: "Standard (Werbung)", price: 7.99 },
-          { id: "standard", label: "Standard",           price: 11.99, popular: true },
-          { id: "premium",  label: "Premium 4K",         price: 17.99 },
+          { id: "ads",           label: "Standard mit Werbung", price: 9.90,  prices: { DE: 6.99, FR: 6.99, US: 12.49 } },
+          { id: "standard",      label: "Standard",             price: 16.90, prices: { DE: 10.99, FR: 10.99 }, popular: true },
+          { id: "standard-year", label: "Standard, Jahresabo",  price: 14.08, prices: { DE: 9.16, FR: 9.16 }, billing: "yearly", description: "CHF 169 bzw. 109.90 € pro Jahr" },
+          { id: "premium",       label: "Premium 4K",           price: 23.40, prices: { DE: 15.99, FR: 15.99, US: 21.49 } },
+          { id: "premium-year",  label: "Premium, Jahresabo",   price: 19.50, prices: { DE: 13.33, FR: 13.33, US: 17.92 }, billing: "yearly", description: "CHF 234, 159.90 € bzw. $214.99 pro Jahr" },
         ],
       },
       {
         id: "amazon-prime", name: "Amazon Prime Video",
-        tagline: "Prime Video + schnelle Lieferung", website: "https://primevideo.com",
+        tagline: "Prime Video (CH) bzw. Prime mit Versand (DE/FR/US)", website: "https://primevideo.com",
         peerPopularity: 29,
         variants: [
-          { id: "video",   label: "Nur Prime Video",      price: 6.99 },
-          { id: "prime",   label: "Prime Mitgliedschaft", price: 9.99, popular: true, description: "Video + Shopping" },
+          { id: "video",      label: "Prime Video",          price: 9.99, description: "In der Schweiz nur Video" },
+          { id: "prime",      label: "Prime Mitgliedschaft", prices: { DE: 8.99, FR: 6.99, US: 14.99 }, popular: true, description: "Video + Versand" },
+          { id: "prime-year", label: "Prime, Jahresabo",     prices: { DE: 7.49, FR: 5.83, US: 11.58 }, billing: "yearly", description: "89.90 €, 69.90 € bzw. $139 pro Jahr" },
         ],
       },
       {
-        id: "apple-tv", name: "Apple TV+",
-        tagline: "Apple Originals", website: "https://tv.apple.com",
+        id: "apple-tv", name: "Apple TV",
+        tagline: "Apple Originals (früher Apple TV+)", website: "https://tv.apple.com",
         peerPopularity: 18,
         variants: [
-          { id: "single",      label: "Einzeln",             price: 9.99 },
-          { id: "apple-one",   label: "Apple One Einzel",    price: 19.95, popular: true, description: "MusicDoubleNote, TV+, Arcade, iCloud 50 GB" },
-          { id: "apple-fam",   label: "Apple One Familie",   price: 30.95, description: "Bis zu 5 Personen" },
+          { id: "single", label: "Apple TV", price: 10.90, prices: { DE: 9.99, FR: 9.99, US: 14.99 }, popular: true, description: "Auch in Apple One enthalten" },
+        ],
+      },
+      {
+        id: "apple-one", name: "Apple One",
+        tagline: "Apple Music, TV, Arcade und iCloud+ im Paket", website: "https://apple.com/apple-one",
+        peerPopularity: 14,
+        variants: [
+          { id: "individual", label: "Einzelperson", price: 23.90, prices: { DE: 19.95, FR: 19.95, US: 21.95 }, popular: true, description: "Music, TV, Arcade, iCloud+ 50 GB" },
+          { id: "family",     label: "Familie",      price: 33.90, prices: { DE: 25.95, FR: 25.95, US: 27.95 }, description: "Bis 6 Personen, iCloud+ 200 GB" },
+          { id: "premier",    label: "Premium",      price: 42.90, prices: { DE: 34.95, FR: 34.95, US: 39.95 }, description: "Bis 6 Personen, iCloud+ 2 TB, Fitness+ (US zusätzlich News+)" },
         ],
       },
       {
         id: "yt-premium", name: "YouTube Premium",
-        tagline: "YouTube ohne Werbung + YouTube MusicDoubleNote", website: "https://youtube.com/premium",
+        tagline: "YouTube ohne Werbung + YouTube Music", website: "https://youtube.com/premium",
         peerPopularity: 22,
         variants: [
-          { id: "single", label: "Einzel",           price: 13.99, popular: true },
-          { id: "family", label: "Familie (bis 5)",  price: 20.99 },
+          { id: "single", label: "Einzel",          price: 17.90, prices: { DE: 14.99, US: 15.99 }, popular: true },
+          { id: "family", label: "Familie (bis 6)", price: 33.90, prices: { DE: 27.99, US: 26.99 } },
         ],
       },
       {
@@ -138,8 +204,10 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         tagline: "Sport-Streaming: Fussball, Champions League", website: "https://dazn.com",
         peerPopularity: 12,
         variants: [
-          { id: "monthly", label: "Monatlich",             price: 29.99 },
-          { id: "annual",  label: "Jährlich (pro Monat)", price: 19.99, popular: true, description: "CHF 239.88/Jahr" },
+          { id: "monthly",          label: "Super Sports, monatlich", price: 24.90, prices: { DE: 24.99 } },
+          { id: "annual",           label: "Super Sports, Jahresabo", prices: { DE: 19.99 }, billing: "yearly", popular: true },
+          { id: "unlimited",        label: "Unlimited, monatlich",    price: 34.90, prices: { DE: 44.99 }, description: "Schweiz: ab-Preis" },
+          { id: "unlimited-annual", label: "Unlimited, Jahresabo",    prices: { DE: 34.99 }, billing: "yearly" },
         ],
       },
     ],
@@ -155,29 +223,30 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         tagline: "Meistgenutzter Musik-Streamingdienst", website: "https://spotify.com",
         peerPopularity: 71,
         variants: [
-          { id: "individual", label: "Individual",       price: 12.95, popular: true },
-          { id: "duo",        label: "Duo (2 Pers.)",   price: 16.95 },
-          { id: "family",     label: "Familie (bis 6)", price: 21.95 },
-          { id: "student",    label: "Student",          price: 6.50 },
+          { id: "individual", label: "Individual",      price: 15.95, prices: { DE: 12.99, FR: 12.14, US: 12.99 }, popular: true },
+          { id: "duo",        label: "Duo (2 Pers.)",   price: 21.95, prices: { DE: 17.99, FR: 17.20, US: 18.99 } },
+          { id: "family",     label: "Familie (bis 6)", price: 26.95, prices: { DE: 21.99, FR: 21.24, US: 21.99 } },
+          { id: "student",    label: "Student",         price: 8.95,  prices: { DE: 6.99, FR: 7.07, US: 6.99 } },
         ],
       },
       {
-        id: "apple-music", name: "Apple MusicDoubleNote",
-        tagline: "Hi-Res Audio, für Apple-Nutzer", website: "https://music.apple.com",
+        id: "apple-music", name: "Apple Music",
+        tagline: "Hi-Res Audio, für Apple-Nutzer (auch in Apple One)", website: "https://music.apple.com",
         peerPopularity: 24,
         variants: [
-          { id: "individual", label: "Individual",       price: 11.99, popular: true },
-          { id: "family",     label: "Familie (bis 6)", price: 17.99 },
-          { id: "student",    label: "Student",          price: 5.99 },
+          { id: "individual", label: "Einzelperson",    price: 14.90, prices: { DE: 11.99, FR: 11.99, US: 11.99 }, popular: true },
+          { id: "family",     label: "Familie (bis 6)", price: 24.90, prices: { DE: 19.99, FR: 19.99, US: 19.99 } },
+          { id: "student",    label: "Studierende",     price: 8.90,  prices: { DE: 6.99, FR: 6.99, US: 6.99 } },
         ],
       },
       {
         id: "tidal", name: "TIDAL",
-        tagline: "HiFi Lossless Audio", website: "https://tidal.com",
+        tagline: "Lossless und Dolby Atmos", website: "https://tidal.com",
         peerPopularity: 5,
         variants: [
-          { id: "hifi",      label: "HiFi",            price: 9.99 },
-          { id: "hifi-plus", label: "HiFi Plus",       price: 19.99, popular: true, description: "Dolby Atmos, 360° Audio" },
+          { id: "individual", label: "Individual",      prices: { DE: 12.99, FR: 12.99, US: 11.99 }, popular: true },
+          { id: "family",     label: "Familie (bis 6)", prices: { DE: 21.99, FR: 21.99, US: 19.99 } },
+          { id: "student",    label: "Studierende",     prices: { US: 6.99 } },
         ],
       },
     ],
@@ -237,11 +306,15 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         ],
       },
       {
-        id: "chatgpt", name: "ChatGPT Plus",
-        tagline: "GPT-4o, DALL-E, Plugins", website: "https://chat.openai.com",
-        peerPopularity: 24,
+        id: "chatgpt", name: "ChatGPT",
+        tagline: "OpenAI, verrechnet in USD", website: "https://chatgpt.com",
+        peerPopularity: 24, currency: "USD",
         variants: [
-          { id: "plus", label: "ChatGPT Plus", price: 22.00, popular: true },
+          { id: "go",            label: "Go",                              price: 8,   description: "Mit Werbung, Preis je nach Region" },
+          { id: "plus",          label: "Plus",                            price: 20,  popular: true },
+          { id: "pro",           label: "Pro",                             price: 200, description: "Höchste Limits" },
+          { id: "business",      label: "Business (pro Platz)",            price: 25,  description: "Ab 2 Plätzen" },
+          { id: "business-year", label: "Business, Jahresabo (pro Platz)", price: 20,  billing: "yearly" },
         ],
       },
     ],
@@ -455,12 +528,92 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
     providers: [
       {
         id: "linkedin", name: "LinkedIn Premium",
-        tagline: "Karriere-Netzwerk mit erweiterten Funktionen", website: "https://linkedin.com",
+        tagline: "Karriere-Netzwerk, inklusive LinkedIn Learning", website: "https://linkedin.com",
         peerPopularity: 19,
         variants: [
           { id: "career",   label: "Premium Career",   price: 44.99, popular: true },
           { id: "business", label: "Premium Business", price: 69.99 },
           { id: "sales",    label: "Sales Navigator",  price: 129.99 },
+        ],
+      },
+      {
+        id: "claude-pro", name: "Claude",
+        tagline: "Anthropic, verrechnet in USD", website: "https://claude.ai",
+        peerPopularity: 12, currency: "USD",
+        variants: [
+          { id: "pro",       label: "Pro",                                  price: 20, popular: true },
+          { id: "pro-year",  label: "Pro, Jahresabo",                       price: 17, billing: "yearly", description: "$200 pro Jahr" },
+          { id: "max5",      label: "Max (5× Pro)",                         price: 100 },
+          { id: "max20",     label: "Max (20× Pro)",                        price: 200 },
+          { id: "team",      label: "Team Standard (pro Platz)",            price: 25 },
+          { id: "team-year", label: "Team Standard, Jahresabo (pro Platz)", price: 20, billing: "yearly" },
+        ],
+      },
+      {
+        id: "google-gemini", name: "Google Gemini",
+        tagline: "Google AI mit Gemini, inklusive Google-One-Speicher", website: "https://gemini.google.com",
+        peerPopularity: 16,
+        variants: [
+          { id: "plus",  label: "Google AI Plus",  price: 10, description: "2 TB Speicher" },
+          { id: "pro",   label: "Google AI Pro",   price: 17, prices: { US: 19.99 }, popular: true, description: "5 TB Speicher" },
+          { id: "ultra", label: "Google AI Ultra", prices: { US: 99.99 }, description: "Höchste Limits" },
+        ],
+      },
+      {
+        id: "perplexity", name: "Perplexity",
+        tagline: "KI-Suche, verrechnet in USD", website: "https://perplexity.ai",
+        peerPopularity: 8, currency: "USD",
+        variants: [
+          { id: "pro",      label: "Pro",            price: 20, popular: true },
+          { id: "pro-year", label: "Pro, Jahresabo", price: 16.67, billing: "yearly", description: "$200 pro Jahr" },
+          { id: "max",      label: "Max",            price: 200 },
+          { id: "max-year", label: "Max, Jahresabo", price: 166.67, billing: "yearly", description: "$2'000 pro Jahr" },
+        ],
+      },
+      {
+        id: "mistral", name: "Mistral Le Chat",
+        tagline: "Europäische KI, verrechnet in USD", website: "https://chat.mistral.ai",
+        peerPopularity: 3, currency: "USD",
+        variants: [
+          { id: "pro",  label: "Pro",               price: 14.99, popular: true },
+          { id: "team", label: "Team (pro Nutzer)", price: 24.99 },
+        ],
+      },
+      {
+        id: "cursor", name: "Cursor",
+        tagline: "KI-Editor für Entwicklung, verrechnet in USD", website: "https://cursor.com",
+        peerPopularity: 9, currency: "USD",
+        variants: [
+          { id: "plus",    label: "Plus",               price: 8 },
+          { id: "premium", label: "Premium",            price: 30, popular: true },
+          { id: "super",   label: "Super",              price: 100 },
+          { id: "ultra",   label: "Ultra",              price: 200 },
+          { id: "teams",   label: "Teams (pro Nutzer)", price: 30 },
+        ],
+      },
+      {
+        id: "github-copilot", name: "GitHub Copilot",
+        tagline: "KI-Assistent im Code-Editor, verrechnet in USD", website: "https://github.com/features/copilot",
+        peerPopularity: 7, currency: "USD",
+        variants: [
+          { id: "pro",      label: "Pro",  price: 10, popular: true },
+          { id: "pro-plus", label: "Pro+", price: 39 },
+          { id: "max",      label: "Max",  price: 100 },
+        ],
+      },
+      {
+        id: "midjourney", name: "Midjourney",
+        tagline: "KI-Bilder, verrechnet in USD", website: "https://midjourney.com",
+        peerPopularity: 4, currency: "USD",
+        variants: [
+          { id: "basic",         label: "Basic",               price: 10 },
+          { id: "basic-year",    label: "Basic, Jahresabo",    price: 8,  billing: "yearly" },
+          { id: "standard",      label: "Standard",            price: 30, popular: true },
+          { id: "standard-year", label: "Standard, Jahresabo", price: 24, billing: "yearly" },
+          { id: "pro",           label: "Pro",                 price: 60 },
+          { id: "pro-year",      label: "Pro, Jahresabo",      price: 48, billing: "yearly" },
+          { id: "mega",          label: "Mega",                price: 120 },
+          { id: "mega-year",     label: "Mega, Jahresabo",     price: 96, billing: "yearly" },
         ],
       },
       {
@@ -470,32 +623,6 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
         variants: [
           { id: "plus",     label: "Plus",     price: 9.00, popular: true },
           { id: "business", label: "Business", price: 17.00 },
-        ],
-      },
-      {
-        id: "claude-pro", name: "Claude Pro",
-        tagline: "Anthropic Claude mit erweitertem Kontext", website: "https://claude.ai",
-        peerPopularity: 12,
-        variants: [
-          { id: "pro", label: "Claude Pro", price: 22.00, popular: true },
-        ],
-      },
-      {
-        id: "google-gemini", name: "Google Gemini",
-        tagline: "Google AI mit Gemini-Modellen", website: "https://gemini.google.com",
-        peerPopularity: 16,
-        variants: [
-          { id: "pro",   label: "Google AI Pro",   price: 21.90, popular: true },
-          { id: "ultra", label: "Google AI Ultra", price: 274.00, description: "Höchste Limits" },
-        ],
-      },
-      {
-        id: "cursor", name: "Cursor",
-        tagline: "KI-Editor für Entwicklung", website: "https://cursor.com",
-        peerPopularity: 9,
-        variants: [
-          { id: "pro",   label: "Pro",   price: 18.00, popular: true },
-          { id: "ultra", label: "Ultra", price: 180.00 },
         ],
       },
       {
@@ -543,6 +670,45 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
           { id: "biz-plus", label: "Business+ (pro Nutzer)", price: 12.50 },
         ],
       },
+      {
+        id: "linkedin-learning", name: "LinkedIn Learning",
+        tagline: "Video-Kurse, verrechnet in USD (in Premium Career enthalten)", website: "https://linkedin.com/learning",
+        peerPopularity: 6, currency: "USD",
+        variants: [
+          { id: "monthly", label: "Monatlich", price: 39.99 },
+          { id: "annual",  label: "Jahresabo", price: 19.99, billing: "yearly", popular: true },
+        ],
+      },
+      {
+        id: "coursera", name: "Coursera Plus",
+        tagline: "Kurse und Zertifikate von Hochschulen, verrechnet in USD", website: "https://coursera.org",
+        peerPopularity: 4, currency: "USD",
+        variants: [
+          { id: "monthly", label: "Monatlich", price: 59 },
+          { id: "annual",  label: "Jahresabo", price: 33.25, billing: "yearly", popular: true, description: "$399 pro Jahr" },
+        ],
+      },
+      {
+        id: "duolingo", name: "Duolingo",
+        tagline: "Sprachen lernen (Preise aus Deutschland)", website: "https://duolingo.com",
+        peerPopularity: 9,
+        variants: [
+          { id: "super-year", label: "Super, Jahresabo",       prices: { DE: 6.99 },  billing: "yearly", popular: true },
+          { id: "max",        label: "Max, monatlich",         prices: { DE: 29.99 } },
+          { id: "max-year",   label: "Max, Jahresabo",         prices: { DE: 14.99 }, billing: "yearly" },
+          { id: "family",     label: "Familie Max, Jahresabo", prices: { DE: 19.99 }, billing: "yearly", description: "Bis 6 Profile" },
+        ],
+      },
+      {
+        id: "babbel", name: "Babbel",
+        tagline: "Sprachkurse (Preise aus Deutschland)", website: "https://babbel.com",
+        peerPopularity: 5,
+        variants: [
+          { id: "3m",  label: "3 Monate (pro Monat)",  prices: { DE: 17.99 } },
+          { id: "6m",  label: "6 Monate (pro Monat)",  prices: { DE: 13.99 } },
+          { id: "12m", label: "12 Monate (pro Monat)", prices: { DE: 8.99 }, billing: "yearly", popular: true },
+        ],
+      },
     ],
   },
   {
@@ -588,6 +754,63 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
     Icon: CreditCard,
     description: "Konto-, Karten- und Depotgebühren",
     providers: [
+      {
+        id: "ubs", name: "UBS",
+        tagline: "Privatkonto mit Debitkarte (Richtwert, Preisblatt prüfen)", website: "https://ubs.com/ch",
+        peerPopularity: 30,
+        variants: [
+          { id: "key4", label: "UBS key4 banking", price: 3, popular: true, description: "Rund CHF 36 pro Jahr bei Nutzung in der Schweiz" },
+        ],
+      },
+      {
+        id: "postfinance", name: "PostFinance",
+        tagline: "Privatkonto (Richtwert, Preisblatt prüfen)", website: "https://postfinance.ch",
+        peerPopularity: 28,
+        variants: [
+          { id: "smart", label: "Smart", price: 5, popular: true, description: "Gratis mit Hypothek, Versicherung oder Anlagen" },
+        ],
+      },
+      {
+        id: "zkb", name: "Zürcher Kantonalbank",
+        tagline: "Privatkonto (Richtwert, Preisblatt prüfen)", website: "https://zkb.ch",
+        peerPopularity: 16,
+        variants: [
+          { id: "banking", label: "ZKB Banking", price: 0, popular: true, description: "Ohne Kontoführungsgebühr" },
+        ],
+      },
+      {
+        id: "raiffeisen", name: "Raiffeisen",
+        tagline: "Privatkonto (Richtwert, je Raiffeisenbank verschieden)", website: "https://raiffeisen.ch",
+        peerPopularity: 22,
+        variants: [
+          { id: "package", label: "Kontopaket", price: 7, popular: true, description: "Rund CHF 84 pro Jahr" },
+        ],
+      },
+      {
+        id: "migros-bank", name: "Migros Bank",
+        tagline: "Privatkonto (Richtwert, Preisblatt prüfen)", website: "https://migrosbank.ch",
+        peerPopularity: 12,
+        variants: [
+          { id: "free", label: "Privatkonto", price: 0, popular: true, description: "Ohne Kontoführungsgebühr" },
+        ],
+      },
+      {
+        id: "valiant", name: "Valiant",
+        tagline: "Privatkonto (Richtwert, Preisblatt prüfen)", website: "https://valiant.ch",
+        peerPopularity: 6,
+        variants: [
+          { id: "lila", label: "Lila Set", price: 0, popular: true, description: "Ohne Kontoführungsgebühr" },
+        ],
+      },
+      {
+        id: "cler", name: "Bank Cler (Zak)",
+        tagline: "Smartphone-Konto (Richtwert)", website: "https://cler.ch",
+        peerPopularity: 5,
+        variants: [
+          { id: "zak",      label: "Zak",      price: 0, popular: true },
+          { id: "zak-plus", label: "Zak Plus", price: 8 },
+        ],
+      },
       {
         id: "revolut", name: "Revolut",
         tagline: "Konto und Karte mit Fremdwährungen", website: "https://revolut.com",
@@ -691,14 +914,15 @@ function fchf(n: number): string {
   return `CHF ${n % 1 === 0 ? n : n.toFixed(2)}`;
 }
 
-function getEffectiveMonthly(entry: SelectedExpenseEntry, providers: ExpenseProvider[]): number {
+export function getEffectiveMonthly(entry: SelectedExpenseEntry, providers: ExpenseProvider[]): number {
   if (entry.viewMode === "individual" && entry.individualAmount != null) {
-  const { t } = useTranslation();
     return toMonthlyCHF(entry.individualAmount, entry.frequency ?? "monthly", entry.currency ?? "CHF");
   }
   if (entry.customPrice != null) return entry.customPrice;
-  const variant = providers.flatMap(p => p.variants).find(v => v.id === entry.variantId);
-  return variant?.price ?? 0;
+  // Tarif-IDs wie «individual» gibt es bei mehreren Anbietern: über den Anbieter suchen
+  const provider = providers.find(p => p.id === entry.providerId);
+  const variant = provider && entryVariant(provider, entry.variantId);
+  return provider && variant ? variantMonthlyCHF(provider, variant, entry.country ?? "CH") : 0;
 }
 
 function getEffectiveMonthlyCustom(entry: CustomExpenseEntry): number {
@@ -830,8 +1054,8 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
   function handleSearchSelect(provider: ExpenseProvider, category: ExpenseCategory) {
     setOpenCategories(prev => { const next = new Set(prev); next.add(category.id); return next; });
     if (!selectedMap[provider.id]) {
-      const defaultVariant = provider.variants.find(v => v.popular) ?? provider.variants[0];
-      update({ expenseEntries: [...data.expenseEntries, { providerId: provider.id, categoryId: category.id, variantId: defaultVariant.id }] });
+      const defaultSel = defaultSelection(provider);
+      update({ expenseEntries: [...data.expenseEntries, { providerId: provider.id, categoryId: category.id, ...defaultSel }] });
     }
     openSidebar(provider, category.id);
     setSearchCategoryId(null);
@@ -842,11 +1066,11 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
     const isSelected = !!selectedMap[provider.id];
     if (!isSelected) {
       // Select with popular variant as default
-      const defaultVariant = provider.variants.find(v => v.popular) ?? provider.variants[0];
+      const defaultSel = defaultSelection(provider);
       update({
         expenseEntries: [
           ...data.expenseEntries,
-          { providerId: provider.id, categoryId, variantId: defaultVariant.id },
+          { providerId: provider.id, categoryId, ...defaultSel },
         ],
       });
     }
@@ -860,11 +1084,11 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
       update({ expenseEntries: data.expenseEntries.filter(x => x.providerId !== provider.id) });
       if (focusedProviderId === provider.id) closeSidebarProvider();
     } else {
-      const defaultVariant = provider.variants.find(v => v.popular) ?? provider.variants[0];
+      const defaultSel = defaultSelection(provider);
       update({
         expenseEntries: [
           ...data.expenseEntries,
-          { providerId: provider.id, categoryId, variantId: defaultVariant.id },
+          { providerId: provider.id, categoryId, ...defaultSel },
         ],
       });
       openSidebar(provider, categoryId);
@@ -974,9 +1198,13 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
                     const isSelected = !!selectedMap[prov.id];
                     const isFocused = focusedProviderId === prov.id;
                     const entry = selectedMap[prov.id];
-                    const activeVariant = entry
-                      ? prov.variants.find(v => v.id === entry.variantId)
-                      : (prov.variants.find(v => v.popular) ?? prov.variants[0]);
+                    // Ausgewählt: der eigene Betrag; sonst die Vorauswahl (Tarif und Land)
+                    const rowMonthly = entry
+                      ? getEffectiveMonthly(entry, cat.providers)
+                      : (() => {
+                          const d = defaultSelection(prov);
+                          return variantMonthlyCHF(prov, entryVariant(prov, d.variantId), d.country ?? "CH");
+                        })();
 
                     return (
                       <div
@@ -1013,10 +1241,8 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
                             "font-mono text-sm",
                             isSelected ? "text-accent font-semibold" : "text-text-tertiary"
                           )}>
-                            {entry
-                              ? fchf(getEffectiveMonthly(entry, cat.providers))
-                              : fchf(activeVariant?.price ?? 0)}
-                            {(activeVariant?.price ?? 0) > 0 && <span className="text-2xs font-normal opacity-70">/Mo</span>}
+                            {fchf(rowMonthly)}
+                            {rowMonthly > 0 && <span className="text-2xs font-normal opacity-70">/Mo</span>}
                           </div>
                           {prov.peerPopularity && (
                             <div className="flex items-center gap-1 justify-end mt-1 text-2xs text-text-tertiary">
@@ -1103,7 +1329,7 @@ export default function Step5AccordionExpenses({ data, update }: Props) {
                                   <span className="text-text-tertiary text-2xs ml-2">{catalogText(resCat.label)}</span>
                                 </div>
                                 <span className="text-text-tertiary font-mono text-2xs flex-shrink-0">
-                                  CHF {provider.variants.find(v => v.popular)?.price ?? provider.variants[0]?.price}/Mo
+                                  {fchf((() => { const d = defaultSelection(provider); return variantMonthlyCHF(provider, entryVariant(provider, d.variantId), d.country ?? "CH"); })())}/Mo
                                 </span>
                                 {selectedMap[provider.id] && <Check className="w-3 h-3 text-accent flex-shrink-0" />}
                               </button>

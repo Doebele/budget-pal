@@ -379,7 +379,10 @@
     "s12": "e.g. family plan, shared with partner…",
     "s13": "e.g. annual plan, shared account…",
     "s14": "e.g. annual plan, shared account…",
-    "s15": "e.g. newspaper subscription, club membership…"
+    "s15": "e.g. newspaper subscription, club membership…",
+    "country": "Country",
+    "yearly": "Annual",
+    "unavailable": "not available"
   },
   "import": {
     "i00": "Cancel",
