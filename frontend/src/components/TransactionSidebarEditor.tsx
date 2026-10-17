@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { transactionsApi, categoriesApi } from "@/lib/api";
-import { formatCHF, getFrequencyStyle, PERIODICITY_LABELS } from "@/lib/theme";
+import { formatCHF, frequencyPillStyle, PERIODICITY_LABELS } from "@/lib/theme";
+import { useThemeColors } from "@/hooks/useThemeColors";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { clsx } from "clsx";
@@ -43,6 +44,7 @@ const PERIODICITY_LABELS_FULL: Record<RecurrenceType, string> = {
 
 export default function TransactionSidebarEditor({ transactions, periodLabel, onClose }: Props) {
   const { t } = useTranslation();
+  const { theme } = useThemeColors();
   const queryClient = useQueryClient();
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -268,10 +270,7 @@ export default function TransactionSidebarEditor({ transactions, periodLabel, on
                           </span>
                         )}
                         {txn.is_recurring && txn.periodicity && (
-                          <span className={clsx(
-                            "text-sm px-1 py-1 rounded border",
-                            getFrequencyStyle(txn.periodicity)
-                          )}>
+                          <span className="pill" style={frequencyPillStyle(txn.periodicity, theme)}>
                             {PERIODICITY_LABELS[txn.periodicity] ?? txn.periodicity}
                           </span>
                         )}
@@ -375,11 +374,10 @@ export default function TransactionSidebarEditor({ transactions, periodLabel, on
                         type="button"
                         onClick={() => updateDraft({ periodicity: p })}
                         className={clsx(
-                          "px-2 py-1 rounded-md text-sm border transition-all",
-                          draft.periodicity === p
-                            ? getFrequencyStyle(p)
-                            : "border-border-strong bg-bg-elevated/40 text-text-tertiary hover:border-border-strong"
+                          "pill px-3 py-1 transition-all",
+                          draft.periodicity !== p && "border-border-strong text-text-tertiary hover:text-text-secondary"
                         )}
+                        style={draft.periodicity === p ? frequencyPillStyle(p, theme) : undefined}
                       >
                         {PERIODICITY_LABELS_FULL[p]}
                       </button>

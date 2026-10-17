@@ -455,6 +455,11 @@
     @apply inline-flex items-center gap-1 px-2 py-px rounded-sm text-sm font-medium;
   }
 
+  /* Label als Pille (Kategorie, Rhythmus) — Farben über pillStyle() in lib/theme.ts */
+  .pill {
+    @apply inline-flex items-center gap-1 rounded-full border px-2 py-px text-sm font-normal whitespace-nowrap;
+  }
+
   .skeleton {
     @apply bg-bg-surface2 rounded-sm animate-pulse;
   }
