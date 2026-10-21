@@ -7,6 +7,7 @@
  * nutzen den Hook `useThemeColors()` (src/hooks/useThemeColors.ts); der Export
  * `colors` ist ein Dark-Alias für noch nicht migrierte Stellen.
  */
+import type React from "react";
 import { displayLocale } from "./format";
 
 // Chart-Serienfarben sind in beiden Themes lesbar und bleiben geteilt.
@@ -261,31 +262,60 @@ export const PERIODICITY_LABELS: Record<string, string> = {
   yearly: "Jährlich",
 };
 
-/**
- * Returns Tailwind class string (bg + border + text) for the periodicity value.
- * Guaranteed to use full literal class names so Tailwind JIT keeps them.
- * Light-Mode-Varianten zuerst, `dark:` überschreibt (darkMode-Selector
- * in tailwind.config.js zeigt auf [data-theme="dark"]).
- */
-export function getFrequencyStyle(periodicity: string | null | undefined): string {
-  switch (periodicity) {
-    case "weekly":     return "bg-cyan-100 border-cyan-300 text-cyan-700 dark:bg-cyan-900/20 dark:border-cyan-800 dark:text-cyan-300";
-    case "monthly":    return "bg-blue-100 border-blue-300 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300";
-    case "quarterly":  return "bg-orange-100 border-orange-300 text-orange-700 dark:bg-orange-900/20 dark:border-orange-800 dark:text-orange-300";
-    case "halfyearly": return "bg-violet-100 border-violet-300 text-violet-700 dark:bg-violet-900/20 dark:border-violet-800 dark:text-violet-300";
-    case "yearly":     return "bg-emerald-100 border-emerald-300 text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-800 dark:text-emerald-300";
-    default:           return "bg-slate-200 border-slate-300 text-slate-600 dark:bg-slate-700/50 dark:border-slate-600 dark:text-slate-400";
+// ── Pillen-Labels (Kategorie, Rhythmus) ────────────────────────
+// Eine Form für alle Labels wie die Legende der Diagramme: runde Pille,
+// Tönung 12 %, Rand 35 %. Die Textfarbe wird so lange zum Hintergrund hin
+// abgedunkelt (hell) bzw. aufgehellt (dunkel), bis sie WCAG AA erreicht
+// (4.5:1 gegen die getönte Pille auf der Kartenfläche).
+
+/** Rhythmus-Farben (gleiche Töne wie bisher) */
+export const FREQUENCY_COLORS: Record<string, string> = {
+  weekly: "#06b6d4",
+  monthly: "#3b82f6",
+  quarterly: "#f97316",
+  halfyearly: "#8b5cf6",
+  yearly: "#10b981",
+};
+const NEUTRAL_PILL = "#8896a8";
+const PILL_SURFACE = { light: "#f3f3f0", dark: "#13141a" } as const;
+
+const hexRgb = (h: string): [number, number, number] => {
+  const n = parseInt(h.replace("#", "").slice(0, 6), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+};
+const mix = (a: number[], b: number[], t: number) => a.map((x, i) => x + (b[i] - x) * t);
+const luminance = (rgb: number[]) => {
+  const [r, g, b] = rgb.map((c) => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+export const contrastRatio = (a: number[], b: number[]) => {
+  const [l1, l2] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (l1 + 0.05) / (l2 + 0.05);
+};
+const toHex = (rgb: number[]) => "#" + rgb.map((c) => Math.round(c).toString(16).padStart(2, "0")).join("");
+
+/** Textfarbe aus `hex`, die auf der getönten Pille mindestens 4.5:1 erreicht */
+export function readablePillText(hex: string, theme: "light" | "dark"): string {
+  const color = hexRgb(hex);
+  const bg = mix(hexRgb(PILL_SURFACE[theme]), color, 0.12);
+  const target = theme === "light" ? [0, 0, 0] : [255, 255, 255];
+  for (let t = 0; t <= 1; t += 0.05) {
+    const c = mix(color, target, t);
+    if (contrastRatio(c, bg) >= 4.5) return toHex(c);
   }
+  return toHex(target);
 }
 
-/** Tailwind badge classes (no border) for inline status chips. */
-export function getFrequencyBadgeStyle(periodicity: string | null | undefined): string {
-  switch (periodicity) {
-    case "weekly":     return "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/50 dark:text-cyan-300";
-    case "monthly":    return "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300";
-    case "quarterly":  return "bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300";
-    case "halfyearly": return "bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300";
-    case "yearly":     return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300";
-    default:           return "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-400";
-  }
+/** Inline-Stil einer Pille in der Farbe `hex` (für die Klasse `.pill`) */
+export function pillStyle(hex: string | null | undefined, theme: "light" | "dark"): React.CSSProperties {
+  const c = hex || NEUTRAL_PILL;
+  return { backgroundColor: c + "1f", borderColor: c + "59", color: readablePillText(c, theme) };
+}
+
+/** Pille für einen Rhythmus (null = nicht wiederkehrend, neutral) */
+export function frequencyPillStyle(periodicity: string | null | undefined, theme: "light" | "dark"): React.CSSProperties {
+  return pillStyle(periodicity ? FREQUENCY_COLORS[periodicity] ?? NEUTRAL_PILL : NEUTRAL_PILL, theme);
 }

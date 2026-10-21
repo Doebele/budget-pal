@@ -7,7 +7,8 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { transactionsApi, accountsApi } from "@/lib/api";
-import { formatAmount, getFrequencyBadgeStyle, PERIODICITY_LABELS } from "@/lib/theme";
+import { formatAmount, frequencyPillStyle, pillStyle, PERIODICITY_LABELS } from "@/lib/theme";
+import { useThemeColors } from "@/hooks/useThemeColors";
 import { useAuth } from "@/lib/auth";
 import { useTaxonomy, useTaxonomySuperCategories } from "@/lib/categories";
 import { format } from "date-fns";
@@ -79,6 +80,7 @@ interface BudgetAnalysis {
 
 export default function Transactions() {
   const { t } = useTranslation();
+  const { theme } = useThemeColors();
   const { user } = useAuth();
   const refCcy = user?.currency ?? "CHF";
   const superCategories = useTaxonomySuperCategories();
@@ -562,7 +564,7 @@ export default function Transactions() {
                       <tr key={idx} className="hover:bg-bg-surface2/50">
                         <td className="px-3 py-2 text-text-secondary">{item.description}</td>
                         <td className="px-3 py-2">
-                          <span className={clsx("inline-flex items-center px-2 py-1 rounded text-sm", getFrequencyBadgeStyle(item.periodicity))}>
+                          <span className="pill" style={frequencyPillStyle(item.periodicity, theme)}>
                             {PERIODICITY_LABELS[item.periodicity] ?? item.periodicity}
                           </span>
                         </td>
@@ -823,14 +825,7 @@ export default function Transactions() {
                           {(() => {
                             const sc = resolveSuperCategory(txn.category || "");
                             return (
-                              <span
-                                className="badge text-sm flex items-center gap-1"
-                                style={{
-                                  backgroundColor: sc.color + "22",
-                                  color: sc.color,
-                                  border: `1px solid ${sc.color}44`,
-                                }}
-                              >
+                              <span className="pill" style={pillStyle(sc.color, theme)}>
                                 <sc.icon className="w-3 h-3 shrink-0" />
                                 {txn.category ? translateCategory(txn.category) : t("txn.uncategorized")}
                               </span>
@@ -845,17 +840,15 @@ export default function Transactions() {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <div className={clsx(
-                        "inline-flex items-center gap-1 rounded text-sm transition-colors",
-                        txn.is_recurring
-                          ? getFrequencyBadgeStyle(txn.periodicity)
-                          : "text-text-disabled"
-                      )}>
+                      <div
+                        className="pill transition-colors"
+                        style={frequencyPillStyle(txn.is_recurring ? (txn.periodicity ?? "monthly") : null, theme)}
+                      >
                         <Repeat className="w-3 h-3 shrink-0" />
                         <select
                           value={txn.is_recurring ? (txn.periodicity ?? "monthly") : ""}
                           onChange={(e) => handleRecurringChange(txn, e.target.value)}
-                          className="bg-transparent border-none outline-none cursor-pointer text-sm appearance-none"
+                          className="bg-transparent border-none outline-none cursor-pointer text-sm text-current appearance-none [field-sizing:content]"
                         >
                           <option value="">—</option>
                           <option value="weekly">{t("periodicity.weekly")}</option>
