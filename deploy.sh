@@ -20,6 +20,12 @@ fi
 # 2. Neue Images holen und starten, warten bis alle Container healthy sind
 echo "Starte Tag ${TAG}"
 IMAGE_TAG="$TAG" "${COMPOSE[@]}" pull
+# Das Cache-Volume gehoert appuser (uid 1000). Volumes von vor diesem Fix sind
+# root-eigen, und Docker uebernimmt die Rechte aus dem Image nur in ein neues,
+# leeres Volume. Idempotent, kostet eine Sekunde.
+IMAGE_TAG="$TAG" "${COMPOSE[@]}" run --rm --no-deps -u root --entrypoint chown \
+  budget-pal-backend 1000:1000 /app/data/cache \
+  || echo "WARNUNG: chown auf das Cache-Volume fehlgeschlagen (Wechselkurse werden nicht zwischengespeichert)"
 if IMAGE_TAG="$TAG" "${COMPOSE[@]}" up -d --remove-orphans --wait --wait-timeout 300; then
   echo "$TAG" > "$LAST_GOOD_FILE"
 else
