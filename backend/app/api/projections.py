@@ -48,7 +48,7 @@ class ProjectionParameters(BaseModel):
     target_age: Optional[int] = None
     mean_return: float = 0.07
     return_volatility: float = 0.12
-    inflation_rate: float = 0.015
+    inflation_rate: float = Field(default=0.015, ge=0, le=0.1)
     include_pension: bool = True
     date_of_birth: Optional[str] = None  # ISO format: YYYY-MM-DD
     retirement_age: int = Field(default=65, ge=50, le=75)
