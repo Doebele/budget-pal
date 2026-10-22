@@ -11,10 +11,10 @@
  */
 import { clsx } from "clsx";
 import { useState, useMemo } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bank, Brain, Calendar, FloppyDisk, InfoCircle, NavArrowDown, Refresh, Reports, Table } from "@/lib/icons";
 
-import { api, accountsApi, transactionsApi, recurringPlanApi, categoriesApi } from "@/lib/api";
+import { api, accountsApi, transactionsApi, recurringPlanApi, categoriesApi, forecastingApi } from "@/lib/api";
 import { formatAmount } from "@/lib/theme";
 import ForecastComparisonChart, {
   type HistoricalPoint,
@@ -60,9 +60,31 @@ interface ForecastResult {
   total_monthly_income_mean: number;
   total_monthly_expense_mean: number;
   scenario_id: number | null;
+  basis?: Basis;
   peer_net_monthly: number;
   empirical_net_monthly: number;
   reference_currency?: string;
+}
+
+/** Two separate views, never blended: imported statements vs. wizard assumptions. */
+type Basis = "actual" | "empirical";
+
+interface SavedScenario {
+  id: number;
+  name: string;
+  parameters: {
+    horizon_months?: number;
+    basis?: Basis;
+    peer_profile?: PeerProfile | null;
+  };
+}
+
+interface PeerProfile {
+  age_group: string;
+  canton: string;
+  household_type: string;
+  employment_status: string;
+  income_level: string;
 }
 
 // ── Horizon options ──────────────────────────────────────────
@@ -160,8 +182,10 @@ export default function Forecast() {
   const [showPeerSettings, setShowPeerSettings] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [scenarioName, setScenarioName] = useState("");
+  const [basis, setBasis] = useState<Basis>("actual");
+  const queryClient = useQueryClient();
 
-  const [peerProfile, setPeerProfile] = useState({
+  const [peerProfile, setPeerProfile] = useState<PeerProfile>({
     age_group: "35-44",
     canton: "ZH",
     household_type: "single",
@@ -214,6 +238,7 @@ export default function Forecast() {
   const forecastPayload = {
     horizon_months: selectedHorizon.months,
     time_horizon: horizon,
+    basis,
     include_peer_baseline: true,
     peer_profile: peerProfile,
     lookback_months: 24,
@@ -226,8 +251,7 @@ export default function Forecast() {
     isFetching,
   } = useQuery<ForecastResult>({
     queryKey: ["forecast", forecastPayload],
-    queryFn: () =>
-      api.post("/forecasting/scenario", forecastPayload).then((r) => r.data),
+    queryFn: () => forecastingApi.generate(forecastPayload).then((r) => r.data),
     staleTime: 10 * 60_000,
   });
 
@@ -247,8 +271,7 @@ export default function Forecast() {
   // Fetch peer-baseline independently (not coupled to forecast cache)
   const { data: peerBaseline } = useQuery({
     queryKey: ["peer-baseline", peerProfile],
-    queryFn: () =>
-      api.get("/forecasting/peer-baseline", { params: peerProfile }).then((r) => r.data),
+    queryFn: () => forecastingApi.peerBaseline(peerProfile).then((r) => r.data),
     staleTime: 30 * 60_000,
   });
 
@@ -302,7 +325,8 @@ export default function Forecast() {
     const today = new Date();
     const points: BudgetPlanPoint[] = [];
 
-    for (let i = 0; i < selectedHorizon.months; i++) {
+    // Like the forecast, start with next month.
+    for (let i = 1; i <= selectedHorizon.months; i++) {
       const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
       const year = d.getFullYear();
       const month = d.getMonth() + 1; // 1–12
@@ -352,7 +376,7 @@ export default function Forecast() {
     const today = new Date();
     const result: Record<string, Record<string, number>> = {};
 
-    for (let i = 0; i < selectedHorizon.months; i++) {
+    for (let i = 1; i <= selectedHorizon.months; i++) {
       const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
       const year = d.getFullYear();
       const month = d.getMonth() + 1;
@@ -388,12 +412,29 @@ export default function Forecast() {
     return result;
   }, [planY0, planY1, planY2, selectedHorizon, currentYear, catById, superCategories, VALID_SC_ID_SET]);
 
-  // Save scenario mutation
+  // Saved scenarios keep their basis, so each view can be reopened as it was.
+  const { data: savedScenarios = [] } = useQuery<SavedScenario[]>({
+    queryKey: ["forecast-scenarios"],
+    queryFn: () => forecastingApi.listScenarios().then((r) => r.data),
+  });
+
   const saveMutation = useMutation({
     mutationFn: (name: string) =>
-      api.post("/forecasting/scenario", { ...forecastPayload, save_as: name }).then((r) => r.data),
-    onSuccess: () => setScenarioName(""),
+      forecastingApi.generate({ ...forecastPayload, save_as: name }).then((r) => r.data),
+    onSuccess: () => {
+      setScenarioName("");
+      queryClient.invalidateQueries({ queryKey: ["forecast-scenarios"] });
+    },
   });
+
+  function loadScenario(id: number) {
+    const p = savedScenarios.find((sc) => sc.id === id)?.parameters;
+    if (!p) return;
+    setBasis(p.basis ?? "actual");
+    const h = HORIZONS.find((x) => x.months === p.horizon_months);
+    if (h) setHorizon(h.key);
+    if (p.peer_profile) setPeerProfile(p.peer_profile);
+  }
 
   // Historical data for chart (API returns `expenses` as positive number)
   const historicalPoints: HistoricalPoint[] = useMemo(() => {
@@ -444,6 +485,21 @@ export default function Forecast() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {savedScenarios.length > 0 && (
+            <select
+              aria-label={t("pages:ui.scenario")}
+              value=""
+              onChange={(e) => e.target.value && loadScenario(Number(e.target.value))}
+              className="input text-base w-44"
+            >
+              <option value="">{t("pages:ui.scenario")}…</option>
+              {savedScenarios.map((sc) => (
+                <option key={sc.id} value={sc.id}>
+                  {sc.name} · {t(sc.parameters.basis === "empirical" ? "common:nav.wizard" : "common:nav.transactions")}
+                </option>
+              ))}
+            </select>
+          )}
           {/* Save scenario */}
           <div className="flex gap-1">
             <input
@@ -472,6 +528,19 @@ export default function Forecast() {
         </div>
       </div>
 
+      {/* ── Basis: Reale vs. Empirische Angaben ── */}
+      <div className="flex flex-wrap gap-2 items-center">
+        {(["actual", "empirical"] as const).map((b) => (
+          <button
+            key={b}
+            onClick={() => setBasis(b)}
+            className={clsx("toggle-btn", basis === b && "active")}
+          >
+            {t(b === "actual" ? "common:nav.transactions" : "common:nav.wizard")}
+          </button>
+        ))}
+      </div>
+
       {/* ── Horizon selector ── */}
       <div className="flex flex-wrap gap-2 items-center">
         <span className="text-text-tertiary text-sm font-medium mr-1">Zeithorizont:</span>
@@ -489,13 +558,17 @@ export default function Forecast() {
       {/* ── Data quality banner ── */}
       {forecast && (
         <div className={`msg ${
-          (forecast.data_months ?? 0) < 3 ? "msg-warning" : "msg-success"
+          basis === "actual" && (forecast.data_months ?? 0) < 3 ? "msg-warning" : "msg-success"
         }`}>
           <InfoCircle />
           <span>
-            {(forecast.data_months ?? 0) < 3
-              ? `Nur ${forecast.data_months} Monate Transaktionsdaten — Peer-Gruppe-Werte werden stärker gewichtet.`
-              : `${forecast.data_months} Monate Transaktionshistorie analysiert (${forecast.first_date} – ${forecast.last_date}).`
+            {basis === "empirical"
+              ? forecast.total_monthly_income_mean === 0 && forecast.total_monthly_expense_mean === 0
+                ? "Noch keine empirischen Angaben erfasst — fülle zuerst den Wizard aus."
+                : "Annahmen aus den empirischen Angaben: feste Monatsbeträge, ohne Kontoauszüge."
+              : (forecast.data_months ?? 0) < 3
+                ? `Nur ${forecast.data_months} Monate Transaktionsdaten — die Prognose ist entsprechend unsicher.`
+                : `${forecast.data_months} Monate Transaktionshistorie analysiert (${forecast.first_date} – ${forecast.last_date}).`
             }
             {" "}Ø Einnahmen: {fmtFc(forecast.total_monthly_income_mean)}/Mt · Ø Ausgaben: {fmtFc(forecast.total_monthly_expense_mean)}/Mt
           </span>
@@ -677,7 +750,7 @@ export default function Forecast() {
             forecastData={forecast?.forecast ?? []}
             historicalAxisMonths={historicalPoints.map((p) => p.month)}
             forecastAxisMonths={forecastPoints.map((p) => p.month)}
-            wizardData={wizardState}
+            wizardData={basis === "empirical" ? wizardState : null}
             budgetPlanByMonth={budgetPlanByMonth}
             budgetPlanMonths={budgetPlanPoints.map((p) => p.month)}
             height={320}
