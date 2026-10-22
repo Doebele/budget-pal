@@ -1022,6 +1022,9 @@
     "retirementAge": "Rentenalter",
     "meanReturn": "Ø Rendite p.a. (%)",
     "volatility": "Volatilität σ (%)",
-    "inflation": "Teuerung CHF p.a. (%)"
+    "inflation": "Teuerung CHF p.a. (%)",
+    "crash": "Crash bei Pensionierung",
+    "crashNone": "Kein Crash",
+    "crashHint": "Fester Markteinbruch im ersten Rentenjahr, in jedem Lauf gleich"
   }
 }

@@ -52,6 +52,8 @@ export default function Projections() {
     inflation_rate: 0.015,
     retirement_age: 65,
     include_pension: true,
+    // Stresstest: Einbruch im ersten Jahr der Pensionierung (0.3 = -30 %)
+    retirement_crash: 0,
   });
 
   // Lebenskosten im Ruhestand pro Monat; null = aus Szenario bzw. geschaetzt
@@ -298,6 +300,22 @@ export default function Projections() {
               onChange={(e) => setSpendingMonthly(e.target.value === "" ? null : Math.max(0, +e.target.value))}
             />
             <p className="text-text-tertiary text-2xs mt-1">{t("pages:ui.retirementSpendingHint")}</p>
+          </div>
+          <div>
+            <label className="label" htmlFor="retirement-crash">{t("pages:params.crash")}</label>
+            <select
+              id="retirement-crash"
+              className="input"
+              value={params.retirement_crash}
+              onChange={(e) => setParams((p) => ({ ...p, retirement_crash: +e.target.value }))}
+            >
+              {[0, 0.2, 0.3, 0.4, 0.5].map((c) => (
+                <option key={c} value={c}>
+                  {c === 0 ? t("pages:params.crashNone") : `−${c * 100} %`}
+                </option>
+              ))}
+            </select>
+            <p className="text-text-tertiary text-2xs mt-1">{t("pages:params.crashHint")}</p>
           </div>
         </div>
       </div>
