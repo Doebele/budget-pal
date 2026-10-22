@@ -420,6 +420,7 @@ class ProjectionService:
         drawdown_until_age: int = 90,
         seed: Optional[int] = None,
         tax_in_retirement: bool = True,
+        retirement_crash: float = 0.0,
     ) -> Dict[str, Any]:
         """
         Run Monte Carlo simulation and pension projections.
@@ -488,6 +489,12 @@ class ProjectionService:
             size=(runs, years),
         )
         annual_returns = np.exp(annual_log_returns) - 1  # shape (runs, years)
+        # Stresstest: im ersten Jahr der Pensionierung faellt der Markt in
+        # jedem Lauf um denselben Anteil (Renditefolge-Risiko); die uebrigen
+        # Jahre bleiben zufaellig.
+        crash_idx = retirement_age - current_age
+        if retirement_crash and 0 <= crash_idx < years:
+            annual_returns[:, crash_idx] = -retirement_crash
 
         portfolio = np.full(runs, current_net_worth, dtype=np.float64)
         all_values = np.zeros((runs, years + 1), dtype=np.float64)

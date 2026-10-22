@@ -50,6 +50,8 @@ class ProjectionParameters(BaseModel):
     return_volatility: float = 0.12
     inflation_rate: float = 0.015
     include_pension: bool = True
+    # Stresstest: Einbruch (Anteil, 0.3 = -30 %) im ersten Jahr der Pensionierung
+    retirement_crash: float = Field(default=0.0, ge=0, le=0.6)
     date_of_birth: Optional[str] = None  # ISO format: YYYY-MM-DD
     retirement_age: int = Field(default=65, ge=50, le=75)
     # Jaehrliche Lebenskosten im Ruhestand in heutigen CHF. Ohne Angabe: aus
@@ -365,6 +367,7 @@ async def _run_kwargs(
         canton=canton,
         married=married,
         drawdown_until_age=int(merged.get("life_expectancy") or 90),
+        retirement_crash=merged.get("retirement_crash", 0.0),
     )
 
 

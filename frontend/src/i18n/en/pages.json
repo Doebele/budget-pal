@@ -1022,6 +1022,9 @@
     "retirementAge": "Retirement age",
     "meanReturn": "Avg. return p.a. (%)",
     "volatility": "Volatility σ (%)",
-    "inflation": "CHF inflation p.a. (%)"
+    "inflation": "CHF inflation p.a. (%)",
+    "crash": "Crash at retirement",
+    "crashNone": "No crash",
+    "crashHint": "Fixed market drop in the first year of retirement, the same in every run"
   }
 }
