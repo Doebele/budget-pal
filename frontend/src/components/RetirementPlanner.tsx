@@ -51,6 +51,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
   const [annualIncome, setAnnualIncome] = useState(90_000);
   const [showPeer, setShowPeer] = useState(false);
   const [meanReturn, setMeanReturn] = useState(0.07);
+  const [inflationRate, setInflationRate] = useState(0.015);
   // Lebenskosten im Ruhestand pro Monat; null = der Server schaetzt sie
   const [spendingMonthly, setSpendingMonthly] = useState<number | null>(null);
 
@@ -68,7 +69,7 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
     years_to_project: Math.max(yearsToRetirement + 25, 30), // through age 90
     mean_return: meanReturn,
     return_volatility: 0.12,
-    inflation_rate: 0.015,
+    inflation_rate: inflationRate,
     retirement_age: retirementAge,
     include_pension: true,
     date_of_birth: dateOfBirth ?? undefined,
@@ -188,6 +189,24 @@ export default function RetirementPlanner({ currentNetWorth, monthlyNetMean, dat
             <div className="flex justify-between text-2xs text-text-tertiary mt-1">
               <span>2% (konservativ)</span>
               <span>12% (aggressiv)</span>
+            </div>
+          </div>
+          <div>
+            <label className="text-text-tertiary text-sm mb-1 block">
+              {t("pages:wizard.w45")} ({(inflationRate * 100).toFixed(2)}%)
+            </label>
+            <input
+              type="range"
+              min={0}
+              max={0.05}
+              step={0.0025}
+              value={inflationRate}
+              onChange={(e) => setInflationRate(Number(e.target.value))}
+              className="w-full accent-accent"
+            />
+            <div className="flex justify-between text-2xs text-text-tertiary mt-1">
+              <span>0%</span>
+              <span>5%</span>
             </div>
           </div>
           <div>
