@@ -48,7 +48,7 @@ class ProjectionParameters(BaseModel):
     target_age: Optional[int] = None
     mean_return: float = 0.07
     return_volatility: float = 0.12
-    inflation_rate: float = 0.015
+    inflation_rate: float = Field(default=0.015, ge=0, le=0.1)
     include_pension: bool = True
     # Stresstest: Einbruch (Anteil, 0.3 = -30 %) im ersten Jahr der Pensionierung
     retirement_crash: float = Field(default=0.0, ge=0, le=0.6)
