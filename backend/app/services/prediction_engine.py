@@ -4,8 +4,11 @@ Prediction Engine — Time-series forecasting for budget-pal.
 Combines:
   A. Historical transaction analysis (seasonality, trend, stability)
   B. Periodicity-aware recurring expense projection (weekly/monthly/quarterly/…)
-  C. Peer-group calibration (Swiss BFS HABE defaults) for sparse data
-  D. Forward projection (N months) with confidence intervals
+  C. Forward projection (N months) with confidence intervals
+
+Two bases that are never blended (see CLAUDE.md glossary): `actual` uses the
+imported transactions, `empirical` the wizard's assumed budgets. The peer group
+(BFS HABE) only feeds reference lines, not the forecast.
 
 Algorithm overview
 ------------------
@@ -37,7 +40,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy import select, func, extract, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.models import Transaction, Account
+from app.models.models import INVEST_CATEGORY, Transaction, Account, counted_in_totals
 from app.services.peer_group import get_peer_group_defaults, PeerGroupProfile
 from app.services.currency_service import (
     currency_service,
@@ -64,22 +67,6 @@ TRACKED_CATEGORIES = [
     "Sparen",
     "Sonstiges",
 ]
-
-# Map Swiss-German category names → peer-group expense keys
-CATEGORY_TO_PEER_KEY: Dict[str, str] = {
-    "Wohnen": "housing",
-    "Lebensmittel": "groceries",
-    "Transport": "transport",
-    "Krankenkasse": "health_insurance",
-    "Restaurant": "dining_out",
-    "Freizeit": "entertainment",
-    "Kleider": "clothing",
-    "Reisen": "travel",
-    "Bildung": "education",
-    "Abonnemente": "subscriptions",
-    "Kommunikation": "communication",
-    "Sparen": "savings",
-}
 
 # How many times per month each periodicity fires
 PERIODICITY_MONTHLY_FACTOR: Dict[str, float] = {
@@ -214,9 +201,15 @@ class PredictionEngine:
         peer_profile: Optional[Dict[str, str]] = None,
         include_peer_baseline: bool = True,
         reference_currency: str = "CHF",
+        basis: str = "actual",
     ) -> Dict[str, Any]:
         """
         Generate a monthly forecast for `horizon_months` into the future.
+
+        `basis` picks one of two separate views, never a blend:
+          actual    : Reale Angaben — imported transactions only
+          empirical : Empirische Angaben — the wizard's assumed monthly budgets
+        The peer group only supplies the two reference lines below.
 
         Returns extended response including:
           peer_net_monthly        : flat peer-group monthly net (income − expenses)
@@ -224,9 +217,12 @@ class PredictionEngine:
         """
         ref = normalize_reference_currency(reference_currency)
         rates = await currency_service.get_rates("EUR")
-        analysis = await self.analyze(
-            db, user_id, account_ids, lookback_months, reference_currency=ref
-        )
+        if basis == "empirical":
+            analysis = await self._empirical_analysis(db, user_id, rates, ref)
+        else:
+            analysis = await self.analyze(
+                db, user_id, account_ids, lookback_months, reference_currency=ref
+            )
         peer_defaults: Dict[str, float] = {}
 
         if include_peer_baseline and peer_profile:
@@ -253,7 +249,6 @@ class PredictionEngine:
         forecast_rows: List[Dict[str, Any]] = []
 
         now = datetime.now(timezone.utc)
-        data_sparse = analysis["data_months"] < 3
 
         for step in range(1, horizon_months + 1):
             total_month = now.month + step - 1
@@ -267,33 +262,14 @@ class PredictionEngine:
             predicted_expense = 0.0
             predicted_income = 0.0
             confidence_variance = 0.0
-            calibrated = False
 
             for cat, profile in analysis["category_profiles"].items():
                 mean: float = profile["mean"]
                 std: float = profile["std"]
                 slope: float = profile["trend_slope"]
-                seasonal = profile["seasonal_indices"].get(target_month, 1.0)
+                seasonal = profile["seasonal_indices"].get(str(target_month), 1.0)
 
-                # Peer-group blending
-                peer_amount = 0.0
-                peer_key = CATEGORY_TO_PEER_KEY.get(cat)
-                if peer_key and peer_key in peer_defaults:
-                    peer_amount = convert_with_eur_rates(
-                        rates, float(peer_defaults[peer_key]), "CHF", ref
-                    )
-
-                if data_sparse and peer_amount:
-                    blended_mean = 0.3 * mean + 0.7 * peer_amount
-                    calibrated = True
-                elif peer_amount and include_peer_baseline:
-                    blended_mean = 0.9 * mean + 0.1 * peer_amount
-                    calibrated = True
-                else:
-                    blended_mean = mean
-                    calibrated = data_sparse
-
-                projected = (blended_mean + slope * step) * seasonal
+                projected = (mean + slope * step) * seasonal
                 low = projected - 1.64 * std
                 high = projected + 1.64 * std
 
@@ -321,7 +297,9 @@ class PredictionEngine:
                 "confidence_low": round(net - 1.64 * net_std, 2),
                 "confidence_high": round(net + 1.64 * net_std, 2),
                 "category_breakdown": cat_breakdown,
-                "peer_calibrated": calibrated,
+                # Kept for API compatibility: the peer group no longer enters
+                # the forecast itself, so it is never calibrated.
+                "peer_calibrated": False,
             })
 
         return {
@@ -333,6 +311,56 @@ class PredictionEngine:
         }
 
     # ── Private helpers ───────────────────────────────────────
+
+    async def _empirical_analysis(
+        self,
+        db: AsyncSession,
+        user_id: int,
+        rates: Dict[str, float],
+        ref: str,
+    ) -> Dict[str, Any]:
+        """Profiles from the wizard (Empirische Angaben): flat assumed monthly
+        amounts — no trend, no seasonality, no spread, no transactions."""
+        # Late import: the API module imports services at load time.
+        from app.api.budget_multimodal import _get_wizard_budgets, _get_wizard_scenario
+
+        budgets = await _get_wizard_budgets(user_id, db)
+        params = await _get_wizard_scenario(user_id, db) or {}
+
+        by_label: Dict[str, float] = defaultdict(float)
+        for b in budgets:
+            # Wizard amounts are entered in CHF and are always expenses.
+            by_label[b.notes or "Sonstiges"] -= convert_with_eur_rates(
+                rates, float(b.amount), "CHF", ref
+            )
+        income = convert_with_eur_rates(
+            rates, float(params.get("monthly_income") or 0.0), "CHF", ref
+        )
+        if income:
+            by_label["Einkommen"] += income
+
+        profiles = {
+            label: {
+                "mean": round(amount, 2),
+                "std": 0.0,
+                "trend_slope": 0.0,
+                "seasonal_indices": {},
+                "data_points": 0,
+                "recurring_override": False,
+            }
+            for label, amount in by_label.items()
+        }
+        return {
+            "data_months": 0,
+            "category_profiles": profiles,
+            "total_monthly_income_mean": round(income, 2),
+            "total_monthly_expense_mean": round(
+                -sum(a for a in by_label.values() if a < 0), 2
+            ),
+            "first_date": None,
+            "last_date": None,
+            "recurring_monthly_equiv": {},
+        }
 
     async def _fetch_monthly_aggregates(
         self,
@@ -359,6 +387,8 @@ class PredictionEngine:
             cutoff_year -= 1
         from datetime import datetime as dt
         cutoff = dt(cutoff_year, cutoff_month, 1, tzinfo=timezone.utc)
+        # Der laufende Monat ist noch unvollständig und würde die Mittel drücken.
+        month_start = dt(now.year, now.month, 1, tzinfo=timezone.utc)
 
         stmt = (
             select(Transaction.date, Transaction.category, Transaction.amount, Account.currency)
@@ -366,7 +396,9 @@ class PredictionEngine:
             .where(
                 Transaction.account_id.in_(account_subq),
                 Transaction.is_deleted.isnot(True),
+                counted_in_totals(),
                 Transaction.date >= cutoff,
+                Transaction.date < month_start,
             )
         )
 
@@ -375,6 +407,8 @@ class PredictionEngine:
         for row in result.all():
             d = row.date
             y, mo = int(d.year), int(d.month)
+            if row.category == INVEST_CATEGORY:
+                continue  # weder Einnahme noch Ausgabe
             cat = row.category or "Sonstiges"
             cur = (row.currency or "CHF").strip().upper()
             conv = convert_with_eur_rates(rates, float(row.amount), cur, ref_currency)
@@ -428,6 +462,7 @@ class PredictionEngine:
             .where(
                 Transaction.account_id.in_(account_subq),
                 Transaction.is_deleted.isnot(True),
+                counted_in_totals(),
                 Transaction.is_recurring.is_(True),
                 Transaction.date >= cutoff,
             )
@@ -436,6 +471,8 @@ class PredictionEngine:
         result = await db.execute(stmt)
         groups: Dict[tuple, List[float]] = defaultdict(list)
         for r in result.all():
+            if r.category == INVEST_CATEGORY:
+                continue
             cur = (r.currency or "CHF").strip().upper()
             conv = convert_with_eur_rates(rates, float(r.amount), cur, ref_currency)
             groups[(r.category or "Sonstiges", r.periodicity or "monthly")].append(conv)
@@ -504,6 +541,9 @@ class PredictionEngine:
 
         month_keys_24 = sorted({(r["year"], r["month"]) for r in rows_24})
         month_idx_24  = {ym: i for i, ym in enumerate(month_keys_24)}
+        cal_month_count: Dict[int, int] = defaultdict(int)
+        for _, m in month_keys_24:
+            cal_month_count[m] += 1
 
         for r in rows_24:
             ym = (r["year"], r["month"])
@@ -544,7 +584,7 @@ class PredictionEngine:
                 mean_val = raw_mean
 
             # Standard deviation from 12-month window
-            std_val = _std_dev(monthly_vals_12) if monthly_vals_12 else 0.0
+            std_val = _std_dev(padded) if monthly_vals_12 else 0.0
 
             # Trend from 24-month series (linear regression → CHF/month drift)
             # Formula: projected[t] = (baseline_mean + slope × t) × seasonal_index[month_t]
@@ -566,8 +606,10 @@ class PredictionEngine:
             # Seasonality from 24-month calendar averages
             cal_24 = cat_monthly_cal_24.get(cat, {})
             seasonal_input: Dict[int, float] = {}
-            for cal_month, vals in cal_24.items():
-                seasonal_input[cal_month] = sum(vals) / len(vals)
+            for cal_month, n in cal_month_count.items():
+                # Monate ohne Buchung zählen als 0, sonst wirkt z. B. eine
+                # Quartalsrechnung, als fiele sie jeden Monat an.
+                seasonal_input[cal_month] = sum(cal_24.get(cal_month, [])) / n
             s_indices = _seasonal_indices(seasonal_input)
 
             profiles[cat] = {

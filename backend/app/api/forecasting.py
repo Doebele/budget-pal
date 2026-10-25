@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from app.core.database import get_db
 from app.core.security import get_current_user
@@ -48,6 +48,9 @@ class ForecastRequest(BaseModel):
     account_ids: Optional[List[int]] = None
     horizon_months: int = Field(default=12, ge=1, le=240)
     time_horizon: str = "monthly"  # monthly | yearly | retirement | lifecycle
+    # actual = Reale Angaben (import), empirical = Empirische Angaben (wizard).
+    # Two separate views; the forecast never blends them.
+    basis: Literal["actual", "empirical"] = "actual"
     include_peer_baseline: bool = True
     peer_profile: Optional[PeerProfileInput] = None
     lookback_months: int = Field(default=24, ge=3, le=60)
@@ -81,6 +84,7 @@ class ForecastResponse(BaseModel):
     total_monthly_income_mean: float
     total_monthly_expense_mean: float
     scenario_id: Optional[int] = None
+    basis: str = "actual"
     # Reference lines for chart overlay
     peer_net_monthly: float = 0.0  # peer-group monthly net (income − expenses)
     empirical_net_monthly: float = 0.0  # empirical Swiss median savings (income × rate)
@@ -130,6 +134,7 @@ async def generate_forecast(
             peer_profile=peer_dict,
             include_peer_baseline=req.include_peer_baseline,
             reference_currency=ref_cur,
+            basis=req.basis,
         )
     except Exception as exc:
         logger.error("Forecast generation failed for user=%d: %s", current_user.id, exc)
@@ -147,6 +152,7 @@ async def generate_forecast(
             parameters={
                 "horizon_months": req.horizon_months,
                 "time_horizon": req.time_horizon,
+                "basis": req.basis,
                 "include_peer_baseline": req.include_peer_baseline,
                 "peer_profile": peer_dict,
                 "lookback_months": req.lookback_months,
@@ -165,7 +171,7 @@ async def generate_forecast(
                     ],
                 },
             },
-            expires_at=datetime.now(timezone.utc) + timedelta(hours=24),
+            expires_at=datetime.now(timezone.utc) + timedelta(days=365),
         )
         db.add(scenario)
         await db.flush()
@@ -200,6 +206,7 @@ async def generate_forecast(
         total_monthly_income_mean=analysis["total_monthly_income_mean"],
         total_monthly_expense_mean=analysis["total_monthly_expense_mean"],
         scenario_id=scenario_id,
+        basis=req.basis,
         peer_net_monthly=result.get("peer_net_monthly", 0.0),
         empirical_net_monthly=result.get("empirical_net_monthly", 0.0),
         reference_currency=normalize_reference_currency(current_user.currency),
