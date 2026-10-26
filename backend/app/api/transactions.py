@@ -569,7 +569,32 @@ async def list_transactions(
     count_q = select(func.count()).select_from(Transaction).join(Account).where(and_(*filters))
     total: int = (await db.execute(count_q)).scalar_one()
     response.headers["X-Total-Count"] = str(total)
-    response.headers["Access-Control-Expose-Headers"] = "X-Total-Count, X-Next-Cursor"
+
+    # ── Summe der Treffer (Referenzwaehrung) — nur auf der ersten Seite ──
+    # Gleiche Filter wie die Liste, aber wie jede Summe ohne Kontouebertraege
+    # und ignorierte Buchungen.
+    if not cursor and not offset:
+        sum_q = (
+            select(Account.currency, Transaction.amount > 0, func.sum(Transaction.amount))
+            .select_from(Transaction)
+            .join(Account)
+            .where(and_(*filters, counted_in_totals()))
+            .group_by(Account.currency, Transaction.amount > 0)
+        )
+        rates = await currency_service.get_rates("EUR")
+        ref = normalize_reference_currency(current_user.currency)
+        total_in = total_out = 0.0
+        for cur, is_in, amount in (await db.execute(sum_q)).all():
+            conv = convert_with_eur_rates(rates, float(amount or 0), (cur or "CHF").strip().upper(), ref)
+            if is_in:
+                total_in += conv
+            else:
+                total_out += conv
+        response.headers["X-Total-In"] = f"{total_in:.2f}"
+        response.headers["X-Total-Out"] = f"{total_out:.2f}"
+    response.headers["Access-Control-Expose-Headers"] = (
+        "X-Total-Count, X-Next-Cursor, X-Total-In, X-Total-Out"
+    )
 
     # ── Keyset cursor pagination ─────────────────────────────────
     decoded = _decode_cursor(cursor) if cursor else None

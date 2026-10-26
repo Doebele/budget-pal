@@ -167,14 +167,21 @@ export default function Transactions() {
       const lastRes = allPagesParam[allPagesParam.length - 1] as unknown as { nextCursor?: string };
       return lastRes?.nextCursor ?? undefined;
     },
-    select: (data) => ({
+    select: (data) => {
+      // Summe aller Treffer (nicht nur der geladenen Seiten): vom Server, erste Seite
+      const h = (data.pages[0] as { headers?: Record<string, string> } | undefined)?.headers;
+      return {
       ...data,
+      totalIn: Number(h?.["x-total-in"] ?? 0),
+      totalOut: Number(h?.["x-total-out"] ?? 0),
+      totalCount: Number(h?.["x-total-count"] ?? 0),
       pages: data.pages.map((page, i) => ({
         data: (page as { data: Transaction[] }).data,
         nextCursor: (page as { headers: Record<string, string> }).headers?.["x-next-cursor"],
         _pageIdx: i,
       })),
-    }),
+      };
+    },
   });
 
   // Flatten all pages into a single list
@@ -621,6 +628,31 @@ export default function Transactions() {
               </span>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Total aller Treffer im Zeitraum, mit allen Filtern */}
+      {txnPages && (
+        <div className="card py-3 flex flex-wrap items-baseline gap-x-6 gap-y-1">
+          <div>
+            <p className="text-text-tertiary text-xs">
+              {t("pages:ui.periodTotal", { count: txnPages.totalCount })}
+              {categoryFilter ? ` · ${translateCategory(titleCase(categoryFilter))}` : ""}
+            </p>
+            <p className={clsx(
+              "text-2xl font-mono font-light",
+              txnPages.totalIn + txnPages.totalOut >= 0 ? "text-gain" : "text-loss",
+            )}>
+              {formatAmount(txnPages.totalIn + txnPages.totalOut, refCcy)}
+            </p>
+          </div>
+          {txnPages.totalIn !== 0 && txnPages.totalOut !== 0 && (
+            <p className="text-sm text-text-secondary font-mono">
+              <span className="text-gain">+{formatAmount(txnPages.totalIn, refCcy)}</span>
+              {" · "}
+              <span className="text-loss">{formatAmount(txnPages.totalOut, refCcy)}</span>
+            </p>
+          )}
         </div>
       )}
 

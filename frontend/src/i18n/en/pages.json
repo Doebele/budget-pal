@@ -559,6 +559,8 @@
     "r41": "— No mapping (category ID will be cleared) —"
   },
   "ui": {
+    "periodTotal_one": "Total for the period · {{count}} booking",
+    "periodTotal_other": "Total for the period · {{count}} bookings",
     "10_jahre": "10 years",
     "12_monate": "12 months",
     "1_jahr": "1 year",

@@ -559,6 +559,8 @@
     "r41": "— Keine Zuweisung (Kategorie-ID wird geleert) —"
   },
   "ui": {
+    "periodTotal_one": "Total im Zeitraum · {{count}} Buchung",
+    "periodTotal_other": "Total im Zeitraum · {{count}} Buchungen",
     "10_jahre": "10 Jahre",
     "12_monate": "12 Monate",
     "1_jahr": "1 Jahr",
