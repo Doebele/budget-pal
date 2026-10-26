@@ -18,7 +18,7 @@ import json
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status, BackgroundTasks
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_, desc, tuple_, inspect as sa_inspect
+from sqlalchemy import select, func, and_, or_, case, desc, tuple_, inspect as sa_inspect
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
@@ -574,22 +574,26 @@ async def list_transactions(
     # Gleiche Filter wie die Liste, aber wie jede Summe ohne Kontouebertraege
     # und ignorierte Buchungen.
     if not cursor and not offset:
+        # Nur nach Waehrung gruppieren: `GROUP BY amount > 0` lehnt Postgres ab
+        # (jeder Ausdruck bekommt einen eigenen Bind-Parameter), SQLite nicht.
         sum_q = (
-            select(Account.currency, Transaction.amount > 0, func.sum(Transaction.amount))
+            select(
+                Account.currency,
+                func.sum(case((Transaction.amount > 0, Transaction.amount), else_=0)),
+                func.sum(case((Transaction.amount < 0, Transaction.amount), else_=0)),
+            )
             .select_from(Transaction)
             .join(Account)
             .where(and_(*filters, counted_in_totals()))
-            .group_by(Account.currency, Transaction.amount > 0)
+            .group_by(Account.currency)
         )
         rates = await currency_service.get_rates("EUR")
         ref = normalize_reference_currency(current_user.currency)
         total_in = total_out = 0.0
-        for cur, is_in, amount in (await db.execute(sum_q)).all():
-            conv = convert_with_eur_rates(rates, float(amount or 0), (cur or "CHF").strip().upper(), ref)
-            if is_in:
-                total_in += conv
-            else:
-                total_out += conv
+        for cur, amount_in, amount_out in (await db.execute(sum_q)).all():
+            cur = (cur or "CHF").strip().upper()
+            total_in += convert_with_eur_rates(rates, float(amount_in or 0), cur, ref)
+            total_out += convert_with_eur_rates(rates, float(amount_out or 0), cur, ref)
         response.headers["X-Total-In"] = f"{total_in:.2f}"
         response.headers["X-Total-Out"] = f"{total_out:.2f}"
     response.headers["Access-Control-Expose-Headers"] = (

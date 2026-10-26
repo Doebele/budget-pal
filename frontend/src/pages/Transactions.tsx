@@ -7,7 +7,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { transactionsApi, accountsApi } from "@/lib/api";
-import { formatAmount, frequencyPillStyle, pillStyle, PERIODICITY_LABELS } from "@/lib/theme";
+import { formatAmount, formatAmountRounded, frequencyPillStyle, pillStyle, PERIODICITY_LABELS } from "@/lib/theme";
 import { useThemeColors } from "@/hooks/useThemeColors";
 import { useAuth } from "@/lib/auth";
 import { useTaxonomy, useTaxonomySuperCategories } from "@/lib/categories";
@@ -641,16 +641,22 @@ export default function Transactions() {
             </p>
             <p className={clsx(
               "text-2xl font-mono font-light",
-              txnPages.totalIn + txnPages.totalOut >= 0 ? "text-gain" : "text-loss",
+              txnPages.totalIn + txnPages.totalOut > 0 && "text-gain",
+              txnPages.totalIn + txnPages.totalOut < 0 && "text-loss",
+              txnPages.totalIn + txnPages.totalOut === 0 && "text-text-primary",
             )}>
-              {formatAmount(txnPages.totalIn + txnPages.totalOut, refCcy)}
+              {formatAmountRounded(txnPages.totalIn + txnPages.totalOut, refCcy)}
             </p>
           </div>
+          {/* Beschriftet statt mit Vorzeichen: Intl setzt das Minus hinter
+              die Währung («CHF-200.00»), ein Plus davor sähe anders aus */}
           {txnPages.totalIn !== 0 && txnPages.totalOut !== 0 && (
-            <p className="text-sm text-text-secondary font-mono">
-              <span className="text-gain">+{formatAmount(txnPages.totalIn, refCcy)}</span>
+            <p className="text-sm text-text-secondary">
+              {t("pages:dashboard.income")}{" "}
+              <span className="text-gain font-mono">{formatAmountRounded(txnPages.totalIn, refCcy)}</span>
               {" · "}
-              <span className="text-loss">{formatAmount(txnPages.totalOut, refCcy)}</span>
+              {t("pages:dashboard.expenses")}{" "}
+              <span className="text-loss font-mono">{formatAmountRounded(-txnPages.totalOut, refCcy)}</span>
             </p>
           )}
         </div>
