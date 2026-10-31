@@ -5,7 +5,7 @@
  * (see pages/Wizard.tsx). Do not read "empirical" as "observed".
  */
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { transactionsApi, accountsApi } from "@/lib/api";
 import { formatAmount, formatAmountRounded, frequencyPillStyle, pillStyle, PERIODICITY_LABELS } from "@/lib/theme";
 import { useThemeColors } from "@/hooks/useThemeColors";
@@ -157,11 +157,15 @@ export default function Transactions() {
     isFetchingNextPage,
     fetchNextPage,
     hasNextPage,
+    isPlaceholderData,
   } = useInfiniteQuery({
     queryKey: ["transactions", txnQueryParams],
     queryFn: ({ pageParam }) =>
       transactionsApi.listPage(txnQueryParams, pageParam as string | undefined),
     initialPageParam: undefined as string | undefined,
+    // Beim Filterwechsel die alten Zeilen und das alte Total stehen lassen,
+    // bis die neuen da sind: sonst verschwindet die Summenkarte und die Seite springt
+    placeholderData: keepPreviousData,
     getNextPageParam: (_lastPage, _pages, _lastParam, allPagesParam) => {
       // next cursor comes from the X-Next-Cursor response header
       const lastRes = allPagesParam[allPagesParam.length - 1] as unknown as { nextCursor?: string };
@@ -311,7 +315,7 @@ export default function Transactions() {
         <div>
           <h1 className="text-xl font-light text-text-primary">{t("pages:transactions.title")}</h1>
           <p className="text-text-tertiary text-base mt-1">
-            {range.label} · {t("pages:ui.entriesCount", { count: transactions?.length || 0 })}
+            {range.label} · {t("pages:ui.entriesCount", { count: txnPages?.totalCount ?? 0 })}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -633,7 +637,10 @@ export default function Transactions() {
 
       {/* Total aller Treffer im Zeitraum, mit allen Filtern */}
       {txnPages && (
-        <div className="card py-3 flex flex-wrap items-baseline gap-x-6 gap-y-1">
+        <div className={clsx(
+          "card py-3 flex flex-wrap items-end gap-x-6 gap-y-1 transition-opacity",
+          isPlaceholderData && "opacity-60",
+        )}>
           <div>
             <p className="text-text-tertiary text-xs">
               {t("pages:ui.periodTotal", { count: txnPages.totalCount })}
